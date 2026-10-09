@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { TILE_SIZE, tileToChunk, worldToTile } from '../core/grid.ts';
-import { BUILDINGS, START_BUILDINGS, type BuildingId, type BuildingProto } from '../data/buildings.ts';
+import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, type BuildingId, type BuildingProto } from '../data/buildings.ts';
+import { OBJECTIVES } from '../data/objectives.ts';
+import { QUEST_IDS } from '../data/quests.ts';
+import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../data/research.ts';
+import { missingRequirements } from './research.ts';
 import { deserialize, serialize } from './save.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
 import { COLONY } from '../data/inhabitants.ts';
@@ -1554,9 +1558,41 @@ describe('bâtiments de départ', () => {
   it('une colonie neuve ne propose que START_BUILDINGS, ou ce qu’un plan, une recherche ou un objectif gouverne', () => {
     const world = World.newColony(100);
 
-    for (const id of START_BUILDINGS) expect(free(world, id)).toBe(true);
     expect(START_BUILDINGS).toContain('lab');
-    for (const id of ['drill', 'farm', 'well', 'quarry', 'lumberCamp', 'watchtower', 'forge', 'charcoalKiln', 'clinic'] as const) expect(free(world, id)).toBe(false);
+    for (const id of START_BUILDINGS) expect(free(world, id)).toBe(true);
+    for (const id of ['drill', 'farm', 'well', 'quarry', 'lumberCamp', 'foresterHouse', 'watchtower', 'constructionPost', 'purifier', 'forge', 'charcoalKiln', 'clinic'] as const) {
+      expect(free(world, id)).toBe(false);
+    }
+  });
+
+  it('le labo ouvre les bâtiments de base : chaque recherche finie fait entrer les siens', () => {
+    const world = World.newColony(100);
+
+    for (const id of RESEARCH_IDS) {
+      const opens: readonly BuildingId[] = RESEARCH[id].opens;
+
+      if (opens.length === 0) continue;
+      for (const building of opens) expect(free(world, building)).toBe(false);
+      world.researchDone.push(id);
+      for (const building of opens) expect(free(world, building)).toBe(true);
+    }
+  });
+
+  it('jamais bloqué : toutes les recherches, quêtes et objectifs faits, tout le menu est là', () => {
+    const world = World.newColony(100);
+    const done = new Set<ResearchId>();
+
+    // Les recherches dans l'ordre de leurs prérequis, comme un joueur les lancerait.
+    while (done.size < RESEARCH_IDS.length) {
+      const next = RESEARCH_IDS.filter((id) => !done.has(id) && missingRequirements(id, [...done]).length === 0);
+
+      expect(next.length).toBeGreaterThan(0);
+      for (const id of next) done.add(id);
+    }
+    world.researchDone = [...done];
+    world.questsDone = QUEST_IDS.length;
+    world.objective = OBJECTIVES.length;
+    for (const id of MENU_BUILDING_IDS) expect(free(world, id)).toBe(true);
   });
 
   it('une sauvegarde d’avant les ouvre tous, et une colonie neuve se recharge à l’identique', () => {

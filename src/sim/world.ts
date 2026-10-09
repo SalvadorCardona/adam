@@ -137,7 +137,7 @@ import { HOME_REGION_ID, REGION_COUNT, placeRegions, regionAt, type Region } fro
 import { createEve, currentQuest, harvestYieldWithTools, isUnlocked, mostDamaged, questProgress, rideHome, walkTo } from './eve.ts';
 import { ADAM_SALT, adultAge, bornTrait, canWork, cleanName, foeAge, nameOf, sexOf, traitOf, yearsToWork } from './inhabitants.ts';
 import { KID_SPRINT, stepKid } from './kids.ts';
-import { drainNeeds, stuntingNeed, freshNeeds, needState, needsPace, pacedTick, urgentNeed } from './needs.ts';
+import { drainNeeds, stuntingNeed, freshNeeds, needState, needsPace, pacedTick, urgentNeed, type Needs } from './needs.ts';
 import { assignBeds, freshHousing, moodCauses, nightlyMood, moodOf, type Lodging } from './housing.ts';
 import { rollLoot, stepPickup } from './loot.ts';
 import { copyStats, emptyStats, objectiveDone } from './objectives.ts';
@@ -179,6 +179,7 @@ import {
   queueFull,
   researchCost,
   researchHolder,
+  openingResearch,
   unlockingResearch,
 } from './research.ts';
 import { TownFlows } from './flows.ts';
@@ -2519,9 +2520,33 @@ export class World {
     return levelOf(this.player.xp);
   }
 
-  /** Les points de vie max d'Adam : ceux de base, plus ses niveaux. */
+  /** Les points de vie max d'Adam : ceux de base, plus ses niveaux et la recherche. */
   public maxHp(): number {
-    return PLAYER_MAX_HP + levelHp(this.level());
+    return PLAYER_MAX_HP + levelHp(this.level()) + this.bonus('maxHp');
+  }
+
+  /**
+   * Le pas d'un habitant en secondes de marche, pour `walkToward` : un tick,
+   * allongé par la recherche (`workerSpeed`). Adam a sa propre vitesse ; un
+   * patient boitille au pas d'un tick.
+   */
+  private walkStep(): number {
+    return STEP_SECONDS * (1 + this.bonus('workerSpeed'));
+  }
+
+  /**
+   * Les unités de travail d'un geste ce tick : 0 si l'habitant, affamé, le
+   * saute ; 1, plus de temps en temps une de plus avec la recherche
+   * (`workSpeed`), réparties sur les ticks sans hasard (`extraUnits`).
+   */
+  private toil(needs: Needs): number {
+    if (!pacedTick(this.tickCount, needsPace(needs))) return 0;
+    return 1 + extraUnits(1, this.bonus('workSpeed'), this.tickCount);
+  }
+
+  /** La part de faim et de soif que la recherche épargne aux habitants. */
+  private needResist(): Record<NeedId, number> {
+    return { hunger: this.bonus('hungerResist'), thirst: this.bonus('thirstResist') };
   }
 
   /** Les labos finis de la colonie : chacun mène sa recherche. */
@@ -2750,6 +2775,8 @@ export class World {
 
       this.player.inventory = Store.fromJSON(inventory.capacity + effect.amount, inventory.toJSON());
     }
+    // Plus de points de vie : ceux qu'on gagne arrivent pleins.
+    if (effect?.stat === 'maxHp' && this.player.hp > 0) this.player.hp = Math.min(this.maxHp(), this.player.hp + effect.amount);
     this.events.emit('researchCompleted', { id: lab.id, research });
     this.advanceResearchQueue(lab);
   }
@@ -2971,17 +2998,20 @@ export class World {
   /**
    * Le bâtiment est-il débloqué ? Il faut son plan, s'il en demande un (quêtes
    * d'Ève), la recherche qui le débloque, s'il s'obtient au labo, et
-   * l'objectif `unlockObjective`, s'il en attend un.
+   * l'objectif `unlockObjective`, s'il en attend un. Un bâtiment de base est
+   * ouvert d'emblée (`openBuildings`) ou par la recherche qui l'ouvre (`opens`).
    */
   public isUnlocked(building: BuildingId): boolean {
     const proto: BuildingProto = BUILDINGS[building];
     const research = unlockingResearch(building);
+    const opening = openingResearch(building);
 
     // Un bâtiment sans plan, recherche ni objectif n'est là que s'il est ouvert.
     const gated = proto.plan || research !== null || proto.unlockObjective !== undefined;
+    const open = this.openBuildings.has(building) || (opening !== null && this.researchDone.includes(opening));
 
     return (
-      (gated || this.openBuildings.has(building)) &&
+      (gated || open) &&
       isUnlocked(building, this.questsDone) &&
       (research === null || this.researchDone.includes(research)) &&
       this.objective >= (proto.unlockObjective ?? 0)
@@ -6237,7 +6267,7 @@ export class World {
    */
   private stepNeeds(mobile: Inhabitant, alarm: boolean): boolean {
     // Avant la mairie, ni faim ni soif : les provisions de la colonie arrivent avec elle (`COLONY.startingStock`).
-    if (this.warehouse()) drainNeeds(mobile.needs, this.isToiling(mobile), this.traitFor(mobile));
+    if (this.warehouse()) drainNeeds(mobile.needs, this.isToiling(mobile), this.traitFor(mobile), this.needResist());
     if (isLaborer(mobile) && this.starve(mobile)) return true;
 
     if (alarm) {
@@ -6359,7 +6389,7 @@ export class World {
 
     const door = doorOf(hall);
 
-    if (!walkToward(mobile, door.x, door.y, STEP_SECONDS, this.onRoad)) return;
+    if (!walkToward(mobile, door.x, door.y, this.walkStep(), this.onRoad)) return;
 
     const { item, meal } = NEEDS[need];
 
@@ -6631,7 +6661,7 @@ export class World {
 
     const door = doorOf(stop);
 
-    if (!walkToward(worker, door.x, door.y, STEP_SECONDS, this.onRoad)) return;
+    if (!walkToward(worker, door.x, door.y, this.walkStep(), this.onRoad)) return;
 
     if (job.carried) this.dropOff(worker, job);
     else this.pickUp(worker, job);
@@ -6765,7 +6795,7 @@ export class World {
 
   private goHome(worker: Laborer, door: { x: number; y: number }): void {
     if (worker.inside) standStill(worker);
-    else if (walkToward(worker, door.x, door.y, STEP_SECONDS, this.onRoad)) worker.inside = true;
+    else if (walkToward(worker, door.x, door.y, this.walkStep(), this.onRoad)) worker.inside = true;
   }
 
   /** Sans travail : il va dormir à la nuit tombée, et flâne devant sa porte le reste du temps. */
@@ -6779,7 +6809,7 @@ export class World {
       worker.inside = false;
       Object.assign(worker, wanderFrom(door.x, door.y));
     }
-    wander(worker, door, this.seed, this.tickCount, STEP_SECONDS, this.onRoad);
+    wander(worker, door, this.seed, this.tickCount, this.walkStep(), this.onRoad);
   }
 
   /**
@@ -6803,7 +6833,7 @@ export class World {
 
     const spot = this.outsideSpot(sleeper, door);
 
-    if (walkToward(sleeper, spot.x, spot.y, STEP_SECONDS, this.onRoad)) {
+    if (walkToward(sleeper, spot.x, spot.y, this.walkStep(), this.onRoad)) {
       sleeper.facing = 'down';
       sleeper.sleepingOut = true;
     }
@@ -7039,12 +7069,14 @@ export class World {
 
     const spot = this.buildSpot(worker, site);
 
-    if (!walkToward(worker, spot.x, spot.y, STEP_SECONDS, this.onRoad)) return;
+    if (!walkToward(worker, spot.x, spot.y, this.walkStep(), this.onRoad)) return;
 
     worker.facing = 'up';
-    // Affamé, il ne frappe plus qu'un tick sur deux.
-    if (!pacedTick(this.tickCount, needsPace(worker.needs))) return;
-    site.work += 1;
+    // Affamé, il ne frappe plus qu'un tick sur deux ; de bons outils abattent plus d'ouvrage.
+    const work = this.toil(worker.needs);
+
+    if (work === 0) return;
+    site.work += work;
     if (site.work >= siteWork(site)) this.complete(site);
   }
 
@@ -7201,7 +7233,7 @@ export class World {
 
         const spot = chopSpot(tree);
 
-        if (walkToward(lumberjack, spot.x, spot.y, STEP_SECONDS, this.onRoad)) {
+        if (walkToward(lumberjack, spot.x, spot.y, this.walkStep(), this.onRoad)) {
           lumberjack.state = 'chop';
           lumberjack.facing = 'right';
           lumberjack.chopTicks = LUMBERJACKS.chopTicks;
@@ -7213,13 +7245,13 @@ export class World {
         standStill(lumberjack);
         lumberjack.inside = false;
         // Affamé, il ne frappe plus qu'un tick sur deux.
-        if (pacedTick(this.tickCount, needsPace(lumberjack.needs))) lumberjack.chopTicks -= 1;
+        lumberjack.chopTicks -= this.toil(lumberjack.needs);
         if (lumberjack.chopTicks <= 0) this.chop(lumberjack, door);
         break;
 
       case 'toCamp':
         lumberjack.inside = false;
-        if (walkToward(lumberjack, door.x, door.y, STEP_SECONDS, this.onRoad)) this.storeWood(lumberjack, camp);
+        if (walkToward(lumberjack, door.x, door.y, this.walkStep(), this.onRoad)) this.storeWood(lumberjack, camp);
         break;
     }
   }
@@ -7316,7 +7348,7 @@ export class World {
       return;
     }
     lumberjack.inside = false;
-    if (walkToward(lumberjack, door.x, door.y, STEP_SECONDS, this.onRoad)) lumberjack.facing = 'down';
+    if (walkToward(lumberjack, door.x, door.y, this.walkStep(), this.onRoad)) lumberjack.facing = 'down';
   }
 
   private releaseTree(lumberjack: Lumberjack): void {
@@ -7508,7 +7540,7 @@ export class World {
 
         const spot = plantSpot(plot);
 
-        if (walkToward(forester, spot.x, spot.y, STEP_SECONDS, this.onRoad)) {
+        if (walkToward(forester, spot.x, spot.y, this.walkStep(), this.onRoad)) {
           forester.state = 'plant';
           forester.facing = 'right';
           forester.plantTicks = FORESTERS.plantTicks;
@@ -7519,7 +7551,7 @@ export class World {
       case 'plant':
         standStill(forester);
         forester.inside = false;
-        if (pacedTick(this.tickCount, needsPace(forester.needs))) forester.plantTicks -= 1;
+        forester.plantTicks -= this.toil(forester.needs);
         if (forester.plantTicks <= 0) this.plant(forester, house, door);
         break;
     }
@@ -7728,7 +7760,7 @@ export class World {
 
         const spot = plantSpot(plot);
 
-        if (walkToward(farmer, spot.x, spot.y, STEP_SECONDS, this.onRoad)) {
+        if (walkToward(farmer, spot.x, spot.y, this.walkStep(), this.onRoad)) {
           const sowing = farmer.state === 'toSow';
 
           farmer.state = sowing ? 'sow' : 'harvest';
@@ -7742,7 +7774,7 @@ export class World {
       case 'harvest':
         standStill(farmer);
         farmer.inside = false;
-        if (pacedTick(this.tickCount, needsPace(farmer.needs))) farmer.workTicks -= 1;
+        farmer.workTicks -= this.toil(farmer.needs);
         if (farmer.workTicks > 0) break;
         if (farmer.state === 'sow') this.sow(farmer, farm, door, bedtime);
         else this.reap(farmer, farm, door, bedtime);
@@ -7750,7 +7782,7 @@ export class World {
 
       case 'toFarm':
         farmer.inside = false;
-        if (walkToward(farmer, door.x, door.y, STEP_SECONDS, this.onRoad)) this.storeCrop(farmer, farm, door, bedtime);
+        if (walkToward(farmer, door.x, door.y, this.walkStep(), this.onRoad)) this.storeCrop(farmer, farm, door, bedtime);
         break;
     }
   }
@@ -7860,7 +7892,7 @@ export class World {
       return;
     }
     farmer.inside = false;
-    if (walkToward(farmer, door.x, door.y, STEP_SECONDS, this.onRoad)) farmer.facing = 'down';
+    if (walkToward(farmer, door.x, door.y, this.walkStep(), this.onRoad)) farmer.facing = 'down';
   }
 
   /** Il lâche sa case ; une récolte pas encore cueillie rend sa place au coffre. */
@@ -8005,13 +8037,16 @@ export class World {
    * elle n'achève pas : un bâtiment garde toujours son dernier point de vie.
    */
   /**
-   * Les stations de dépollution : toutes les `PURIFIER.intervalTicks`, chacune
-   * rend saine la case polluée la plus proche de son emprise, dans son rayon.
-   * Le décalage par id les désynchronise ; sans case à nettoyer, elle attend.
+   * Les stations de dépollution : toutes les `PURIFIER.intervalTicks` (moins
+   * la recherche, `purifyTicks`), chacune rend saine la case polluée la plus
+   * proche de son emprise, dans son rayon. Le décalage par id les
+   * désynchronise ; sans case à nettoyer, elle attend.
    */
   private purify(): void {
+    const interval = Math.max(1, PURIFIER.intervalTicks + this.bonus('purifyTicks'));
+
     for (const entity of this.entities.values()) {
-      if (entity.kind !== 'purifier' || (this.tickCount + entity.id) % PURIFIER.intervalTicks !== 0) continue;
+      if (entity.kind !== 'purifier' || (this.tickCount + entity.id) % interval !== 0) continue;
 
       const next = this.land.cleanableAround(entity.tx, entity.ty, entity.width, entity.height, PURIFIER.radius)[0];
 

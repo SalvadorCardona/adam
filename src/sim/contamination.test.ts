@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BUILDINGS } from '../data/buildings.ts';
 import { CONTAMINATION, CONTAMINATION_KINDS, PURIFIER } from '../data/contamination.ts';
+import { RESEARCH } from '../data/research.ts';
 import { TILE_SIZE } from '../core/grid.ts';
 import { Land, contaminationAt } from './contamination.ts';
 import { decodeSave, encodeSave } from './save.ts';
@@ -91,19 +92,27 @@ describe('terres polluées et radioactives', () => {
 });
 
 describe('station de dépollution', () => {
-  it('n’est pas au menu au départ, ni avant son objectif', () => {
+  it('n’est pas au menu au départ : elle se débloque au labo, recherche « Dépollution »', () => {
     const world = new World(SEED);
 
     expect(world.isUnlocked('purifier')).toBe(false);
-    expect(BUILDINGS.purifier.unlockObjective).toBe(PURIFIER.unlockObjective);
-    world.objective = PURIFIER.unlockObjective;
+    expect(RESEARCH.purification.unlocks).toContain('purifier');
+    world.researchDone.push('purification');
     expect(world.isUnlocked('purifier')).toBe(true);
+  });
+
+  it('va plus vite avec « Filtres doubles »', () => {
+    const world = new World(SEED);
+
+    expect(world.bonus('purifyTicks')).toBe(0);
+    world.researchDone.push('charcoalFilters');
+    expect(PURIFIER.intervalTicks + world.bonus('purifyTicks')).toBe(PURIFIER.intervalTicks / 2);
   });
 
   it('nettoie les cases polluées voisines, une à la fois, les plus proches d’abord', () => {
     const world = new World(SEED);
 
-    world.objective = PURIFIER.unlockObjective;
+    world.researchDone.push('purification');
 
     const site = siteBesidePollution(world);
     const before = world.land.cleanableAround(site.tx, site.ty, 2, 2, PURIFIER.radius);

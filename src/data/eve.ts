@@ -62,6 +62,13 @@ export const EVE_LINES = {
      * fer (tour renforcée, antenne) passent par elle, et elle par le labo.
      * `labForge` sans labo, `foundry` une fois qu'il y en a un.
      */
+    /**
+     * Le bâtiment qu'elle conseille (puits, tour, carrière) n'est pas encore
+     * au menu : il s'ouvre au labo. `{building}` : son nom ; `{research}` :
+     * la recherche qui l'ouvre. `labOpen` sans labo, `labResearch` avec.
+     */
+    labOpen: 'Il nous faut : {building}. Ça s’ouvre au labo, Adam — bâtis-en un, il est dans « Bâtir ».',
+    labResearch: 'Il nous faut : {building}. Au labo, lance « {research} », et ça arrivera dans « Bâtir ».',
     labForge: 'Pour renforcer nos tours, il faudra des plaques de fer. Bâtis un labo : c’est là qu’on trouvera comment forger.',
     foundry: 'Au labo, lance la Fonderie : la forge et le four à charbon arriveront dans « Bâtir ».',
     /** Une fois la forge débloquée au labo, tant qu'elle n'est pas bâtie : le charbon sert enfin. */

@@ -412,6 +412,8 @@ export const content: Content = {
       well: 'Our workers are getting thirsty, Adam! Place a well on a riverbank: a single worker draws water there.',
       quarry: 'Out of stone in town? Place a quarry: its workers cut it from the ruins.',
       coming: 'Hang in there: {n} more night{s} and I’m coming with my machine!',
+      labOpen: 'We need: {building}. It opens at the lab, Adam — build one, it’s in “Build”.',
+      labResearch: 'We need: {building}. At the lab, start “{research}” and it’ll show up in “Build”.',
       labForge: 'To reinforce our towers, we’ll need iron plates. Build a lab: that’s where we’ll learn to forge.',
       foundry: 'At the lab, start the Foundry: the forge and the charcoal kiln will show up in “Build”.',
       forge: 'The forge is unlocked! Iron and coal in, iron plates out.',
@@ -448,9 +450,15 @@ export const content: Content = {
     bowCooldown: { label: 'Time between arrows', unit: ' s' },
     bagCapacity: { label: 'Bag slots', unit: '' },
     walkSpeed: { label: 'Adam’s speed', unit: ' tiles/s' },
+    maxHp: { label: 'Adam’s hit points', unit: '' },
     porterCarry: { label: 'Porter load', unit: '' },
+    workerSpeed: { label: 'Townsfolk speed', unit: '' },
+    workSpeed: { label: 'Work pace', unit: '' },
+    hungerResist: { label: 'Less hunger', unit: '' },
+    thirstResist: { label: 'Less thirst', unit: '' },
     woodYield: { label: 'Extra wood harvested', unit: '' },
     drillTicks: { label: 'Mining time', unit: ' s' },
+    purifyTicks: { label: 'Time per cleaned tile', unit: ' s' },
     farmYield: { label: 'Food per harvest', unit: '' },
   },
   buildingCategories: {
@@ -463,11 +471,62 @@ export const content: Content = {
   },
   researchThemes: {
     building: 'Buildings',
-    combat: 'Combat',
-    harvest: 'Harvest',
-    town: 'Town',
+    workers: 'Workers',
+    character: 'Character',
   },
   research: {
+    waterWell: {
+      label: 'Well digging',
+      description: 'A rope, a bucket, a stone rim: river water within reach.',
+    },
+    woodcraft: {
+      label: 'Woodcraft',
+      description: 'Salvaged axes and saplings to replant: the forest works for the town.',
+    },
+    lookout: {
+      label: 'Lookout',
+      description: 'A ladder, a flag, a makeshift crossbow: you see the mutants coming.',
+    },
+    mining: {
+      label: 'Mining',
+      description: 'A wheel, a drill bit, iron wedges: stone and ore come out on their own.',
+    },
+    organizedSites: {
+      label: 'Organized sites',
+      description: 'A plan on the table, a helmet per head: the builders take over.',
+    },
+    purification: {
+      label: 'Decontamination',
+      description: 'Charcoal and sand filters: the purple mud washes clean.',
+    },
+    charcoalFilters: {
+      label: 'Double filters',
+      description: 'Two layers of charcoal instead of one: the station cleans twice as fast.',
+    },
+    sandals: {
+      label: 'Braided sandals',
+      description: 'Braided bark under every foot: the whole town walks faster.',
+    },
+    rations: {
+      label: 'Dried rations',
+      description: 'Dried meat in every pocket: they last longer without eating.',
+    },
+    canteens: {
+      label: 'Canteens',
+      description: 'A hooped wooden canteen on the belt: thirst can wait.',
+    },
+    goodTools: {
+      label: 'Quality tools',
+      description: 'Polished handles, iron blades: every swing gets more done.',
+    },
+    runners: {
+      label: 'Runners',
+      description: 'Iron-studded soles: the town runs from one building to the next.',
+    },
+    paddedVest: {
+      label: 'Padded vest',
+      description: 'A crab shell sewn on the chest: blows glance off.',
+    },
     metalworking: {
       label: 'Foundry',
       description: 'A stone crucible, a makeshift bellows: iron gives in and melts.',

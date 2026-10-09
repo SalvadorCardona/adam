@@ -4,22 +4,26 @@
  * Tout ici est pur — des fonctions de l'état, sans rien modifier. `World`
  * garde l'état (`researchDone`, le labo et sa recherche en cours) et lit les
  * effets à un seul endroit, `World.bonus(stat)`, qui renvoie
- * `researchBonus()` : l'arc, le sac, la marche, les porteurs, la récolte, les
- * foreuses et les fermes le consultent au moment d'agir. Une recherche qui
- * débloque des bâtiments (`unlocks`) est lue par `World.isUnlocked`. Les données
+ * `researchBonus()` : l'arc, le sac, la marche et les PV d'Adam, l'allure,
+ * la cadence, la faim et la soif des habitants, les porteurs, la récolte, les
+ * foreuses, la dépollution et les fermes le consultent au moment d'agir. Une
+ * recherche qui débloque des bâtiments (`unlocks`) est lue par
+ * `World.isUnlocked` ; celle qui en ouvre (`opens`) les range, finie, dans
+ * `World.openBuildings`. Les données
  * (`WEAPONS`, `PORTERS`, `RECIPES`…) ne sont jamais réécrites : une
  * recherche finie ne change que ce qu'on ajoute à leur valeur.
  */
 
 import type { BuildingId } from '../data/buildings.ts';
 import type { ItemId } from '../data/items.ts';
+import { PURIFIER } from '../data/contamination.ts';
 import { PRODUCTION } from '../data/production.ts';
 import { RECIPES } from '../data/recipes.ts';
 import { CROPS } from '../data/resources.ts';
 import { RESEARCH, RESEARCH_IDS, type ResearchId, type ResearchStat } from '../data/research.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { PORTERS } from '../data/workers.ts';
-import { INVENTORY_CAPACITY, PLAYER_SPEED_TILES } from './player.ts';
+import { INVENTORY_CAPACITY, PLAYER_MAX_HP, PLAYER_SPEED_TILES } from './player.ts';
 import type { Lab } from './types.ts';
 
 /** La valeur de chaque statistique sans aucune recherche : celle des données. */
@@ -28,9 +32,15 @@ export const STAT_BASE: Readonly<Record<ResearchStat, number>> = {
   bowCooldown: WEAPONS.bow.cooldown,
   bagCapacity: INVENTORY_CAPACITY,
   walkSpeed: PLAYER_SPEED_TILES,
+  maxHp: PLAYER_MAX_HP,
   porterCarry: PORTERS.carry,
+  workerSpeed: 0,
+  workSpeed: 0,
+  hungerResist: 0,
+  thirstResist: 0,
   woodYield: 0,
   drillTicks: RECIPES.mineOre.duration,
+  purifyTicks: PURIFIER.intervalTicks,
   farmYield: CROPS.yield,
 };
 
@@ -49,6 +59,16 @@ export function researchBonus(done: readonly ResearchId[], stat: ResearchStat): 
 /** La recherche qui débloque ce bâtiment, ou `null` s'il ne s'obtient pas au labo. */
 export function unlockingResearch(building: BuildingId): ResearchId | null {
   return RESEARCH_IDS.find((id) => (RESEARCH[id].unlocks as readonly BuildingId[]).includes(building)) ?? null;
+}
+
+/** La recherche qui ouvre ce bâtiment de base dans une colonie neuve (`opens`), ou `null`. */
+export function openingResearch(building: BuildingId): ResearchId | null {
+  return RESEARCH_IDS.find((id) => (RESEARCH[id].opens as readonly BuildingId[]).includes(building)) ?? null;
+}
+
+/** Les bâtiments qu'une recherche fait entrer au menu : ceux qu'elle débloque, puis ceux qu'elle ouvre. */
+export function researchBuildings(id: ResearchId): BuildingId[] {
+  return [...(RESEARCH[id].unlocks as readonly BuildingId[]), ...(RESEARCH[id].opens as readonly BuildingId[])];
 }
 
 /** Le coût d'une recherche, objet par objet. */

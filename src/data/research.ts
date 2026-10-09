@@ -7,7 +7,7 @@
  * mutant, croc de loup, pince de crabe, cœur de la Reine) : le combat nourrit
  * la progression.
  *
- * Le labo n'en mène qu'une à la fois. On la choisit, le labo attend son coût
+ * Un labo n'en mène qu'une à la fois, les suivantes en file. On la choisit, le labo attend son coût
  * — apporté par Adam (heurt, « Transférer » : le sac puis la ville dans son
  * rayon) ou livré par les porteurs depuis la mairie — puis le compte à
  * rebours tourne ; à la fin, l'effet vaut pour toute la partie.
@@ -18,14 +18,24 @@
  * bougent jamais.
  *
  * Une recherche peut aussi **débloquer des bâtiments** (`unlocks`) : la
- * forge et le four à charbon, la clinique. Tant qu'elle n'est pas finie, ils
- * n'apparaissent pas au menu de construction ; le labo est l'endroit où l'on
- * découvre ce qui arrive ensuite (`World.isUnlocked`).
+ * forge et le four à charbon, la clinique, la caserne, la station de
+ * dépollution. Tant qu'elle n'est pas finie, ils n'apparaissent pas au menu
+ * de construction ; le labo est l'endroit où l'on découvre ce qui arrive
+ * ensuite (`World.isUnlocked`). Les bâtiments de base qu'une colonie neuve
+ * n'a pas (`START_BUILDINGS` : Maison, Nurserie, Poste de logistique, Labo),
+ * le labo les **ouvre** (`opens`) : puits, cabane, tour, carrière, foreuse,
+ * poste de construction. Ceux-là, un objectif ou une quête peut les
+ * demander : leur recherche ne coûte que ce qui se récolte.
+ *
+ * Trois onglets (`theme`) : Bâtiments, Ouvriers (tous les habitants de la
+ * ville), Personnage (Adam). Une recherche de plus est une entrée de plus ici
+ * et ses textes dans le dictionnaire.
  *
  * `validatePrototypes()` vérifie les objets, les quantités, les prérequis
  * (connus, sans cycle) et que le coffre du labo contient le plus gros coût.
  */
 
+import type { UiIcon } from '../art/ui.ts';
 import type { BuildingId } from './buildings.ts';
 import type { ItemId } from './items.ts';
 
@@ -43,12 +53,24 @@ export type ResearchStat =
   | 'bagCapacity'
   /** Vitesse d'Adam, en tuiles par seconde. */
   | 'walkSpeed'
+  /** Points de vie max d'Adam. */
+  | 'maxHp'
   /** Objets portés en un voyage par un porteur (ex-mutants compris). */
   | 'porterCarry'
+  /** Part de vitesse de marche en plus pour tous les habitants : porteurs, bûcherons, bâtisseurs… */
+  | 'workerSpeed'
+  /** Part de travail en plus à chaque geste : coup de hache, de marteau, semis, récolte. */
+  | 'workSpeed'
+  /** Part de faim en moins : la jauge baisse d'autant moins vite. */
+  | 'hungerResist'
+  /** Part de soif en moins : la jauge baisse d'autant moins vite. */
+  | 'thirstResist'
   /** Part de bois en plus à chaque passage de récolte sur un arbre. */
   | 'woodYield'
   /** Ticks entre deux minerais d'une foreuse (négatif : elle va plus vite). */
   | 'drillTicks'
+  /** Ticks entre deux cases nettoyées par une station de dépollution (négatif : elle va plus vite). */
+  | 'purifyTicks'
   /** Nourriture par récolte d'une ferme. */
   | 'farmYield';
 
@@ -69,26 +91,39 @@ export const RESEARCH_STATS = {
   bowCooldown: { label: 'Délai entre deux flèches', unit: ' s', ticks: true, percent: false },
   bagCapacity: { label: 'Places du sac', unit: '', ticks: false, percent: false },
   walkSpeed: { label: 'Vitesse d’Adam', unit: ' cases/s', ticks: false, percent: false },
+  maxHp: { label: 'Points de vie d’Adam', unit: '', ticks: false, percent: false },
   porterCarry: { label: 'Charge d’un porteur', unit: '', ticks: false, percent: false },
+  workerSpeed: { label: 'Vitesse des habitants', unit: '', ticks: false, percent: true },
+  workSpeed: { label: 'Cadence de travail', unit: '', ticks: false, percent: true },
+  hungerResist: { label: 'Faim en moins', unit: '', ticks: false, percent: true },
+  thirstResist: { label: 'Soif en moins', unit: '', ticks: false, percent: true },
   woodYield: { label: 'Bois récolté en plus', unit: '', ticks: false, percent: true },
   drillTicks: { label: 'Temps d’extraction', unit: ' s', ticks: true, percent: false },
+  purifyTicks: { label: 'Temps par case dépolluée', unit: ' s', ticks: true, percent: false },
   farmYield: { label: 'Nourriture par récolte', unit: '', ticks: false, percent: false },
 } as const satisfies Record<ResearchStat, ResearchStatProto>;
 
-/** Les thèmes du panneau : la liste se lit groupée, dans cet ordre. */
+/**
+ * Les onglets du labo, dans cet ordre : les bâtiments (ceux qui entrent au
+ * menu, ceux qui tournent mieux), tous les habitants de la ville, et Adam.
+ */
 export const RESEARCH_THEMES = {
   building: 'Bâtiments',
-  combat: 'Combat',
-  harvest: 'Récolte',
-  town: 'Ville',
+  workers: 'Ouvriers',
+  character: 'Personnage',
 } as const;
 
 export type ResearchTheme = keyof typeof RESEARCH_THEMES;
+
+/** L'icône d'une recherche au labo : celle d'un objet, la vignette d'un bâtiment, ou un pictogramme de `art/ui.ts`. */
+export type ResearchIcon = { item: ItemId } | { building: BuildingId } | { ui: UiIcon };
 
 export interface ResearchProto {
   label: string;
   /** Une ligne, sous le nom : ce que la recherche raconte. */
   description: string;
+  icon: ResearchIcon;
+  /** Son onglet au labo. */
   theme: ResearchTheme;
   /** Ce qu'il faut déposer au labo avant que le compte à rebours démarre. */
   cost: Partial<Record<ItemId, number>>;
@@ -100,128 +135,319 @@ export interface ResearchProto {
   effect: { stat: ResearchStat; amount: number } | null;
   /** Bâtiments qui n'entrent au menu de construction qu'une fois la recherche finie. */
   unlocks: readonly BuildingId[];
+  /**
+   * Bâtiments de base, fermés dans une colonie neuve (`START_BUILDINGS`) :
+   * la recherche finie les ouvre (`World.openBuildings`). Une partie qui les
+   * a déjà ouverts — une sauvegarde d'avant — n'en a pas besoin.
+   */
+  opens: readonly BuildingId[];
 }
 
 export const RESEARCH = {
+  // ---------------------------------------------------------- Bâtiments
+  waterWell: {
+    label: 'Puisatier',
+    description: 'Une corde, un seau, une margelle : l’eau de la rivière à portée de main.',
+    icon: { building: 'well' },
+    theme: 'building',
+    cost: { wood: 6, stone: 4 },
+    duration: 20 * 20,
+    requires: [],
+    effect: null,
+    unlocks: [],
+    opens: ['well'],
+  },
+  woodcraft: {
+    label: 'Bûcheronnage',
+    description: 'Des haches de récup, des pousses à replanter : la forêt travaille pour la ville.',
+    icon: { building: 'lumberCamp' },
+    theme: 'building',
+    cost: { wood: 8, stone: 4 },
+    duration: 20 * 30,
+    requires: [],
+    effect: null,
+    unlocks: [],
+    opens: ['lumberCamp', 'foresterHouse'],
+  },
+  lookout: {
+    label: 'Guet',
+    description: 'Une échelle, un drapeau, une arbalète bricolée : on voit venir les mutants.',
+    icon: { building: 'watchtower' },
+    theme: 'building',
+    cost: { wood: 8, stone: 6 },
+    duration: 20 * 30,
+    requires: [],
+    effect: null,
+    unlocks: [],
+    opens: ['watchtower'],
+  },
+  mining: {
+    label: 'Extraction',
+    description: 'Une roue, un trépan, des coins de fer : la pierre et le minerai sortent seuls.',
+    icon: { building: 'drill' },
+    theme: 'building',
+    cost: { wood: 10, stone: 8, ironOre: 4 },
+    duration: 20 * 45,
+    requires: [],
+    effect: null,
+    unlocks: [],
+    opens: ['quarry', 'drill'],
+  },
+  organizedSites: {
+    label: 'Chantiers organisés',
+    description: 'Un plan sur la table, un casque par tête : les bâtisseurs prennent le relais.',
+    icon: { building: 'constructionPost' },
+    theme: 'building',
+    cost: { wood: 12, stone: 12 },
+    duration: 20 * 60,
+    requires: ['woodcraft'],
+    effect: null,
+    unlocks: [],
+    opens: ['constructionPost'],
+  },
   metalworking: {
     label: 'Fonderie',
     description: 'Un creuset de pierre, un soufflet de fortune : le fer se laisse fondre.',
+    icon: { building: 'forge' },
     theme: 'building',
     cost: { stone: 10, ironOre: 8 },
-    duration: 20 * 45,
-    requires: [],
+    duration: 20 * 60,
+    requires: ['mining'],
     effect: null,
     unlocks: ['forge', 'charcoalKiln'],
-  },
-  fieldMedicine: {
-    label: 'Médecine de fortune',
-    description: 'De la gelée de mutant sous la loupe : ce qui les change se soigne.',
-    theme: 'building',
-    cost: { food: 6, mutantGoo: 2 },
-    duration: 20 * 45,
-    requires: [],
-    effect: null,
-    unlocks: ['clinic'],
-  },
-  militia: {
-    label: 'Milice',
-    description: 'Des lances taillées, un râtelier : de quoi former une petite escorte.',
-    theme: 'building',
-    cost: { wood: 10, stone: 8, wolfFang: 2 },
-    duration: 20 * 45,
-    requires: [],
-    effect: null,
-    unlocks: ['barracks'],
-  },
-  sharpArrows: {
-    label: 'Flèches à croc',
-    description: 'Des crocs de loup en pointe de flèche : ça mord.',
-    theme: 'combat',
-    cost: { wood: 8, wolfFang: 3 },
-    duration: 20 * 45,
-    requires: [],
-    effect: { stat: 'bowDamage', amount: 0.5 },
-    unlocks: [],
-  },
-  quickDraw: {
-    label: 'Tir rapide',
-    description: 'Une corde enduite de gelée de mutant : elle claque plus vite.',
-    theme: 'combat',
-    cost: { wood: 6, mutantGoo: 4 },
-    duration: 20 * 60,
-    requires: ['sharpArrows'],
-    effect: { stat: 'bowCooldown', amount: -4 },
-    unlocks: [],
-  },
-  irradiatedArrows: {
-    label: 'Flèches irradiées',
-    description: 'Un éclat du cœur de la Reine dans chaque pointe : ça brûle.',
-    theme: 'combat',
-    cost: { ironPlate: 4, radCore: 1 },
-    duration: 20 * 90,
-    requires: ['sharpArrows'],
-    effect: { stat: 'bowDamage', amount: 1 },
-    unlocks: [],
-  },
-  bigBag: {
-    label: 'Sac renforcé',
-    description: 'Des pinces de crabe en guise de boucles : le sac prend du ventre.',
-    theme: 'town',
-    cost: { wood: 8, crabClaw: 4 },
-    duration: 20 * 45,
-    requires: [],
-    effect: { stat: 'bagCapacity', amount: 15 },
-    unlocks: [],
-  },
-  walkingBoots: {
-    label: 'Bottes de marche',
-    description: 'Semelles de pierre polie, tiges tressées : Adam file.',
-    theme: 'town',
-    cost: { stone: 6, food: 6 },
-    duration: 20 * 45,
-    requires: [],
-    effect: { stat: 'walkSpeed', amount: 0.9 },
-    unlocks: [],
-  },
-  sturdyPorters: {
-    label: 'Porteurs endurants',
-    description: 'De bons repas et des hottes plus larges pour les ouvriers.',
-    theme: 'town',
-    cost: { food: 10, wood: 10 },
-    duration: 20 * 60,
-    requires: ['walkingBoots'],
-    effect: { stat: 'porterCarry', amount: 2 },
-    unlocks: [],
-  },
-  sharpAxes: {
-    label: 'Haches affûtées',
-    description: 'Une meule de pierre et du fil de fer : chaque coup compte.',
-    theme: 'harvest',
-    cost: { stone: 8, ironOre: 6 },
-    duration: 20 * 45,
-    requires: [],
-    effect: { stat: 'woodYield', amount: 0.5 },
-    unlocks: [],
+    opens: [],
   },
   fastDrills: {
     label: 'Foreuses rapides',
     description: 'Des mèches trempées au charbon : les foreuses creusent plus vite.',
-    theme: 'harvest',
+    icon: { item: 'ironOre' },
+    theme: 'building',
     cost: { ironOre: 10, coal: 4 },
     duration: 20 * 60,
-    requires: ['sharpAxes'],
+    requires: ['mining'],
     effect: { stat: 'drillTicks', amount: -10 },
     unlocks: [],
+    opens: [],
+  },
+  fieldMedicine: {
+    label: 'Médecine de fortune',
+    description: 'De la gelée de mutant sous la loupe : ce qui les change se soigne.',
+    icon: { building: 'clinic' },
+    theme: 'building',
+    cost: { food: 6, mutantGoo: 2 },
+    duration: 20 * 60,
+    requires: [],
+    effect: null,
+    unlocks: ['clinic'],
+    opens: [],
+  },
+  militia: {
+    label: 'Milice',
+    description: 'Des lances taillées, un râtelier : de quoi former une petite escorte.',
+    icon: { building: 'barracks' },
+    theme: 'building',
+    cost: { wood: 10, stone: 8, wolfFang: 2 },
+    duration: 20 * 60,
+    requires: [],
+    effect: null,
+    unlocks: ['barracks'],
+    opens: [],
+  },
+  purification: {
+    label: 'Dépollution',
+    description: 'Des filtres de charbon et de sable : la boue violette se laisse laver.',
+    icon: { building: 'purifier' },
+    theme: 'building',
+    cost: { stone: 12, coal: 6, ironOre: 6 },
+    duration: 20 * 90,
+    requires: ['mining'],
+    effect: null,
+    unlocks: ['purifier'],
+    opens: [],
+  },
+  charcoalFilters: {
+    label: 'Filtres doubles',
+    description: 'Deux couches de charbon au lieu d’une : la station lave deux fois plus vite.',
+    icon: { item: 'coal' },
+    theme: 'building',
+    cost: { coal: 10, ironPlate: 4 },
+    duration: 20 * 120,
+    requires: ['purification', 'metalworking'],
+    effect: { stat: 'purifyTicks', amount: -30 },
+    unlocks: [],
+    opens: [],
   },
   fertileFarms: {
     label: 'Fermes fertiles',
     description: 'Un engrais de gelée de mutant, dilué. Beaucoup dilué.',
-    theme: 'harvest',
+    icon: { ui: 'wheat' },
+    theme: 'building',
     cost: { food: 6, mutantGoo: 3 },
     duration: 20 * 60,
     requires: [],
     effect: { stat: 'farmYield', amount: 1 },
     unlocks: [],
+    opens: [],
+  },
+
+  // ----------------------------------------------------------- Ouvriers
+  sandals: {
+    label: 'Sandales tressées',
+    description: 'De l’écorce tressée sous chaque pied : toute la ville marche plus vite.',
+    icon: { ui: 'people' },
+    theme: 'workers',
+    cost: { wood: 6, food: 4 },
+    duration: 20 * 40,
+    requires: [],
+    effect: { stat: 'workerSpeed', amount: 0.15 },
+    unlocks: [],
+    opens: [],
+  },
+  rations: {
+    label: 'Rations séchées',
+    description: 'De la viande séchée dans chaque poche : on tient plus longtemps sans manger.',
+    icon: { item: 'food' },
+    theme: 'workers',
+    cost: { food: 8, stone: 4 },
+    duration: 20 * 45,
+    requires: [],
+    effect: { stat: 'hungerResist', amount: 0.25 },
+    unlocks: [],
+    opens: [],
+  },
+  canteens: {
+    label: 'Gourdes',
+    description: 'Une gourde de bois cerclée à la ceinture : la soif attend.',
+    icon: { item: 'water' },
+    theme: 'workers',
+    cost: { water: 8, wood: 6 },
+    duration: 20 * 45,
+    requires: [],
+    effect: { stat: 'thirstResist', amount: 0.25 },
+    unlocks: [],
+    opens: [],
+  },
+  sturdyPorters: {
+    label: 'Porteurs endurants',
+    description: 'De bons repas et des hottes plus larges pour les ouvriers.',
+    icon: { ui: 'worker' },
+    theme: 'workers',
+    cost: { food: 10, wood: 10 },
+    duration: 20 * 60,
+    requires: ['sandals'],
+    effect: { stat: 'porterCarry', amount: 2 },
+    unlocks: [],
+    opens: [],
+  },
+  goodTools: {
+    label: 'Outils de qualité',
+    description: 'Des manches polis, des lames de fer : chaque geste abat plus d’ouvrage.',
+    icon: { ui: 'toil' },
+    theme: 'workers',
+    cost: { wood: 10, stone: 6, ironOre: 8 },
+    duration: 20 * 75,
+    requires: ['sandals'],
+    effect: { stat: 'workSpeed', amount: 0.25 },
+    unlocks: [],
+    opens: [],
+  },
+  runners: {
+    label: 'Coursiers',
+    description: 'Des semelles cloutées de fer : la ville court d’un bâtiment à l’autre.',
+    icon: { ui: 'move' },
+    theme: 'workers',
+    cost: { ironPlate: 4, food: 10 },
+    duration: 20 * 120,
+    requires: ['sturdyPorters', 'metalworking'],
+    effect: { stat: 'workerSpeed', amount: 0.15 },
+    unlocks: [],
+    opens: [],
+  },
+
+  // --------------------------------------------------------- Personnage
+  walkingBoots: {
+    label: 'Bottes de marche',
+    description: 'Semelles de pierre polie, tiges tressées : Adam file.',
+    icon: { ui: 'direction' },
+    theme: 'character',
+    cost: { stone: 6, food: 6 },
+    duration: 20 * 45,
+    requires: [],
+    effect: { stat: 'walkSpeed', amount: 0.9 },
+    unlocks: [],
+    opens: [],
+  },
+  bigBag: {
+    label: 'Sac renforcé',
+    description: 'Des pinces de crabe en guise de boucles : le sac prend du ventre.',
+    icon: { ui: 'bag' },
+    theme: 'character',
+    cost: { wood: 8, crabClaw: 4 },
+    duration: 20 * 45,
+    requires: [],
+    effect: { stat: 'bagCapacity', amount: 15 },
+    unlocks: [],
+    opens: [],
+  },
+  sharpAxes: {
+    label: 'Haches affûtées',
+    description: 'Une meule de pierre et du fil de fer : chaque coup compte.',
+    icon: { ui: 'axe' },
+    theme: 'character',
+    cost: { stone: 8, ironOre: 6 },
+    duration: 20 * 45,
+    requires: [],
+    effect: { stat: 'woodYield', amount: 0.5 },
+    unlocks: [],
+    opens: [],
+  },
+  paddedVest: {
+    label: 'Gilet rembourré',
+    description: 'Une carapace de crabe cousue sur la poitrine : les coups glissent.',
+    icon: { ui: 'heart' },
+    theme: 'character',
+    cost: { wood: 6, food: 6, crabClaw: 3 },
+    duration: 20 * 60,
+    requires: [],
+    effect: { stat: 'maxHp', amount: 4 },
+    unlocks: [],
+    opens: [],
+  },
+  sharpArrows: {
+    label: 'Flèches à croc',
+    description: 'Des crocs de loup en pointe de flèche : ça mord.',
+    icon: { item: 'wolfFang' },
+    theme: 'character',
+    cost: { wood: 8, wolfFang: 3 },
+    duration: 20 * 60,
+    requires: [],
+    effect: { stat: 'bowDamage', amount: 0.5 },
+    unlocks: [],
+    opens: [],
+  },
+  quickDraw: {
+    label: 'Tir rapide',
+    description: 'Une corde enduite de gelée de mutant : elle claque plus vite.',
+    icon: { item: 'mutantGoo' },
+    theme: 'character',
+    cost: { wood: 6, mutantGoo: 4 },
+    duration: 20 * 75,
+    requires: ['sharpArrows'],
+    effect: { stat: 'bowCooldown', amount: -4 },
+    unlocks: [],
+    opens: [],
+  },
+  irradiatedArrows: {
+    label: 'Flèches irradiées',
+    description: 'Un éclat du cœur de la Reine dans chaque pointe : ça brûle.',
+    icon: { item: 'radCore' },
+    theme: 'character',
+    cost: { ironPlate: 4, radCore: 1 },
+    duration: 20 * 120,
+    requires: ['sharpArrows'],
+    effect: { stat: 'bowDamage', amount: 1 },
+    unlocks: [],
+    opens: [],
   },
   // Les spécialités des régions conquises (`data/regions.ts`) : une recherche par biome.
   amberBows: {

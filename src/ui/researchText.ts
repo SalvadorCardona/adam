@@ -12,7 +12,7 @@
 import type { BuildingId } from '../data/buildings.ts';
 import { bagBonus, type PerkId } from '../data/perks.ts';
 import { RESEARCH, RESEARCH_STATS, type ResearchId, type ResearchStat } from '../data/research.ts';
-import { STAT_BASE, missingRequirements, researchBonus, type ResearchStatus } from '../sim/research.ts';
+import { STAT_BASE, missingRequirements, researchBonus, researchBuildings, type ResearchStatus } from '../sim/research.ts';
 import { TICKS_PER_SECOND } from '../sim/world.ts';
 import { t } from '../i18n/locale.ts';
 
@@ -53,9 +53,9 @@ export function effectLine(id: ResearchId, done: readonly ResearchId[], perks: r
   return t().researchPanel.effect(t().researchStats[stat].label, formatStat(stat, before), formatStat(stat, before + amount));
 }
 
-/** Les bâtiments qu'une recherche fait entrer au menu de construction, ou `''`. */
+/** Les bâtiments qu'une recherche fait entrer au menu de construction — débloqués ou ouverts —, ou `''`. */
 export function unlocksLine(id: ResearchId): string {
-  const unlocks: readonly BuildingId[] = RESEARCH[id].unlocks;
+  const unlocks: readonly BuildingId[] = researchBuildings(id);
 
   return unlocks.length === 0 ? '' : `${t().researchPanel.unlocks} ${unlocks.map((building) => t().buildings[building].label).join(', ')}`;
 }
