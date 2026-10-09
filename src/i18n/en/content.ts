@@ -26,6 +26,9 @@ export const content: Content = {
     meat: 'Meat',
     water: 'Water',
     ironPlate: 'Iron plate',
+    brick: 'Brick',
+    tools: 'Tools',
+    steel: 'Steel',
     mutantGoo: 'Mutant goo',
     wolfFang: 'Wolf fang',
     crabClaw: 'Crab claw',
@@ -287,6 +290,33 @@ export const content: Content = {
       effect: '3 wood → 1 coal, 1 worker.',
       upgrades: [],
     },
+    brickworks: {
+      label: 'Brickworks',
+      sign: 'Bricks',
+      siteDescription: 'A long kiln to lay up, wooden molds drying in the sun. It will need a brickmaker.',
+      description:
+        'A long kiln lying under a tiled roof, and rows of bricks cooling on racks. Its brickmaker bakes crushed stone over a wood fire: the borough rebuilds in brick.',
+      effect: '2 stone + 1 wood → 1 brick, 1 worker.',
+      upgrades: [],
+    },
+    workshop: {
+      label: 'Workshop',
+      sign: 'Workshop',
+      siteDescription: 'A workbench already set down, an awning to stretch. It will need iron plates to fit out.',
+      description:
+        'A brick workshop under a striped awning: a vise, a grindstone, wrenches hanging on the wall. Its craftsman shapes tools out of iron plates, and the town can finally build big.',
+      effect: '1 iron plate + 2 wood → 1 tools, 1 worker.',
+      upgrades: [],
+    },
+    steelworks: {
+      label: 'Steelworks',
+      sign: 'Steel',
+      siteDescription: 'A blast furnace to raise, girders waiting. It will need tools and bricks.',
+      description:
+        'A brick blast furnace hooped with iron, two chimneys puffing away, a glowing ladle of metal. Its founder casts steel from iron plates and coal: the industrial city has its heart.',
+      effect: '2 iron plates + 2 coal → 1 steel, 1 worker.',
+      upgrades: [],
+    },
     clinic: {
       label: 'Clinic',
       sign: 'Clinic',
@@ -359,6 +389,9 @@ export const content: Content = {
     raiseChild: 'Birth',
     smeltPlate: 'Smelting',
     burnCharcoal: 'Charring',
+    fireBrick: 'Firing',
+    makeTools: 'Toolmaking',
+    castSteel: 'Casting',
   },
   weapons: {
     bow: 'Makeshift bow',
@@ -395,7 +428,6 @@ export const content: Content = {
     mountain: 'Mountain',
     wasteland: 'Polluted lands',
   },
-  eras: ['Founding', 'Colony', 'Signal'],
   enemyBase: {
     label: 'Mutant base',
     description: 'A camp of ruins and glowing puddles. While it stands, nobody builds or harvests in its zone.',
@@ -529,6 +561,7 @@ export const content: Content = {
       foundry: 'At the lab, start the Foundry: the forge and the charcoal kiln will show up in “Build”.',
       forge: 'The forge is unlocked! Iron and coal in, iron plates out.',
       kiln: 'Forge hungry for coal? A charcoal kiln bakes your spare wood: three logs, one coal.',
+      eraReady: 'We’ve got everything to become a {era}! Open the town hall, “Eras” tab, and make the move.',
       waitBirth: 'The baby arrives in {time}.',
       waitDawn: 'Next dawn in {time}.',
       meanwhile: '{wait} In the meantime: {todo}',
@@ -556,6 +589,24 @@ export const content: Content = {
     busy: 'Not now, Adam, they’re coming!',
     allDone: 'No more blueprints for now. I’m sketching what’s next!',
   },
+  eras: [
+    { label: 'Camp', motto: 'Tarps, a fire, ten pairs of hands. We hang on.', threat: 'Only the nearby mutant bases prowl at night.' },
+    {
+      label: 'Borough',
+      motto: 'Streets, kilns, neighbors: it smells of bread and warm brick.',
+      threat: 'Mutants sniff out the borough: two more every night.',
+    },
+    {
+      label: 'Town',
+      motto: 'Workshops, tools, children running around: the town hums.',
+      threat: 'A big mutant leads every wave.',
+    },
+    {
+      label: 'Industrial city',
+      motto: 'Chimneys, rails, sirens: the city rumbles, and the whole wasteland hears it.',
+      threat: 'Two big mutants and an extra pack, every night.',
+    },
+  ],
   researchStats: {
     bowDamage: { label: 'Bow damage', unit: '' },
     bowCooldown: { label: 'Time between arrows', unit: ' s' },
@@ -710,6 +761,38 @@ export const content: Content = {
     sporeCompost: {
       label: 'Spore compost',
       description: 'Spores from the polluted lands, buried in the field: the harvest nearly doubles.',
+    },
+    brickmaking: {
+      label: 'Brick firing',
+      description: 'Crushed stone, a wood fire, plank molds: bricks are back.',
+    },
+    handcarts: {
+      label: 'Handcarts',
+      description: 'Two scrap wheels under a brick crate: porters carry more.',
+    },
+    toolmaking: {
+      label: 'Toolmaking',
+      description: 'A vise, a grindstone and iron plates: we shape our own tools.',
+    },
+    compositeBows: {
+      label: 'Composite bows',
+      description: 'Wood, fang horn, precise tools: the bow bites harder.',
+    },
+    toolDrills: {
+      label: 'Tooled drills',
+      description: 'Bits swapped with a wrench, without stopping the wheel.',
+    },
+    steelmaking: {
+      label: 'Blast furnace',
+      description: 'Hotter than the forge, taller than the town hall: steel flows.',
+    },
+    steelArrows: {
+      label: 'Steel arrows',
+      description: 'Tempered steel tips: nothing resists them anymore.',
+    },
+    steelFrame: {
+      label: 'Steel-frame bag',
+      description: 'A steel frame, new straps: the bag holds twice as much without sagging.',
     },
   },
   achievements: {

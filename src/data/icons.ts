@@ -100,6 +100,40 @@ export const ITEM_ICONS: Record<ItemId, string> = {
     circle(6.5, 14, 1.3, ink.base),
     circle(17.5, 14, 1.3, ink.base),
   ),
+  /** Deux briques corail empilées, joints en capsule : la brique du Bourg. */
+  brick: svg(
+    S,
+    S,
+    shadedBlock(3, 12, 18, 8, 3, 'coral', RADIUS.small),
+    shadedBlock(6, 5, 15, 8, 3, 'coral', RADIUS.small),
+    pill(11, 15, 2, 3, coral.shade),
+    pill(5, 13.5, 4, 1.4, coral.light),
+  ),
+  /** Un marteau et une clé plate croisés : les outils de la Ville. */
+  tools: svg(
+    S,
+    S,
+    line(6, 19, 17, 8, ink.base),
+    circle(18, 7, 3.6, ink.base),
+    circle(19.2, 5.8, 1.6, paper.base),
+    line(7, 6, 17, 18, orange.shade),
+    rect(3, 3, 9, 5.4, cyan.shade, 1.6),
+    rect(3, 3, 9, 4, cyan.base, 1.6),
+    pill(4.2, 3.6, 3.4, 1.2, cyan.light),
+  ),
+  /** Une poutrelle d'acier en I, son dessus luisant : l'acier de la Cité. */
+  steel: svg(
+    S,
+    S,
+    rect(3, 4, 18, 4.5, ink.shade, 1.5),
+    rect(3, 4, 18, 3.2, ink.base, 1.5),
+    rect(9.5, 7, 5, 10, ink.shade, 1),
+    rect(9.5, 7, 3.6, 10, ink.base, 1),
+    rect(3, 15.5, 18, 4.5, ink.shade, 1.5),
+    rect(3, 15.5, 18, 3.2, ink.base, 1.5),
+    pill(4.5, 4.6, 7, 1.2, cyan.light),
+    pill(4.5, 16.1, 7, 1.2, cyan.light),
+  ),
   /** Une goutte de gelée fluo, tremblotante, qui louche d'un œil : un bout de mutant, drôle plus qu'effrayant. */
   mutantGoo: svg(
     S,

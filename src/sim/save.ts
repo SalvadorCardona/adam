@@ -21,6 +21,7 @@ import { COMPANION_CLASSES, isCompanionClass, type CompanionClassId } from '../d
 import { RARE_OFFERS, type RareOfferId } from '../data/caravan.ts';
 import { ENEMY_BASE_LEVELS, RAIDS, enemyBaseLevel } from '../data/enemyBases.ts';
 import { ENEMIES, WILDLIFE, type EnemyId, type WildlifeId } from '../data/enemies.ts';
+import { LAST_ERA } from '../data/eras.ts';
 import { MAX_GEAR } from '../data/gear.ts';
 import { XP_SHARE, type Shooter } from '../data/levels.ts';
 import { HAPPINESS } from '../data/housing.ts';
@@ -146,6 +147,8 @@ export interface WorldState {
   seenBuildings: BuildingId[];
   /** Bâtiments ouverts sans plan ni recherche. Absent d'une sauvegarde d'avant : tous. */
   openBuildings?: BuildingId[];
+  /** L'ère atteinte, index de `ERAS` (`data/eras.ts`). Absent d'une sauvegarde d'avant les ères : le Campement, 0. */
+  era?: number;
   /** Offres rares de la caravane déjà prises, par offre. Absent des sauvegardes d'avant elle : aucune. */
   rareTrades: Partial<Record<RareOfferId, number>>;
   /** Index de l'objectif en cours ; `OBJECTIVES.length` une fois la chaîne bouclée. */
@@ -495,6 +498,7 @@ function parseState(raw: unknown): WorldState {
     researchDone: [...new Set(array(state['researchDone'] ?? []).map((id) => oneOf(id, RESEARCH) as ResearchId))],
     seenBuildings: [...new Set(array(state['seenBuildings'] ?? []).map((id) => oneOf(id, BUILDINGS) as BuildingId))],
     ...(state['openBuildings'] !== undefined && { openBuildings: [...new Set(array(state['openBuildings']).map((id) => oneOf(id, BUILDINGS) as BuildingId))] }),
+    ...(state['era'] !== undefined && { era: Math.min(LAST_ERA, int(state['era'])) }),
     rareTrades: parseRareTrades(state['rareTrades'] ?? {}),
     ...(state['colonists'] !== undefined && { colonists: int(state['colonists']) }),
     ...(state['staffPosts'] !== undefined && { staffPosts: unique(array(state['staffPosts']).map(parseStaffPost)) }),

@@ -4,6 +4,7 @@ import type { Messages } from '../messages.ts';
 import { collection } from './collection.ts';
 import { common, settings } from './common.ts';
 import { content } from './content.ts';
+import { eraPanel } from './eraPanel.ts';
 import { hud } from './hud.ts';
 import { inventory } from './inventory.ts';
 import { menu } from './menu.ts';
@@ -27,6 +28,7 @@ export const EN: Messages = {
   inventory,
   trade,
   researchPanel,
+  eraPanel,
   resourcePanel,
   wardrobe,
   collection,

@@ -27,15 +27,18 @@ describe('prototypes', () => {
   });
 
   it('refuse un objet récoltable sans débouché', () => {
-    // Sans la forge, les recherches au charbon du labo ni l'étage 2 de l'antenne, le charbon ne servirait à rien : la validation doit le dire.
+    // Sans la forge, l'aciérie, les recherches au charbon du labo ni l'étage 2 de l'antenne, le charbon ne servirait à rien : la validation doit le dire.
     const forge = RECIPES.smeltPlate as RecipeProto;
-    const researches = [RESEARCH.fastDrills, RESEARCH.purification, RESEARCH.charcoalFilters] as ResearchProto[];
+    const steel = RECIPES.castSteel as RecipeProto;
+    const researches = [RESEARCH.fastDrills, RESEARCH.purification, RESEARCH.charcoalFilters, RESEARCH.steelmaking] as ResearchProto[];
     const floor = BUILDINGS.antenna.upgrades[0] as BuildingUpgrade;
     const inputs = forge.inputs;
+    const steelInputs = steel.inputs;
     const costs = researches.map((research) => research.cost);
     const floorCost = floor.cost;
 
     forge.inputs = { ironOre: 2 };
+    steel.inputs = { ironPlate: 2 };
     for (const research of researches) research.cost = { ironOre: 10 };
     floor.cost = { ironPlate: 40, radCore: 1 };
     try {
@@ -44,6 +47,7 @@ describe('prototypes', () => {
       );
     } finally {
       forge.inputs = inputs;
+      steel.inputs = steelInputs;
       researches.forEach((research, index) => (research.cost = costs[index]!));
       floor.cost = floorCost;
     }

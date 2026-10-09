@@ -13,7 +13,7 @@
  * du labo, un effet qui porte sur une statistique connue.
  */
 
-import { BIOMES, ERAS, HOME_REGION, REGION_RINGS, type BiomeProto, type RegionRing } from './regions.ts';
+import { BIOMES, HOME_REGION, REGION_RINGS, type BiomeProto, type RegionRing } from './regions.ts';
 import { TILE_SIZE } from '../core/grid.ts';
 import { PALETTE, auditSvg } from './artDirection.ts';
 import { BUILDINGS, RUIN, START_BUILDINGS, type BuildingProto } from './buildings.ts';
@@ -32,6 +32,7 @@ import { PERKS, type PerkProto } from './perks.ts';
 import { QUESTS, QUEST_IDS, TOOLS, type QuestProto } from './quests.ts';
 import { RECIPES, type RecipeProto } from './recipes.ts';
 import { RESEARCH, RESEARCH_STATS, type ResearchProto } from './research.ts';
+import { ERAS, type EraProto } from './eras.ts';
 import { RESOURCES, ROCK_OF_ORE } from './resources.ts';
 import { TEST_SCENARIOS, type TestScenarioProto } from './testScenario.ts';
 import { BUILDING_PARTS, RESOURCE_PARTS, SPRITES, UPGRADE_PARTS, WALKER_PARTS, type SpriteProto } from './sprites.ts';
@@ -291,6 +292,8 @@ export function validatePrototypes(): string[] {
     for (const itemId of Object.keys(research.cost)) consumed.add(itemId);
   }
   for (const need of Object.values(NEEDS) as NeedProto[]) consumed.add(need.item);
+  // Ce qu'on investit pour changer d'ère (`data/eras.ts`) est aussi un débouché.
+  for (const era of ERAS as readonly EraProto[]) for (const itemId of Object.keys(era.requires?.invest ?? {})) consumed.add(itemId);
   consumed.add(HUNTING.meat);
   for (const id of Object.keys(ITEMS)) {
     if (!consumed.has(id)) {
@@ -299,6 +302,7 @@ export function validatePrototypes(): string[] {
   }
 
   errors.push(...researchErrors());
+  errors.push(...eraErrors());
 
   for (const [id, building] of Object.entries(BUILDINGS)) {
     if (
@@ -800,6 +804,72 @@ export function wardrobeErrors(): string[] {
  * chaque bâtiment du menu a son chemin : jamais le joueur ne bute sur un
  * bâtiment absent du menu.
  */
+/**
+ * Les ères : la première sans condition, les suivantes avec ; des ids
+ * connus ; chaque recherche dans une ère qui existe ; ce qu'une ère demande
+ * (bâtiment, recherche) déjà à portée avant elle, sinon on n'y passerait jamais.
+ */
+function eraErrors(): string[] {
+  const errors: string[] = [];
+  const eras = ERAS as readonly EraProto[];
+  // Ce que le menu et le labo offrent, ère par ère : les bâtiments ouverts d'emblée, puis ceux de chaque ère.
+  const reachable = new Set<string>(Object.keys(BUILDINGS).filter((id) => !eras.some((era) => (era.opens as readonly string[]).includes(id))));
+  const researched = new Set<string>();
+
+  if (eras.length === 0 || eras[0]!.requires !== null) errors.push('ERAS : la première ère est celle du départ, sans condition');
+
+  eras.forEach((era, index) => {
+    const at = `ERAS[${index}]`;
+
+    if (era.label.trim() === '' || era.motto.trim() === '') errors.push(`${at} : nom ou devise vide`);
+    if (index > 0 && era.requires === null) errors.push(`${at} : une ère après la première a ses conditions`);
+    if (era.resource !== null && !(era.resource in ITEMS)) errors.push(`${at} : ressource inconnue « ${era.resource} »`);
+    for (const [proto, count] of Object.entries(era.threat)) {
+      if (!(proto in ENEMIES) || !Number.isInteger(count) || (count ?? 0) <= 0) errors.push(`${at} : menace incohérente « ${proto} »`);
+    }
+
+    const requires = era.requires;
+
+    if (requires) {
+      if (requires.objectives < 0 || requires.objectives > OBJECTIVES.length) errors.push(`${at} : objectifs hors de la chaîne`);
+      if (requires.population <= 0) errors.push(`${at} : population nulle`);
+      for (const [building, count] of Object.entries(requires.buildings)) {
+        if (!(building in BUILDINGS) || !Number.isInteger(count) || (count ?? 0) <= 0) errors.push(`${at} : bâtiment demandé incohérent « ${building} »`);
+        else if (!reachable.has(building)) errors.push(`${at} : demande « ${building} », qui n'est pas encore à portée`);
+      }
+      for (const research of requires.research) {
+        if (!researched.has(research)) errors.push(`${at} : demande la recherche « ${research} », pas encore à portée`);
+      }
+      for (const [itemId, amount] of Object.entries(requires.invest)) {
+        if (!(itemId in ITEMS) || !Number.isInteger(amount) || (amount ?? 0) <= 0) errors.push(`${at} : investissement incohérent « ${itemId} »`);
+      }
+    }
+
+    // Ce que l'ère ouvre devient à portée de la suivante : ses bâtiments, son onglet de recherches.
+    for (const building of era.opens) {
+      const proto: BuildingProto | undefined = BUILDINGS[building];
+
+      if (!proto?.menu || proto.plan || proto.unlockObjective !== undefined) errors.push(`${at} : ouvre « ${building} », qui a sa propre condition`);
+      reachable.add(building);
+    }
+    for (const [id, research] of Object.entries(RESEARCH) as [string, ResearchProto][]) {
+      if (research.era !== index) continue;
+      researched.add(id);
+      for (const building of research.unlocks) reachable.add(building);
+    }
+  });
+
+  for (const [id, research] of Object.entries(RESEARCH) as [string, ResearchProto][]) {
+    if (!Number.isInteger(research.era) || research.era < 0 || research.era >= eras.length) errors.push(`RESEARCH.${id} : ère inconnue`);
+    for (const required of research.requires) {
+      const before = (RESEARCH as Record<string, ResearchProto>)[required];
+
+      if (before && before.era > research.era) errors.push(`RESEARCH.${id} : prérequis « ${required} » d'une ère plus tardive`);
+    }
+  }
+  return errors;
+}
+
 function researchErrors(): string[] {
   const errors: string[] = [];
   const labs = Object.entries(BUILDINGS).filter(([, building]) => building.kind === 'lab');

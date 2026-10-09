@@ -17,7 +17,8 @@
  * route). Pour la conquérir, il faut vaincre son **gardien** — le mini-boss
  * de son biome (`BIOMES[].guardian`), qui veille sur son repaire —, et pour
  * qu'il se montre, que la colonie ait atteint l'**ère** de son anneau
- * (`ERAS`, `REGION_RINGS[].era`). Plus l'anneau est loin, plus le gardien
+ * (`REGION_RINGS[].era`, index de `ERAS` de `data/eras.ts`) : le Campement
+ * ouvre le premier anneau, le Bourg le deuxième, la Ville le troisième. Plus l'anneau est loin, plus le gardien
  * est coriace (`REGION_RINGS[].hpScale`, `damageScale`).
  *
  * Conquise, la région rapporte sa **spécialité** : un objet qu'on ne trouve
@@ -53,26 +54,6 @@ export const BIOMES = {
 /** Les biomes qu'une région à conquérir peut prendre, dans l'ordre où l'égalité se départage. */
 export const CONQUEST_BIOMES = ['forest', 'coast', 'mountain', 'wasteland'] as const satisfies readonly BiomeId[];
 
-/**
- * Les ères de la colonie, lues dans la chaîne d'objectifs : une ère est
- * atteinte dès que `objective` objectifs sont réussis. Elles ne sont pas de
- * l'état — `World.objective` suffit.
- */
-export interface EraProto {
-  label: string;
-  /** Objectifs réussis qu'il faut pour l'atteindre (`data/objectives.ts`). */
-  objective: number;
-}
-
-export const ERAS = [
-  // Dès le départ.
-  { label: 'Fondation', objective: 0 },
-  // Trois nuits tenues : Ève est là.
-  { label: 'Colonie', objective: 2 },
-  // Acte I terminé.
-  { label: 'Signal', objective: 6 },
-] as const satisfies readonly EraProto[];
-
 /** La prairie de départ : un disque autour du centre de la mairie, toujours conquis. */
 export const HOME_REGION = {
   /** Rayon, en tuiles : la clairière, les filons du foyer (≤ 20) et le premier pas au-delà. */
@@ -90,7 +71,7 @@ export interface RegionRing {
   sectors: number;
   /** Distance du repaire du gardien au centre de la mairie, en tuiles. */
   lair: number;
-  /** Ère qu'il faut avoir atteinte pour que ses gardiens se montrent (indice dans `ERAS`). */
+  /** Ère qu'il faut avoir atteinte pour que ses gardiens se montrent (index de `ERAS`, `data/eras.ts`). */
   era: number;
   /** Multiplicateurs des points de vie et des coups du gardien de son biome. */
   hpScale: number;
@@ -137,13 +118,3 @@ export const REGION_GUARDIAN = {
   hideTiles: 30,
   regenTicks: 40,
 } as const;
-
-/** L'ère atteinte après `done` objectifs réussis (indice dans `ERAS`). */
-export function eraOf(done: number): number {
-  let era = 0;
-
-  ERAS.forEach((proto, index) => {
-    if (done >= proto.objective) era = index;
-  });
-  return era;
-}

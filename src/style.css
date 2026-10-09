@@ -6743,3 +6743,238 @@ span.wardrobe-thumb {
   font-weight: 600;
   color: var(--ink);
 }
+
+/* ------------------------------------------------------------------ ères */
+
+/*
+ * Le panneau des ères (`ui/eraPanel.ts`) : une carte blanche par-dessus le
+ * jeu, qui défile si l'écran est court. La frise en tête, les conditions en
+ * lignes menthe (tenue) ou corail (manque), le bouton du passage en bas.
+ */
+.era-overlay {
+  align-items: flex-start;
+  overflow-y: auto;
+  padding: calc(var(--safe-top) + 16px) 12px calc(var(--safe-bottom) + 16px);
+}
+
+.era-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(440px, 100%);
+  margin: auto;
+  padding: 16px 16px 18px;
+  border-radius: 28px;
+  box-shadow: 0 7px 0 var(--paper-shade);
+  animation: panel-pop 360ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.era-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.era-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--violet);
+}
+
+.era-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: var(--paper-shade);
+}
+
+.era-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* La frise : une capsule par ère, pleine atteinte, cerclée pour la courante. */
+.era-timeline {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--paper-shade);
+  list-style: none;
+}
+
+.era-step {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 4px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--violet-shade);
+  overflow-wrap: anywhere;
+}
+
+.era-step[data-state='done'] {
+  background: var(--violet-light);
+  color: var(--paper);
+}
+
+.era-step[data-state='current'] {
+  background: var(--violet);
+  color: var(--paper);
+  box-shadow: 0 3px 0 var(--violet-shade);
+}
+
+.era-next {
+  margin: 4px 0 0;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.era-motto {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.era-section {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--violet);
+}
+
+.era-checks,
+.era-brings,
+.era-recap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.era-check,
+.era-bring {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 3px 0 var(--paper-shade);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.era-check[data-met='true'] {
+  background: var(--mint-light);
+  box-shadow: 0 3px 0 var(--mint-shade);
+}
+
+.era-check[data-met='false'] .era-check-count {
+  color: var(--danger);
+}
+
+.era-check-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.era-check-count {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.era-check .icon-building,
+.era-bring .icon-building {
+  border-radius: 999px;
+  background: var(--grass);
+}
+
+.era-invest-title {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: left;
+}
+
+.era-bring-buildings {
+  flex-wrap: wrap;
+  border-radius: 18px;
+}
+
+.era-buildings {
+  display: flex;
+  flex-wrap: wrap;
+  flex-basis: 100%;
+}
+
+.era-advance {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.era-advance-note {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* L'écran du passage : un voile violet, le nom de l'ère en grand, le récapitulatif. */
+.era-screen {
+  z-index: 11;
+  background: rgb(123 92 255 / 0.5);
+}
+
+.era-screen-panel {
+  width: min(380px, 100%);
+}
+
+.era-screen-panel > .icon-ui {
+  align-self: center;
+  margin-bottom: -6px;
+}
+
+.era-screen-name {
+  margin: -8px 0 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* « Ères · Bourg » dans la fenêtre de la mairie : une pastille quand tout est réuni. */
+.building-panel-actions button[data-ready='true'] {
+  position: relative;
+}
+
+.building-panel-actions button[data-ready='true']::after {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--coral);
+  content: '';
+}

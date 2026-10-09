@@ -8,7 +8,9 @@
  * Dessous, la file du labo, puis trois onglets (`panelTabs.ts`, comme
  * Bâtiment / Inventaire) : **Bâtiments** — ce qui entre au menu de
  * construction, ce qui tourne mieux —, **Ouvriers** — tous les habitants de
- * la ville —, **Personnage** — Adam. Chaque onglet est une liste qui défile :
+ * la ville —, **Personnage** — Adam ; puis un onglet par ère atteinte après
+ * le Campement (`data/eras.ts`, Bourg, Ville, Cité industrielle), le nom de
+ * l'ère et l'icône de sa ressource, qui porte ses recherches. Chaque onglet est une liste qui défile :
  * par recherche, son icône, son nom, son effet chiffré (« Dégâts de l'arc :
  * 1 → 1,5 ») ou les bâtiments qu'elle fait entrer au menu, vignette et nom,
  * son coût en icônes — rouge ce qui manque, sac et ville comptés ensemble —,
@@ -23,6 +25,7 @@
  */
 
 import type { BuildingId } from '../data/buildings.ts';
+import { ERAS, type EraProto } from '../data/eras.ts';
 import type { ItemId } from '../data/items.ts';
 import { PRODUCTION } from '../data/production.ts';
 import { RESEARCH, RESEARCH_IDS, RESEARCH_THEMES, type ResearchId, type ResearchTheme } from '../data/research.ts';
@@ -36,6 +39,29 @@ import { siteNeedRow } from './siteNeedRow.ts';
 import { clock, effectLine, statusLine } from './researchText.ts';
 
 const THEMES = Object.keys(RESEARCH_THEMES) as ResearchTheme[];
+
+/** Un onglet du labo : un thème du Campement, ou l'ère `n` qui suit (`era1`…). */
+type ResearchTab = ResearchTheme | `era${number}`;
+
+/** Les ères qui ont leur onglet : toutes sauf le Campement. */
+const ERA_TABS = (ERAS as readonly EraProto[]).map((_, era) => era).filter((era) => era > 0);
+
+/** L'onglet d'une recherche : son thème au Campement, son ère ensuite. */
+function tabOf(id: ResearchId): ResearchTab {
+  const { era, theme } = RESEARCH[id];
+
+  return era > 0 ? `era${era}` : theme;
+}
+
+/** L'icône de l'onglet d'une ère : sa ressource, sinon un drapeau. */
+function eraTabIcon(era: number): HTMLElement {
+  const resource = (ERAS as readonly EraProto[])[era]!.resource;
+  const icon = resource ? itemIcon(resource, 22) : uiIcon('hammer', 22);
+
+  icon.alt = '';
+  icon.removeAttribute('title');
+  return icon;
+}
 
 /** L'ordre d'une liste : ce que mène un labo, ce qui se lance, ce qui est verrouillé, ce qui est fini. Stable : les données gardent leur ordre. */
 const STATUS_ORDER: Record<ResearchStatus, number> = { running: 0, collecting: 0, queued: 1, available: 2, taken: 3, locked: 4, done: 5 };
@@ -65,8 +91,10 @@ export class ResearchPanel {
   private readonly cancelButton: HTMLButtonElement;
   private readonly takeButton: HTMLButtonElement;
   private readonly queue: HTMLElement;
-  private readonly tabs: PanelTabs<ResearchTheme>;
-  private readonly lists = new Map<ResearchTheme, HTMLElement>();
+  private readonly tabs: PanelTabs<ResearchTab>;
+  private readonly lists = new Map<ResearchTab, HTMLElement>();
+  /** La dernière ère vue : une ère neuve ouvre son onglet. */
+  private seenEra = -1;
   private labId: number | null = null;
   private lastHead = '';
   private lastCurrent = '';
@@ -121,17 +149,19 @@ export class ResearchPanel {
     this.queue = element('div', 'research-queue');
     this.queue.hidden = true;
 
-    this.tabs = new PanelTabs<ResearchTheme>(THEMES.map((id) => ({ id, icon: TAB_ICONS[id]() })) as [
-      { id: ResearchTheme; icon: HTMLElement },
-      ...{ id: ResearchTheme; icon: HTMLElement }[],
-    ]);
+    const tabs: { id: ResearchTab; icon: HTMLElement }[] = [
+      ...THEMES.map((id) => ({ id, icon: TAB_ICONS[id]() })),
+      ...ERA_TABS.map((era) => ({ id: `era${era}` as const, icon: eraTabIcon(era) })),
+    ];
+
+    this.tabs = new PanelTabs<ResearchTab>(tabs as [(typeof tabs)[number], ...(typeof tabs)[number][]]);
     this.tabs.bar.classList.add('research-tabs');
-    for (const theme of THEMES) {
+    for (const { id } of tabs) {
       const list = element('div', 'research-list');
 
-      list.dataset['theme'] = theme;
-      this.tabs.page(theme).append(list);
-      this.lists.set(theme, list);
+      list.dataset['theme'] = id;
+      this.tabs.page(id).append(list);
+      this.lists.set(id, list);
     }
 
     this.root.append(this.current, this.queue, this.tabs.bar, this.tabs.pages);
@@ -145,11 +175,20 @@ export class ResearchPanel {
       this.takeButton.textContent = text.takeRest;
       this.tabs.bar.setAttribute('aria-label', text.tabsLabel);
       for (const theme of THEMES) this.tabs.setLabel(theme, t().researchThemes[theme]);
+      for (const era of ERA_TABS) this.tabs.setLabel(`era${era}`, t().eras[era]!.label);
     });
   }
 
   /** À chaque frame, fenêtre du labo ouverte. */
   public update(lab: Lab): void {
+    // Un onglet par ère atteinte ; une ère neuve ouvre le sien.
+    if (this.world.era !== this.seenEra) {
+      const fresh = this.seenEra >= 0 && this.world.era > this.seenEra;
+
+      this.seenEra = this.world.era;
+      for (const era of ERA_TABS) this.tabs.setAvailable(`era${era}`, era <= this.world.era);
+      if (fresh) this.tabs.select(`era${this.world.era}`);
+    }
     if (lab.id !== this.labId) {
       this.labId = lab.id;
       this.lastHead = '';
@@ -157,7 +196,7 @@ export class ResearchPanel {
       this.lastQueue = '';
       this.lastList = '';
       // Un autre labo : on ouvre l'onglet de ce qu'il cherche, sinon les bâtiments.
-      this.tabs.select(lab.research === null ? 'building' : RESEARCH[lab.research].theme);
+      this.tabs.select(lab.research === null ? 'building' : tabOf(lab.research));
     }
     this.updateCurrent(lab);
     this.updateQueue(lab);
@@ -298,7 +337,7 @@ export class ResearchPanel {
     this.currentCost.dataset['layout'] = key.startsWith('collecting:') ? 'ledger' : '';
   }
 
-  /** Les trois onglets. Reconstruits seulement quand un état, un coût ou un stock change. */
+  /** Les onglets. Reconstruits seulement quand un état, un coût ou un stock change. */
   private updateList(lab: Lab): void {
     const { world } = this;
     const { researchDone: done } = world;
@@ -309,20 +348,21 @@ export class ResearchPanel {
       lab.endTick > 0,
       queueFull(lab),
       world.perks.join(','),
+      world.era,
       ...this.relevantItems().map((item) => `${item}=${this.owned(item)}`),
     ].join('|');
 
     if (key === this.lastList) return;
     this.lastList = key;
 
-    for (const theme of THEMES) {
+    for (const [tab, list] of this.lists) {
       // Ce qui se mène d'abord, puis ce qui attend un prérequis, les recherches finies au bout : le pouce n'a pas à les traverser.
       const rows = statuses
-        .filter(([id]) => RESEARCH[id].theme === theme)
+        .filter(([id]) => tabOf(id) === tab && RESEARCH[id].era <= world.era)
         .sort(([, a], [, b]) => STATUS_ORDER[a] - STATUS_ORDER[b])
         .map(([id, status]) => this.row(id, status, lab));
 
-      this.lists.get(theme)!.replaceChildren(...rows);
+      list.replaceChildren(...rows);
     }
   }
 

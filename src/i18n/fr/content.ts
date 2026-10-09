@@ -10,6 +10,7 @@ import { ACHIEVEMENTS, TROPHIES } from '../../data/achievements.ts';
 import { RARE_OFFERS } from '../../data/caravan.ts';
 import { ENEMY_BASE } from '../../data/enemyBases.ts';
 import { ENEMIES, WILDLIFE } from '../../data/enemies.ts';
+import { ERAS, type EraProto } from '../../data/eras.ts';
 import { EVE_LINES } from '../../data/eve.ts';
 import { GEAR } from '../../data/gear.ts';
 import { ITEMS } from '../../data/items.ts';
@@ -18,7 +19,7 @@ import { OBJECTIVES, type ObjectiveProto } from '../../data/objectives.ts';
 import { PERKS } from '../../data/perks.ts';
 import { QUESTS, TOOLS } from '../../data/quests.ts';
 import { RECIPES } from '../../data/recipes.ts';
-import { BIOMES, ERAS } from '../../data/regions.ts';
+import { BIOMES } from '../../data/regions.ts';
 import { COMPANION_CLASSES } from '../../data/companions.ts';
 import { RESEARCH, RESEARCH_STATS, RESEARCH_THEMES } from '../../data/research.ts';
 import { RESOURCES } from '../../data/resources.ts';
@@ -85,9 +86,8 @@ export const content = {
   companionClasses: mapTable(COMPANION_CLASSES, ({ label, effect }): { label: string; effect: string } => ({ label, effect })),
   enemies: mapTable(ENEMIES, (enemy): string => enemy.label),
   wildlife: mapTable(WILDLIFE, (beast): string => beast.label),
-  /** Les biomes des régions, et les ères de la colonie (`data/regions.ts`). */
+  /** Les biomes des régions (`data/regions.ts`). */
   biomes: mapTable(BIOMES, (biome): string => biome.label),
-  eras: ERAS.map((era): string => era.label),
   enemyBase: { label: ENEMY_BASE.label, description: ENEMY_BASE.description },
   /** Les arcs d'Adam, du niveau 0 au dernier. */
   gear: GEAR.map(({ label }): string => label),
@@ -99,6 +99,12 @@ export const content = {
     ({ title, hint, celebration, banner }): ObjectiveText => ({ title, hint, celebration, banner: banner ?? '' }),
   ),
   eve: EVE_LINES,
+  /** Les ères de la colonie, dans l'ordre de `ERAS`. */
+  eras: (ERAS as readonly EraProto[]).map(({ label, motto, threatLine }): { label: string; motto: string; threat: string } => ({
+    label,
+    motto,
+    threat: threatLine,
+  })),
   researchStats: mapTable(RESEARCH_STATS, ({ label, unit }): { label: string; unit: string } => ({ label, unit })),
   researchThemes: mapTable(RESEARCH_THEMES, (label): string => label),
   research: mapTable(RESEARCH, ({ label, description }): { label: string; description: string } => ({ label, description })),

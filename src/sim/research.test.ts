@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TILE_SIZE } from '../core/grid.ts';
 import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, type BuildingId } from '../data/buildings.ts';
 import { ENEMIES, WILDLIFE } from '../data/enemies.ts';
+import { ERAS } from '../data/eras.ts';
 import type { ItemId } from '../data/items.ts';
 import { COLONY } from '../data/inhabitants.ts';
 import { PRODUCTION } from '../data/production.ts';
@@ -128,10 +129,13 @@ function finish(world: World, research: ResearchId): void {
 }
 
 describe('recherches — données', () => {
-  it('passe la validation, au moins quatre recherches par onglet (et les spécialités des régions)', () => {
+  it('passe la validation, au moins quatre recherches par onglet (et les spécialités des régions), douze au plus par onglet d’ère', () => {
     expect(validatePrototypes()).toEqual([]);
     for (const theme of Object.keys(RESEARCH_THEMES) as ResearchTheme[]) {
       expect(RESEARCH_IDS.filter((id) => RESEARCH[id].theme === theme).length).toBeGreaterThanOrEqual(4);
+    }
+    for (let era = 1; era < ERAS.length; era += 1) {
+      expect(RESEARCH_IDS.filter((id) => RESEARCH[id].era === era).length).toBeLessThanOrEqual(12);
     }
   });
 

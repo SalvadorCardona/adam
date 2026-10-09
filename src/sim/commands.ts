@@ -109,6 +109,12 @@ export type Command =
    */
   | { type: 'removeDecor'; id: EntityId }
   /**
+   * Fait passer la colonie à l'ère suivante (`data/eras.ts`) : toutes ses
+   * conditions tiennent, et son investissement se paie d'un coup — le sac
+   * d'abord, puis la ville. Le bouton « Passer au Bourg » du panneau des ères.
+   */
+  | { type: 'advanceEra' }
+  /**
    * Forge l'arc du niveau suivant (`data/gear.ts`) depuis la fenêtre de la
    * forge (`GEAR_WORKSHOP`) : payé d'un coup, le sac d'abord, puis la ville
    * si la forge est dans son rayon. Adam doit être à portée de la forge.
@@ -303,6 +309,13 @@ export type RepairRejection =
   | 'intact'
   /** Ni le sac, ni la ville à portée n'ont de quoi réparer. */
   | 'noMaterial';
+
+/** Motif de refus d'un passage d'ère — remonté à l'UI par un événement. */
+export type EraRejection =
+  /** La colonie est déjà à la dernière ère. */
+  | 'lastEra'
+  /** Une condition ne tient pas encore, ou l'investissement manque. */
+  | 'notReady';
 
 export type UpgradeRejection =
   /** Le bâtiment n'existe plus, ou n'est encore qu'un chantier. */

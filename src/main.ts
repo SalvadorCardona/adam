@@ -60,6 +60,7 @@ import { TILE_SIZE } from './core/grid.ts';
 import { nextWave } from './sim/dayNight.ts';
 import { detectLocale, onLocale, setLocale, t } from './i18n/locale.ts';
 import { BuildingPanel } from './ui/buildingPanel.ts';
+import { EraPanel } from './ui/eraPanel.ts';
 import { CaravanPanel } from './ui/caravanPanel.ts';
 import { BagPanel } from './ui/bagPanel.ts';
 import { ResourcePanel } from './ui/resourcePanel.ts';
@@ -119,6 +120,9 @@ const ITEM_PARTICLES: Record<ItemId, ParticleStyle> = {
   meat: PARTICLES.claw,
   water: PARTICLES.water,
   ironPlate: PARTICLES.iron,
+  brick: PARTICLES.stone,
+  tools: PARTICLES.iron,
+  steel: PARTICLES.coal,
   mutantGoo: PARTICLES.mutant,
   wolfFang: PARTICLES.bone,
   crabClaw: PARTICLES.claw,
@@ -286,6 +290,14 @@ async function main(): Promise<void> {
     },
     hud.resourcesButton,
   );
+  // Le panneau des ères s'ouvre depuis la fenêtre de la mairie, qu'il remplace.
+  const eras = new EraPanel(world);
+
+  panel.setOnEras(() => {
+    panel.close();
+    eras.show();
+    audio.play('open');
+  });
   const trade = new CaravanPanel(world, () => {
     panel.close();
     inventory.close();
@@ -519,6 +531,16 @@ async function main(): Promise<void> {
     celebrating = true;
     window.umami?.track('victoire');
   });
+  // Une ère atteinte : l'horloge s'arrête sur l'écran du passage, les feuilles tombent, « En avant ! » rend la main.
+  world.events.on('eraReached', ({ era }) => {
+    celebrating = true;
+    hud.rainLeaves();
+    eras.showReached(era, () => {
+      celebrating = false;
+      accumulator = 0;
+    });
+    window.umami?.track(`ere-${era}`);
+  });
   // Refonder : les graines de la colonie au jardin, la partie effacée, puis une carte neuve.
   let refounding = false;
 
@@ -564,6 +586,7 @@ async function main(): Promise<void> {
     hud.root.append(title.root);
   }
   hud.root.append(inventory.root);
+  hud.root.append(eras.root, eras.screen);
   // Par-dessus tout, écran titre compris : la langue se choisit avant même de jouer.
   hud.root.append(settings.root);
   mount.append(hud.root);
@@ -625,7 +648,7 @@ async function main(): Promise<void> {
         paused,
         mapOpen: worldMap.open,
         menuOpen: buildMenu.isOpen,
-        panelOpen: panel.open || trade.open,
+        panelOpen: panel.open || trade.open || eras.open,
         resourcesOpen: resources.open,
       });
 
@@ -636,6 +659,7 @@ async function main(): Promise<void> {
       else if (action === 'closePanel') {
         panel.close();
         trade.close();
+        eras.hide();
       }
       else if (action === 'closeResources') resources.close();
       else setPaused(action === 'pause');
@@ -787,13 +811,14 @@ async function main(): Promise<void> {
     renderer.setSelected(panel.selection);
     buildMenu.refresh();
     panel.update();
+    eras.update();
     inventory.update();
     resources.update();
     trade.update();
     // Un menu, une fenêtre ou la pause par-dessus : le joystick s'efface et
     // lâche son doigt ; il revient à la fermeture.
     stick.setEnabled(
-      running && !world.defeated && !buildMenu.isOpen && !panel.open && !inventory.open && !resources.open && !trade.open && !worldMap.open,
+      running && !world.defeated && !buildMenu.isOpen && !panel.open && !eras.open && !inventory.open && !resources.open && !trade.open && !worldMap.open,
     );
     if (hud.root.dataset['stick'] !== String(stick.shown)) hud.root.dataset['stick'] = String(stick.shown);
   });
@@ -989,6 +1014,8 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('objectiveCompleted', ({ index }) =>
     audio.play(index < OBJECTIVES.length - 1 && !(OBJECTIVES[index] as ObjectiveProto).banner ? 'objective' : 'colony'),
   );
+  // Une ère atteinte a la fanfare d'une fin d'acte.
+  world.events.on('eraReached', () => audio.play('colony'));
   world.events.on('antennaRaised', () => audio.play('build'));
   world.events.on('antennaFell', () => audio.play('alarm'));
   world.events.on('survivorsArrived', () => audio.play('build'));
@@ -1039,6 +1066,9 @@ function wireSave(world: World, saves: LocalSave, started: () => boolean): Autos
     due = true;
   });
   world.events.on('objectiveCompleted', () => {
+    due = true;
+  });
+  world.events.on('eraReached', () => {
     due = true;
   });
   const waveOver = (): void => {

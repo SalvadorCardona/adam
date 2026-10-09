@@ -118,7 +118,8 @@ export function levelOverlay(level: 2 | 3, spot: LevelSpot, height: number): str
 
 /**
  * Le sprite du bâtiment au niveau `level` : tous les morceaux de `base`, sauf
- * le chantier, dont `built` et `damaged` portent l'ornement de l'ère.
+ * le chantier, dont `built`, `damaged` et les visages d'ère de la mairie
+ * (`era1`…, `data/eras.ts`) portent l'ornement du niveau.
  */
 export function levelled(base: SpriteProto, level: 2 | 3, spot: LevelSpot): SpriteProto {
   const overlay = levelOverlay(level, spot, base.height);
@@ -127,7 +128,7 @@ export function levelled(base: SpriteProto, level: 2 | 3, spot: LevelSpot): Spri
   for (const [name, source] of Object.entries(base.parts)) {
     if (name === 'site') continue;
     // L'ornement va juste avant `</svg>` : devant le bâtiment, derrière les marques de dégâts.
-    parts[name] = name === 'built' || name === 'damaged' ? source.replace(/<\/svg>$/, `${overlay}</svg>`) : source;
+    parts[name] = name === 'built' || name === 'damaged' || /^era\d$/.test(name) ? source.replace(/<\/svg>$/, `${overlay}</svg>`) : source;
   }
   return { ...base, parts };
 }
