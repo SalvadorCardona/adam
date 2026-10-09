@@ -526,6 +526,20 @@ partie : clé `mobile-factory:collection` (`storage/localCollection.ts`), jamais
 effacée par « Recommencer ». L'écran Collection s'ouvre depuis l'écran titre et
 la pause.
 
+**Hors ligne** (`data/offline.ts`, tous les réglages ; `sim/offline.ts`,
+`World.catchUp`) — à la réouverture (ou au retour d'un arrière-plan),
+`main.ts` mesure l'absence depuis `savedAt` (`awayMs` : horloge reculée ou
+date illisible → 0) et pousse la commande `catchUp`. La ville la rattrape
+en agrégé, par pas d'une minute, bornée à `OFFLINE.maxMs` (8 h, lu par
+`World.offlineCapMs()`), rien sous `minMs` ni sans mairie : producteurs à
+leur cadence moyenne (en ville s'il y a des porteurs ou logisticiens,
+sinon dans leur coffre jusqu'au plein), forges, naissances, recherches et
+formations qui avancent, repas et gorgées habitant par habitant. Ni jour,
+ni nuit, ni vague, ni mort : sans vivres, la jauge s'arrête à
+`starvedGauge` et reprend en jeu. Le récap « Pendant votre absence »
+(`ui/offlineRecap.ts`, événement `offlineCaughtUp`) arrête l'horloge ;
+« Récupérer » fait voler les gains vers la ville. Rien de sauvegardé en plus.
+
 **Prestige** (`src/data/prestige.ts`, icône `PRESTIGE_ICON`) — un compteur
 de la colonie (`World.prestige`, sauvegardé ; absent d'une vieille
 sauvegarde : 0), ni porté ni stocké. Chaque bâtiment achevé rapporte

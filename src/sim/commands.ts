@@ -198,7 +198,14 @@ export type Command =
    * Réglage de débogage : faux, le brouillard de guerre se lève — toute la
    * carte se voit et se bâtit. Les cases explorées continuent de se compter.
    */
-  | { type: 'setFog'; enabled: boolean };
+  | { type: 'setFog'; enabled: boolean }
+  /**
+   * Le jeu rouvert après `awayMs` d'absence (`main.ts` la lit sur l'horloge
+   * de l'appareil, `sim/offline.ts` l'a rendue sûre) : la ville rattrape ce
+   * temps en agrégé, borné au plafond (`World.catchUp`), et le récap suit
+   * (`offlineCaughtUp`).
+   */
+  | { type: 'catchUp'; awayMs: number };
 
 /** Motif de refus d'une commande sur un chantier — remonté à l'UI par un événement. */
 export type SiteRejection =

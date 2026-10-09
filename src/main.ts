@@ -43,6 +43,7 @@ import { GameRenderer } from './render/renderer.ts';
 import { AchievementTracker } from './sim/achievements.ts';
 import { earnedSkins, type Collection } from './sim/collection.ts';
 import { activePerks, harvestSeeds, plant, type Garden } from './sim/garden.ts';
+import { awayMs } from './sim/offline.ts';
 import { stageScenario } from './sim/testScenario.ts';
 import type { Entity } from './sim/types.ts';
 import { STEP_MS, TICKS_PER_SECOND, World } from './sim/world.ts';
@@ -66,6 +67,7 @@ import { JoystickView } from './ui/joystick.ts';
 import { BuildMenu } from './ui/buildMenu.ts';
 import { rewardText } from './ui/collectionPanel.ts';
 import { Hud } from './ui/hud.ts';
+import { OfflineRecap } from './ui/offlineRecap.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
 import { haptics } from './ui/haptics.ts';
 import { NotificationPrompt } from './ui/notificationPrompt.ts';
@@ -218,6 +220,8 @@ async function main(): Promise<void> {
 
   // Le joystick repart au repos : un doigt posé au moment où l'onglet s'est fermé ne fait plus marcher Adam.
   if (loaded.status === 'ok') world.push({ type: 'setMoveAxis', x: 0, y: 0 });
+  // La ville a vécu pendant que le jeu était fermé : elle rattrape ce temps au premier tick, borné au plafond.
+  if (loaded.status === 'ok') world.push({ type: 'catchUp', awayMs: awayMs(loaded.savedAt, Date.now()) });
 
   const renderer = await GameRenderer.create(world, mount);
   const audio = new AudioEngine();
@@ -526,6 +530,25 @@ async function main(): Promise<void> {
     accumulator = 0;
   });
 
+  // Le récap « Pendant votre absence » : ouvert, il arrête l'horloge ; « Récupérer » rend la main.
+  const recap = new OfflineRecap(
+    () => hud.townBanner,
+    () => {
+      accumulator = 0;
+    },
+  );
+
+  world.events.on('offlineCaughtUp', (report) => {
+    buildMenu.close();
+    panel.close();
+    inventory.close();
+    resources.close();
+    trade.close();
+    recap.show(report);
+    audio.play('open');
+  });
+  hud.root.append(recap.root);
+
   hud.pauseButton.addEventListener('click', () => setPaused(!paused));
   hud.settingsButton.addEventListener('click', () => settings.toggle());
   hud.root.append(pause.root);
@@ -565,8 +588,16 @@ async function main(): Promise<void> {
 
   // Onglet caché, appel entrant, écran verrouillé : la partie s'arrête d'elle-même,
   // et elle est écrite tout de suite — sur mobile, un onglet caché peut être tué sans prévenir.
+  // Revenu d'un long arrière-plan sans que la page ait été rechargée, la ville rattrape ce temps comme à la réouverture.
+  let hiddenAt = 0;
+
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) return;
+    if (!document.hidden) {
+      if (started && !scenario && hiddenAt > 0) world.push({ type: 'catchUp', awayMs: awayMs(hiddenAt, Date.now()) });
+      hiddenAt = 0;
+      return;
+    }
+    hiddenAt = Date.now();
     setPaused(true);
     autosave.now();
   });
@@ -697,7 +728,7 @@ async function main(): Promise<void> {
   let lastAxisY = 0;
 
   renderer.app.ticker.add((ticker) => {
-    const running = started && !paused && !settings.open && !notifyPrompt.open && !inventory.dressing;
+    const running = started && !paused && !settings.open && !notifyPrompt.open && !inventory.dressing && !recap.open;
 
     if (running && !celebrating) accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS);
 
@@ -1018,6 +1049,10 @@ function wireSave(world: World, saves: LocalSave, started: () => boolean): Autos
   });
   // Un échange sac ⇄ coffre est un geste du joueur : il ne doit pas se perdre à la fermeture de l'onglet.
   world.events.on('itemsTransferred', () => {
+    due = true;
+  });
+  // Le temps rattrapé hors ligne est acquis : il s'écrit, pour ne pas le rattraper deux fois.
+  world.events.on('offlineCaughtUp', () => {
     due = true;
   });
   world.events.on('townHallDestroyed', () => saves.clear());

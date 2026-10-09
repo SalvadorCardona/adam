@@ -204,7 +204,8 @@ export class TownFlows {
     );
   }
 
-  private reset(): void {
+  /** Tout oublier : sans ville, ou quand le stock a sauté d'un coup (le rattrapage hors ligne). */
+  public reset(): void {
     this.ring.length = 0;
     this.last = [];
     this.pendingIn = ITEM_IDS.map(() => 0);

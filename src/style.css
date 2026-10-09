@@ -5245,6 +5245,117 @@ button:disabled,
   color: var(--good);
 }
 
+/*
+ * « Pendant votre absence » : un voile indigo de nuit, la lune au-dessus du
+ * titre, puis les gains en capsules menthe, les dépenses en corail, les
+ * recherches et les naissances, les alertes. Il défile s'il est long ; à
+ * « Récupérer », les icônes des gains s'envolent vers la ville.
+ */
+.offline-recap {
+  z-index: 11;
+  background: rgb(31 32 112 / 0.55);
+}
+
+.offline-panel {
+  width: min(380px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.offline-panel > .icon-ui {
+  align-self: center;
+  margin-bottom: -6px;
+}
+
+.offline-panel.offline-leaving {
+  animation: overlay-out 420ms ease-in 260ms forwards;
+}
+
+.offline-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.offline-body > .overlay-text {
+  text-align: center;
+}
+
+.offline-capped {
+  margin: -6px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--muted);
+}
+
+.offline-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.offline-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.offline-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.offline-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 5px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.offline-gain .offline-chip {
+  background: var(--mint-light);
+  color: var(--mint-shade);
+}
+
+.offline-spent .offline-chip {
+  background: var(--coral-light);
+  color: var(--coral-shade);
+}
+
+.offline-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: var(--paper-shade);
+}
+
+.offline-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.offline-alerts .offline-line {
+  color: var(--danger);
+}
+
+.offline-flyer {
+  position: fixed;
+  z-index: 13;
+  pointer-events: none;
+}
+
 /* ------------------------------------------------------------ célébration */
 
 /*
