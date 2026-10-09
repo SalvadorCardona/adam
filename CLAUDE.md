@@ -348,13 +348,32 @@ droit sur la cible de leur vague (`Mutant.target`, sauvegardée) : une fois
 sur deux, pour chaque base, le bâtiment de l'usine fini le plus proche
 d'elle (`WAVES.targets` : foreuse, ferme,
 carrière, cabane, forge), sinon la mairie, qui reprend la main si la cible
-tombe ; ils traversent tout sauf le bâti, qu'ils cassent. Un bâtiment de
-l'usine abattu redevient son chantier, à moitié livré (`RUIN`). Une vague
-s'annonce trois secondes avant (bandeau avec son effectif, ses bases, la direction de la plus proche — `World.leadBase` — et sa cible, cor grave, léger recul de caméra vers elle —
+tombe ; ils traversent tout sauf le bâti, qu'ils cassent. Un bâtiment
+abattu, hors mairie, redevient son chantier, à moitié livré (`RUIN`). Une vague
+s'annonce de loin (voir Annonce longue), et trois secondes avant (bandeau avec son effectif, ses bases, la direction de la plus proche — `World.leadBase` — et sa cible, cor grave, léger recul de caméra vers elle —
 pas si un bâtiment est armé ou une fenêtre ouverte, et un tap n'ouvre rien
 pendant que la carte glisse),
 sort de chaque base par sa porte, l'un après l'autre (`RAIDS.exitStagger`), d'une flaque vert fluo — un mutant qui émerge
 (`WAVES.emergeTicks`) n'est pas visable — et finit sur « Nuit N — vague repoussée ! » ;
+**Annonce longue** (`WAVE_WARNING`, `World.waveForecast`, `sim/waves.ts`) :
+2 min 30 avant sa sortie, une capsule « Vague dans 2:30 ×N » à droite de
+l'horloge (`.hud-wave`, corail et qui bat sous `urgentTicks` ; un tap montre
+la base), un repère de bord vers la base de tête, un trait corail sur la carte
+du monde, un toast et la notification « Vague annoncée » (type `attack` des
+Notifications, `waveAnnounced`) si la fenêtre n'a pas le focus.
+L'effectif annoncé est exact : la production des bases se déroule d'avance
+(`projectedRaiders`). Pas de vague hors ligne : onglet caché, le jeu est en pause.
+Force (`WAVE_STRENGTH`) : la cadence des bases (le temps), plus des renforts
+de la base de tête — `perEra` par ère (`eraOf` : fin de l'acte I, Signal) et
+un par `buildingsPerRaider` bâtiments au-delà de `freeBuildings`, palissades
+exclues (`World.townSize`). Abattue toute avant l'aube, une vague paie sa
+prime en ville (`WAVE_BOUNTY`, `waveRewarded`, `bountyNight` sauvegardé).
+Défenses de la recherche « Fortifications » (onglet Bâtiments du labo) : la
+**tour d'archers** (`archerTower`, kind `tower`, deux ouvriers : sans eux elle
+ne tire pas, à un, deux fois moins vite) et la **palissade** (`palisade`, kind
+`wall`, 1 × 1, 3 bois) qui arrête un mutant le temps qu'il la casse. Tout
+bâtiment abattu, hors mairie, redevient son chantier (`RUIN`) ; un chantier
+n'arrête pas un mutant (`blockerAt`).
 tout ennemi abattu (mutant, crabe, loup) lâche au sol le butin de sa table
 (`loot`, tirée du PRNG du monde ; `LOOT_DROPS`, `src/sim/loot.ts`) qu'Adam
 ramasse en marchant dessus — sac plein, il reste au sol. L'arc d'Adam et la tour de guet
@@ -745,7 +764,7 @@ météo `harsh` ne tombe jamais sur une nuit de vagues (`spoilsNight`). Rendu en
 `storage/localNotifications.ts`, `public/sw.js`) — le navigateur prévient quand
 le jeu n'a pas la main (`document.hidden` ou sans focus) : recherche finie,
 enfant né, vivres bas (`World.needAlert`, au passage de « tout va bien » à
-« ça manque »), vague annoncée (`waveCountdown`, une fois par vague). Sans
+« ça manque »), vague annoncée (`waveAnnounced`, sinon `waveCountdown` ; une fois par vague). Sans
 serveur ni Web Push : la partie s'arrête onglet caché et rien n'arrive page
 fermée, donc rien à notifier tant que le jeu n'a pas de temps hors ligne.
 Réglages (section Notifications, cachée si l'API manque) : un interrupteur par

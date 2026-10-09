@@ -57,6 +57,7 @@ import { LocalNotifications } from './storage/localNotifications.ts';
 import { LocalSigns } from './storage/localSigns.ts';
 import { LocalZoom } from './storage/localZoom.ts';
 import { TILE_SIZE } from './core/grid.ts';
+import { nextWave } from './sim/dayNight.ts';
 import { detectLocale, onLocale, setLocale, t } from './i18n/locale.ts';
 import { BuildingPanel } from './ui/buildingPanel.ts';
 import { CaravanPanel } from './ui/caravanPanel.ts';
@@ -66,7 +67,7 @@ import { escapeAction } from './ui/escape.ts';
 import { JoystickView } from './ui/joystick.ts';
 import { BuildMenu } from './ui/buildMenu.ts';
 import { rewardText } from './ui/collectionPanel.ts';
-import { Hud } from './ui/hud.ts';
+import { Hud, clock as clockText } from './ui/hud.ts';
 import { OfflineRecap } from './ui/offlineRecap.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
 import { haptics } from './ui/haptics.ts';
@@ -433,6 +434,7 @@ async function main(): Promise<void> {
 
   renderer.setSigns(signsOn);
   settings.setSigns(signsOn);
+
 
   // Les vibrations : même principe, et l'interrupteur disparaît là où le navigateur ne sait pas vibrer.
   const hapticPrefs = scenario ? new LocalHaptics(null) : LocalHaptics.browser();
@@ -1181,9 +1183,19 @@ function wireNotifications(world: World, notifier: Notifier, onResearchStarted: 
     notifier.notify('child', { title: t().notifications.child.title, body: t().notifications.child.body(name) }),
   );
 
-  // Une vague s'annonce en trois temps (3, 2, 1 s) : une seule notification par vague.
+  // Une vague s'annonce 2:30 avant (`waveAnnounced`), puis en trois temps (3, 2, 1 s) : une seule notification par vague,
+  // au premier des deux. Pas de vague hors ligne : onglet caché, le jeu est en pause.
   let announced = '';
 
+  world.events.on('waveAnnounced', ({ night, ticks, count, from }) => {
+    const clock = world.clock();
+
+    announced = `${night}:${clock ? nextWave(clock).wave : 0}`;
+    notifier.notify('attack', {
+      title: t().hud.wave.notifyTitle,
+      body: t().hud.wave.announced(clockText(Math.ceil(ticks / TICKS_PER_SECOND)), count, t().hud.from[from]),
+    });
+  });
   world.events.on('waveCountdown', ({ night, wave, count }) => {
     const key = `${night}:${wave}`;
 

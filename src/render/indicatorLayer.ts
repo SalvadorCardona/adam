@@ -12,8 +12,9 @@
  *   mutants), plus opaque quand il approche — et, dans la météo de brouillard, par
  *   mutant avalé par la brume même s'il est à l'écran. Le brouillard de
  *   guerre, lui, les tait : seul un mutant sur une case vue a son repère ;
- * - vert fluo, plus gros et qui bat, vers le point d'où surgira la
- *   prochaine vague, pendant les trois secondes de son annonce ;
+ * - vert fluo, plus gros, vers la base d'où surgira la prochaine vague,
+ *   pendant toute son annonce (`WAVE_WARNING`) — il bat dans ses dernières
+ *   secondes ;
  * - jaune, avec un petit toit, vers la mairie (ou son chantier) quand elle
  *   sort du champ, qui pulse tant que le chantier attend quelque chose, et
  *   qui grossit et clignote en corail quand la mairie est frappée (`alarm`) ;
@@ -45,7 +46,6 @@ import { FAMILY_TONES, PALETTE, hex, type Tone } from '../data/artDirection.ts';
 import { ICON_SIZE, ITEM_ICONS } from '../data/icons.ts';
 import { ITEM_IDS, type ItemId } from '../data/items.ts';
 import { findDeposit, type Deposit } from '../sim/deposits.ts';
-import { ticksToNextWave } from '../sim/dayNight.ts';
 import type { EntityId } from '../sim/types.ts';
 import { TICKS_PER_SECOND, type World } from '../sim/world.ts';
 import type { Camera } from './camera.ts';
@@ -298,15 +298,15 @@ export class IndicatorLayer {
     this.pointFlag(camera, zone, px, py, deltaMs);
     this.pointSpot(camera, zone, px, py, deltaMs);
 
-    const { world } = this;
-    const clock = world.clock();
-    const left = clock ? ticksToNextWave(clock) : 0;
+    // Toute l'annonce de la vague (`World.waveForecast`), un repère montre la base d'où elle sortira ;
+    // il bat dans ses dernières secondes. Une nuit calme n'a rien à montrer du doigt.
+    const forecast = this.world.waveForecast();
 
-    // Une nuit calme — aucune base debout, rien en réserve — n'a rien à montrer du doigt.
-    if (clock && !world.defeated && left > 0 && left <= ANNOUNCE_SECONDS * TICKS_PER_SECOND && world.raidSize(clock.cycle).count > 0) {
-      const origin = world.waveOrigin();
+    if (forecast) {
+      const pressing = forecast.urgent || forecast.ticks <= ANNOUNCE_SECONDS * TICKS_PER_SECOND;
+      const scale = pressing ? 1.25 + Math.sin(this.elapsed / 120) * 0.15 : 1.1;
 
-      this.arrow(camera, zone, origin.x, origin.y, 'toxic', 1, 1.25 + Math.sin(this.elapsed / 120) * 0.15, 'eye');
+      this.arrow(camera, zone, forecast.x, forecast.y, 'toxic', pressing ? 1 : 0.85, scale, 'eye');
     }
 
     const hall = this.world.entities.get(this.world.townHallId);

@@ -74,7 +74,7 @@ function declared(block: string, property: string): string[] {
 }
 
 /** Les blocs de la rangée du haut : la barre, et ceux des groupes de gauche et de droite. */
-const BLOCKS = ['.hud-topbar', '.hud-town', '.hud-people', '.hud-clock', '.hud-hunger', '.hud-weather'];
+const BLOCKS = ['.hud-topbar', '.hud-town', '.hud-people', '.hud-clock', '.hud-hunger', '.hud-wave', '.hud-weather'];
 /** Les cases de la barre : toutes de la hauteur `--cell-h`, tirée de `--hud-h`. */
 const CELLS = ['.hud-objective'];
 

@@ -29,6 +29,7 @@ export type BuildingKind =
   | 'forge'
   | 'clinic'
   | 'purifier'
+  | 'wall'
   | 'barracks'
   | 'lab'
   | 'lumberCamp'
@@ -498,6 +499,53 @@ export const BUILDINGS = {
         sprite: 'reinforcedTower',
       },
     ],
+  },
+  archerTower: {
+    label: LORE.buildings.archerTower.name,
+    sign: LORE.buildings.archerTower.sign,
+    siteDescription: LORE.buildings.archerTower.site,
+    description: LORE.buildings.archerTower.description,
+    effect: LORE.buildings.archerTower.effect,
+    kind: 'tower',
+    category: 'defense',
+    width: 2,
+    height: 2,
+    cost: { wood: 14, stone: 10, ironOre: 4 },
+    storage: 0,
+    logisticRadius: 0,
+    hp: 80,
+    // Ses archers y entrent : sans eux, elle ne tire pas ; à moitié, deux fois moins vite (`World.runTower`).
+    workers: 2,
+    minWorkers: 0,
+    menu: true,
+    unique: false,
+    plan: false,
+    sprite: 'archerTower',
+    weapon: 'archerBow',
+    upgrades: [],
+  },
+  palisade: {
+    label: LORE.buildings.palisade.name,
+    sign: LORE.buildings.palisade.sign,
+    siteDescription: LORE.buildings.palisade.site,
+    description: LORE.buildings.palisade.description,
+    effect: LORE.buildings.palisade.effect,
+    kind: 'wall',
+    category: 'defense',
+    width: 1,
+    height: 1,
+    cost: { wood: 3 },
+    storage: 0,
+    logisticRadius: 0,
+    hp: 40,
+    workers: 0,
+    minWorkers: 0,
+    menu: true,
+    unique: false,
+    plan: false,
+    sprite: 'palisade',
+    weapon: null,
+    upgrades: [],
   },
   forge: {
     label: LORE.buildings.forge.name,

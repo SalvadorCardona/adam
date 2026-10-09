@@ -186,6 +186,51 @@ export const WAVES = {
 } as const;
 
 /**
+ * L'annonce d'une vague : elle ne tombe jamais sans prévenir. `leadTicks`
+ * avant sa sortie, le HUD affiche « Vague dans 2:30 » et son effectif, un
+ * repère de bord montre la base d'où elle sortira, et une notification part
+ * si le joueur l'a permise (`waveAnnounced`). Sous `urgentTicks`, la
+ * capsule bat. Les trois dernières secondes gardent leur compte à rebours.
+ * Une nuit calme — rien en réserve, pas de chef, pas de renfort — ne
+ * s'annonce pas.
+ */
+export const WAVE_WARNING = {
+  leadTicks: 20 * 150,
+  urgentTicks: 20 * 30,
+} as const;
+
+/**
+ * La force d'une vague. Les bases en font l'essentiel, et leur cadence monte
+ * déjà chaque nuit (`RAIDS.paceGrowth`, `capacityEvery`) : c'est le temps.
+ * S'y ajoutent des **renforts**, qui sortent de la base la plus proche de la
+ * mairie avec les chefs :
+ * - `perEra` par ère franchie — la fin de l'acte I, puis le Signal
+ *   (`eraOf`, `sim/waves.ts`) ;
+ * - un tous les `buildingsPerRaider` bâtiments finis au-delà de
+ *   `freeBuildings` (palissades non comprises) : la ville qui grandit attire
+ *   la convoitise.
+ * Au plus `maxReinforcements`. Une jeune colonie n'en reçoit aucun.
+ */
+export const WAVE_STRENGTH = {
+  perEra: 2,
+  freeBuildings: 8,
+  buildingsPerRaider: 6,
+  maxReinforcements: 12,
+} as const;
+
+/**
+ * La prime d'une vague repoussée — tous ses mutants abattus avant l'aube,
+ * pas seulement survécue (l'aube a son butin, `DAWN_REWARD`) : `items` en
+ * ville, multipliés par `1 + perNight × (nuit − 1)` (arrondi), et `boss` en
+ * plus une nuit de chef. Sans mairie debout, dans le sac ; le surplus au sol.
+ */
+export const WAVE_BOUNTY = {
+  items: { wood: 4, stone: 4, ironOre: 2 },
+  perNight: 0.2,
+  boss: { ironPlate: 3, mutantGoo: 2 },
+} as const satisfies { items: Partial<Record<ItemId, number>>; perNight: number; boss: Partial<Record<ItemId, number>> };
+
+/**
  * La Reine des flaques, nuit par nuit et phase par phase.
  *
  * Elle sort d'une base une nuit sur cinq à partir de la dixième —

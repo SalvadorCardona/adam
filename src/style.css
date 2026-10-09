@@ -1562,6 +1562,56 @@ button:disabled,
   display: none;
 }
 
+/*
+ * L'annonce de la prochaine vague, à droite de l'horloge : « Vague dans 2:30 »
+ * et son effectif, en indigo ; sous les trente dernières secondes, elle passe
+ * en corail et bat. Un tap montre la base d'où elle sortira.
+ */
+.hud .hud-wave {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 12px;
+  border: none;
+  background: var(--ink);
+  box-shadow: 0 3px 0 var(--ink-shade);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+  white-space: nowrap;
+  cursor: var(--cursor-hand);
+}
+
+.hud .hud-wave[data-urgent='true'] {
+  background: var(--coral);
+  box-shadow: 0 3px 0 var(--coral-shade);
+  animation: hunger-pulse 1s ease-in-out infinite;
+}
+
+.hud-wave[hidden] {
+  display: none;
+}
+
+.hud-wave .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.hud-wave .hud-wave-count {
+  opacity: 0.85;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud .hud-wave[data-urgent='true'] {
+    animation: none;
+  }
+}
+
 @keyframes tip-in {
   from {
     opacity: 0;
@@ -1570,7 +1620,8 @@ button:disabled,
 
 /* Sur un téléphone, l'alerte de vivres se serre. */
 @media (max-width: 599px), (max-height: 499px) {
-  .hud .hud-hunger {
+  .hud .hud-hunger,
+  .hud .hud-wave {
     padding: 0 10px;
     font-size: 14px;
   }
