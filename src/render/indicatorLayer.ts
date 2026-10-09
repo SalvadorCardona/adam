@@ -24,7 +24,10 @@
  *   d'une alerte de la ville tapée dans le panneau du sac (`pointTo`) —
  *   la forge qui attend son charbon —, quelques secondes.
  *
- * La mairie, le gisement et le bâtiment d'une alerte disent leur distance (« 24 m ») quand ils sont
+ * - violet, avec un éclat, vers le coffre ou la ruine non trouvé le plus proche, sur une case
+ *   déjà explorée (un secret, lui, reste discret : pas de repère). Même étiquette de distance ;
+ *
+ * La mairie, le gisement, le bâtiment d'une alerte et le point d'intérêt disent leur distance (« 24 m ») quand ils sont
  * loin. Le repère de la mairie se tape (`homeAt`).
  *
  * Aucun repère ne se pose sous le HUD : la zone utile s'arrête sous la quête
@@ -37,7 +40,7 @@
  */
 
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
-import { TILE_SIZE, floorDiv } from '../core/grid.ts';
+import { CHUNK_SIZE, TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { FAMILY_TONES, PALETTE, hex, type Tone } from '../data/artDirection.ts';
 import { ICON_SIZE, ITEM_ICONS } from '../data/icons.ts';
 import { ITEM_IDS, type ItemId } from '../data/items.ts';
@@ -106,6 +109,9 @@ export const ITEM_TONES: Record<ItemId, Tone> = {
   spore: FAMILY_TONES.ruins,
 };
 
+/** Le point d'intérêt visé est cherché dans les chunks à cette distance d'Adam, au plus. */
+const SPOT_CHUNKS = 2;
+
 /** Durée du repère d'une alerte de la ville, en ms : le temps de regarder, puis de marcher. */
 const FLAG_MS = 8000;
 
@@ -137,7 +143,7 @@ interface Zone {
   bottom: number;
 }
 
-type Glyph = 'eye' | 'home' | 'item';
+type Glyph = 'eye' | 'home' | 'item' | 'spot';
 
 /** Une pastille posée : son centre à l'écran, et si sa flèche descend. */
 interface Pin {
@@ -158,6 +164,10 @@ export class IndicatorLayer {
   private readonly depositLabel = label();
   private readonly flagIcon = new Sprite();
   private readonly flagLabel = label();
+  private readonly spotLabel = label();
+  /** Le coffre ou la ruine visé, cherché toutes les `SEARCH_MS`. */
+  private spot: { x: number; y: number } | null = null;
+  private spotIn = 0;
   private readonly world: World;
   private readonly library: SpriteLibrary;
   private elapsed = 0;
@@ -185,7 +195,7 @@ export class IndicatorLayer {
     this.icon.visible = false;
     this.flagIcon.anchor.set(0.5);
     this.flagIcon.visible = false;
-    this.container.addChild(this.graphics, this.icon, this.flagIcon, this.homeLabel, this.depositLabel, this.flagLabel);
+    this.container.addChild(this.graphics, this.icon, this.flagIcon, this.homeLabel, this.depositLabel, this.flagLabel, this.spotLabel);
   }
 
   /**
@@ -237,6 +247,7 @@ export class IndicatorLayer {
     this.depositLabel.visible = false;
     this.flagIcon.visible = false;
     this.flagLabel.visible = false;
+    this.spotLabel.visible = false;
     this.home = null;
 
     const { player } = this.world;
@@ -285,6 +296,7 @@ export class IndicatorLayer {
     }
 
     this.pointFlag(camera, zone, px, py, deltaMs);
+    this.pointSpot(camera, zone, px, py, deltaMs);
 
     const { world } = this;
     const clock = world.clock();
@@ -311,6 +323,47 @@ export class IndicatorLayer {
       this.home = center;
       if (center && tiles >= LABEL_TILES) this.tag(this.homeLabel, center, meters(tiles));
     }
+  }
+
+  /** Le repère du coffre ou de la ruine le plus proche qu'Adam n'a pas encore trouvé, sur une case explorée. */
+  private pointSpot(camera: Camera, zone: Zone, px: number, py: number, deltaMs: number): void {
+    const { world } = this;
+
+    this.spotIn -= deltaMs;
+    if (this.spotIn <= 0) {
+      this.spotIn = SEARCH_MS;
+      this.spot = null;
+
+      let best = Infinity;
+      const ccx = floorDiv(px, CHUNK_SIZE);
+      const ccy = floorDiv(py, CHUNK_SIZE);
+
+      for (let cy = ccy - SPOT_CHUNKS; cy <= ccy + SPOT_CHUNKS; cy += 1) {
+        for (let cx = ccx - SPOT_CHUNKS; cx <= ccx + SPOT_CHUNKS; cx += 1) {
+          for (const found of [world.chestOfChunk(cx, cy), world.spotOfChunk('ruin', cx, cy)]) {
+            if (!found || world.isFound(found.id) || world.sightAt(found.tx, found.ty) === 'unexplored') continue;
+
+            const x = (found.tx + 0.5) * TILE_SIZE;
+            const y = (found.ty + 0.5) * TILE_SIZE;
+            const distance = (x - px) ** 2 + (y - py) ** 2;
+
+            if (distance < best) {
+              best = distance;
+              this.spot = { x, y };
+            }
+          }
+        }
+      }
+    }
+    if (!this.spot) return;
+
+    const center = this.arrow(camera, zone, this.spot.x, this.spot.y, 'violet', 0.9, 1 + Math.sin(this.elapsed / 400) * 0.04, 'spot');
+
+    if (!center) return;
+
+    const tiles = Math.hypot(this.spot.x - px, this.spot.y - py) / TILE_SIZE;
+
+    if (tiles >= LABEL_TILES) this.tag(this.spotLabel, center, meters(tiles));
   }
 
   /** Le repère d'une alerte de la ville : il bat, et s'éteint au bout de `FLAG_MS` ou si le bâtiment tombe. */
@@ -432,6 +485,13 @@ export class IndicatorLayer {
     } else if (glyph === 'item') {
       // Un disque blanc sous l'icône de l'objet : elle reste lisible sur sa propre teinte.
       g.circle(cx0, cy0, 8.5).fill({ color: hex(PALETTE.paper.base), alpha: opacity });
+    } else if (glyph === 'spot') {
+      // Un disque blanc et un éclat jaune à quatre branches : la même étincelle que sur la ruine.
+      const spark = PALETTE.yellow.shade;
+
+      g.circle(cx0, cy0, 8.5).fill({ color: hex(PALETTE.paper.base), alpha: opacity });
+      g.roundRect(cx0 - 1.4, cy0 - 6, 2.8, 12, 1.4).fill({ color: hex(spark), alpha: opacity });
+      g.roundRect(cx0 - 6, cy0 - 1.4, 12, 2.8, 1.4).fill({ color: hex(spark), alpha: opacity });
     } else {
       // Un gros œil de mutant, qui louche.
       g.circle(cx0, cy0, 5).fill({ color: hex(PALETTE.paper.base), alpha: opacity });

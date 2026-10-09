@@ -43,6 +43,7 @@ export const wardrobe: Messages['wardrobe'] = {
     queen: 'Loot from the Puddle Queen',
     beast: 'Found on a beast',
     chest: 'Found in a chest',
+    ruin: 'Found in a ruin',
   },
   locked: 'To be found',
   lockedHint: 'Found while playing: chests on the map, objectives, mutant bases and their chiefs, the Queen, sometimes a beast.',

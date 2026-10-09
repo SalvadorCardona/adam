@@ -68,6 +68,14 @@ export const hud: Messages['hud'] = {
     west: 'from the west',
     northWest: 'from the northwest',
   },
+  /** Points of interest on the map: what floats when Adam finds one, and their edge marker. */
+  discovery: {
+    ruin: 'Ruin searched!',
+    secret: 'Stash found!',
+    plan: (building: string): string => `Blueprint found: ${building}`,
+    research: 'Something for the research',
+    marker: { chest: 'Chest', ruin: 'Ruin', secret: 'Stash' },
+  },
   toast: {
     depositFar: 'Too far from the town hall — get closer to drop off',
     depositNoTown: 'No town yet: build the town hall first',

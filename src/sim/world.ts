@@ -78,6 +78,8 @@ import { drawPieces, lookRejection, type LookRejection } from './wardrobe.ts';
 import { CHESTS } from '../data/chests.ts';
 import { PURIFIER } from '../data/contamination.ts';
 import { chestOfChunk, type Chest } from './chests.ts';
+import { DISCOVERIES, type DiscoveryKind, type RuinReward } from '../data/discoveries.ts';
+import { rollDiscoveryLoot, rollRuinReward, spotOfChunk, tierAt, type Spot, type SpotKind } from './discoveries.ts';
 import { HOUSING } from '../data/housing.ts';
 import { REACTIONS, type ReactionId, type TraitId } from '../data/traits.ts';
 import { AGES, COLONY, NURSERY_CARE } from '../data/inhabitants.ts';
@@ -742,6 +744,12 @@ export type WorldEvents = {
   piecesSpared: { source: LootSource; prestige: number };
   /** Adam ouvre un coffre de la carte, au centre (x, y) de sa case. */
   chestOpened: { id: number; tx: number; ty: number; x: number; y: number };
+  /**
+   * Adam trouve un point d'intérêt — coffre, ruine ou secret — en (x, y). `items` est ce qui est
+   * parti vers le sac (le surplus tombe au sol en `lootDropped`), `plan` le bâtiment dont il
+   * reçoit le plan, `reward` ce que donne une ruine.
+   */
+  discoveryFound: { id: number; kind: DiscoveryKind; tx: number; ty: number; x: number; y: number; items: [ItemId, number][]; plan: BuildingId | null; reward: RuinReward | null };
 };
 
 export class World {
@@ -840,7 +848,7 @@ export class World {
   private menuKnown: Set<BuildingId> | null = null;
 
   /** Ce dont dépendait le menu au dernier compte : tant que rien n'en change, `watchUnlocks` ne recompte pas. */
-  private unlockStamp: { hall: boolean; research: number; quests: number; objective: number } | null = null;
+  private unlockStamp: { hall: boolean; research: number; quests: number; objective: number; open: number } | null = null;
 
   /**
    * Combien de fois chaque offre rare de la caravane a été prise : leur
@@ -920,6 +928,10 @@ export class World {
   private readonly chestCache = new Map<string, Chest | null>();
   /** Les coffres qu'Adam a ouverts, par id : c'est tout ce qui est de l'état. */
   private readonly openedChests = new Set<number>();
+  /** La ruine et le secret de chaque chunk déjà regardé, tels que la seed les pose (`sim/discoveries.ts`). */
+  private readonly spotCache = new Map<string, Spot | null>();
+  /** Les ruines fouillées et les secrets trouvés, par id. */
+  private readonly foundSpots = new Set<number>();
 
   /** Les réservations des porteurs. Pas de l'état : elles se relisent dans leurs jobs. */
   private readonly jobs = new JobBoard();
@@ -1122,6 +1134,7 @@ export class World {
       mobiles: [...this.mobiles.values()].map(copyMobile),
       dens: [...this.dens].map(([id, den]) => ({ id, ...den })),
       chests: [...this.openedChests],
+      spots: [...this.foundSpots],
       scheduler: this.scheduler.toJSON(this.tickCount),
     };
   }
@@ -1229,6 +1242,8 @@ export class World {
 
     this.openedChests.clear();
     for (const id of state.chests ?? []) this.openedChests.add(id);
+    this.foundSpots.clear();
+    for (const id of state.spots ?? []) this.foundSpots.add(id);
 
     // Une sauvegarde d'avant les bases mutantes les découvre autour de la mairie — sauf celles dont la
     // zone tient déjà du bâti, ou dont l'emprise tomberait sur Adam.
@@ -1322,6 +1337,7 @@ export class World {
       this.watchRegion();
       this.harvestNearby();
       this.openChests();
+      this.searchSpots();
     }
     this.growForest();
     this.stepClock();
@@ -3013,10 +3029,10 @@ export class World {
     const hall = this.warehouse() !== null;
     const stamp = this.unlockStamp;
 
-    if (stamp && stamp.hall === hall && stamp.research === this.researchDone.length && stamp.quests === this.questsDone && stamp.objective === this.objective) {
+    if (stamp && stamp.hall === hall && stamp.research === this.researchDone.length && stamp.quests === this.questsDone && stamp.objective === this.objective && stamp.open === this.openBuildings.size) {
       return;
     }
-    this.unlockStamp = { hall, research: this.researchDone.length, quests: this.questsDone, objective: this.objective };
+    this.unlockStamp = { hall, research: this.researchDone.length, quests: this.questsDone, objective: this.objective, open: this.openBuildings.size };
 
     const known = this.menuKnown;
     const menu = MENU_BUILDING_IDS.filter((id) => this.inMenu(id));
@@ -4304,8 +4320,111 @@ export class World {
         this.openedChests.add(chest.id);
         this.events.emit('chestOpened', { id: chest.id, tx: chest.tx, ty: chest.ty, x, y });
         this.findPiece('chest', chest.id, 1, x, y);
+
+        const tier = tierAt(this.seed, chest.tx, chest.ty);
+        const items = rollDiscoveryLoot(this.seed, chest.id, DISCOVERIES.chest.loot[tier]!);
+
+        this.emitFind(chest.id, 'chest', chest.tx, chest.ty, this.stowFinds(items, x, y), null, null);
       }
     }
+  }
+
+  /* ----------------------------------------------------- ruines et secrets */
+
+  /** La ruine ou le secret d'un chunk, ou `null` : celui de la seed, sauf sous une base mutante ou sur la case d'un coffre. */
+  public spotOfChunk(kind: SpotKind, cx: number, cy: number): Spot | null {
+    const key = `${kind}:${coordKey(cx, cy)}`;
+    let spot = this.spotCache.get(key);
+
+    if (spot === undefined) {
+      const found = spotOfChunk(this.seed, kind, cx, cy);
+      const chest = this.chestOfChunk(cx, cy);
+
+      spot = found && !this.enemyBases.some((base) => onBase(base, found.tx, found.ty)) && !(chest && chest.tx === found.tx && chest.ty === found.ty) ? found : null;
+      this.spotCache.set(key, spot);
+    }
+    return spot;
+  }
+
+  /** Ce point (coffre, ruine ou secret) a-t-il déjà été trouvé ? */
+  public isFound(id: number): boolean {
+    return this.openedChests.has(id) || this.foundSpots.has(id);
+  }
+
+  /** Adam passe près d'une ruine ou d'un secret pas encore trouvé : il le fouille. */
+  private searchSpots(): void {
+    const { player } = this;
+    const reach = Math.max(DISCOVERIES.ruin.searchTiles, DISCOVERIES.secret.findTiles) * TILE_SIZE;
+
+    for (let cy = floorDiv(player.y - reach, CHUNK_SIZE); cy <= floorDiv(player.y + reach, CHUNK_SIZE); cy += 1) {
+      for (let cx = floorDiv(player.x - reach, CHUNK_SIZE); cx <= floorDiv(player.x + reach, CHUNK_SIZE); cx += 1) {
+        for (const kind of ['ruin', 'secret'] as const) {
+          const spot = this.spotOfChunk(kind, cx, cy);
+
+          if (!spot || this.foundSpots.has(spot.id)) continue;
+
+          const x = (spot.tx + 0.5) * TILE_SIZE;
+          const y = (spot.ty + 0.5) * TILE_SIZE;
+          const range = (kind === 'ruin' ? DISCOVERIES.ruin.searchTiles : DISCOVERIES.secret.findTiles) * TILE_SIZE;
+
+          if (distanceSq(player.x, player.y, x, y) > range * range) continue;
+          this.foundSpots.add(spot.id);
+          this.findSpot(spot, x, y);
+        }
+      }
+    }
+  }
+
+  private findSpot(spot: Spot, x: number, y: number): void {
+    if (spot.kind === 'secret') {
+      const items = rollDiscoveryLoot(this.seed, spot.id, DISCOVERIES.secret.loot[spot.tier]!);
+
+      this.emitFind(spot.id, 'secret', spot.tx, spot.ty, this.stowFinds(items, x, y), null, null);
+      return;
+    }
+
+    const { plans, research } = DISCOVERIES.ruin;
+    const missing = plans[spot.tier]!.filter((building) => !this.openBuildings.has(building));
+    const reward = rollRuinReward(this.seed, spot.id, spot.tier, missing.length);
+    let items: [ItemId, number][] = [];
+    let plan: BuildingId | null = null;
+
+    if (reward === 'plan') {
+      plan = missing[hash3(this.seed, spot.id, 3) % missing.length]!;
+      this.openBuildings.add(plan);
+    } else if (reward === 'piece') {
+      this.findPiece('ruin', spot.id, 1, x, y);
+    } else {
+      items = this.stowFinds(rollDiscoveryLoot(this.seed, spot.id, research[spot.tier]!), x, y);
+    }
+    this.emitFind(spot.id, 'ruin', spot.tx, spot.ty, items, plan, reward);
+  }
+
+  /**
+   * Met le butin d'un point dans le sac ; ce qui n'y tient pas tombe au sol à côté. Rend ce qui est parti
+   * vers le sac. Tant que la mairie n'est pas debout, le sac garde sa règle (`carryLimit`) : le surplus
+   * attend au sol qu'Adam s'en éloigne, comme ce qu'il jette.
+   */
+  private stowFinds(items: [ItemId, number][], x: number, y: number): [ItemId, number][] {
+    const stowed: [ItemId, number][] = [];
+
+    for (const [index, [item, amount]] of items.entries()) {
+      const room = this.townStock() ? amount : Math.max(0, this.carryLimit(item) - this.player.inventory.count(item));
+      const added = this.player.inventory.add(item, Math.min(amount, room));
+
+      if (added > 0) stowed.push([item, added]);
+      if (added === amount) continue;
+
+      const px = x + (index - (items.length - 1) / 2) * DROP_SPACING;
+      const pickup = this.spawnPickup(item, amount - added, px, y + DROP_AHEAD, true);
+
+      this.events.emit('lootDropped', { id: pickup.id, item, x: pickup.x, y: pickup.y });
+    }
+    return stowed;
+  }
+
+  private emitFind(id: number, kind: DiscoveryKind, tx: number, ty: number, items: [ItemId, number][], plan: BuildingId | null, reward: RuinReward | null): void {
+    this.events.emit('discoveryFound', { id, kind, tx, ty, x: (tx + 0.5) * TILE_SIZE, y: (ty + 0.5) * TILE_SIZE, items, plan, reward });
   }
 
   /* -------------------------------------------------------------- équipement */

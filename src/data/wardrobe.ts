@@ -136,7 +136,7 @@ export const DEFAULT_LOOK: Look = {
 };
 
 /** Ce qui fait trouver une pièce. */
-export const LOOT_SOURCES = ['objective', 'enemyBase', 'chief', 'queen', 'beast', 'chest'] as const;
+export const LOOT_SOURCES = ['objective', 'enemyBase', 'chief', 'queen', 'beast', 'chest', 'ruin'] as const;
 
 export type LootSource = (typeof LOOT_SOURCES)[number];
 
@@ -165,6 +165,8 @@ export const WARDROBE_LOOT = {
   queen: { chance: 1, weights: { epic: 1, rare: 1 } },
   beast: { chance: 0.05, weights: { common: 1 } },
   chest: { chance: 1, weights: { common: 3, rare: 2, epic: 1 } },
+  /** Une ruine fouillée : jamais de courante, c'est un lieu rare (`DISCOVERIES.ruin`). */
+  ruin: { chance: 1, weights: { rare: 2, epic: 1 } },
 } as const satisfies Record<FlatLootSource, WardrobeDrop>;
 
 /**

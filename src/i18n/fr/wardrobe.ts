@@ -45,6 +45,7 @@ export const wardrobe = {
     queen: 'Butin de la Reine des flaques',
     beast: 'Trouvée sur une bête',
     chest: 'Trouvée dans un coffre',
+    ruin: 'Trouvée dans une ruine',
   },
   locked: 'À trouver',
   /** Sous une pièce verrouillée choisie : où la chercher. */

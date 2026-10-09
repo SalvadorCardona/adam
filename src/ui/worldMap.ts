@@ -37,7 +37,7 @@
  * Aucune règle de jeu ici, et rien n'est écrit dans le monde : on lit.
  */
 
-import { TILE_SIZE, floorDiv } from '../core/grid.ts';
+import { CHUNK_TILES, TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { GROUND, PALETTE, type Color } from '../data/artDirection.ts';
 import type { ContaminationKind } from '../data/contamination.ts';
 import type { ItemId } from '../data/items.ts';
@@ -467,6 +467,7 @@ export class WorldMap {
 
     this.drawBuildings();
     this.drawLairs();
+    this.drawSpots();
     this.drawMobiles();
     this.drawPlayer();
     this.drawCameraFrame();
@@ -496,8 +497,22 @@ export class WorldMap {
     }
   }
 
+  /** Les coffres et les ruines pas encore trouvés, sur les cases explorées : un point blanc cerclé de violet. */
+  private drawSpots(): void {
+    const tiles = this.view.visibleTiles();
+
+    for (let cy = floorDiv(tiles.minTy, CHUNK_TILES); cy <= floorDiv(tiles.maxTy, CHUNK_TILES); cy += 1) {
+      for (let cx = floorDiv(tiles.minTx, CHUNK_TILES); cx <= floorDiv(tiles.maxTx, CHUNK_TILES); cx += 1) {
+        for (const spot of [this.world.chestOfChunk(cx, cy), this.world.spotOfChunk('ruin', cx, cy)]) {
+          if (!spot || this.world.isFound(spot.id) || this.sightOf(spot.tx + 0.5, spot.ty + 0.5) === 'unexplored') continue;
+          this.footprint(spot.tx, spot.ty, 1, 1, 'spot');
+        }
+      }
+    }
+  }
+
   /** Une emprise, en trois tons comme une carte du HUD : la face avant, le dessus, et un liseré clair. */
-  private footprint(tx: number, ty: number, width: number, height: number, kind: 'site' | 'built' | 'base' | 'ruin'): void {
+  private footprint(tx: number, ty: number, width: number, height: number, kind: 'site' | 'built' | 'base' | 'ruin' | 'spot'): void {
     const { context, view } = this;
     const at = view.toScreen(tx, ty);
     const w = Math.max(3, width * view.scale);
@@ -509,6 +524,7 @@ export class WorldMap {
       built: { base: PALETTE.yellow.base, shade: PALETTE.yellow.shade },
       base: { base: PALETTE.toxic.base, shade: PALETTE.toxic.shade },
       ruin: { base: PALETTE.violet.light, shade: PALETTE.violet.shade },
+      spot: { base: PALETTE.paper.base, shade: PALETTE.violet.base },
     };
     const tone = tones[kind];
 

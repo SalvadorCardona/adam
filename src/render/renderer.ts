@@ -31,6 +31,7 @@ import { Camera, ZOOM, stepZoom } from './camera.ts';
 import { ChunkLayer } from './chunkLayer.ts';
 import { EnemyBaseLayer } from './enemyBaseLayer.ts';
 import { ChestLayer } from './chestLayer.ts';
+import { SpotLayer } from './spotLayer.ts';
 import { EntityLayer } from './entityLayer.ts';
 import { FogLayer } from './fogLayer.ts';
 import { GhostLayer } from './ghostLayer.ts';
@@ -62,6 +63,7 @@ export class GameRenderer {
   private readonly resourceLayer: ResourceLayer;
   private readonly enemyBases: EnemyBaseLayer;
   private readonly chests: ChestLayer;
+  private readonly spots: SpotLayer;
   private readonly ghostLayer: GhostLayer;
   private readonly workReach: WorkReachLayer;
   private readonly selection: SelectionLayer;
@@ -102,6 +104,7 @@ export class GameRenderer {
     this.resourceLayer = new ResourceLayer(world, library, this.tiles, this.entityLayer.container, this.shadows);
     this.enemyBases = new EnemyBaseLayer(world, library, this.tiles, this.entityLayer.container, this.shadows);
     this.chests = new ChestLayer(world, library, this.tiles, this.entityLayer.container, this.shadows);
+    this.spots = new SpotLayer(world, library, this.entityLayer.container);
     this.indicators = new IndicatorLayer(world, library);
     this.ghostLayer = new GhostLayer(world, library);
     this.workReach = new WorkReachLayer(world);
@@ -335,6 +338,7 @@ export class GameRenderer {
     this.entityLayer.update(alpha, this.app.ticker, this.camera.zoom);
     this.enemyBases.update(this.app.ticker.deltaMS);
     this.chests.update(this.camera, this.app.ticker.deltaMS);
+    this.spots.update(this.camera, this.app.ticker.deltaMS);
     this.particles.update(this.app.ticker.deltaMS);
     this.nightLayer.update(alpha);
     this.fogLayer.update(this.camera);
@@ -375,6 +379,7 @@ export class GameRenderer {
     this.signboards.destroy();
     this.enemyBases.destroy();
     this.chests.destroy();
+    this.spots.destroy();
     this.ghostLayer.destroy();
     this.workReach.destroy();
     this.selection.destroy();
