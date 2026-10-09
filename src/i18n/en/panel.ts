@@ -346,6 +346,15 @@ export const panel: Messages['panel'] = {
     hp: (from: number, to: number): string => `HP ${from} → ${to}`,
     range: (from: number, to: number): string => `range ${from} → ${to}`,
     rate: (percent: number): string => `fire rate ${percent > 0 ? '+' : ''}${percent}%`,
+    beds: (from: number, to: number): string => `beds ${from} → ${to}`,
+    logistic: (from: number, to: number): string => `radius ${from} → ${to} tiles`,
+    speed: (percent: number): string => `production +${percent}%`,
+    needsResearch: (research: string): string => `Needs the “${research}” research at the lab.`,
+  },
+
+  decor: {
+    mood: (amount: number, radius: number): string => `+${amount} happiness each dawn for workers within ${radius} tiles`,
+    remove: 'Remove',
   },
 
   starved: {

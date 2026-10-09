@@ -43,7 +43,20 @@ export const content: Content = {
         'The colony’s first building. The game starts on its construction site: bring it wood and stone to finish it.',
       description: 'The heart of the colony: if it falls, all is lost.',
       effect: 'The heart of the colony: if it falls, all is lost.',
-      upgrades: [],
+      upgrades: [
+        {
+          label: 'Stone town hall',
+          description:
+            'The plank walls give way to a stone plinth: the town hall sees farther, its logistic radius grows and its coral pennant flies higher.',
+          action: 'Build in stone',
+        },
+        {
+          label: 'City hall',
+          description:
+            'Red bricks, lanterns on the pillars and a great golden banner: the whole town gathers under its radius.',
+          action: 'Build in brick',
+        },
+      ],
     },
     lumberCamp: {
       label: 'Lumber camp',
@@ -70,7 +83,20 @@ export const content: Content = {
       description:
         'A collapsed car park, a jury-rigged crane and piles of pink rubble. Three workers cut stone from the ruins of the old world and store it in its chest, which porters empty into the town hall. No rock needed: there’s no shortage of ruins.',
       effect: '3 workers cut stone, no rock needed.',
-      upgrades: [],
+      upgrades: [
+        {
+          label: 'Stone quarry',
+          description:
+            'A better-guyed crane and a cut-stone plinth: the workers cut a fifth faster.',
+          action: 'Reinforce',
+        },
+        {
+          label: 'Great quarry',
+          description:
+            'Brick hoists and a golden pennant: the quarry runs almost twice as fast as at the start.',
+          action: 'Mechanize',
+        },
+      ],
     },
     well: {
       label: 'Well',
@@ -105,7 +131,20 @@ export const content: Content = {
       siteDescription: 'A stone frame waiting for its iron. Set on the edge of an ore vein, it will mine it on its own.',
       description: 'A salvaged machine that mines the vein beneath it.',
       effect: 'Mines the ore of the vein beneath it on its own.',
-      upgrades: [],
+      upgrades: [
+        {
+          label: 'Stone drill',
+          description:
+            'A stone footing under the derrick: the drill bites a fifth faster.',
+          action: 'Reinforce',
+        },
+        {
+          label: 'Brick drill',
+          description:
+            'A brick shaft and a golden banner: the drill runs almost twice as fast as at the start.',
+          action: 'Mechanize',
+        },
+      ],
     },
     nursery: {
       label: 'Nursery',
@@ -132,7 +171,20 @@ export const content: Content = {
       description:
         'A two-storey house, its chimney smoking and a quilt airing at the window. Four inhabitants sleep warm here: without a bed, you sleep outside, wake up unhappy and drag your feet.',
       effect: '4 beds: 4 inhabitants sleep warm.',
-      upgrades: [],
+      upgrades: [
+        {
+          label: 'Stone house',
+          description:
+            'A stone plinth and one more bed upstairs: six inhabitants sleep warm.',
+          action: 'Extend',
+        },
+        {
+          label: 'Brick house',
+          description:
+            'Red bricks, a lantern on the gable and a golden pennant: eight inhabitants find a bed.',
+          action: 'Raise',
+        },
+      ],
     },
     farm: {
       label: 'Farm',
@@ -175,6 +227,46 @@ export const content: Content = {
       description:
         'Three sharpened stakes bound with rope. A mutant goes around nothing: it stops and breaks it, while the towers riddle it with arrows.',
       effect: 'Stops mutants while they break it.',
+      upgrades: [],
+    },
+    flowerBed: {
+      label: 'Flower bed',
+      sign: 'Flower bed',
+      siteDescription: 'A square of turned earth and a few seeds, waiting.',
+      description: 'A small bed of coral, yellow and violet flowers. Nothing justifies it, which is exactly why the workers nearby wake up in a better mood.',
+      effect: '+1 happiness each dawn for workers within 4 tiles.',
+      upgrades: [],
+    },
+    bench: {
+      label: 'Bench',
+      sign: 'Bench',
+      siteDescription: 'Two planks and four legs, flat-packed, to nail together.',
+      description: 'A plank bench and a patch of shade. You sit down at the end of the day to watch the colony live, and it does you good.',
+      effect: '+1 happiness each dawn for workers within 5 tiles.',
+      upgrades: [],
+    },
+    streetLamp: {
+      label: 'Street lamp',
+      sign: 'Street lamp',
+      siteDescription: 'A post in the ground, its lantern still in the crate.',
+      description: 'An indigo post and its yellow lantern, lit from dusk. The night feels shorter when you can see your home from afar.',
+      effect: '+2 happiness each dawn for workers within 6 tiles.',
+      upgrades: [],
+    },
+    fountain: {
+      label: 'Fountain',
+      sign: 'Fountain',
+      siteDescription: 'A stone basin to assemble; the water comes later.',
+      description: 'A stone basin and a jet falling in pearls: a decoration found by exploring, and the nicest square in the colony.',
+      effect: '+3 happiness each dawn for workers within 8 tiles. Unlocked by exploring 500 tiles.',
+      upgrades: [],
+    },
+    adamStatue: {
+      label: 'Statue of Adam',
+      sign: 'Statue',
+      siteDescription: 'An empty stone plinth, and a sculptor taking measurements.',
+      description: 'Adam, bow in hand, pack on his back and scarf in the wind. Survivors stand a little straighter passing it: he is the one who held out.',
+      effect: '+4 happiness each dawn for workers within 10 tiles. Unlocked after the end of act I.',
       upgrades: [],
     },
     forge: {
@@ -487,6 +579,7 @@ export const content: Content = {
     logistics: 'Logistics',
     housing: 'Housing',
     research: 'Research',
+    decor: 'Decoration',
   },
   researchThemes: {
     building: 'Buildings',
@@ -549,6 +642,10 @@ export const content: Content = {
     metalworking: {
       label: 'Foundry',
       description: 'A stone crucible, a makeshift bellows: iron gives in and melts.',
+    },
+    masonry: {
+      label: 'Masonry',
+      description: 'Kiln-fired bricks and lime mortar: the town hall, houses, quarry and drill can reach level 3.',
     },
     fieldMedicine: {
       label: 'Makeshift medicine',

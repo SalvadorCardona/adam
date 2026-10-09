@@ -134,6 +134,11 @@ export interface House extends Built {
   kind: 'house';
 }
 
+/** Une décoration : ni ouvrier ni coffre, elle remonte le moral alentour (`sim/decor.ts`). */
+export interface Decor extends Built {
+  kind: 'decor';
+}
+
 /**
  * La ferme : elle loge ses fermiers, qui cultivent un champ carré autour
  * d'elle (`sim/farmer.ts`), et son coffre reçoit ce qu'ils récoltent. Les
@@ -276,6 +281,7 @@ export type Entity =
   | Nursery
   | Tower
   | House
+  | Decor
   | Farm
   | Quarry
   | Forge

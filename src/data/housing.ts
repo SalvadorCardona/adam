@@ -60,3 +60,9 @@ export const HOUSING = {
   /** Un dormeur dehors s'allonge à moins de tant de tuiles de la porte de son travail. */
   outsideSpread: 1.5,
 } as const;
+
+/** Les décorations (`mood` de `data/buildings.ts`) et le moral. */
+export const DECOR = {
+  /** Le plus que les décorations alentour ajoutent au bonheur d'un ouvrier en une aube. */
+  maxPerDawn: 6,
+} as const;

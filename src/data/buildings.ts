@@ -36,7 +36,8 @@ export type BuildingKind =
   | 'foresterHouse'
   | 'depot'
   | 'yard'
-  | 'antenna';
+  | 'antenna'
+  | 'decor';
 
 /**
  * Les familles du menu de construction : une puce de filtre chacune, dans
@@ -50,6 +51,7 @@ export const BUILDING_CATEGORIES = {
   logistics: 'Logistique',
   housing: 'Habitat',
   research: 'Recherche',
+  decor: 'Décor',
 } as const;
 
 export type BuildingCategory = keyof typeof BUILDING_CATEGORIES;
@@ -82,6 +84,17 @@ export interface BuildingProto {
   logisticRadius: number;
   /** Points de vie du bâtiment fini. */
   hp: number;
+  /**
+   * Une décoration (`kind: 'decor'`) : à chaque aube, elle remonte le moral
+   * des ouvriers à moins de `radius` tuiles de son centre (`sim/decor.ts`).
+   * Absent : le bâtiment n'est pas un décor.
+   */
+  mood?: DecorMood;
+  /**
+   * Il n'entre au menu qu'une fois tant de cases explorées (`FogOfWar.exploredCount`) :
+   * la fontaine se gagne en partant voir ailleurs. Absent : aucune exigence.
+   */
+  unlockExplored?: number;
   /**
    * Ouvriers que le bâtiment héberge une fois terminé, et le plus qu'il en
    * emploie : son maximum. Ils comptent dans la population de la colonie ;
@@ -150,9 +163,18 @@ export interface BuildingProto {
   upgrades: readonly BuildingUpgrade[];
 }
 
+/** Ce qu'une décoration donne au moral, et jusqu'où. */
+export interface DecorMood {
+  /** Points de bonheur ajoutés à chaque aube à un ouvrier qui est à portée. */
+  amount: number;
+  /** Portée en tuiles, du centre de l'emprise. */
+  radius: number;
+}
+
 /**
  * Un niveau d'amélioration : ce qu'il coûte depuis le niveau d'avant, et ce
- * qu'il remplace dans le prototype — points de vie, arme, sprite, textes.
+ * qu'il remplace dans le prototype — points de vie, arme, sprite, textes —
+ * plus, selon le bâtiment, un bonus : lits, rayon logistique, cadence.
  */
 export interface BuildingUpgrade {
   /** Nom du bâtiment à ce niveau : le titre de sa fenêtre. */
@@ -166,10 +188,19 @@ export interface BuildingUpgrade {
   hp: number;
   weapon: WeaponId | null;
   sprite: SpriteId;
+  /** Lits du niveau (une maison). Absent : ceux du niveau d'avant. */
+  beds?: number;
+  /** Rayon logistique du niveau (la mairie). Absent : celui du niveau d'avant. */
+  logisticRadius?: number;
+  /** Part de la durée d'un cycle de production (0,8 : un cycle sur cinq en moins). Absent : celle du niveau d'avant. */
+  speed?: number;
+  /** L'id de la recherche du labo qui ouvre ce niveau (vérifié par `validatePrototypes()`) : sans elle, le bouton reste grisé. Absent : aucune. */
+  research?: string;
 }
 
 /** Ce qui change d'un niveau à l'autre, lu par la simulation et le rendu. */
-export type BuildingLevel = Pick<BuildingUpgrade, 'label' | 'description' | 'hp' | 'weapon' | 'sprite'>;
+export type BuildingLevel = Pick<BuildingUpgrade, 'label' | 'description' | 'hp' | 'weapon' | 'sprite'> &
+  Partial<Pick<BuildingUpgrade, 'beds' | 'logisticRadius' | 'speed'>>;
 
 export const BUILDINGS = {
   townHall: {
@@ -193,7 +224,29 @@ export const BUILDINGS = {
     plan: false,
     sprite: 'townHall',
     weapon: null,
-    upgrades: [],
+    upgrades: [
+      {
+        label: LORE.buildings.townHall.levels[0].name,
+        action: LORE.buildings.townHall.levels[0].action,
+        description: LORE.buildings.townHall.levels[0].description,
+        cost: { wood: 30, stone: 24 },
+        hp: 200,
+        weapon: null,
+        sprite: 'townHall2',
+        logisticRadius: 13,
+      },
+      {
+        label: LORE.buildings.townHall.levels[1].name,
+        action: LORE.buildings.townHall.levels[1].action,
+        description: LORE.buildings.townHall.levels[1].description,
+        cost: { stone: 40, ironPlate: 8 },
+        hp: 300,
+        weapon: null,
+        sprite: 'townHall3',
+        logisticRadius: 16,
+        research: 'masonry',
+      },
+    ],
   },
   lumberCamp: {
     label: LORE.buildings.lumberCamp.name,
@@ -266,7 +319,29 @@ export const BUILDINGS = {
     plan: false,
     sprite: 'quarry',
     weapon: null,
-    upgrades: [],
+    upgrades: [
+      {
+        label: LORE.buildings.quarry.levels[0].name,
+        action: LORE.buildings.quarry.levels[0].action,
+        description: LORE.buildings.quarry.levels[0].description,
+        cost: { wood: 12, stone: 6 },
+        hp: 90,
+        weapon: null,
+        sprite: 'quarry2',
+        speed: 0.8,
+      },
+      {
+        label: LORE.buildings.quarry.levels[1].name,
+        action: LORE.buildings.quarry.levels[1].action,
+        description: LORE.buildings.quarry.levels[1].description,
+        cost: { stone: 16, ironPlate: 4 },
+        hp: 130,
+        weapon: null,
+        sprite: 'quarry3',
+        speed: 0.55,
+        research: 'masonry',
+      },
+    ],
   },
   well: {
     label: LORE.buildings.well.name,
@@ -363,7 +438,29 @@ export const BUILDINGS = {
     plan: false,
     sprite: 'drill',
     weapon: null,
-    upgrades: [],
+    upgrades: [
+      {
+        label: LORE.buildings.drill.levels[0].name,
+        action: LORE.buildings.drill.levels[0].action,
+        description: LORE.buildings.drill.levels[0].description,
+        cost: { wood: 8, stone: 8 },
+        hp: 65,
+        weapon: null,
+        sprite: 'drill2',
+        speed: 0.8,
+      },
+      {
+        label: LORE.buildings.drill.levels[1].name,
+        action: LORE.buildings.drill.levels[1].action,
+        description: LORE.buildings.drill.levels[1].description,
+        cost: { stone: 14, ironPlate: 4 },
+        hp: 95,
+        weapon: null,
+        sprite: 'drill3',
+        speed: 0.55,
+        research: 'masonry',
+      },
+    ],
   },
   nursery: {
     label: LORE.buildings.nursery.name,
@@ -440,7 +537,29 @@ export const BUILDINGS = {
     plan: false,
     sprite: 'home',
     weapon: null,
-    upgrades: [],
+    upgrades: [
+      {
+        label: LORE.buildings.home.levels[0].name,
+        action: LORE.buildings.home.levels[0].action,
+        description: LORE.buildings.home.levels[0].description,
+        cost: { wood: 14, stone: 8 },
+        hp: 90,
+        weapon: null,
+        sprite: 'home2',
+        beds: 6,
+      },
+      {
+        label: LORE.buildings.home.levels[1].name,
+        action: LORE.buildings.home.levels[1].action,
+        description: LORE.buildings.home.levels[1].description,
+        cost: { stone: 18, ironPlate: 4 },
+        hp: 130,
+        weapon: null,
+        sprite: 'home3',
+        beds: 8,
+        research: 'masonry',
+      },
+    ],
   },
   farm: {
     label: LORE.buildings.farm.name,
@@ -737,6 +856,136 @@ export const BUILDINGS = {
       },
     ],
   },
+  flowerBed: {
+    label: LORE.buildings.flowerBed.name,
+    sign: LORE.buildings.flowerBed.sign,
+    siteDescription: LORE.buildings.flowerBed.site,
+    description: LORE.buildings.flowerBed.description,
+    effect: LORE.buildings.flowerBed.effect,
+    // Une décoration : aucune fonction, un peu de moral (`mood`).
+    kind: 'decor',
+    category: 'decor',
+    width: 1,
+    height: 1,
+    cost: { wood: 2 },
+    storage: 0,
+    logisticRadius: 0,
+    hp: 10,
+    workers: 0,
+    minWorkers: 0,
+    mood: { amount: 1, radius: 4 },
+    menu: true,
+    unique: false,
+    unlockObjective: 2,
+    plan: false,
+    sprite: 'flowerBed',
+    weapon: null,
+    upgrades: [],
+  },
+  bench: {
+    label: LORE.buildings.bench.name,
+    sign: LORE.buildings.bench.sign,
+    siteDescription: LORE.buildings.bench.site,
+    description: LORE.buildings.bench.description,
+    effect: LORE.buildings.bench.effect,
+    // Une décoration : aucune fonction, un peu de moral (`mood`).
+    kind: 'decor',
+    category: 'decor',
+    width: 1,
+    height: 1,
+    cost: { wood: 4 },
+    storage: 0,
+    logisticRadius: 0,
+    hp: 15,
+    workers: 0,
+    minWorkers: 0,
+    mood: { amount: 1, radius: 5 },
+    menu: true,
+    unique: false,
+    unlockObjective: 2,
+    plan: false,
+    sprite: 'bench',
+    weapon: null,
+    upgrades: [],
+  },
+  streetLamp: {
+    label: LORE.buildings.streetLamp.name,
+    sign: LORE.buildings.streetLamp.sign,
+    siteDescription: LORE.buildings.streetLamp.site,
+    description: LORE.buildings.streetLamp.description,
+    effect: LORE.buildings.streetLamp.effect,
+    // Une décoration : aucune fonction, un peu de moral (`mood`).
+    kind: 'decor',
+    category: 'decor',
+    width: 1,
+    height: 1,
+    cost: { wood: 2, stone: 2 },
+    storage: 0,
+    logisticRadius: 0,
+    hp: 20,
+    workers: 0,
+    minWorkers: 0,
+    mood: { amount: 2, radius: 6 },
+    menu: true,
+    unique: false,
+    unlockObjective: 3,
+    plan: false,
+    sprite: 'streetLamp',
+    weapon: null,
+    upgrades: [],
+  },
+  fountain: {
+    label: LORE.buildings.fountain.name,
+    sign: LORE.buildings.fountain.sign,
+    siteDescription: LORE.buildings.fountain.site,
+    description: LORE.buildings.fountain.description,
+    effect: LORE.buildings.fountain.effect,
+    // Une décoration : aucune fonction, un peu de moral (`mood`).
+    kind: 'decor',
+    category: 'decor',
+    width: 2,
+    height: 2,
+    cost: { stone: 14 },
+    storage: 0,
+    logisticRadius: 0,
+    hp: 40,
+    workers: 0,
+    minWorkers: 0,
+    mood: { amount: 3, radius: 8 },
+    menu: true,
+    unique: false,
+    unlockExplored: 500,
+    plan: false,
+    sprite: 'fountain',
+    weapon: null,
+    upgrades: [],
+  },
+  adamStatue: {
+    label: LORE.buildings.adamStatue.name,
+    sign: LORE.buildings.adamStatue.sign,
+    siteDescription: LORE.buildings.adamStatue.site,
+    description: LORE.buildings.adamStatue.description,
+    effect: LORE.buildings.adamStatue.effect,
+    // Une décoration : aucune fonction, un peu de moral (`mood`).
+    kind: 'decor',
+    category: 'decor',
+    width: 1,
+    height: 1,
+    cost: { stone: 12, ironPlate: 2 },
+    storage: 0,
+    logisticRadius: 0,
+    hp: 50,
+    workers: 0,
+    minWorkers: 0,
+    mood: { amount: 4, radius: 10 },
+    menu: true,
+    unique: false,
+    unlockObjective: 6,
+    plan: false,
+    sprite: 'adamStatue',
+    weapon: null,
+    upgrades: [],
+  },
 } as const satisfies Record<string, BuildingProto>;
 
 export type BuildingId = keyof typeof BUILDINGS;
@@ -755,11 +1004,35 @@ export const MENU_BUILDING_IDS = BUILDING_IDS.filter((id) => BUILDINGS[id].menu)
  */
 export const START_BUILDINGS = ['home', 'nursery', 'logisticsPost', 'lab'] as const satisfies readonly BuildingId[];
 
-/** Les lits du bâtiment fini : sa part de l'Habitation de la ville. */
-export function bedsOf(id: BuildingId): number {
+/** Le bonus d'un niveau : celui du plus haut niveau, jusqu'à `level`, qui le fixe ; `base` sinon. */
+function bonusAt<K extends 'beds' | 'logisticRadius' | 'speed'>(id: BuildingId, level: number, key: K, base: number): number {
   const proto: BuildingProto = BUILDINGS[id];
 
-  return proto.beds ?? 0;
+  for (let at = Math.min(level, proto.upgrades.length + 1); at >= 2; at -= 1) {
+    const value = proto.upgrades[at - 2]?.[key];
+
+    if (value !== undefined) return value;
+  }
+  return base;
+}
+
+/** Les lits du bâtiment fini à ce niveau : sa part de l'Habitation de la ville. */
+export function bedsOf(id: BuildingId, level = 1): number {
+  const proto: BuildingProto = BUILDINGS[id];
+
+  return bonusAt(id, level, 'beds', proto.beds ?? 0);
+}
+
+/** Le rayon logistique à ce niveau, en tuiles. */
+export function logisticRadiusOf(id: BuildingId, level = 1): number {
+  const proto: BuildingProto = BUILDINGS[id];
+
+  return bonusAt(id, level, 'logisticRadius', proto.logisticRadius);
+}
+
+/** La part de la durée d'un cycle de production à ce niveau : 1 tel que bâti, moins après. */
+export function speedOf(id: BuildingId, level = 1): number {
+  return bonusAt(id, level, 'speed', 1);
 }
 
 /** Un gisement sur lequel la foreuse se pose : chacun a son nom court au dictionnaire. */

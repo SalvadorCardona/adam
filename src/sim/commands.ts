@@ -103,6 +103,12 @@ export type Command =
    */
   | { type: 'upgradeBuilding'; id: EntityId }
   /**
+   * Retire une décoration debout (`kind: 'decor'`) : elle disparaît et son
+   * coût retourne à la ville, ou au sol sans mairie. Les autres bâtiments
+   * ne se retirent pas. Le bouton « Retirer » de sa fenêtre.
+   */
+  | { type: 'removeDecor'; id: EntityId }
+  /**
    * Forge l'arc du niveau suivant (`data/gear.ts`) depuis la fenêtre de la
    * forge (`GEAR_WORKSHOP`) : payé d'un coup, le sac d'abord, puis la ville
    * si la forge est dans son rayon. Adam doit être à portée de la forge.
@@ -307,6 +313,8 @@ export type UpgradeRejection =
   | 'maxLevel'
   /** Ni le sac, ni la ville à portée n'ont tout le coût. */
   | 'missingItems'
+  /** Le niveau attend sa recherche au labo (`BuildingUpgrade.research`). */
+  | 'locked'
   /** Un étage d'antenne ne s'achète pas : il se livre, comme un chantier (`supplyBuilding`). */
   | 'delivered';
 

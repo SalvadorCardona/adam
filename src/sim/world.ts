@@ -47,7 +47,7 @@
 import { Emitter } from '../core/events.ts';
 import { CHUNK_SIZE, CHUNK_TILES, TILE_SIZE, coordKey, distanceSq, floorDiv, type TileCoord } from '../core/grid.ts';
 import { hash3, mulberry32, type StatefulRng } from '../core/rng.ts';
-import { BUILDINGS, BUILDING_IDS, MENU_BUILDING_IDS, START_BUILDINGS, REPAIR, RUIN, bedsOf, buildingLevel, nextUpgrade, type BuildingId, type BuildingKind, type BuildingProto } from '../data/buildings.ts';
+import { BUILDINGS, BUILDING_IDS, MENU_BUILDING_IDS, START_BUILDINGS, REPAIR, RUIN, bedsOf, buildingLevel, nextUpgrade, speedOf, type BuildingId, type BuildingKind, type BuildingProto } from '../data/buildings.ts';
 import { CARAVAN, RARE_OFFERS, type RareOfferId } from '../data/caravan.ts';
 import { CLINIC } from '../data/clinic.ts';
 import { DEATH } from '../data/death.ts';
@@ -102,7 +102,7 @@ import { OBJECTIVES, objectiveBagBonus, type Reward } from '../data/objectives.t
 import { OFFLINE, OFFLINE_ALERTS, type OfflineAlertId } from '../data/offline.ts';
 import type { QuestId } from '../data/quests.ts';
 import { RECIPES, recipeOf, type RecipeId, type RecipeProto } from '../data/recipes.ts';
-import { RESEARCH, type ResearchId, type ResearchStat } from '../data/research.ts';
+import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../data/research.ts';
 import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
 import { ROADS } from '../data/roads.ts';
 import { WEAPONS } from '../data/weapons.ts';
@@ -143,6 +143,7 @@ import { createEve, currentQuest, harvestYieldWithTools, isUnlocked, mostDamaged
 import { ADAM_SALT, adultAge, bornTrait, canWork, cleanName, foeAge, nameOf, sexOf, traitOf, yearsToWork } from './inhabitants.ts';
 import { KID_SPRINT, stepKid } from './kids.ts';
 import { drainNeeds, stuntingNeed, freshNeeds, needState, needsPace, pacedTick, urgentNeed, type Needs } from './needs.ts';
+import { decorMoodAt, type DecorSpot } from './decor.ts';
 import { assignBeds, freshHousing, moodCauses, nightlyMood, moodOf, type Lodging } from './housing.ts';
 import { rollLoot, stepPickup } from './loot.ts';
 import { copyStats, emptyStats, objectiveDone } from './objectives.ts';
@@ -465,6 +466,7 @@ export type WorldEvents = {
   /** Un chantier offert par le jardin des souvenirs vient d'ouvrir déjà livré. */
   siteReady: { id: EntityId };
   /** Le chantier a été annulé : ce qui y était livré est retourné à la ville (`toTown`), ou posé au sol. */
+  decorRemoved: { id: EntityId; proto: BuildingId; tx: number; ty: number; toTown: boolean };
   siteCancelled: { id: EntityId; proto: BuildingId; tx: number; ty: number; toTown: boolean };
   /**
    * Le bâtiment est passé au niveau `level`, sous le même id : le rendu
@@ -888,7 +890,8 @@ export class World {
   private menuKnown: Set<BuildingId> | null = null;
 
   /** Ce dont dépendait le menu au dernier compte : tant que rien n'en change, `watchUnlocks` ne recompte pas. */
-  private unlockStamp: { hall: boolean; research: number; quests: number; objective: number; open: number } | null = null;
+  private unlockStamp: { hall: boolean; research: number; quests: number; objective: number; open: number; explored: number } | null = null;
+  private exploredStamp = { revision: -1, count: 0 };
 
   /**
    * Combien de fois chaque offre rare de la caravane a été prise : leur
@@ -1543,6 +1546,10 @@ export class World {
         this.cancelSite(command.id);
         break;
 
+      case 'removeDecor':
+        this.removeDecor(command.id);
+        break;
+
       case 'trade':
         this.trade(command.caravan, command.offer);
         break;
@@ -1684,6 +1691,13 @@ export class World {
 
   /* ------------------------------------------------------------ amélioration */
 
+  /** La recherche du labo que le niveau suivant attend encore, ou `null` : rien ne le retient. */
+  public upgradeLocked(building: Building): ResearchId | null {
+    const research = nextUpgrade(building.proto, building.level)?.research;
+
+    return research !== undefined && isResearchId(research) && !this.researchDone.includes(research) ? research : null;
+  }
+
   /**
    * Ce qui manque, objet par objet, pour payer le niveau suivant : ni dans
    * le sac, ni dans le disponible de la ville à portée. Vide si tout y est ;
@@ -1725,6 +1739,7 @@ export class World {
     const missing = this.upgradeMissing(building);
 
     if (!upgrade || !missing) return reject('maxLevel');
+    if (this.upgradeLocked(building) !== null) return reject('locked');
     if (Object.keys(missing).length > 0) return reject('missingItems');
 
     const town = this.townStockFor(building);
@@ -3056,6 +3071,12 @@ export class World {
     if (removed.length > 0) this.events.emit('roadRemoved', { tiles: removed, toBag });
   }
 
+  /** Les cases explorées, recomptées seulement quand le brouillard a bougé (`FogOfWar.revision`). */
+  private exploredTiles(): number {
+    if (this.exploredStamp.revision !== this.fog.revision) this.exploredStamp = { revision: this.fog.revision, count: this.fog.exploredCount() };
+    return this.exploredStamp.count;
+  }
+
   /**
    * Le bâtiment est-il débloqué ? Il faut son plan, s'il en demande un (quêtes
    * d'Ève), la recherche qui le débloque, s'il s'obtient au labo, et
@@ -3068,14 +3089,15 @@ export class World {
     const opening = openingResearch(building);
 
     // Un bâtiment sans plan, recherche ni objectif n'est là que s'il est ouvert.
-    const gated = proto.plan || research !== null || proto.unlockObjective !== undefined;
+    const gated = proto.plan || research !== null || proto.unlockObjective !== undefined || proto.unlockExplored !== undefined;
     const open = this.openBuildings.has(building) || (opening !== null && this.researchDone.includes(opening));
 
     return (
       (gated || open) &&
       isUnlocked(building, this.questsDone) &&
       (research === null || this.researchDone.includes(research)) &&
-      this.objective >= (proto.unlockObjective ?? 0)
+      this.objective >= (proto.unlockObjective ?? 0) &&
+      this.exploredTiles() >= (proto.unlockExplored ?? 0)
     );
   }
 
@@ -3104,10 +3126,10 @@ export class World {
     const hall = this.warehouse() !== null;
     const stamp = this.unlockStamp;
 
-    if (stamp && stamp.hall === hall && stamp.research === this.researchDone.length && stamp.quests === this.questsDone && stamp.objective === this.objective && stamp.open === this.openBuildings.size) {
+    if (stamp && stamp.hall === hall && stamp.research === this.researchDone.length && stamp.quests === this.questsDone && stamp.objective === this.objective && stamp.open === this.openBuildings.size && stamp.explored === this.exploredTiles()) {
       return;
     }
-    this.unlockStamp = { hall, research: this.researchDone.length, quests: this.questsDone, objective: this.objective, open: this.openBuildings.size };
+    this.unlockStamp = { hall, research: this.researchDone.length, quests: this.questsDone, objective: this.objective, open: this.openBuildings.size, explored: this.exploredTiles() };
 
     const known = this.menuKnown;
     const menu = MENU_BUILDING_IDS.filter((id) => this.inMenu(id));
@@ -3231,6 +3253,10 @@ export class World {
 
       case 'house':
         building = { ...base, kind: 'house' };
+        break;
+
+      case 'decor':
+        building = { ...base, kind: 'decor' };
         break;
 
       case 'farm':
@@ -3495,7 +3521,7 @@ export class World {
   private scheduleDrill(drill: Drill): void {
     const recipe = RECIPES[DRILL_RECIPE];
     // Foreuses rapides (labo) : le cycle raccourcit, jamais sous un tick.
-    const duration = Math.max(1, recipe.duration + this.bonus('drillTicks'));
+    const duration = Math.max(1, Math.ceil((recipe.duration + this.bonus('drillTicks')) * speedOf(drill.proto, drill.level)));
 
     this.scheduler.schedule(drill.id, this.tickCount + duration, this.tickCount);
   }
@@ -3530,7 +3556,7 @@ export class World {
   private scheduleFarm(farm: Quarry): void {
     const { filled, max } = this.staffing(farm) ?? { filled: 1, max: 1 };
     const recipe = quarryRecipe(farm);
-    const duration = Math.ceil((recipe.duration * max) / Math.max(1, filled));
+    const duration = Math.ceil((recipe.duration * max * speedOf(farm.proto, farm.level)) / Math.max(1, filled));
 
     this.scheduler.schedule(farm.id, this.tickCount + duration, this.tickCount);
   }
@@ -6618,9 +6644,25 @@ export class World {
    */
   private restInhabitants(): void {
     this.settleBeds();
+
+    const spots = this.decorSpots();
+
     for (const mobile of this.mobiles.values()) {
-      if (isLaborer(mobile)) mobile.happiness = nightlyMood(mobile.happiness, moodCauses(mobile, this.scared.has(mobile.id)), this.traitFor(mobile));
+      if (isLaborer(mobile)) mobile.happiness = nightlyMood(mobile.happiness, moodCauses(mobile, this.scared.has(mobile.id)), this.traitFor(mobile), decorMoodAt(mobile.x, mobile.y, spots));
     }
+  }
+
+  /** Les décorations debout, au centre de leur emprise : ce qui remonte le moral à l'aube. */
+  private decorSpots(): DecorSpot[] {
+    const spots: DecorSpot[] = [];
+
+    for (const entity of this.entities.values()) {
+      const proto: BuildingProto = BUILDINGS[entity.proto];
+      const mood = entity.kind === 'decor' ? proto.mood : undefined;
+
+      if (mood) spots.push({ ...mood, x: (entity.tx + entity.width / 2) * TILE_SIZE, y: (entity.ty + entity.height / 2) * TILE_SIZE });
+    }
+    return spots;
   }
 
   /**
@@ -6634,7 +6676,7 @@ export class World {
     const sleepers: Laborer[] = [];
 
     for (const entity of this.entities.values()) {
-      const beds = entity.kind === 'site' ? 0 : bedsOf(entity.proto);
+      const beds = entity.kind === 'site' ? 0 : bedsOf(entity.proto, entity.level);
 
       if (beds > 0) lodgings.push({ id: entity.id, beds, ...doorOf(entity) });
     }
@@ -6669,7 +6711,7 @@ export class World {
       if (mobile.bed !== null) housed += 1;
     }
     for (const entity of this.entities.values()) {
-      if (entity.kind !== 'site') beds += bedsOf(entity.proto);
+      if (entity.kind !== 'site') beds += bedsOf(entity.proto, entity.level);
     }
     return { housed, population, beds };
   }
@@ -7722,6 +7764,30 @@ export class World {
     this.chunks.release(id, site.tx, site.ty, site.width, site.height);
     this.dirtyTile(site.tx, site.ty);
     this.events.emit('siteCancelled', { id, proto: site.proto, tx: site.tx, ty: site.ty, toTown: town !== null });
+  }
+
+  /**
+   * Retire une décoration : le coût entier retourne à la ville, ou reste au
+   * sol sans mairie. Rien d'autre qu'une décoration ne se retire.
+   */
+  private removeDecor(id: EntityId): void {
+    const decor = this.entities.get(id);
+
+    if (decor?.kind !== 'decor') return;
+
+    const town = this.townStock();
+    const door = doorOf(decor);
+
+    for (const [item, amount] of Object.entries(BUILDINGS[decor.proto].cost) as [ItemId, number][]) {
+      if (town) town.add(item, amount);
+      else this.spawnPickup(item, amount, door.x, door.y - TILE_SIZE / 2, false);
+    }
+
+    this.entities.delete(id);
+    this.chunks.release(id, decor.tx, decor.ty, decor.width, decor.height);
+    this.dirtyTile(decor.tx, decor.ty);
+    this.rosterChanged();
+    this.events.emit('decorRemoved', { id, proto: decor.proto, tx: decor.tx, ty: decor.ty, toTown: town !== null });
   }
 
   /* -------------------------------------------------------------- bûcherons */

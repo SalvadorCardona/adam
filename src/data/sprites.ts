@@ -45,6 +45,8 @@ import { FORGE } from '../art/forge.ts';
 import { JOBS } from '../art/jobs.ts';
 import { KID } from '../art/kid.ts';
 import { LAB } from '../art/lab.ts';
+import { levelled } from '../art/levels.ts';
+import { ADAM_STATUE, BENCH, FLOWER_BED, FOUNTAIN, STREET_LAMP } from '../art/ornaments.ts';
 import { LOGISTICIAN } from '../art/logistician.ts';
 import { LOGISTICS_POST } from '../art/logisticsPost.ts';
 import { LOOT } from '../art/loot.ts';
@@ -205,6 +207,21 @@ export const SPRITES = {
   forge: FORGE,
   charcoalKiln: CHARCOAL_KILN,
   reinforcedTower: REINFORCED_TOWER,
+  /** Les niveaux 2 (pierre) et 3 (brique) des bâtiments principaux : le sprite de base, ornementé (`art/levels.ts`). */
+  townHall2: levelled(TOWN_HALL, 2, { footprint: 96, flagX: 68, flagY: 37, bunting: 66 }),
+  townHall3: levelled(TOWN_HALL, 3, { footprint: 96, flagX: 68, flagY: 36, bunting: 66 }),
+  home2: levelled(HOME, 2, { footprint: 64, flagX: 20, flagY: 13, bunting: 68 }),
+  home3: levelled(HOME, 3, { footprint: 64, flagX: 20, flagY: 12, bunting: 68 }),
+  quarry2: levelled(QUARRY, 2, { footprint: 64, flagX: 44, flagY: 48, bunting: 70 }),
+  quarry3: levelled(QUARRY, 3, { footprint: 64, flagX: 44, flagY: 47, bunting: 70 }),
+  drill2: levelled(DRILL, 2, { footprint: 64, flagX: 12, flagY: 47, bunting: 70 }),
+  drill3: levelled(DRILL, 3, { footprint: 64, flagX: 12, flagY: 46, bunting: 70 }),
+  /** Les décorations : sans fonction, elles lèvent le moral (`art/ornaments.ts`). */
+  flowerBed: FLOWER_BED,
+  bench: BENCH,
+  streetLamp: STREET_LAMP,
+  fountain: FOUNTAIN,
+  adamStatue: ADAM_STATUE,
   clinic: CLINIC_SPRITE,
   purifier: PURIFIER_SPRITE,
   barracks: BARRACKS,

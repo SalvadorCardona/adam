@@ -88,6 +88,8 @@ export const hud: Messages['hud'] = {
     bagFullSite: 'Bag full — go deliver to the site',
     bagFullDrop: 'Bag full — tap the bag, then "Drop"',
     upgradeMissing: 'Not enough to pay — not in the bag, not in town',
+    upgradeLocked: 'This level is waiting for a lab research',
+    decorRemoved: (building: string, toTown: boolean): string => `${building} removed — ${toTown ? 'the cost goes back to town' : 'the cost stays on the ground'}`,
     repairedFromTown: (amount: number, item: string): string => `Repaired with ${amount} ${lower(item)} from town`,
     eveRadio: (line: string): string => `Eve, on the radio: ${line}`,
     dusk: 'Night is falling — head home!',

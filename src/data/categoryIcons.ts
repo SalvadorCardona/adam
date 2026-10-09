@@ -94,6 +94,19 @@ export const CATEGORY_ICONS = {
     circle(14.5, 13.5, 1.2, cyan.light),
     circle(12.5, 9.5, 0.9, cyan.base),
   ),
+  /** Décor : une fleur sur sa tige, corolle corail, cœur jaune, deux feuilles menthe. */
+  decor: svg(
+    S,
+    S,
+    line(12, 11, 12, 21, mint.shade),
+    pill(5.5, 14.5, 6.5, 3, mint.base),
+    pill(12, 16.5, 6.5, 3, mint.shade),
+    circle(12, 6.5, 3.6, coral.base),
+    circle(7.4, 10.2, 3.6, coral.base),
+    circle(16.6, 10.2, 3.6, coral.base),
+    circle(12, 11, 3.6, coral.shade),
+    circle(12, 9.5, 3.2, yellow.base),
+  ),
 } as const satisfies Record<BuildingCategory | 'all', string>;
 
 /** Une puce de filtre : « Tous », ou une famille. */

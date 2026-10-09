@@ -709,6 +709,7 @@ export class Hud {
     world.events.on('upgradeRejected', ({ reason }) => {
       if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
       if (reason === 'missingItems') this.notify(t().hud.toast.upgradeMissing, 'bad');
+      if (reason === 'locked') this.notify(t().hud.toast.upgradeLocked, 'bad');
     });
     world.events.on('playerRepaired', ({ item, amount, fromBag }) => {
       this.repaired = true;
@@ -769,6 +770,7 @@ export class Hud {
       for (const [item, amount] of reward) this.float(item, amount);
     });
     world.events.on('buildingDestroyed', ({ proto }) => this.notify(t().hud.toast.destroyed(t().buildings[proto].label), 'bad'));
+    world.events.on('decorRemoved', ({ proto, toTown }) => this.notify(t().hud.toast.decorRemoved(t().buildings[proto].label, toTown), 'info'));
     world.events.on('siteCancelled', ({ proto, toTown }) =>
       this.notify(t().hud.toast.siteCancelled(t().buildings[proto].label, toTown), 'info'),
     );

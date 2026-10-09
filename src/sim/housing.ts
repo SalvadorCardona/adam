@@ -139,11 +139,12 @@ export function moodCauses(person: Pick<Housing, 'bed'> & { needs?: Needs }, sca
 
 /**
  * Le bonheur au matin : chaque cause ajoute sa part, la peur pesant selon le
- * trait ; entre 0 et `HAPPINESS.max`.
+ * trait, `decor` celle des décorations alentour (`sim/decor.ts`) ; entre 0 et
+ * `HAPPINESS.max`.
  */
-export function nightlyMood(happiness: number, causes: readonly MoodCause[], trait?: TraitId): number {
+export function nightlyMood(happiness: number, causes: readonly MoodCause[], trait?: TraitId, decor = 0): number {
   const proto = trait === undefined ? null : TRAITS[trait];
-  const delta = causes.reduce<number>((sum, cause) => sum + MOOD[cause] * (cause === 'scared' && proto ? proto.fear : 1), 0);
+  const delta = causes.reduce<number>((sum, cause) => sum + MOOD[cause] * (cause === 'scared' && proto ? proto.fear : 1), 0) + decor;
 
   return Math.min(HAPPINESS.max, Math.max(0, happiness + delta));
 }

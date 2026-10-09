@@ -50,7 +50,7 @@
 
 import { Container, Graphics, Sprite } from 'pixi.js';
 import { TILE_SIZE, worldToTile } from '../core/grid.ts';
-import { BUILDINGS, type BuildingId, type BuildingProto } from '../data/buildings.ts';
+import { BUILDINGS, logisticRadiusOf, type BuildingId, type BuildingProto } from '../data/buildings.ts';
 import { PALETTE, RADIUS, STROKE, hex } from '../data/artDirection.ts';
 import { BUILD_REACH_TILES } from '../sim/player.ts';
 import { oreAt } from '../sim/terrain.ts';
@@ -379,7 +379,7 @@ export class GhostLayer {
   /** Le rayon de la mairie : dessiné une fois, redessiné seulement si elle apparaît ou tombe. */
   private updateWarehouseReach(): void {
     const hall = this.world.warehouse();
-    const radius = hall ? BUILDINGS[hall.proto].logisticRadius : 0;
+    const radius = hall ? logisticRadiusOf(hall.proto, hall.level) : 0;
     const key = hall && Number.isFinite(radius) ? `${hall.id}:${radius}` : '';
 
     if (key === this.lastWarehouseKey) return;

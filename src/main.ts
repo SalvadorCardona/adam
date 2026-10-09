@@ -945,6 +945,7 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('recruitRejected', () => audio.play('deny'));
   world.events.on('companionHealed', () => audio.play('pickup'));
   world.events.on('siteCancelled', () => audio.play('deliver'));
+  world.events.on('decorRemoved', () => audio.play('pickup'));
   world.events.on('roadPaved', () => audio.play('deliver'));
   world.events.on('roadRemoved', () => audio.play('pickup'));
   world.events.on('waveCountdown', ({ seconds }) => {
@@ -1026,6 +1027,9 @@ function wireSave(world: World, saves: LocalSave, started: () => boolean): Autos
   };
 
   world.events.on('buildingCompleted', () => {
+    due = true;
+  });
+  world.events.on('decorRemoved', () => {
     due = true;
   });
   world.events.on('siteCancelled', () => {
@@ -1360,6 +1364,7 @@ function wireParticles(world: World, renderer: GameRenderer): void {
     particles.burst(x, y - 16, PARTICLES.mutant, 14, 0.14);
     particles.burst(x, y - 16, PARTICLES.confetti, 12, 0.16);
   });
+  world.events.on('decorRemoved', ({ tx, ty }) => particles.burst((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, PARTICLES.rubble, 5, 0.06));
   world.events.on('siteCancelled', ({ tx, ty }) => particles.burst((tx + 1) * TILE_SIZE, (ty + 1) * TILE_SIZE, PARTICLES.rubble, 8, 0.08));
   // Une poussière de pierre sur chaque dalle posée ou retirée.
   const roadDust = ({ tiles }: { tiles: readonly { tx: number; ty: number }[] }): void => {

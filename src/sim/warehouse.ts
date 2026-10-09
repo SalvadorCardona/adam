@@ -13,12 +13,12 @@
  */
 
 import { TILE_SIZE, distanceSq } from '../core/grid.ts';
-import { BUILDINGS } from '../data/buildings.ts';
+import { logisticRadiusOf } from '../data/buildings.ts';
 import type { Entity } from './types.ts';
 
 /** L'entité est-elle dans le rayon logistique de `hub` ? Mesuré de centre d'emprise à centre d'emprise. */
 export function inLogisticRange(hub: Entity, entity: Pick<Entity, 'tx' | 'ty' | 'width' | 'height'>): boolean {
-  const radius = BUILDINGS[hub.proto].logisticRadius * TILE_SIZE;
+  const radius = logisticRadiusOf(hub.proto, hub.kind === 'site' ? 1 : hub.level) * TILE_SIZE;
   const hubX = (hub.tx + hub.width / 2) * TILE_SIZE;
   const hubY = (hub.ty + hub.height / 2) * TILE_SIZE;
   const x = (entity.tx + entity.width / 2) * TILE_SIZE;
@@ -30,7 +30,7 @@ export function inLogisticRange(hub: Entity, entity: Pick<Entity, 'tx' | 'ty' | 
 
 /** Le point (x, y), en pixels monde, est-il dans le rayon logistique de `hub` ? Pour ce qui n'a pas d'emprise : la caravane. */
 export function pointInLogisticRange(hub: Entity, x: number, y: number): boolean {
-  const radius = BUILDINGS[hub.proto].logisticRadius * TILE_SIZE;
+  const radius = logisticRadiusOf(hub.proto, hub.kind === 'site' ? 1 : hub.level) * TILE_SIZE;
 
   return distanceSq((hub.tx + hub.width / 2) * TILE_SIZE, (hub.ty + hub.height / 2) * TILE_SIZE, x, y) <= radius * radius;
 }

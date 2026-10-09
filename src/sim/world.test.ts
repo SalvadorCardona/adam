@@ -1592,6 +1592,7 @@ describe('bâtiments de départ', () => {
     world.researchDone = [...done];
     world.questsDone = QUEST_IDS.length;
     world.objective = OBJECTIVES.length;
+    world.fog.reveal(world.player.x / TILE_SIZE, world.player.y / TILE_SIZE, 20);
     for (const id of MENU_BUILDING_IDS) expect(free(world, id)).toBe(true);
   });
 

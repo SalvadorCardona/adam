@@ -217,6 +217,18 @@ export const RESEARCH = {
     unlocks: ['forge', 'charcoalKiln'],
     opens: [],
   },
+  masonry: {
+    label: 'Maçonnerie',
+    description: 'Briques cuites au four et mortier de chaux : la mairie, les maisons, la carrière et la foreuse montent au troisième niveau.',
+    icon: { building: 'townHall' },
+    theme: 'building',
+    cost: { stone: 20, ironPlate: 3 },
+    duration: 20 * 60,
+    requires: ['metalworking'],
+    effect: null,
+    unlocks: [],
+    opens: [],
+  },
   fastDrills: {
     label: 'Foreuses rapides',
     description: 'Des mèches trempées au charbon : les foreuses creusent plus vite.',

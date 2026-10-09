@@ -248,6 +248,48 @@ export const JOB_DRAWINGS = {
     circle(7.5, 6.5, 1.3, cyan.light),
     circle(5.8, 9.4, 0.9, cyan.base),
   ),
+  /** Le parterre : une fleur corail sur sa tige, deux feuilles. */
+  flowerBed: job(
+    line(12, 11, 12, 20, mint.shade),
+    pill(6, 14.5, 6, 3, mint.base),
+    pill(12, 16, 6, 3, mint.shade),
+    circle(12, 7, 3.4, coral.base),
+    circle(8, 10.5, 3.4, coral.base),
+    circle(16, 10.5, 3.4, coral.base),
+    circle(12, 10.8, 3.4, coral.shade),
+    circle(12, 9.6, 3, orange.base),
+  ),
+  /** Le banc : l'assise et le dossier de planches, deux pieds. */
+  bench: job(
+    line(7, 16.5, 7, 20, ink.base),
+    line(17, 16.5, 17, 20, ink.base),
+    pill(6, 8, 12, 3, orange.base),
+    pill(5, 12.5, 14, 4, orange.shade),
+    pill(6, 12.5, 6, 1.4, orange.light),
+  ),
+  /** Le lampadaire : un mât et sa lanterne blanche (le jaune est celui du médaillon). */
+  streetLamp: job(
+    rect(10.8, 9, 2.4, 11, ink.base, 1.2),
+    pill(8, 19, 8, 2, ink.base),
+    rect(7.5, 3, 9, 7.5, ink.base, 3),
+    rect(9, 4.5, 6, 4.5, paper.base, 2),
+    pill(9.6, 5.3, 2.6, 1, paper.shade),
+  ),
+  /** La fontaine : une vasque de pierre, le jet qui retombe en deux gouttes. */
+  fountain: job(
+    shadedPill(4.5, 14, 15, 6, 2, 'coral'),
+    pill(10.6, 8, 2.8, 7, cyan.base),
+    circle(12, 7, 2.4, cyan.base),
+    circle(7.8, 10.5, 1.2, cyan.shade),
+    circle(16.2, 10.5, 1.2, cyan.shade),
+  ),
+  /** La statue d'Adam : une silhouette de pierre corail, l'écharpe au vent, sur son socle. */
+  adamStatue: job(
+    shadedPill(6, 17, 12, 4, 1.4, 'coral'),
+    shadedPill(9.5, 9.5, 5, 8, 1.4, 'coral'),
+    circle(12, 6.5, 3, coral.base),
+    pill(14, 9.2, 5, 1.8, coral.shade),
+  ),
   /** L'Antenne : le pylône et son émetteur, qui appellent au loin. */
   antenna: job(
     polygon([9.5, 20.5, 14.5, 20.5, 12, 7], ink.base),
