@@ -1118,7 +1118,8 @@ export class World {
     this.giftedSites = [...state.giftedSites];
     this.researchDone = [...state.researchDone];
     this.seenBuildings = new Set(state.seenBuildings);
-    this.openBuildings = new Set(state.openBuildings ?? BUILDING_IDS);
+    // Une colonie sauvegardée avant que le labo ne soit un bâtiment de départ le retrouve au menu.
+    this.openBuildings = new Set([...(state.openBuildings ?? BUILDING_IDS), ...START_BUILDINGS]);
     this.rareTrades = { ...state.rareTrades };
     this.objective = state.objective;
     this.victory = state.victory;
