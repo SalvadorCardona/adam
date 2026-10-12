@@ -9350,7 +9350,7 @@ export class World {
   }
 
   /**
-   * Ce qu'Adam peut prendre dans un coffre : tout, pour une foreuse ou une
+   * Ce qu'Adam peut prendre dans un coffre : tout le disponible, pour une foreuse ou une
    * ferme ; les sorties seulement pour une forge — plaques ou charbon, ses
    * entrées restent au four ; au labo, le reste d'une recherche abandonnée, jamais
    * ce que la recherche en cours attend.
@@ -9364,7 +9364,11 @@ export class World {
       });
     }
 
-    const entries = producer.store.entries();
+    // Le disponible, pas le stock brut : ce qu'un porteur a déjà réservé reste au coffre.
+    const entries = producer.store
+      .entries()
+      .map(([item]): [ItemId, number] => [item, producer.store.available(item)])
+      .filter(([, amount]) => amount > 0);
 
     if (producer.kind !== 'forge') return entries;
 
