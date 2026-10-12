@@ -23,7 +23,11 @@ import { BUILDINGS } from '../data/buildings.ts';
 import { DECOR, DECOR_DENSITY, DECOR_IDS, type DecorId, type DecorTerrain } from '../data/decor.ts';
 import type { Habitat } from '../data/enemies.ts';
 import type { ItemId } from '../data/items.ts';
+import { HOME_REGION, REGION_SHAPE } from '../data/regions.ts';
 import { RESOURCES, ROCK_OF_ORE, type ResourceId } from '../data/resources.ts';
+import { contaminationAt } from './contamination.ts';
+import { inBaseZone, placeEnemyBases } from './enemyBases.ts';
+import { HOME_REGION_ID, regionAt, regionCenter } from './regions.ts';
 
 export type TerrainKind = 'water' | 'sand' | 'grass' | 'rock';
 
@@ -104,7 +108,16 @@ export function inRiver(seed: number, tx: number, ty: number): boolean {
   return Math.abs(level - 0.5) < half;
 }
 
+/** Le terrain de la tuile : celui du bruit, plus la mare du foyer quand la prairie n'a pas d'autre rive. */
 export function terrainAt(seed: number, tx: number, ty: number): TerrainKind {
+  const pond = homePond(seed);
+
+  if (pond && inDisc(tx, ty, pond.tx, pond.ty, HOME_POND.radius)) return 'water';
+  return groundAt(seed, tx, ty);
+}
+
+/** Le terrain tel que le tire le bruit, sans la mare : celui que juge le foyer en se plaçant. */
+function groundAt(seed: number, tx: number, ty: number): TerrainKind {
   const height = 0.65 * smoothNoise(seed, tx, ty, 28) + 0.35 * smoothNoise(seed ^ 0x9e3779b9, tx, ty, 9);
 
   if (height < 0.3) return 'water';
@@ -229,7 +242,7 @@ function inClearing(sx: number, sy: number, tx: number, ty: number): boolean {
 function isClearing(seed: number, sx: number, sy: number): boolean {
   for (let ty = sy - TOWN_HALL_HEIGHT; ty <= sy + 2; ty += 1) {
     for (let tx = sx - 2; tx <= sx + 2; tx += 1) {
-      if (!isBuildable(terrainAt(seed, tx, ty))) return false;
+      if (!isBuildable(groundAt(seed, tx, ty))) return false;
     }
   }
   return true;
@@ -306,7 +319,7 @@ function planHome(seed: number, sx: number, sy: number, force = false): Home | n
   const ax = sx;
   const ay = sy + 1;
   const reachable = reachableFrom(seed, ax, ay);
-  const land = (tx: number, ty: number): boolean => terrainAt(seed, tx, ty) !== 'water';
+  const land = (tx: number, ty: number): boolean => groundAt(seed, tx, ty) !== 'water';
   const clear = (tx: number, ty: number, radius: number): boolean => {
     for (let dy = -radius; dy <= radius; dy += 1) {
       for (let dx = -radius; dx <= radius; dx += 1) {
@@ -390,7 +403,7 @@ function planHome(seed: number, sx: number, sy: number, force = false): Home | n
     !inOre(tx, ty, iron) &&
     nodeAt(seed, tx, ty) === null;
   const groveAt =
-    pick(0x1656567b, HOME_GROVE, (tx, ty) => bare(tx, ty) && terrainAt(seed, tx, ty) === 'grass') ??
+    pick(0x1656567b, HOME_GROVE, (tx, ty) => bare(tx, ty) && groundAt(seed, tx, ty) === 'grass') ??
     pick(0x1656567b, HOME_GROVE, bare) ??
     (force ? [ax + HOME_GROVE.min, ay] : null);
 
@@ -421,7 +434,7 @@ function hasDrillEdge(seed: number, node: OreNode, others: readonly OreNode[]): 
     for (let x = 0; x < cols; x += 1) {
       const tx = left + x;
       const ty = top + y;
-      const terrain = terrainAt(seed, tx, ty);
+      const terrain = groundAt(seed, tx, ty);
 
       if (terrain === 'water') continue;
       if (inOre(tx, ty, node)) kinds[x + y * cols] = 1;
@@ -464,7 +477,7 @@ function homeNode(seed: number, item: ItemId, [tx, ty]: [number, number], radius
 function hasWayOut(seed: number, sx: number, sy: number, ores: readonly OreNode[]): boolean {
   const blocked = (tx: number, ty: number): boolean => {
     if (inClearing(sx, sy, tx, ty)) return tx >= sx - 1 && tx <= sx + 1 && ty < sy;
-    if (!isWalkable(terrainAt(seed, tx, ty))) return true;
+    if (!isWalkable(groundAt(seed, tx, ty))) return true;
 
     const ore = ores.find((node) => inOre(tx, ty, node)) ?? nodeAt(seed, tx, ty);
     const rock = ore ? rockOn(seed, ore, tx, ty) : null;
@@ -491,6 +504,139 @@ function hasWayOut(seed: number, sx: number, sy: number, ores: readonly OreNode[
     }
   }
   return seen.size >= SPAWN_OPEN_TILES;
+}
+
+/* ------------------------------------------------------------------- mare */
+
+/**
+ * La mare du foyer : le puits se pose au bord de l'eau, et sans lui la
+ * colonie meurt de soif vers vingt minutes. Aucune rivière ne passe à moins
+ * de `RIVER.clearRadius` tuiles de l'origine ; sans lac proche, l'eau tombait
+ * hors de la prairie de départ, dans une région à conquérir ou la zone d'une
+ * base mutante, sur une seed sur douze. Le foyer y creuse alors une mare, à
+ * portée de pas d'Adam, une marge de terre tout autour pour le puits.
+ *
+ * Seulement là : une prairie qui a déjà sa rive garde sa carte à la tuile près,
+ * ses anciennes sauvegardes aussi. Tirée de la seed seule, après le foyer
+ * (`homeOf`, qui se place sur le terrain sans elle), donc pure.
+ *
+ * Distances en tuiles depuis le départ d'Adam, comme les pièces du foyer : au
+ * plus loin, la mare et sa marge restent sous les 22 tuiles de la mairie où
+ * commencent les zones des bases (`ENEMY_BASE_RINGS`), dans la prairie et sur
+ * une terre saine.
+ */
+const HOME_POND = { min: 9, max: 14, radius: 1.5, margin: 3 };
+
+/** Sel du tirage de la mare. */
+const POND_SALT = 0x4f1bbcdc;
+
+/** Seed → centre de la mare, ou `null` : la prairie a sa rive (ou on est en train d'en juger). */
+const PONDS = new Map<number, { tx: number; ty: number } | null>();
+
+/** Le centre de la mare du foyer, ou `null` si la prairie de départ a déjà une rive où poser un puits. */
+export function homePond(seed: number): { tx: number; ty: number } | null {
+  const known = PONDS.get(seed);
+
+  if (known !== undefined) return known;
+
+  // Pendant qu'on juge la prairie, le terrain est celui du bruit : `terrainAt` lit `null` ici.
+  PONDS.set(seed, null);
+
+  const pond = hasWellShore(seed) ? null : planPond(seed);
+
+  PONDS.set(seed, pond);
+  return pond;
+}
+
+/**
+ * La prairie de départ a-t-elle une rive où poser un puits dans une partie
+ * neuve ? Une emprise de puits qui touche l'eau, sur une terre constructible
+ * et saine, toute dans la prairie, hors des zones des bases mutantes — posées
+ * comme le monde les pose, sur une emprise libre.
+ */
+function hasWellShore(seed: number): boolean {
+  const hall = regionCenter(seed);
+  const bases = placeEnemyBases(seed, hall, (tx, ty) => isBuildable(terrainAt(seed, tx, ty)) && resourceAt(seed, tx, ty) === null);
+  const { width, height } = BUILDINGS.well;
+  const reach = Math.ceil(HOME_REGION.radius + REGION_SHAPE.radiusWarp);
+  const left = Math.floor(hall.x) - reach;
+  const top = Math.floor(hall.y) - reach;
+  const span = 2 * reach + 1;
+  // Chaque tuile jugée une fois : 0 inconnue, 1 eau, 2 terre où le puits se pose, 3 terre où il ne se pose pas.
+  const kinds = new Uint8Array((span + 2) * (span + 2));
+  const kind = (tx: number, ty: number): number => {
+    const index = tx - left + 1 + (ty - top + 1) * (span + 2);
+
+    if (kinds[index] === 0) {
+      if (terrainAt(seed, tx, ty) === 'water') kinds[index] = 1;
+      else {
+        const usable =
+          regionAt(seed, tx, ty) === HOME_REGION_ID &&
+          contaminationAt(seed, tx, ty) === null &&
+          !bases.some((base) => inBaseZone(base, tx, ty));
+
+        kinds[index] = usable ? 2 : 3;
+      }
+    }
+    return kinds[index]!;
+  };
+
+  for (let ty = top; ty + height <= top + span; ty += 1) {
+    for (let tx = left; tx + width <= left + span; tx += 1) {
+      let usable = true;
+
+      for (let y = ty; y < ty + height && usable; y += 1) {
+        for (let x = tx; x < tx + width && usable; x += 1) usable = kind(x, y) === 2;
+      }
+      if (usable && touchesWater(seed, tx, ty, width, height)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * La mare : une tuile atteignable dans l'anneau `HOME_POND`, tirée de la seed,
+ * dont le disque et sa marge sont de la terre, hors de la clairière, sans
+ * filon — ceux du foyer gardent leur bord de foreuse — et loin du bosquet.
+ */
+function planPond(seed: number): { tx: number; ty: number } | null {
+  const { spawn, ores, grove } = homeOf(seed);
+  const [sx, sy] = spawn;
+  const ax = sx;
+  const ay = sy + 1;
+  const reach = HOME_POND.radius + HOME_POND.margin;
+  const span = Math.ceil(reach);
+  const fits = (cx: number, cy: number): boolean => {
+    if (inDisc(cx, cy, grove.tx, grove.ty, HOME_GROVE.radius + reach)) return false;
+    for (let ty = cy - span; ty <= cy + span; ty += 1) {
+      for (let tx = cx - span; tx <= cx + span; tx += 1) {
+        if (!inDisc(tx, ty, cx, cy, reach)) continue;
+        if (groundAt(seed, tx, ty) === 'water' || inClearing(sx, sy, tx, ty)) return false;
+        if (ores.some((node) => inOre(tx, ty, node)) || nodeAt(seed, tx, ty) !== null) return false;
+      }
+    }
+    return true;
+  };
+  const candidates: [number, number][] = [];
+
+  for (const key of reachableFrom(seed, ax, ay)) {
+    const tx = (key % SPAN) - HOME_REACH + ax;
+    const ty = Math.floor(key / SPAN) - HOME_REACH + ay;
+    const distSq = (tx - ax) ** 2 + (ty - ay) ** 2;
+
+    if (distSq < HOME_POND.min * HOME_POND.min || distSq > HOME_POND.max * HOME_POND.max) continue;
+    candidates.push([tx, ty]);
+  }
+  if (candidates.length === 0) return null;
+
+  const start = hash3(seed ^ POND_SALT, sx, sy) % candidates.length;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const [tx, ty] = candidates[(start + i) % candidates.length]!;
+
+    if (fits(tx, ty)) return { tx, ty };
+  }
+  return null;
 }
 
 /** Le gisement de cellule sur la tuile, sans les filons du foyer. */
@@ -527,7 +673,7 @@ function reachableFrom(seed: number, ax: number, ay: number): number[] {
       const next = nx + ny * SPAN;
 
       if (seen[next]) continue;
-      if (!isWalkable(terrainAt(seed, nx - HOME_REACH + ax, ny - HOME_REACH + ay))) continue;
+      if (!isWalkable(groundAt(seed, nx - HOME_REACH + ax, ny - HOME_REACH + ay))) continue;
       seen[next] = 1;
       queue.push(next);
     }
