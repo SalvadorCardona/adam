@@ -76,6 +76,8 @@ import { TARGET } from '../art/target.ts';
 import { TOWN_HALL } from '../art/townHall.ts';
 import { TREE, TREE_DEAD, TREE_PINE } from '../art/trees.ts';
 import { REINFORCED_TOWER, WATCHTOWER } from '../art/watchtower.ts';
+import { ARCHER_TOWER } from '../art/archerTower.ts';
+import { PALISADE } from '../art/palisade.ts';
 import { RAINBOW, WEATHER_FX } from '../art/weather.ts';
 import { WOLF } from '../art/wolf.ts';
 import { GUARDIAN } from '../art/guardian.ts';
@@ -198,6 +200,8 @@ export const SPRITES = {
   home: HOME,
   farm: FARM,
   watchtower: WATCHTOWER,
+  archerTower: ARCHER_TOWER,
+  palisade: PALISADE,
   forge: FORGE,
   charcoalKiln: CHARCOAL_KILN,
   reinforcedTower: REINFORCED_TOWER,

@@ -261,6 +261,14 @@ export interface Purifier extends Built {
   kind: 'purifier';
 }
 
+/**
+ * La palissade : un pieu de bois sur une case, rien à retenir. Elle ne fait
+ * qu'être là : les mutants ne contournent rien, ils la cassent avant de passer.
+ */
+export interface Wall extends Built {
+  kind: 'wall';
+}
+
 export type Entity =
   | Site
   | Drill
@@ -273,6 +281,7 @@ export type Entity =
   | Forge
   | Clinic
   | Purifier
+  | Wall
   | Barracks
   | Lab
   | LumberCamp

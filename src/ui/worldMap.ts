@@ -468,6 +468,7 @@ export class WorldMap {
     this.drawBuildings();
     this.drawLairs();
     this.drawSpots();
+    this.drawWave();
     this.drawMobiles();
     this.drawPlayer();
     this.drawCameraFrame();
@@ -509,6 +510,50 @@ export class WorldMap {
         }
       }
     }
+  }
+
+  /**
+   * La vague annoncée (`World.waveForecast`) : un trait corail en pointillés,
+   * de la base d'où elle sortira vers la mairie, et sa pointe de flèche. La
+   * direction se dit même si la base n'a pas encore été vue — comme le repère
+   * de bord du jeu.
+   */
+  private drawWave(): void {
+    const forecast = this.world.waveForecast();
+    const hall = this.world.entities.get(this.world.townHallId);
+
+    if (!forecast || !hall) return;
+
+    const { context, view } = this;
+    const from = view.toScreen(forecast.x / TILE_SIZE, forecast.y / TILE_SIZE);
+    const to = view.toScreen(hall.tx + hall.width / 2, hall.ty + hall.height / 2);
+    const length = Math.hypot(to.x - from.x, to.y - from.y);
+
+    if (length < 1) return;
+
+    const ux = (to.x - from.x) / length;
+    const uy = (to.y - from.y) / length;
+    // La pointe s'arrête avant la mairie : son emprise reste lisible.
+    const tip = { x: to.x - ux * Math.max(8, hall.width * view.scale), y: to.y - uy * Math.max(8, hall.height * view.scale) };
+    const head = 9;
+
+    context.lineWidth = 3;
+    context.lineCap = 'round';
+    context.strokeStyle = PALETTE.coral.base;
+    context.setLineDash([7, 6]);
+    context.beginPath();
+    context.moveTo(from.x, from.y);
+    context.lineTo(tip.x, tip.y);
+    context.stroke();
+    context.setLineDash([]);
+    context.fillStyle = PALETTE.coral.base;
+    context.beginPath();
+    context.moveTo(tip.x + ux * head, tip.y + uy * head);
+    context.lineTo(tip.x - uy * head * 0.7, tip.y + ux * head * 0.7);
+    context.lineTo(tip.x + uy * head * 0.7, tip.y - ux * head * 0.7);
+    context.closePath();
+    context.fill();
+    this.dot(forecast.x / TILE_SIZE, forecast.y / TILE_SIZE, Math.max(4, view.scale * 0.8), PALETTE.coral.shade);
   }
 
   /** Une emprise, en trois tons comme une carte du HUD : la face avant, le dessus, et un liseré clair. */

@@ -253,6 +253,18 @@ export const RESEARCH = {
     unlocks: ['barracks'],
     opens: [],
   },
+  fortification: {
+    label: 'Fortifications',
+    description: 'Des pieux, des créneaux et deux bons archers : la ville se prépare à la nuit.',
+    icon: { building: 'archerTower' },
+    theme: 'building',
+    cost: { wood: 12, stone: 8, mutantGoo: 2 },
+    duration: 20 * 45,
+    requires: [],
+    effect: null,
+    unlocks: ['archerTower', 'palisade'],
+    opens: [],
+  },
   purification: {
     label: 'Dépollution',
     description: 'Des filtres de charbon et de sable : la boue violette se laisse laver.',

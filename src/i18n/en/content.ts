@@ -159,6 +159,24 @@ export const content: Content = {
         },
       ],
     },
+    archerTower: {
+      label: 'Archer tower',
+      sign: 'Archers',
+      siteDescription: 'A stone base, plank battlements to nail on. It will take two archers to man it.',
+      description:
+        'A squat plank keep on a stone base, battlements and two colony archers behind them. Without them it does not shoot; with one, half as fast.',
+      effect: 'Shoots mutants within 9 tiles, manned by 2 archers.',
+      upgrades: [],
+    },
+    palisade: {
+      label: 'Palisade',
+      sign: 'Palisade',
+      siteDescription: 'Stakes sharpened to a point, lying on the ground, and a rope to bind them.',
+      description:
+        'Three sharpened stakes bound with rope. A mutant goes around nothing: it stops and breaks it, while the towers riddle it with arrows.',
+      effect: 'Stops mutants while they break it.',
+      upgrades: [],
+    },
     forge: {
       label: 'Forge',
       sign: 'Forge',
@@ -254,6 +272,7 @@ export const content: Content = {
     bow: 'Makeshift bow',
     towerBow: 'Tower bow',
     reinforcedBow: 'Reinforced bow',
+    archerBow: 'Archers’ bows',
   },
   companionClasses: {
     warrior: { label: 'Warrior', effect: 'Fights up close, lots of hit points.' },
@@ -538,6 +557,10 @@ export const content: Content = {
     militia: {
       label: 'Militia',
       description: 'Sharpened spears and a rack: enough to train a small escort.',
+    },
+    fortification: {
+      label: 'Fortifications',
+      description: 'Stakes, battlements and two good archers: the town gets ready for the night.',
     },
     sharpArrows: {
       label: 'Fang arrows',

@@ -123,6 +123,8 @@ export interface WorldState {
   cycleStartTick: number;
   /** Le bâtiment que vise la prochaine vague, une fois annoncée. Absent : pas encore tirée. */
   nextWaveTarget?: EntityId;
+  /** La nuit dont la vague, sortie, paiera sa prime si on l'abat toute (`WAVE_BOUNTY`). Absent : aucune en jeu. */
+  bountyNight?: number;
   kills: number;
   /** Le Prestige de la colonie. Absent des sauvegardes d'avant lui : 0. */
   prestige: number;
@@ -478,6 +480,7 @@ function parseState(raw: unknown): WorldState {
     night: int(state['night']),
     cycleStartTick: int(state['cycleStartTick']),
     ...(state['nextWaveTarget'] !== undefined && { nextWaveTarget: int(state['nextWaveTarget']) }),
+    ...(state['bountyNight'] !== undefined && { bountyNight: int(state['bountyNight']) }),
     kills: int(state['kills']),
     // Absents d'une sauvegarde d'avant le Prestige : la colonie repart de zéro, ses bâtiments déjà payés.
     prestige: state['prestige'] === undefined ? 0 : int(state['prestige']),
@@ -746,6 +749,7 @@ function parseEntity(raw: unknown): SavedEntity {
     case 'house':
     case 'clinic':
     case 'purifier':
+    case 'wall':
     case 'lumberCamp':
     case 'foresterHouse':
     case 'depot':

@@ -24,6 +24,8 @@ export const WEAPONS = {
   /** L'arc de la tour de guet : plus loin, un peu plus lent. */
   towerBow: { label: 'Arc de tour', range: 8, cooldown: 18, damage: 1, arrowSpeed: 16 },
   /** L'arc de la tour renforcée : deux tuiles de plus, 30 % plus rapide (18 / 1,3 ≈ 14). */
+  /** Les arcs de la tour d'archers, ses deux archers à leur poste : plus loin et plus fort qu'une tour de guet. */
+  archerBow: { label: 'Arcs d’archers', range: 9, cooldown: 12, damage: 1.5, arrowSpeed: 18 },
   reinforcedBow: { label: 'Arc renforcé', range: 10, cooldown: 14, damage: 1, arrowSpeed: 16 },
 } as const satisfies Record<string, WeaponProto>;
 

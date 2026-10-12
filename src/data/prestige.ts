@@ -45,6 +45,9 @@ export const BUILD_PRESTIGE = {
   home: 2,
   farm: 2,
   watchtower: 2,
+  archerTower: 3,
+  // Un pieu ne rapporte rien : on n'achète pas du Prestige au mètre de palissade.
+  palisade: 0,
   forge: 3,
   charcoalKiln: 2,
   clinic: 3,

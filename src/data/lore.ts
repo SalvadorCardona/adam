@@ -229,6 +229,24 @@ export const LORE = {
           'et tire plus vite que celui d’une tour de planches.',
       },
     },
+    archerTower: {
+      name: 'Tour d’archers',
+      sign: 'Archers',
+      site: 'Un socle de pierre, des créneaux de planches à clouer. Il faudra deux archers pour la tenir.',
+      description:
+        'Un donjon trapu de planches sur un socle de pierre, des créneaux et deux archers ' +
+        'de la colonie derrière. Sans eux, elle ne tire pas ; avec un seul, deux fois moins vite.',
+      effect: 'Tire sur les mutants à 9 cases, tenue par 2 archers.',
+    },
+    palisade: {
+      name: 'Palissade',
+      sign: 'Palissade',
+      site: 'Des pieux taillés en pointe, couchés au sol, et une corde pour les lier.',
+      description:
+        'Trois pieux taillés en pointe, liés de corde. Un mutant ne contourne rien : ' +
+        'il s’arrête et la casse, le temps que les tours le criblent.',
+      effect: 'Arrête les mutants le temps qu’ils la cassent.',
+    },
     forge: {
       name: 'Forge',
       sign: 'Forge',

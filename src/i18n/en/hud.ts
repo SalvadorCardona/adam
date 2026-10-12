@@ -182,6 +182,15 @@ export const hud: Messages['hud'] = {
     queenSlainText: (night: number): string => `Night ${night} — her radioactive core is on the ground`,
     queenNight: (night: number): string => `Night ${night} — the Puddle Queen`,
     queenIn: (time: string): string => `She rises in ${time}`,
+    soonShort: (time: string): string => `Wave in ${time}`,
+    soon: (time: string, count: number, bases: number, from: string, leader: 'boss' | 'queen' | null): string =>
+      `Wave in ${time}: ${count} mutant${s(count)}` +
+      (bases > 1 ? ` from ${bases} bases, the closest ${from}` : ` ${from}`) +
+      (leader === 'queen' ? ', led by the Puddle Queen' : leader === 'boss' ? ', led by a big mutant' : ''),
+    announced: (time: string, count: number, from: string): string =>
+      `A wave arrives in ${time}: ${count} mutant${s(count)} ${from}. Get the defenses ready!`,
+    notifyTitle: 'Wave incoming',
+    bounty: (night: number, list: string): string => `Night ${night} repelled — bounty: ${list}`,
   },
   quest: {
     objective: (index: number, total: number): string => `Goal ${index}/${total}`,

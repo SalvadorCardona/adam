@@ -221,6 +221,19 @@ export const hud = {
     queenNight: (night: number): string => `Nuit ${night} — la Reine des flaques`,
     /** `time` : « 1:05 ». */
     queenIn: (time: string): string => `Elle sort dans ${time}`,
+    /** La capsule de l'annonce : « Vague dans 2:30 ». */
+    soonShort: (time: string): string => `Vague dans ${time}`,
+    /** Son détail : `from` dit où est la base de tête (« par le nord »), `leader` le chef qui la mène. */
+    soon: (time: string, count: number, bases: number, from: string, leader: 'boss' | 'queen' | null): string =>
+      `Vague dans ${time} : ${count} mutant${s(count)}` +
+      (bases > 1 ? ` de ${bases} bases, la plus proche ${from}` : ` ${from}`) +
+      (leader === 'queen' ? ', menés par la Reine des flaques' : leader === 'boss' ? ', menés par un gros mutant' : ''),
+    /** Le bandeau de l'annonce, et la notification. */
+    announced: (time: string, count: number, from: string): string =>
+      `Une vague arrive dans ${time} : ${count} mutant${s(count)} ${from}. Préparez les défenses !`,
+    notifyTitle: 'Vague en approche',
+    /** `list` : « 6 bois, 6 pierre ». */
+    bounty: (night: number, list: string): string => `Nuit ${night} repoussée — prime : ${list}`,
   },
   /** La quête en haut de l'écran. */
   quest: {

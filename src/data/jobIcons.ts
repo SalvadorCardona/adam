@@ -165,6 +165,26 @@ export const JOB_DRAWINGS = {
     polygon([20.5, 12, 16.5, 9.5, 16.5, 14.5], cyan.base),
     polygon([3.5, 9.5, 6.5, 12, 3.5, 14.5, 5, 12], coral.base),
   ),
+  /** La tour d'archers : la cible corail et blanche, une flèche plantée au cœur. */
+  archerTower: job(
+    shadedCircle(10.5, 13, 7, 'coral'),
+    circle(10.5, 13, 4.6, paper.base),
+    circle(10.5, 13, 2.4, coral.base),
+    line(10.5, 13, 19.5, 4.5, ink.base),
+    polygon([19.5, 4.5, 20.8, 7.4, 16.6, 5.8], cyan.base),
+    polygon([17.2, 3, 21.6, 3.2, 21, 6.6], cyan.shade),
+  ),
+  /** La palissade : trois pieux taillés en pointe, liés d'une corde. */
+  palisade: job(
+    ...[5.5, 10.5, 15.5].map(
+      (x) =>
+        polygon([x, 9, x + 1.5, 5, x + 3, 9], orange.shade) +
+        rect(x, 8.5, 3, 11, orange.shade, 1.2) +
+        rect(x, 8.5, 2, 10.4, orange.base, 1) +
+        pill(x + 0.4, 9.6, 0.9, 3.4, orange.light),
+    ),
+    line(4.5, 13.5, 19.5, 13.5, ink.base),
+  ),
   /** La forge : l'enclume et ses étincelles. */
   forge: job(
     polygon([3.5, 8.5, 20, 8.5, 20, 11.5, 16, 12.5, 15, 15.5, 18.5, 19, 5.5, 19, 9, 15.5, 8, 12.5, 6, 12], ink.shade),

@@ -230,6 +230,10 @@ export class Hud {
   private idleCursor = 0;
   /** L'alerte de nourriture : la ville va en manquer. Un tap montre qui a faim, puis le suivant. */
   private readonly hunger: HTMLButtonElement;
+  /** « Vague dans 2:30 » : l'annonce de la prochaine vague (`World.waveForecast`). */
+  private readonly waveSoon: HTMLButtonElement;
+  private lastWave = '';
+  private waveOrigin: { x: number; y: number } | null = null;
   private lastHunger = '';
   /** Le besoin que dit l'alerte : son tap montre qui en manque. */
   private hungerNeed: NeedId | undefined = undefined;
@@ -420,6 +424,12 @@ export class Hud {
     this.hunger.type = 'button';
     this.hunger.hidden = true;
     this.hunger.addEventListener('click', () => this.focusHungry());
+    this.waveSoon = element('button', 'panel hud-wave');
+    this.waveSoon.type = 'button';
+    this.waveSoon.hidden = true;
+    this.waveSoon.addEventListener('click', () => {
+      if (this.waveOrigin) this.onFocus(this.waveOrigin.x, this.waveOrigin.y);
+    });
     this.floats = element('div', 'hud-floats');
     this.stats = element('div', 'panel hud-stats');
     this.stats.hidden = !debug;
@@ -528,7 +538,7 @@ export class Hud {
     main.append(this.bar, this.quest);
     this.left = element('div', 'hud-left');
     // L'horloge du jour juste à droite de la population.
-    this.left.append(this.town, this.people, this.dayClock, this.hunger);
+    this.left.append(this.town, this.people, this.dayClock, this.waveSoon, this.hunger);
     this.right = element('div', 'hud-right');
     this.right.append(this.weather);
     this.top.append(this.left, main, this.right);
@@ -739,6 +749,14 @@ export class Hud {
     world.events.on('waveCleared', ({ night }) =>
       this.showBanner('cleared', t().hud.wave.cleared(night), t().hud.wave.clearedText, null, BANNER_CLEARED_MS),
     );
+    world.events.on('waveAnnounced', ({ ticks, count, from }) =>
+      this.notify(t().hud.wave.announced(clock(Math.ceil(ticks / TICKS_PER_SECOND)), count, t().hud.from[from]), 'bad'),
+    );
+    world.events.on('waveRewarded', ({ night, reward }) => {
+      if (reward.length === 0) return;
+      for (const [item, amount] of reward) this.float(item, amount);
+      this.notify(t().hud.wave.bounty(night, reward.map(([item, amount]) => t().hud.toast.storedItem(amount, t().items[item])).join(', ')), 'good');
+    });
     world.events.on('lootPicked', ({ item, amount }) => {
       this.float(item, amount);
       this.flyToBag(item);
@@ -1095,6 +1113,37 @@ export class Hud {
     this.hunger.title = label;
     this.hunger.setAttribute('aria-label', label);
     this.hunger.replaceChildren(itemIcon(alert.item, 18), text('hud-hunger-text', alert.minutes === 0 ? words.outShort : words.soonShort(alert.minutes)));
+  }
+
+  /**
+   * L'annonce de la vague, à droite de l'horloge : « Vague dans 2:30 » et son
+   * effectif, toute la fenêtre `WAVE_WARNING.leadTicks` ; en corail et qui bat
+   * sous `urgentTicks`. Le détail — d'où, combien de bases, un chef — au tap
+   * long et pour les lecteurs d'écran ; un tap montre la base de tête.
+   */
+  private updateWave(): void {
+    const forecast = this.world.waveForecast();
+    const seconds = forecast ? Math.ceil(forecast.ticks / TICKS_PER_SECOND) : 0;
+    const key = forecast ? `${seconds}:${forecast.count}:${forecast.boss}:${forecast.queen}:${forecast.urgent}:${forecast.from}:${locale()}` : '';
+
+    this.waveOrigin = forecast && { x: forecast.x, y: forecast.y };
+    if (key === this.lastWave) return;
+    this.lastWave = key;
+    this.waveSoon.hidden = forecast === null;
+    if (!forecast) return;
+
+    const words = t().hud.wave;
+    const time = clock(seconds);
+    const label = words.soon(time, forecast.count, forecast.bases, t().hud.from[forecast.from], forecast.queen ? 'queen' : forecast.boss ? 'boss' : null);
+
+    this.waveSoon.dataset['urgent'] = String(forecast.urgent);
+    this.waveSoon.setAttribute('aria-label', label);
+    setTip(this.waveSoon, label);
+    this.waveSoon.replaceChildren(
+      uiIcon(forecast.boss || forecast.queen ? 'shield' : 'mutant', 18),
+      text('hud-wave-text', words.soonShort(time)),
+      text('hud-wave-count', `×${forecast.count}`),
+    );
   }
 
   /** Centre la caméra sur un habitant qui a faim (ou soif) — au tap suivant, sur le suivant — et dit qui il est. */
@@ -1523,6 +1572,7 @@ export class Hud {
     this.updateLevel();
     this.updatePeople();
     this.updateHunger();
+    this.updateWave();
     this.updateSpeech();
     this.updatePerson();
     this.updateWeather();
