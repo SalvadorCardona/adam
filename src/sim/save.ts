@@ -18,6 +18,7 @@
 import { CHUNK_TILES } from '../core/grid.ts';
 import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, maxLevel, type BuildingId } from '../data/buildings.ts';
 import { COMPANION_CLASSES, isCompanionClass, type CompanionClassId } from '../data/companions.ts';
+import { PIG_FARM } from '../data/pigs.ts';
 import { RARE_OFFERS, type RareOfferId } from '../data/caravan.ts';
 import { ENEMY_BASE_LEVELS, RAIDS, enemyBaseLevel } from '../data/enemyBases.ts';
 import { ENEMIES, WILDLIFE, type EnemyId, type WildlifeId } from '../data/enemies.ts';
@@ -49,6 +50,7 @@ import type {
   BeastState,
   SlamState,
   EnemyBase,
+  PigState,
   CaravanState,
   Entity,
   EntityId,
@@ -465,6 +467,7 @@ const EVE_STATES: readonly EveState[] = ['arriving', 'idle', 'repair'];
 const PATIENT_STATES: readonly PatientState[] = ['stunned', 'following', 'care'];
 
 const CARAVAN_STATES: readonly CaravanState[] = ['arriving', 'parked', 'leaving'];
+const PIG_STATES: readonly PigState[] = ['wild', 'follow', 'flee'];
 
 const TRADE_KINDS: readonly TradeOffer['kind'][] = ['surplus', 'loot', 'rare'];
 
@@ -759,6 +762,12 @@ function parseEntity(raw: unknown): SavedEntity {
     case 'quarry':
     case 'forge':
       return { ...built, kind, blocked: bool(entity['blocked']) };
+    case 'pigPen': {
+      const pigs = int(entity['pigs']);
+
+      if (pigs < 0 || pigs > PIG_FARM.capacity) throw new SaveError(`élevage à ${pigs} cochons`);
+      return { ...built, kind, pigs, endTick: int(entity['endTick']), blocked: bool(entity['blocked']) };
+    }
     case 'townHall':
     case 'house':
     case 'decor':
@@ -1068,6 +1077,24 @@ function parseMobile(raw: unknown, seed: number): Mobile {
         cooldown: mobile['cooldown'] === undefined ? 0 : int(mobile['cooldown']),
         hurtTicks: mobile['hurtTicks'] === undefined ? 0 : int(mobile['hurtTicks']),
         stuck: mobile['stuck'] === undefined ? 0 : int(mobile['stuck']),
+      };
+    }
+    case 'pig': {
+      const state = oneOfList(mobile['state'], PIG_STATES);
+
+      return {
+        ...base,
+        kind: 'pig',
+        state,
+        denId: int(mobile['denId']),
+        homeX: finite(mobile['homeX']),
+        homeY: finite(mobile['homeY']),
+        dirX: finite(mobile['dirX']),
+        dirY: finite(mobile['dirY']),
+        wanderTicks: int(mobile['wanderTicks']),
+        tame: int(mobile['tame']),
+        loose: int(mobile['loose']),
+        fleeTicks: int(mobile['fleeTicks']),
       };
     }
     case 'caravan': {

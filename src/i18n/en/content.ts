@@ -190,6 +190,15 @@ export const content: Content = {
         },
       ],
     },
+    pigPen: {
+      label: 'Pig pen',
+      sign: 'Pig pen',
+      siteDescription: 'A staked-out pen and a half-built fence: it is still waiting for its first pig.',
+      description:
+        'A scrap pen, a sty and a trough. It gives nothing until a pig has been brought here: find one in the forest, tame it and lead it home. After that it yields meat every cycle, which porters empty into the town hall.',
+      effect: 'A forest pig brought here gives meat; up to 3 pigs.',
+      upgrades: [],
+    },
     farm: {
       label: 'Farm',
       sign: 'Farm',
@@ -655,6 +664,10 @@ export const content: Content = {
       label: 'Well digging',
       description: 'A rope, a bucket, a stone rim: river water within reach.',
     },
+    pigFarming: {
+      label: 'Pig farming',
+      description: 'A scrap pen, a sty, a trough: a forest pig would give the town meat.',
+    },
     woodcraft: {
       label: 'Woodcraft',
       description: 'Salvaged axes and saplings to replant: the forest works for the town.',
@@ -1014,6 +1027,7 @@ export const content: Content = {
     army: 'Barracks',
     raid: 'Mutant base',
     chest: 'Chest to open',
+    pigs: 'Pig pen',
     wardrobe: 'Wardrobe',
     regions: 'Regions',
   },

@@ -645,6 +645,15 @@ export class Hud {
 
       if (entity) this.celebrate(entity, t().hud.float.built(t().buildings[entity.proto].label));
     });
+    // Le cochon : apprivoisé, effrayé, entré à l'élevage, échappé.
+    world.events.on('pigTamed', () => this.notify(t().hud.pigs.tamed, 'good'));
+    world.events.on('pigFled', ({ reason }) => this.notify(reason === 'scare' ? t().hud.pigs.fledScare : t().hud.pigs.fledLost, 'bad'));
+    world.events.on('pigPenned', ({ id, pigs }) => {
+      const pen = world.entities.get(id);
+
+      if (pen) this.celebrate(pen, t().hud.pigs.penned(pigs));
+    });
+    world.events.on('pigsEscaped', ({ count }) => this.notify(t().hud.pigs.escaped(count), 'bad'));
     // Un coffre ouvert : « Coffre ouvert ! » monte au-dessus de lui.
     world.events.on('chestOpened', ({ tx, ty }) => this.celebrate({ tx, ty, width: 1, height: 1 }, t().wardrobe.chestOpened));
     // Une ruine fouillée, un secret trouvé : le mot monte du lieu, et le butin vole vers le sac.

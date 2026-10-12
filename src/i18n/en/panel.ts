@@ -124,6 +124,14 @@ export const panel: Messages['panel'] = {
     working: 'The bucket comes up full.',
   },
 
+  pigPen: {
+    pigs: (pigs: number, capacity: number): string => `Pigs: ${pigs}/${capacity}`,
+    meat: (meat: number, seconds: number): string => `Meat: ${meat} every ${seconds} s`,
+    noPig: 'Bring back a pig from the forest: the pen produces nothing while it is empty.',
+    working: 'The pigs root through the straw.',
+    paused: 'Paused: the pigs are resting.',
+  },
+
   house: {
     sleeping: 'The workers sleep here between shifts.',
     beds: 'Whoever has no bed finds one here, the closest to their work.',

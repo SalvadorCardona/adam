@@ -811,6 +811,32 @@ terre `DEATH.respawnSeconds` — `data/death.ts`, écran « Vous êtes mort »,
 mairie ; à terre, ni pas, ni chantier, ni tir : `DEAD_COMMANDS` seules passent) ; l'arc d'Adam vise l'ennemi le plus proche, bête ou
 mutant, et le marque (`player.target`) ; les tours ne visent que les mutants.
 
+**Élevage de cochons** (`data/pigs.ts`, `sim/pigs.ts`, bâtiment `pigPen`, débloqué au
+labo par la recherche « Élevage », onglet Bâtiments) — la viande ne vient plus
+que de la chasse : le **cochon sauvage** (mobile `pig`, sprite `pig`) est rare,
+paisible, et flâne au cœur des forêts autour d'un point tiré de la seed par
+chunk (`pigSpotsOfChunk`, jamais stocké ; `PIGS.wild`) ; ce n'est pas un `Foe` :
+il n'a pas de points de vie, ne frappe jamais et l'arc d'Adam ne le vise pas.
+Pas de bouton pour l'apprivoiser : Adam reste à `PIGS.tame.radius` tuiles
+pendant `PIGS.tame.ticks`, et le cochon le suit (`PigState` : `wild` →
+`follow` ; un seul à la fois). Trop longtemps au-delà de `looseDistance`
+(`patienceTicks`) ou une bête / un mutant à `scareDistance`, il détale
+(`flee`, événement `pigFled`) puis se calme et redevient sauvage, apprivoisable
+de nouveau — jamais tué, jamais perdu pour de bon. Le point d'où il vient reste
+vide `PIGS.wild.respawnTicks` (état dans `World.dens`, sauvegardé) : on en
+retrouvera un plus tard. Arrivé à `PIGS.enterDistance` d'un élevage qui a de la
+place, il y entre (`pigPenned`) : il n'est plus un mobile, l'élevage le compte
+(`PigPen.pigs`). Un seul cochon suffit : chaque cochon (`PIG_FARM.capacity`, 3)
+donne `meatPerPig` de viande par cycle (`cycleTicks`) dans le coffre, que
+porteurs et logisticiens vident ; pas de reproduction, pour que chaque cochon
+se mérite. S'il y a du grain en ville (`PIG_FARM.feed` : de la nourriture, dans le
+rayon de la mairie, au-delà de `keepInTown`), le cycle en prend et va
+`speed` fois plus vite. Sans cochon : pas de cycle, bulle `noPig` (« Ramenez un
+cochon de la forêt »). L'élevage abattu libère ses cochons, qui s'enfuient
+(`pigsEscaped`) et redeviennent sauvages. Sauvegardés : le mobile `pig` et
+`PigPen` (`pigs`, `endTick`, `blocked`) ; une ancienne sauvegarde n'en a pas.
+Partie de test `/test/pigs` (`nearPig` : Adam à trois pas d'un cochon).
+
 **Météo** — lue dans la seed et le temps de jeu, jamais stockée
 (`src/data/weather.ts`, `src/sim/weather.ts`) : pluie acide (Adam ralenti,
 bâtiments abîmés rongés, sauf à l'abri près de la mairie), coup de vent

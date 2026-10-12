@@ -81,6 +81,7 @@ import { NURSERY_CARE } from '../data/inhabitants.ts';
 import type { ItemId } from '../data/items.ts';
 import { RECIPES, type RecipeProto } from '../data/recipes.ts';
 import { WEAPONS } from '../data/weapons.ts';
+import { PIG_FARM } from '../data/pigs.ts';
 import { BUILDERS, FARMERS, FORESTERS, LOGISTICIANS, LUMBERJACKS, WORK_PRIORITIES, type WorkPriority } from '../data/workers.ts';
 import { floorCost } from '../sim/antenna.ts';
 import { NAME_MAX } from '../sim/inhabitants.ts';
@@ -959,6 +960,18 @@ export class BuildingPanel {
           const words = entity.proto === 'well' ? text.well : text.quarry;
 
           lines.push(entity.paused ? paused : full ? text.storeFull : stopped ? words.noOne : words.working);
+          break;
+        }
+
+        case 'pigPen': {
+          const words = text.pigPen;
+          const seconds = Math.round(PIG_FARM.cycleTicks / TICKS_PER_SECOND);
+
+          stats.push(
+            { icon: 'pig', value: `${entity.pigs}/${PIG_FARM.capacity}`, label: words.pigs(entity.pigs, PIG_FARM.capacity) },
+            { icon: 'chest', item: 'meat', value: String(PIG_FARM.meatPerPig * entity.pigs), label: words.meat(PIG_FARM.meatPerPig * entity.pigs, seconds) },
+          );
+          lines.push(entity.paused ? words.paused : entity.pigs === 0 ? words.noPig : full ? text.storeFull : words.working);
           break;
         }
 

@@ -69,6 +69,12 @@ export interface TestScenarioProto {
    */
   nearChest?: number;
   /**
+   * Adam se tient à tant de tuiles à gauche du cochon sauvage le plus proche
+   * de la mairie (`data/pigs.ts`), ses abords explorés, plutôt qu'à `adam` ;
+   * ce cochon-là est posé d'emblée.
+   */
+  nearPig?: number;
+  /**
    * Une colonie qui ne tient que la prairie de départ (`data/regions.ts`),
    * Adam à tant de tuiles du repaire du gardien de la première région, ses
    * abords explorés, plutôt qu'à `adam`.
@@ -254,6 +260,19 @@ export const TEST_SCENARIOS = {
     bag: {},
     adam: { dx: 1, dy: 4 },
     nearChest: 3,
+  },
+  /**
+   * La boucle de l'élevage : un élevage vide près de la mairie, et Adam à trois tuiles d'un cochon sauvage, en forêt.
+   * Il reste près de lui, le cochon le suit ; on le ramène à l'enclos.
+   */
+  pigs: {
+    label: 'Élevage de cochons',
+    seed: 100,
+    buildings: [{ building: 'pigPen', dx: 6, dy: 0 }],
+    town: { wood: 40, stone: 30, food: 40, water: 12 },
+    bag: {},
+    adam: { dx: 1, dy: 4 },
+    nearPig: 3,
   },
   /**
    * L'éditeur de personnage ouvert devant la mairie : Adam a déjà trouvé

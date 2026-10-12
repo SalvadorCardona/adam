@@ -262,6 +262,16 @@ export const LORE = {
         'dans son coffre, que les porteurs vident à la mairie.',
       effect: '1 ouvrier puise 12 eaux par minute, au bord d’une rivière.',
     },
+    pigPen: {
+      name: 'Élevage de cochons',
+      sign: 'Élevage',
+      site: 'Un enclos piqueté et une barrière à moitié posée : il attend encore son premier cochon.',
+      description:
+        'Un enclos de récup, une soue et une auge. Il ne donne rien tant qu’aucun cochon ' +
+        'n’y a été amené : il faut en trouver un en forêt, l’apprivoiser et le ramener. ' +
+        'Ensuite il donne de la viande à chaque cycle, que les porteurs vident à la mairie.',
+      effect: 'Un cochon de la forêt, ramené ici, donne de la viande ; jusqu’à 3 cochons.',
+    },
     farm: {
       name: 'Ferme',
       sign: 'Ferme',

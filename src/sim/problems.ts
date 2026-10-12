@@ -23,6 +23,8 @@ export interface ProblemFacts {
   noWorker: boolean;
   /** Un consommateur attend de quoi lancer son prochain cycle : la nurserie, sa nourriture. */
   starved: boolean;
+  /** L'élevage de cochons est vide : aucun cochon n'y a été ramené. */
+  noPig: boolean;
   /** Le coffre est redescendu à `PROBLEMS.releaseRatio` de sa capacité ou moins. */
   drained: boolean;
 }

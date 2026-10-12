@@ -149,6 +149,16 @@ export const panel = {
     working: 'Le seau remonte, plein.',
   },
 
+  pigPen: {
+    /** `pigs` : cochons logés ; le cycle donne `meat` viandes. */
+    pigs: (pigs: number, capacity: number): string => `Cochons : ${pigs}/${capacity}`,
+    meat: (meat: number, seconds: number): string => `Viande : ${meat} toutes les ${seconds} s`,
+    /** L'élevage est vide : la bulle d'alerte de la carte, expliquée. */
+    noPig: 'Ramenez un cochon de la forêt : tant qu’il est vide, l’élevage ne produit rien.',
+    working: 'Les cochons fouillent la paille.',
+    paused: 'En pause : les cochons se reposent.',
+  },
+
   house: {
     sleeping: 'Les ouvriers dorment ici entre deux journées.',
     beds: 'Ceux qui n’ont pas de lit y trouvent le leur, le plus près de leur travail.',

@@ -9,6 +9,7 @@
  *   de fer, un épi, un galet dépassent du couvercle ;
  * - `noWorker` : un ouvrier, casquette orange des humains, dont le poste
  *   attend quelqu'un ;
+ * - `noPig` : un groin de cochon, tout seul — l'enclos attend le sien ;
  * - `starved` : la même caisse, vide — on voit son fond —, et une flèche
  *   orange qui plonge dedans : elle attend qu'on la remplisse.
  *
@@ -20,7 +21,7 @@ import type { SpriteProto } from '../data/sprites.ts';
 
 const W = 30;
 const H = 31;
-const { paper, yellow, orange, skin, ink } = PALETTE;
+const { paper, yellow, orange, skin, ink, coral } = PALETTE;
 
 /** La bulle, sa pointe au pied du cadre. */
 const BUBBLE = [polygon([9, 23, 17, 23, 13, 30], paper.shade), shadedPill(1, 4, 24, 22, 3, 'paper')];
@@ -64,6 +65,21 @@ export const ALERT = {
       pill(11, 10, 9, 2, orange.shade),
       circle(10.6, 13.8, 0.9, ink.base),
       circle(14, 13.8, 0.9, ink.base),
+      ...BADGE,
+    ),
+    noPig: svg(
+      W,
+      H,
+      ...BUBBLE,
+      // Un groin rose : l'enclos attend son cochon.
+      shadedPill(5.5, 5, 4.5, 7, 1.5, 'skin'),
+      shadedPill(14.5, 5, 4.5, 7, 1.5, 'skin'),
+      shadedCircle(12.5, 13, 7, 'skin'),
+      circle(10, 11.2, 1, ink.base),
+      circle(15, 11.2, 1, ink.base),
+      shadedPill(8.5, 13.6, 8, 5, 1.5, 'coral'),
+      circle(10.8, 16, 0.8, coral.shade),
+      circle(14.2, 16, 0.8, coral.shade),
       ...BADGE,
     ),
     starved: svg(

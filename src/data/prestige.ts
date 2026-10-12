@@ -37,6 +37,7 @@ export const BUILD_PRESTIGE = {
   foresterHouse: 2,
   quarry: 2,
   well: 2,
+  pigPen: 2,
   logisticsPost: 3,
   constructionPost: 3,
   drill: 2,

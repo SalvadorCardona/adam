@@ -6,7 +6,7 @@ import { ProblemWatch, problemsOf, type ProblemFacts } from './problems.ts';
 import { stageScenario } from './testScenario.ts';
 import type { Farm, LumberCamp } from './types.ts';
 
-const CALM: ProblemFacts = { stoppedByPlayer: false, storeFull: false, noWorker: false, starved: false, drained: false };
+const CALM: ProblemFacts = { stoppedByPlayer: false, storeFull: false, noWorker: false, starved: false, noPig: false, drained: false };
 const FULL: ProblemFacts = { ...CALM, storeFull: true };
 
 describe('problèmes d’un bâtiment', () => {

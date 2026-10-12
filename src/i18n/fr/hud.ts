@@ -77,6 +77,14 @@ export const hud = {
     research: 'De quoi avancer la recherche',
     marker: { chest: 'Coffre', ruin: 'Ruine', secret: 'Cachette' },
   },
+  /** L'élevage de cochons : les bulles de la boucle forêt → base. */
+  pigs: {
+    tamed: 'Le cochon vous suit ! Ramenez-le à l’élevage.',
+    fledScare: 'Le cochon, effrayé, s’est enfui…',
+    fledLost: 'Le cochon vous a perdu et s’est enfui…',
+    penned: (pigs: number): string => `Un cochon rejoint l’élevage (${pigs})`,
+    escaped: (count: number): string => (count > 1 ? `${count} cochons se sont échappés !` : 'Un cochon s’est échappé !'),
+  },
   /** Les bulles empilées des événements. */
   toast: {
     saveFailed: 'Sauvegarde impossible — le stockage du navigateur est plein ou bloqué',

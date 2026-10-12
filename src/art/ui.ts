@@ -491,6 +491,19 @@ export const UI_ICONS = {
     group('translate(12 7) rotate(-35)', pill(0, -1.8, 6.5, 3.6, mint.base)),
     shadedPill(5.5, 12, 13, 9, 2.5, 'yellow'),
   ),
+  /** Un cochon de face : les oreilles, la tête ronde, le groin à deux narines — ceux de l'élevage. */
+  pig: svg(
+    S,
+    S,
+    shadedPill(3.5, 3.5, 5.5, 8, 2, 'skin'),
+    shadedPill(15, 3.5, 5.5, 8, 2, 'skin'),
+    shadedCircle(12, 13, 8.4, 'skin'),
+    circle(9, 11, 1.2, ink.base),
+    circle(15, 11, 1.2, ink.base),
+    shadedPill(7.6, 13.6, 8.8, 5.6, 1.6, 'coral'),
+    circle(10.3, 16.4, 0.9, coral.shade),
+    circle(13.7, 16.4, 0.9, coral.shade),
+  ),
   /** Un arbre adulte : coussins de feuillage sur un tronc indigo — ce que la forêt du forestier a de bon à couper. */
   tree: svg(
     S,
