@@ -86,6 +86,7 @@ import { effectLine } from './researchText.ts';
 import { moodMeter } from './moodMeter.ts';
 import { needMeter } from './needMeter.ts';
 import { personText } from './personText.ts';
+import { haptics } from './haptics.ts';
 import { footingText } from './placementReason.ts';
 import { mapUrl, seedLine } from './seed.ts';
 import { setTip, Tooltips } from './tooltip.ts';
@@ -93,15 +94,15 @@ import { setTip, Tooltips } from './tooltip.ts';
 /** Durée de l'alarme après le dernier coup reçu par la mairie hors de l'écran, en ms. */
 const ALARM_MS = 2500;
 
-/** Motif de vibration de l'alarme, et le délai minimal entre deux vibrations, en ms. */
-const ALARM_VIBRATION = [140, 80, 140];
-const ALARM_VIBRATION_EVERY_MS = 4000;
-
 /** Durée de vie d'un « +N Prestige », en ms (cf. `.hud-float-prestige` dans le CSS). */
 const PRESTIGE_FLOAT_MS = 1600;
 
 /** Durée de vie d'un gain flottant, en ms (cf. `hud-float-up` dans le CSS). */
 const FLOAT_MS = 1000;
+
+/** Vol d'un objet récolté jusqu'au sac, en ms ; au plus `MAX_FLYERS` en l'air, la récolte en lâche quatre par demi-seconde. */
+const FLY_MS = 550;
+const MAX_FLYERS = 8;
 
 /** Le temps où la flèche de l'aube reste à côté du Bonheur de la ville, en ms. */
 const MOOD_TREND_MS = 6000;
@@ -306,9 +307,10 @@ export class Hud {
   private delivered = false;
   private repaired = false;
 
-  /** Fin de l'alarme en cours, et dernière vibration, en ms (`performance.now()`). */
+  /** Fin de l'alarme en cours, en ms (`performance.now()`). */
   private alarmUntil = 0;
-  private lastVibration = -Infinity;
+  /** Objets en vol vers le sac (`flyToBag`). */
+  private flyers = 0;
 
   private project: Projector = (x, y) => ({ x, y });
 
@@ -584,6 +586,7 @@ export class Hud {
       if (item === 'wood') this.harvestedWood = true;
       if (item === 'stone') this.harvestedStone = true;
       this.float(item, amount);
+      this.flyToBag(item);
     });
     world.events.on('siteDelivered', ({ item, amount, source }) => {
       this.delivered = true;
@@ -710,7 +713,10 @@ export class Hud {
     world.events.on('waveCleared', ({ night }) =>
       this.showBanner('cleared', t().hud.wave.cleared(night), t().hud.wave.clearedText, null, BANNER_CLEARED_MS),
     );
-    world.events.on('lootPicked', ({ item, amount }) => this.float(item, amount));
+    world.events.on('lootPicked', ({ item, amount }) => {
+      this.float(item, amount);
+      this.flyToBag(item);
+    });
     world.events.on('happinessChanged', ({ from, to }) => {
       this.moodTrend = to === from ? null : { up: to > from, until: performance.now() + MOOD_TREND_MS };
     });
@@ -1236,15 +1242,8 @@ export class Hud {
     this.alarmUntil = now + ALARM_MS;
     this.root.dataset['alarm'] = 'true';
 
-    if (now - this.lastVibration < ALARM_VIBRATION_EVERY_MS) return;
-    this.lastVibration = now;
-
-    // Absente sur iOS et sur ordinateur : l'alarme visuelle suffit alors.
-    try {
-      navigator.vibrate?.(ALARM_VIBRATION);
-    } catch {
-      // Refusée par le navigateur : rien à faire.
-    }
+    // Absente sur iOS et sur ordinateur, coupable dans les réglages : l'alarme visuelle suffit alors.
+    haptics.pulse('alarm', now);
   }
 
   /**
@@ -1330,6 +1329,47 @@ export class Hud {
     floater.append(`${delta > 0 ? '+' : '−'}${Math.abs(delta)}`, itemIcon(item, 18));
     this.floats.append(floater);
     window.setTimeout(() => floater.remove(), FLOAT_MS);
+  }
+
+  /**
+   * L'objet récolté part de la tête d'Adam et file dans le bouton du sac, qui
+   * fait « pop » à l'arrivée. Animation du navigateur, sur `transform` et
+   * `opacity` seulement ; au plus `MAX_FLYERS` à la fois, et rien sous
+   * `prefers-reduced-motion`.
+   */
+  private flyToBag(item: ItemId): void {
+    if (this.flyers >= MAX_FLYERS || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+    const { player } = this.world;
+    const start = this.project(player.x, player.y - 44);
+    const home = this.floats.getBoundingClientRect();
+    const target = this.bag.getBoundingClientRect();
+    const flyer = element('span', 'hud-flyer');
+
+    flyer.append(itemIcon(item, 20));
+    flyer.style.left = `${Math.round(start.x)}px`;
+    flyer.style.top = `${Math.round(start.y)}px`;
+    this.floats.append(flyer);
+    this.flyers += 1;
+
+    const dx = target.left + target.width / 2 - home.left - start.x;
+    const dy = target.top + target.height / 2 - home.top - start.y;
+    const flight = flyer.animate(
+      [
+        { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px)) scale(0.5)`, opacity: 0.9 },
+      ],
+      { duration: FLY_MS, easing: 'cubic-bezier(0.5, 0, 0.8, 0.4)', fill: 'forwards' },
+    );
+
+    flight.onfinish = () => {
+      flyer.remove();
+      this.flyers -= 1;
+      this.bag.animate(
+        [{ transform: 'scale(1)' }, { transform: 'scale(1.18)', offset: 0.4 }, { transform: 'scale(1)' }],
+        { duration: 220, easing: 'ease-out' },
+      );
+    };
   }
 
   /** « +N Prestige » qui monte du bâtiment achevé ou de l'ennemi vaincu, en `x`, `y` pixels monde. */

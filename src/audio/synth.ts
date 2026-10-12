@@ -35,6 +35,7 @@ export type SoundName =
   | 'baby'
   | 'defeat'
   | 'open'
+  | 'tap'
   | 'countdown'
   | 'bite'
   | 'faint'
@@ -186,6 +187,11 @@ export const SOUNDS: Record<SoundName, (ctx: AudioContext, out: AudioNode, at: n
     burst(ctx, out, at, 'highpass', 2600 * v, 1200 * v, { decay: 0.06, peak: 0.8 });
     burst(ctx, out, at + 0.05, 'bandpass', 3200 * v, 900 * v, { decay: 0.08, peak: 0.5 });
     tone(ctx, out, at, 'square', 220 * v, 90 * v, { decay: 0.05, peak: 0.25 });
+  },
+
+  /** Un tap sur un bouton de l'interface : un « tic » bref et clair. */
+  tap(ctx, out, at) {
+    tone(ctx, out, at, 'sine', 900 * vary(0.05), 700, { decay: 0.04, peak: 0.2 });
   },
 
   /** Un objet posé sur le chantier. */

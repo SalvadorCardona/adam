@@ -280,6 +280,24 @@ export const UI_ICONS = {
     line(13.5, 8.5, 17, 8.5, ink.base),
     line(3.5, 3.5, 20.5, 20.5, coral.shade),
   ),
+  /** Un téléphone qui vibre : le boîtier indigo, son écran, deux traits de chaque côté. */
+  vibrateOn: svg(
+    S,
+    S,
+    rect(8, 3, 8, 18, ink.base, 2.5),
+    rect(9.5, 5, 5, 11, ink.light, 1.2),
+    line(4.5, 8, 4.5, 16, ink.base),
+    line(19.5, 8, 19.5, 16, ink.base),
+    line(2, 10, 2, 14, ink.base),
+    line(22, 10, 22, 14, ink.base),
+  ),
+  vibrateOff: svg(
+    S,
+    S,
+    rect(8, 3, 8, 18, ink.base, 2.5),
+    rect(9.5, 5, 5, 11, ink.light, 1.2),
+    line(3.5, 3.5, 20.5, 20.5, coral.shade),
+  ),
   /** Le marteau blanc du bouton de construction, comme sur la maquette. */
   hammer: svg(
     S,

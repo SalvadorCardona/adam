@@ -26,6 +26,7 @@ normalisés à −16 LUFS. `.m4a` : `ffmpeg -i x.ogg -c:a aac -b:a 128k x.m4a`.
 | `horn` | une vague s'annonce |
 | `alarm` | la vague arrive |
 | `defeat` | la mairie est tombée |
+| `tap` | tap sur un bouton de l'interface — un sinus de 900 Hz, 50 ms, généré avec ffmpeg (`sine`, fondus), sans source externe |
 
 ## Bruitages — enregistrements CC0
 

@@ -49,6 +49,7 @@ import { LocalGarden } from './storage/localGarden.ts';
 import { LocalRecord } from './storage/localRecord.ts';
 import { LocalSave, type LoadResult } from './storage/localSave.ts';
 import { LocalLocale } from './storage/localLocale.ts';
+import { LocalHaptics } from './storage/localHaptics.ts';
 import { LocalSigns } from './storage/localSigns.ts';
 import { LocalZoom } from './storage/localZoom.ts';
 import { TILE_SIZE } from './core/grid.ts';
@@ -63,6 +64,7 @@ import { BuildMenu } from './ui/buildMenu.ts';
 import { rewardText } from './ui/collectionPanel.ts';
 import { Hud } from './ui/hud.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
+import { haptics } from './ui/haptics.ts';
 import { SettingsPanel } from './ui/settingsPanel.ts';
 import { WardrobePanel } from './ui/wardrobePanel.ts';
 import { formatSeed, parseSeed } from './ui/seed.ts';
@@ -401,6 +403,7 @@ async function main(): Promise<void> {
     toggleSound: () => settings.setSound(!audio.toggleMuted()),
     toggleMusic: () => settings.setMusic(audio.toggleMusic()),
     toggleSigns: () => showSigns(!signsOn),
+    toggleHaptics: () => showHaptics(!haptics.enabled),
     setSfxVolume: (volume) => audio.setSfxVolume(volume),
     setMusicVolume: (volume) => audio.setMusicVolume(volume),
     onToggle: (open) => {
@@ -411,6 +414,19 @@ async function main(): Promise<void> {
 
   renderer.setSigns(signsOn);
   settings.setSigns(signsOn);
+
+  // Les vibrations : même principe, et l'interrupteur disparaît là où le navigateur ne sait pas vibrer.
+  const hapticPrefs = scenario ? new LocalHaptics(null) : LocalHaptics.browser();
+  const showHaptics = (on: boolean): void => {
+    haptics.setEnabled(on);
+    hapticPrefs.save(on);
+    settings.setHaptics(on);
+  };
+
+  haptics.setEnabled(hapticPrefs.load());
+  settings.setHaptics(haptics.enabled);
+  if (!haptics.supported) settings.hideHaptics();
+  wireHaptics(world);
 
   const autosave = wireSave(world, saves, () => started);
   const garden = wireGarden(world, scenario ? new LocalGarden(null) : LocalGarden.browser());
@@ -763,6 +779,17 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
     if (!document.hidden) for (const type of GESTURES) window.addEventListener(type, unlock);
   });
 
+  // Un « tic » sous chaque bouton de l'interface (pas sur la carte, qui a ses propres sons).
+  document.addEventListener(
+    'pointerdown',
+    (event) => {
+      const button = event.target instanceof Element ? event.target.closest('button') : null;
+
+      if (button && !button.disabled) audio.play('tap');
+    },
+    { capture: true },
+  );
+
   settings.setSound(!audio.muted);
   settings.setMusic(audio.musicOn);
   settings.setVolumes(audio.sfxVolume, audio.musicVolume);
@@ -1034,6 +1061,17 @@ function wireRecord(world: World, records: LocalRecord): number {
   return records.load();
 }
 
+/** Le téléphone vibre aux moments clés : un bâtiment fini, une recherche, un objectif, une naissance. */
+function wireHaptics(world: World): void {
+  world.events.on('resourceHarvested', () => haptics.pulse('tick'));
+  world.events.on('buildingCompleted', () => haptics.pulse('done'));
+  world.events.on('buildingUpgraded', () => haptics.pulse('done'));
+  world.events.on('childBorn', () => haptics.pulse('done'));
+  world.events.on('researchCompleted', () => haptics.pulse('win'));
+  world.events.on('objectiveCompleted', () => haptics.pulse('win'));
+  world.events.on('levelUp', () => haptics.pulse('win'));
+}
+
 /** Les éclats : copeaux à la coupe, sang vert à l'impact, gravats à l'effondrement. */
 function wireParticles(world: World, renderer: GameRenderer): void {
   const { particles } = renderer;
@@ -1091,6 +1129,23 @@ function wireParticles(world: World, renderer: GameRenderer): void {
       particles.burst((entity.tx + i) * TILE_SIZE, foot, PARTICLES.confetti, 7, 0.16);
     }
   });
+  // Une recherche aboutit : confettis et étoiles jaillissent du toit du labo.
+  world.events.on('researchCompleted', ({ id }) => {
+    const lab = world.entities.get(id);
+
+    if (!lab) return;
+    for (let i = 0; i <= lab.width; i += 1) {
+      particles.burst((lab.tx + i) * TILE_SIZE, lab.ty * TILE_SIZE, PARTICLES.confetti, 6, 0.16);
+    }
+    particles.burst((lab.tx + lab.width / 2) * TILE_SIZE, lab.ty * TILE_SIZE, PARTICLES.star, 8, 0.12);
+  });
+  // Un enfant naît : une gerbe légère devant la nurserie.
+  world.events.on('childBorn', ({ x, y }) => {
+    particles.burst(x, y - 12, PARTICLES.confetti, 10, 0.14);
+    particles.burst(x, y - 12, PARTICLES.star, 4, 0.1);
+  });
+  // Un nouveau type de bâtiment entre au menu : quelques confettis autour d'Adam.
+  world.events.on('buildingsUnlocked', () => particles.burst(world.player.x, world.player.y - 16, PARTICLES.confetti, 10, 0.15));
   world.events.on('buildingUpgraded', ({ id }) => {
     const entity = world.entities.get(id);
 

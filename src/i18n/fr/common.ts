@@ -24,6 +24,8 @@ export const settings = {
   music: 'Musique',
   /** Les pancartes des bâtiments, sur la carte. */
   signs: 'Pancartes',
+  /** La vibration du téléphone aux moments clés. */
+  haptics: 'Vibrations',
   /** Les curseurs de volume, sous chaque interrupteur. */
   sfxVolume: 'Volume des bruitages',
   musicVolume: 'Volume de la musique',

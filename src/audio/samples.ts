@@ -42,6 +42,7 @@ export const SAMPLES = {
   heyHo: { files: ['heho_1', 'heho_2', 'heho_3'], gain: 0.6, spread: 0.04 },
   hey: { files: ['he_1', 'he_2', 'he_3'], gain: 0.6, spread: 0.04 },
   open: { files: ['open'], gain: 0.45 },
+  tap: { files: ['tap'], gain: 0.35, spread: 0.05 },
   deny: { files: ['deny'], gain: 0.55 },
   arrow: { files: ['arrow_1', 'arrow_2', 'arrow_3'], gain: 0.4, spread: 0.08 },
   hit: { files: ['hit_1', 'hit_2', 'hit_3'], gain: 0.55, spread: 0.08 },
