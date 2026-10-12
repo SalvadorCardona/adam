@@ -22,6 +22,7 @@ import type { ItemId } from '../data/items.ts';
 import type { ResearchId } from '../data/research.ts';
 import type { Look, PieceId } from '../data/wardrobe.ts';
 import type { NeedId } from '../data/needs.ts';
+import type { TraitId } from '../data/traits.ts';
 import type { JobPriority, WorkPriority } from '../data/workers.ts';
 import type { Housing } from './housing.ts';
 import type { Needs } from './needs.ts';
@@ -509,11 +510,18 @@ export interface Fireball extends Moving {
 
 /**
  * Ce que tout habitant — enfant, ouvrier, bûcheron, forestier, fermier —
- * tient de sa venue : son sexe (`sexOf`, `sim/inhabitants.ts`), qu'il garde
+ * tient de sa venue : son sexe (`sexOf`, `sim/inhabitants.ts`), son trait, qu'il garde
  * en changeant de métier comme un enfant en devenant ouvrier.
  */
 export interface Born {
   sex: Sex;
+  /**
+   * Son trait (`data/traits.ts`), tiré à sa venue ou hérité à la nurserie ;
+   * absent d'une ancienne partie, `traitOf` le tire alors de la seed et de son id.
+   */
+  trait?: TraitId;
+  /** Le nom que le joueur lui a donné ; sans lui, son prénom se tire de la seed (`nameOf`). */
+  alias?: string;
 }
 
 /**

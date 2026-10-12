@@ -113,6 +113,11 @@ export type Command =
    * trouvée, n'est pas de son emplacement, ou qu'une couleur sort du nuancier.
    */
   | { type: 'dressAdam'; look: Look }
+  /**
+   * Renomme un habitant (ouvrier ou enfant) : le champ de sa fiche. Le nom est
+   * nettoyé et coupé à `NAME_MAX` ; vide, il rend le prénom tiré de la seed.
+   */
+  | { type: 'renameInhabitant'; id: MobileId; name: string }
   /** L'éditeur a montré ces pièces trouvées : elles perdent leur « Nouveau » (`Player.unseenPieces`). */
   | { type: 'seePieces'; pieces: PieceId[] }
   /**

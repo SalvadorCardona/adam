@@ -12,6 +12,7 @@
 import { hash3 } from '../core/rng.ts';
 import { FOE_NAMES, type AgeRange } from '../data/enemies.ts';
 import { AGES, NAMES, SEXES, type Sex } from '../data/inhabitants.ts';
+import { BIO_COUNT, TRAIT_IDS, TRAIT_INHERIT, type TraitId } from '../data/traits.ts';
 import type { MobileId } from './types.ts';
 
 /** Sel du hachage d'Adam, qui n'a pas d'id de mobile. */
@@ -71,4 +72,40 @@ export function yearsToWork(age: number): number {
 /** A-t-il l'âge de travailler ? */
 export function canWork(age: number): boolean {
   return age >= AGES.work;
+}
+
+/**
+ * Le trait d'un habitant à sa venue (`data/traits.ts`), tiré de la seed et de
+ * son id : un hachage, pas le PRNG du monde. Une sauvegarde d'avant les traits
+ * le retrouve ainsi au chargement, le même à chaque fois.
+ */
+export function traitOf(seed: number, id: MobileId): TraitId {
+  return TRAIT_IDS[hash3(seed, id, 0x7a17) % TRAIT_IDS.length]!;
+}
+
+/**
+ * Le trait d'un enfant qui naît : avec une chance de `TRAIT_INHERIT`, celui
+ * d'un des `parents` (les adultes de la colonie, tirés au hasard par hachage),
+ * sinon le sien. Sans adulte, le sien.
+ */
+export function bornTrait(seed: number, id: MobileId, parents: readonly TraitId[]): TraitId {
+  const roll = (hash3(seed, id, 0x1e41) % 1000) / 1000;
+
+  if (parents.length === 0 || roll >= TRAIT_INHERIT) return traitOf(seed, id);
+  return parents[hash3(seed, id, 0x1e42) % parents.length]!;
+}
+
+/** Le rang de sa petite biographie parmi celles de son trait (`BIO_COUNT`) : la fiche la lit dans le dictionnaire. */
+export function bioRank(seed: number, id: MobileId): number {
+  return hash3(seed, id, 0xb10) % BIO_COUNT;
+}
+
+/** La longueur maximale d'un nom donné par le joueur. */
+export const NAME_MAX = 16;
+
+/** Le nom proposé, nettoyé : espaces resserrés, coupé à `NAME_MAX` ; `null` s'il est vide. */
+export function cleanName(raw: string): string | null {
+  const name = raw.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX).trim();
+
+  return name === '' ? null : name;
 }

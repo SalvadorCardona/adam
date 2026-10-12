@@ -239,6 +239,8 @@ export const panel: Messages['panel'] = {
       rank: 'Role',
       target: 'Marching on',
       status: 'Status',
+      trait: 'Trait',
+      bio: 'Biography',
     },
     sex: {
       male: 'Man',
@@ -268,6 +270,46 @@ export const panel: Messages['panel'] = {
       child: 'Child',
       exMutant: 'Ex-mutant, porter',
       survivor: 'Survivor, porter',
+    },
+    trait: {
+      hardworking: { name: 'Hard worker', effect: 'quicker at the job' },
+      glutton: { name: 'Glutton', effect: 'gets hungry faster, but full of beans' },
+      fearful: { name: 'Fearful', effect: 'danger weighs twice as much on them' },
+      sturdy: { name: 'Sturdy', effect: 'lasts long without food or water, hardly shaken by danger' },
+      dreamer: { name: 'Dreamer', effect: 'a little slow, head in the clouds: danger barely touches them' },
+    },
+    bios: {
+      hardworking: [
+        'Has already finished tomorrow’s work, and brags about it.',
+        'Sleeps in work gloves, just in case.',
+        'Counts bricks to unwind.',
+      ],
+      glutton: [
+        'Knows the lichen soup recipe by heart, and eats it too.',
+        'Always keeps a bread crust in a pocket, “for later”.',
+        'Complains about the menu, served up a third time.',
+      ],
+      fearful: [
+        'Hears a mutant in every draught.',
+        'Has an escape plan for every room, closets included.',
+        'Says hello to shadows, to be safe.',
+      ],
+      sturdy: [
+        'Once lifted a town hall door, just to see.',
+        'Jokes with hunger: “Come back when I’m done.”',
+        'Sips from the canteen once a week, and swears it’s full.',
+      ],
+      dreamer: [
+        'Sees animals in the ash clouds.',
+        'Writes songs for the trees, who never answer.',
+        'Dreams of a whale-shaped roof.',
+      ],
+    },
+    rename: {
+      label: 'Name',
+      placeholder: 'A new name',
+      confirm: 'Rename',
+      hint: 'Leave empty to get the original name back.',
     },
     homeless: 'nobody',
     outside: 'outside, no bed',

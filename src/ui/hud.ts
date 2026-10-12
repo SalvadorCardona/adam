@@ -70,7 +70,6 @@ import type { WaterStats } from '../render/waterLayer.ts';
 import type { RoadRejection } from '../sim/commands.ts';
 import type { Compass } from '../sim/enemies.ts';
 import type { Trend } from '../sim/flows.ts';
-import { nameOf } from '../sim/inhabitants.ts';
 import type { Entity, Mobile, MobileId } from '../sim/types.ts';
 import { DIAL_ARCS } from '../sim/dayNight.ts';
 import { currentQuest, questProgress } from '../sim/eve.ts';
@@ -728,7 +727,7 @@ export class Hud {
     world.events.on('siteCancelled', ({ proto, toTown }) =>
       this.notify(t().hud.toast.siteCancelled(t().buildings[proto].label, toTown), 'info'),
     );
-    world.events.on('childBorn', () => this.notify(t().hud.toast.childBorn, 'good'));
+    world.events.on('childBorn', ({ name }) => this.notify(t().hud.toast.childBorn(name), 'good'));
     world.events.on('mutantStunned', () => this.notify(t().hud.toast.mutantStunned, 'good'));
     world.events.on('patientFollowing', () => this.notify(t().hud.toast.patientFollowing, 'good'));
     world.events.on('patientAdmitted', () => this.notify(t().hud.toast.patientAdmitted, 'good'));
@@ -934,7 +933,7 @@ export class Hud {
       return;
     }
 
-    const line = personText(nameOf(this.world.seed, mobile.id, mobile.sex), mobile.age, this.world.occupation(mobile));
+    const line = personText(this.world.nameFor(mobile), mobile.age, this.world.occupation(mobile));
     // La jauge avance par centièmes : l'infobulle ne se refait pas à chaque tick.
     const gauges = NEED_IDS.map((need) => Math.round(mobile.needs[need] * 100));
     const happiness = mobile.kind === 'kid' ? null : mobile.happiness;

@@ -83,6 +83,7 @@ import { RECIPES, type RecipeProto } from '../data/recipes.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { BUILDERS, FARMERS, FORESTERS, LOGISTICIANS, LUMBERJACKS, WORK_PRIORITIES, type WorkPriority } from '../data/workers.ts';
 import { floorCost } from '../sim/antenna.ts';
+import { NAME_MAX } from '../sim/inhabitants.ts';
 import { consumerTarget, forgeRecipe } from '../sim/consumers.ts';
 import { canDamage, isShielded, isStanding, raidCapacity } from '../sim/enemyBases.ts';
 import { KILL_PRESTIGE } from '../data/prestige.ts';
@@ -132,6 +133,11 @@ export class BuildingPanel {
   /** La fiche d'une créature : un tableau, un libellé et une valeur par ligne. */
   private readonly facts: HTMLTableElement;
   private lastFacts = '';
+  /** Le champ qui renomme un habitant, et le dernier habitant dont il a pris le nom. */
+  private readonly renameForm: HTMLFormElement;
+  private readonly renameInput: HTMLInputElement;
+  private readonly renameButton: HTMLButtonElement;
+  private renamed: MobileId | null = null;
   /** Les jauges d'un habitant : la faim, la soif. */
   private readonly needs: HTMLElement;
   private lastNeeds = '';
@@ -309,6 +315,26 @@ export class BuildingPanel {
     this.needs.className = 'building-panel-needs';
     this.needs.hidden = true;
 
+    // Le nom d'un habitant : un champ et son bouton, sous la fiche. Entrée valide.
+    this.renameForm = document.createElement('form');
+    this.renameForm.className = 'building-panel-rename';
+    this.renameForm.hidden = true;
+    this.renameInput = document.createElement('input');
+    this.renameInput.type = 'text';
+    this.renameInput.className = 'build-search-input';
+    this.renameInput.maxLength = NAME_MAX;
+    this.renameInput.autocomplete = 'off';
+    this.renameInput.spellcheck = false;
+    this.renameInput.enterKeyHint = 'done';
+    this.renameButton = document.createElement('button');
+    this.renameButton.type = 'submit';
+    this.renameForm.append(this.renameInput, this.renameButton);
+    this.renameForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (this.creatureId !== null) this.world.push({ type: 'renameInhabitant', id: this.creatureId, name: this.renameInput.value });
+      this.renameInput.blur();
+    });
+
     this.items = document.createElement('div');
     this.items.className = 'building-panel-items';
 
@@ -474,6 +500,7 @@ export class BuildingPanel {
         this.lines,
         this.facts,
         this.needs,
+        this.renameForm,
         this.crew,
         this.actions,
         this.upgrade,
@@ -497,6 +524,10 @@ export class BuildingPanel {
       segments.setAttribute('aria-label', text.crew.priority.label);
       for (const [priority, button] of this.priorityButtons) button.textContent = text.crew.priority[priority];
       this.tabs.bar.setAttribute('aria-label', text.tabs.label);
+      this.renameInput.placeholder = text.creature.rename.placeholder;
+      this.renameInput.setAttribute('aria-label', text.creature.rename.label);
+      this.renameInput.title = text.creature.rename.hint;
+      this.renameButton.textContent = text.creature.rename.confirm;
       this.tabs.setLabel('building', text.tabs.building);
       this.tabs.setLabel('inventory', text.tabs.inventory);
       this.transferButton.textContent = text.transferBag;
@@ -581,6 +612,8 @@ export class BuildingPanel {
     this.lastNeeds = '';
     // Les jauges de faim et de soif ne sont qu'à un habitant, la fiche qu'à une créature : `refreshCreature` les montre.
     this.needs.hidden = true;
+    this.renameForm.hidden = true;
+    this.renamed = null;
     this.facts.hidden = true;
     this.lastFacts = '';
     this.cancelArmed = false;
@@ -1129,6 +1162,13 @@ export class BuildingPanel {
     this.setItems([], 'creature');
     this.setFacts(view.facts);
     this.setNeeds(view.needs, view.happiness);
+
+    // Le champ prend le nom de l'habitant ouvert, puis n'y touche plus : on peut y taper tranquille.
+    this.renameForm.hidden = !view.renamable;
+    if (this.renamed !== this.creatureId) {
+      this.renamed = this.creatureId;
+      this.renameInput.value = view.name;
+    }
 
     const { hp } = view;
 

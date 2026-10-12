@@ -105,7 +105,7 @@ export const hud = {
     /** `building` : le nom du bâtiment, avec sa majuscule. */
     siteCancelled: (building: string, toTown: boolean): string =>
       `Chantier annulé : ${building} — ${toTown ? 'le livré retourne en ville' : 'le livré reste au sol'}`,
-    childBorn: 'Un enfant est né à la nurserie !',
+    childBorn: (name: string): string => `${name} est né à la nurserie !`,
     mutantStunned: 'Un mutant assommé ! Touchez-le pour l’emmener à la clinique',
     patientFollowing: 'Il vous suit en boitillant — direction la clinique',
     patientAdmitted: 'Admis à la clinique : une nuit de soins',

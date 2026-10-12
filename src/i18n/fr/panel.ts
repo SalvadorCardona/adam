@@ -272,6 +272,8 @@ export const panel = {
       rank: 'Rôle',
       target: 'Marche sur',
       status: 'État',
+      trait: 'Trait',
+      bio: 'Biographie',
     },
     /** Le sexe d'un habitant, après son symbole (♂, ♀). */
     sex: {
@@ -304,6 +306,49 @@ export const panel = {
       child: 'Enfant',
       exMutant: 'Ex-mutante, porteuse',
       survivor: 'Survivante, porteuse',
+    },
+    /** Son trait (`data/traits.ts`) et son petit effet de jeu, sur la même ligne. */
+    trait: {
+      hardworking: { name: 'Travailleur', effect: 'plus vif à la tâche' },
+      glutton: { name: 'Gourmand', effect: 'a faim plus vite, mais plein d’entrain' },
+      fearful: { name: 'Peureux', effect: 'le danger lui pèse deux fois plus' },
+      sturdy: { name: 'Costaud', effect: 'tient longtemps sans manger ni boire, le danger l’ébranle peu' },
+      dreamer: { name: 'Rêveur', effect: 'un peu lent, la tête ailleurs : le danger l’effleure' },
+    },
+    /** Une ligne drôle par trait et par rang (`BIO_COUNT` chacun), tirée de la seed et de l’id : un récit sans genre. */
+    bios: {
+      hardworking: [
+        'A déjà fini la journée de demain, et s’en vante.',
+        'Dort avec ses gants de travail, au cas où.',
+        'Compte les briques pour se détendre.',
+      ],
+      glutton: [
+        'Connaît la recette de la soupe de lichen par cœur, et la mange aussi.',
+        'Garde toujours une croûte de pain dans la poche, « pour plus tard ».',
+        'Se plaint du menu, resservi trois fois.',
+      ],
+      fearful: [
+        'Entend un mutant dans chaque courant d’air.',
+        'A un plan de fuite pour chaque pièce, y compris les placards.',
+        'Dit bonjour aux ombres, par prudence.',
+      ],
+      sturdy: [
+        'A déjà soulevé une porte de mairie, une fois, pour voir.',
+        'Plaisante avec la faim : « Reviens quand j’aurai fini. »',
+        'Boit à la gourde une fois par semaine, et jure qu’elle est pleine.',
+      ],
+      dreamer: [
+        'Voit des animaux dans les nuages de cendre.',
+        'Compose des chansons pour les arbres, qui ne répondent pas.',
+        'Rêve d’un toit en forme de baleine.',
+      ],
+    },
+    /** Renommer un habitant depuis sa fiche. */
+    rename: {
+      label: 'Nom',
+      placeholder: 'Un nouveau nom',
+      confirm: 'Renommer',
+      hint: 'Laissez vide pour retrouver son prénom d’origine.',
     },
     /** Pour qui il travaille, quand son bâtiment est tombé. */
     homeless: 'personne',

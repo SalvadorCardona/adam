@@ -13,6 +13,8 @@
  */
 
 import { HAPPINESS, MOOD, type MoodCause } from '../data/housing.ts';
+import { TRAITS, type TraitId } from '../data/traits.ts';
+import { needState, type Needs } from './needs.ts';
 import type { EntityId, MobileId } from './types.ts';
 
 /** Ce que tout ouvrier adulte retient de ses nuits (`Housed`, `sim/types.ts`). */
@@ -101,22 +103,47 @@ export function moodOf(happiness: number): Mood {
   return 'neutral';
 }
 
-/** Son allure, en part de la normale : `unhappyPace` malheureux, 1 sinon. Le retour est immédiat au-dessus du seuil. */
+/**
+ * Son allure, en part de la normale : `unhappyPace` malheureux, `contentPace`
+ * content, 1 entre les deux. Le retour est immédiat au-delà des seuils.
+ */
 export function moodPace(happiness: number): number {
-  return moodOf(happiness) === 'unhappy' ? HAPPINESS.unhappyPace : 1;
+  const mood = moodOf(happiness);
+
+  return mood === 'unhappy' ? HAPPINESS.unhappyPace : mood === 'content' ? HAPPINESS.contentPace : 1;
+}
+
+/** L'allure que son trait lui donne (`data/traits.ts`) : 1 s'il n'en a pas. */
+export function traitPace(trait: TraitId | undefined): number {
+  return trait === undefined ? 1 : TRAITS[trait].pace;
 }
 
 /**
- * Ce qui a pesé sur sa nuit : un lit, ou dehors. Un besoin qui pèserait sur
- * le moral s'ajoutera ici — et dans `MOOD`.
+ * Ce qui a pesé sur sa nuit : un lit ou dehors, la faim, la soif, la peur
+ * d'un ennemi approché (`scared`).
+ * Un autre besoin qui pèserait sur le moral s'ajoutera ici — et dans `MOOD`.
  */
-export function moodCauses(person: Pick<Housing, 'bed'>): MoodCause[] {
-  return [person.bed === null ? 'outside' : 'bed'];
+export function moodCauses(person: Pick<Housing, 'bed'> & { needs?: Needs }, scared = false): MoodCause[] {
+  const causes: MoodCause[] = [person.bed === null ? 'outside' : 'bed'];
+
+  if (person.needs) {
+    const hungry = needState('hunger', person.needs.hunger) === 'deprived';
+    const thirsty = needState('thirst', person.needs.thirst) === 'deprived';
+
+    if (hungry) causes.push('hungry');
+    if (thirsty) causes.push('thirsty');
+  }
+  if (scared) causes.push('scared');
+  return causes;
 }
 
-/** Le bonheur au matin : chaque cause ajoute sa part, entre 0 et `HAPPINESS.max`. */
-export function nightlyMood(happiness: number, causes: readonly MoodCause[]): number {
-  const delta = causes.reduce((sum, cause) => sum + MOOD[cause], 0);
+/**
+ * Le bonheur au matin : chaque cause ajoute sa part, la peur pesant selon le
+ * trait ; entre 0 et `HAPPINESS.max`.
+ */
+export function nightlyMood(happiness: number, causes: readonly MoodCause[], trait?: TraitId): number {
+  const proto = trait === undefined ? null : TRAITS[trait];
+  const delta = causes.reduce<number>((sum, cause) => sum + MOOD[cause] * (cause === 'scared' && proto ? proto.fear : 1), 0);
 
   return Math.min(HAPPINESS.max, Math.max(0, happiness + delta));
 }

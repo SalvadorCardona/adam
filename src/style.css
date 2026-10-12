@@ -3644,6 +3644,7 @@ button:disabled,
 .building-panel-lines[hidden],
 .building-panel-facts[hidden],
 .building-panel-needs[hidden],
+.building-panel-rename[hidden],
 .building-panel-stats[hidden],
 .building-panel-stock[hidden],
 .building-panel-meter[hidden],
@@ -4258,6 +4259,38 @@ button:disabled,
 
 .building-panel-facts tr:nth-child(odd) > * {
   background: var(--paper-shade);
+}
+
+/* Renommer un habitant : un champ en capsule lavande, comme la recherche du tiroir, et son bouton violet. */
+.building-panel-rename {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0 4px 0 14px;
+  border-radius: 999px;
+  background: var(--paper-shade);
+  box-shadow: 0 3px 0 var(--violet-light) inset;
+}
+
+.building-panel-rename:focus-within {
+  background: var(--cyan-light);
+  box-shadow: 0 3px 0 var(--cyan-shade) inset;
+}
+
+.building-panel-rename button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--violet);
+  box-shadow: 0 3px 0 var(--violet-shade);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 /* Les jauges d'un habitant, sous ses lignes : la faim, la soif — icône, barre, état. */

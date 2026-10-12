@@ -51,6 +51,7 @@ import { LOOT } from '../art/loot.ts';
 import { CHEST } from '../art/chest.ts';
 import { LUMBER_CAMP } from '../art/lumberCamp.ts';
 import { HUNGRY } from '../art/hungry.ts';
+import { JOYFUL, SCARED, SLEEPY } from '../art/reactions.ts';
 import { THIRSTY } from '../art/thirsty.ts';
 import { UNHAPPY } from '../art/unhappy.ts';
 import { SLEEPER } from '../art/sleeper.ts';
@@ -154,6 +155,10 @@ export const SPRITES = {
   thirsty: THIRSTY,
   /** Bulle « malheureux » au-dessus d'un habitant qui a trop dormi dehors. */
   unhappy: UNHAPPY,
+  /** Bulles de réaction, rares et brèves : la peur d'un ennemi tout près, la joie d'une naissance, la fatigue de la nuit. */
+  scared: SCARED,
+  joyful: JOYFUL,
+  sleepy: SLEEPY,
   /** Un habitant qui dort dehors, faute de lit : allongé sous sa couverture. */
   sleeper: SLEEPER,
   /** La fissure d'un bâtiment sous la moitié de ses points de vie. */

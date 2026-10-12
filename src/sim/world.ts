@@ -79,6 +79,7 @@ import { CHESTS } from '../data/chests.ts';
 import { PURIFIER } from '../data/contamination.ts';
 import { chestOfChunk, type Chest } from './chests.ts';
 import { HOUSING } from '../data/housing.ts';
+import { REACTIONS, type ReactionId, type TraitId } from '../data/traits.ts';
 import { AGES, COLONY, NURSERY_CARE } from '../data/inhabitants.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
 import { HUNTING, NEED_ALERT, NEED_IDS, NEEDS, type NeedId } from '../data/needs.ts';
@@ -132,7 +133,7 @@ import type { WildlifeId } from '../data/enemies.ts';
 import { baseCenter, baseDoor, breed, canDamage, hitsBase, inBaseZone, isShielded, isStanding, onBase, placeEnemyBases } from './enemyBases.ts';
 import { compassOf, stepMutant, stepQueen, surfacePoint, type Compass, type MutantStep } from './enemies.ts';
 import { createEve, currentQuest, harvestYieldWithTools, isUnlocked, mostDamaged, questProgress, rideHome, walkTo } from './eve.ts';
-import { ADAM_SALT, adultAge, canWork, foeAge, nameOf, sexOf, yearsToWork } from './inhabitants.ts';
+import { ADAM_SALT, adultAge, bornTrait, canWork, cleanName, foeAge, nameOf, sexOf, traitOf, yearsToWork } from './inhabitants.ts';
 import { KID_SPRINT, stepKid } from './kids.ts';
 import { drainNeeds, stuntingNeed, freshNeeds, needState, needsPace, pacedTick, urgentNeed } from './needs.ts';
 import { assignBeds, freshHousing, moodCauses, nightlyMood, moodOf, type Lodging } from './housing.ts';
@@ -201,6 +202,7 @@ import { nextWeather, spoilsNight, weatherAt, type WeatherSpell } from './weathe
 import type {
   Antenna,
   Beast,
+  Born,
   Building,
   Caravan,
   Clinic,
@@ -578,7 +580,7 @@ export type WorldEvents = {
   playerKnockedOut: { x: number; y: number };
   playerRespawned: { x: number; y: number };
   /** La nurserie a produit un enfant. */
-  childBorn: { nurseryId: EntityId; kidId: MobileId; x: number; y: number };
+  childBorn: { nurseryId: EntityId; kidId: MobileId; name: string; x: number; y: number };
   /** Une caravane de troc part de loin vers le bord de la clairière : c'est le jour `day`. */
   caravanArriving: { id: MobileId; day: number };
   /** Adam arrive au contact de la caravane garée : la fenêtre Troc s'ouvre. */
@@ -948,6 +950,12 @@ export class World {
 
   /** Depuis quel tick chaque ouvrier dehors est sans travail, cf. `isIdle()`. Jamais sauvegardé. */
   private readonly idleSince = new Map<MobileId, number>();
+  /** Jusqu'à quel tick chacun a peur d'un ennemi vu de près (`REACTIONS.fearTicks`) : la bulle. Rien n'est sauvegardé. */
+  private readonly fearUntil = new Map<MobileId, number>();
+  /** Ceux qui ont eu peur depuis l'aube : leur nuit pèse sur leur moral (`MOOD.scared`), puis le compte repart. */
+  private readonly scared = new Set<MobileId>();
+  /** La dernière naissance : de quoi faire sourire quelques ouvriers un instant (`REACTIONS.joyTicks`). */
+  private joy: { tick: number; kidId: MobileId } | null = null;
   /** Ticks passés à zéro d'un besoin, par habitant et besoin (`famineKey`). Pas sauvegardé : au chargement, le compte repart. */
   private readonly famine = new Map<number, number>();
 
@@ -1360,6 +1368,10 @@ export class World {
 
       case 'dressAdam':
         this.dressAdam(command.look);
+        break;
+
+      case 'renameInhabitant':
+        this.renameInhabitant(command.id, command.name);
         break;
 
       case 'recruitCompanion':
@@ -3413,6 +3425,7 @@ export class World {
       kind: 'kid',
       id,
       sex: sexOf(this.seed, id),
+      trait: bornTrait(this.seed, id, this.adultTraits()),
       ...freshNeeds(),
       age: AGES.nursery,
       x,
@@ -3434,7 +3447,8 @@ export class World {
     this.stats.births += 1;
     nursery.nextBirthTick = this.tickCount + recipe.duration;
     this.scheduler.schedule(nursery.id, nursery.nextBirthTick, this.tickCount);
-    this.events.emit('childBorn', { nurseryId: nursery.id, kidId: kid.id, x, y });
+    this.joy = { tick: this.tickCount, kidId: kid.id };
+    this.events.emit('childBorn', { nurseryId: nursery.id, kidId: kid.id, name: this.nameFor(kid), x, y });
   }
 
   /**
@@ -3707,8 +3721,11 @@ export class World {
     // La viande déposée à la mairie devient de la nourriture.
     if (this.tickCount % HUNTING.convertTicks === 0) this.butcherMeat();
 
-    // Les casernes comptent leur formation à la seconde.
-    if (this.tickCount % TICKS_PER_SECOND === 0) this.stepBarracks();
+    // Les casernes comptent leur formation à la seconde, les ouvriers leur peur.
+    if (this.tickCount % TICKS_PER_SECOND === 0) {
+      this.stepBarracks();
+      this.stepFear();
+    }
 
     // Une fois par tick, pas une fois par ouvrier.
     const troop = this.companions();
@@ -4429,6 +4446,7 @@ export class World {
       kind: 'worker',
       id,
       sex: sexOf(this.seed, id),
+      trait: traitOf(this.seed, id),
       ...freshNeeds(),
       ...freshHousing(),
       age: adultAge(this.seed, id),
@@ -5621,6 +5639,7 @@ export class World {
       this.events.emit('lootDropped', { id: pickup.id, item, x: pickup.x, y: pickup.y });
     }
     this.restInhabitants();
+    this.scared.clear();
     this.ageInhabitants();
 
     // La nuit est survécue : la mairie tient encore (`stepClock` s'arrête à la défaite).
@@ -5651,6 +5670,7 @@ export class World {
         kind: 'worker',
         id,
         sex: sexOf(this.seed, id),
+        trait: traitOf(this.seed, id),
         ...freshNeeds(),
         ...freshHousing(),
         age: adultAge(this.seed, id),
@@ -5686,7 +5706,7 @@ export class World {
   private restInhabitants(): void {
     this.settleBeds();
     for (const mobile of this.mobiles.values()) {
-      if (isLaborer(mobile)) mobile.happiness = nightlyMood(mobile.happiness, moodCauses(mobile));
+      if (isLaborer(mobile)) mobile.happiness = nightlyMood(mobile.happiness, moodCauses(mobile, this.scared.has(mobile.id)), this.traitFor(mobile));
     }
   }
 
@@ -5783,6 +5803,76 @@ export class World {
     return unhappy.sort((a, b) => a.happiness - b.happiness || a.id - b.id);
   }
 
+  /** Son trait (`data/traits.ts`) : celui qu'il porte, sinon celui que la seed lui tire. */
+  public traitFor(person: Pick<Born, 'trait'> & { id: MobileId }): TraitId {
+    return person.trait ?? traitOf(this.seed, person.id);
+  }
+
+  /** Son nom : celui que le joueur lui a donné, sinon son prénom tiré de la seed. */
+  public nameFor(person: Pick<Born, 'alias' | 'sex'> & { id: MobileId }): string {
+    return person.alias ?? nameOf(this.seed, person.id, person.sex);
+  }
+
+  /** Les traits des adultes de la colonie, par id : de quoi hériter pour un enfant qui naît. */
+  private adultTraits(): TraitId[] {
+    const adults: Laborer[] = [];
+
+    for (const mobile of this.mobiles.values()) {
+      if (isLaborer(mobile)) adults.push(mobile);
+    }
+    return adults.sort((a, b) => a.id - b.id).map((adult) => this.traitFor(adult));
+  }
+
+  /**
+   * Renomme un habitant. Un nom vide rend son prénom d'origine ; ni Adam ni
+   * un ennemi n'en reçoivent. Vrai si la fiche a changé.
+   */
+  private renameInhabitant(id: MobileId, name: string): boolean {
+    const mobile = this.mobiles.get(id);
+
+    if (!mobile || !(isLaborer(mobile) || mobile.kind === 'kid')) return false;
+
+    const alias = cleanName(name);
+
+    if (alias === null) delete mobile.alias;
+    else mobile.alias = alias;
+    return true;
+  }
+
+  /**
+   * Ce que dit la bulle de réaction d'un habitant, rare et brève : la peur
+   * d'un ennemi tout près, la joie d'une naissance (un ouvrier sur
+   * `REACTIONS.joyOneIn`), la fatigue d'une nuit au travail (à tour de rôle).
+   * Rien de tout cela n'est sauvegardé ; la faim et la soif ont leurs propres bulles.
+   */
+  public reaction(mobile: Inhabitant): ReactionId | null {
+    if ((this.fearUntil.get(mobile.id) ?? 0) > this.tickCount) return 'scared';
+    if (mobile.kind === 'kid') return null;
+
+    const { joy } = this;
+
+    if (joy && joy.kidId !== mobile.id && this.tickCount - joy.tick < REACTIONS.joyTicks && hash3(this.seed, mobile.id, joy.kidId) % REACTIONS.joyOneIn === 0) return 'joyful';
+    if (this.clock()?.phase === 'night' && this.isToiling(mobile) && (this.tickCount + mobile.id * 97) % REACTIONS.sleepyEvery < REACTIONS.sleepyTicks) return 'sleepy';
+    return null;
+  }
+
+  /** Une fois par seconde : qui a un ennemi à `REACTIONS.fearTiles` a peur — sauf à l'abri chez lui. */
+  private stepFear(): void {
+    const range = (REACTIONS.fearTiles * TILE_SIZE) ** 2;
+    const foes: Mobile[] = [];
+
+    for (const mobile of this.mobiles.values()) {
+      if (mobile.kind === 'mutant' || mobile.kind === 'beast') foes.push(mobile);
+    }
+    if (foes.length === 0) return;
+    for (const mobile of this.mobiles.values()) {
+      if (!(isLaborer(mobile) || mobile.kind === 'kid') || (mobile.kind !== 'kid' && mobile.inside)) continue;
+      if (!foes.some((foe) => (foe.x - mobile.x) ** 2 + (foe.y - mobile.y) ** 2 <= range)) continue;
+      this.fearUntil.set(mobile.id, this.tickCount + REACTIONS.fearTicks);
+      this.scared.add(mobile.id);
+    }
+  }
+
   /**
    * Une année de plus pour chaque habitant — un cycle jour/nuit vaut un an —
    * et l'enfant qui a l'âge de travailler devient ouvrier. Les ennemis
@@ -5796,7 +5886,7 @@ export class World {
       const stunted = mobile.kind === 'kid' ? stuntingNeed(mobile.needs) : null;
 
       if (mobile.kind === 'kid' && stunted !== null) {
-        this.events.emit('growthStunted', { id: mobile.id, name: nameOf(this.seed, mobile.id, mobile.sex), need: stunted });
+        this.events.emit('growthStunted', { id: mobile.id, name: this.nameFor(mobile), need: stunted });
         continue;
       }
       mobile.age += AGES.yearsPerCycle;
@@ -5818,7 +5908,10 @@ export class World {
     const { id, sex, x, y, prevX, prevY, facing, moving, age, needs } = kid;
 
     if (hall) {
-      this.mobiles.set(id, freeWorker({ id, sex, x, y, prevX, prevY, facing, moving, age, needs, meal: null, ...freshHousing() }, hall.id));
+      this.mobiles.set(
+        id,
+        freeWorker({ id, sex, ...bornOf(kid), x, y, prevX, prevY, facing, moving, age, needs, meal: null, ...freshHousing() }, hall.id),
+      );
     } else {
       this.mobiles.delete(id);
     }
@@ -5829,7 +5922,7 @@ export class World {
     const nursery = this.entities.get(kid.homeId);
 
     if (nursery?.kind === 'nursery') this.restart(nursery);
-    if (announce) this.events.emit('kidGrewUp', { id: kid.id, name: nameOf(this.seed, kid.id, kid.sex), x: kid.x, y: kid.y });
+    if (announce) this.events.emit('kidGrewUp', { id: kid.id, name: this.nameFor(kid), x: kid.x, y: kid.y });
   }
 
   /** Le point, en pixels monde, d'où sortira la prochaine vague : la base la plus proche de la mairie, ou la mairie s'il n'en reste pas. */
@@ -5876,7 +5969,7 @@ export class World {
    */
   private stepNeeds(mobile: Inhabitant, alarm: boolean): boolean {
     // Avant la mairie, ni faim ni soif : les provisions de la colonie arrivent avec elle (`COLONY.startingStock`).
-    if (this.warehouse()) drainNeeds(mobile.needs, this.isToiling(mobile));
+    if (this.warehouse()) drainNeeds(mobile.needs, this.isToiling(mobile), this.traitFor(mobile));
     if (isLaborer(mobile) && this.starve(mobile)) return true;
 
     if (alarm) {
@@ -5923,7 +6016,7 @@ export class World {
       }
       this.famine.set(key, ticks);
       if (ticks === 1) {
-        const name = nameOf(this.seed, mobile.id, mobile.sex);
+        const name = this.nameFor(mobile);
 
         this.events.emit('starving', { id: mobile.id, name, need, seconds: Math.round(deathTicks / 20), x: mobile.x, y: mobile.y });
       }
@@ -5953,7 +6046,7 @@ export class World {
     this.mobiles.delete(mobile.id);
     if (isColonist(mobile)) this.colonists = Math.max(0, this.colonists - 1);
     this.rosterChanged();
-    this.events.emit('workerStarved', { id: mobile.id, name: nameOf(this.seed, mobile.id, mobile.sex), need, x: mobile.x, y: mobile.y });
+    this.events.emit('workerStarved', { id: mobile.id, name: this.nameFor(mobile), need, x: mobile.x, y: mobile.y });
   }
 
   /** Travaille-t-il ? Dehors, à une tâche. Un enfant ne travaille jamais, un dormeur non plus. */
@@ -6378,7 +6471,7 @@ export class World {
     this.mobiles.set(
       id,
       freeWorker(
-        { id, sex: sexOf(this.seed, id), x, y, prevX: x, prevY: y, facing: 'down', moving: false, age: adultAge(this.seed, id), ...freshNeeds(), ...freshHousing() },
+        { id, sex: sexOf(this.seed, id), trait: traitOf(this.seed, id), x, y, prevX: x, prevY: y, facing: 'down', moving: false, age: adultAge(this.seed, id), ...freshNeeds(), ...freshHousing() },
         hall.id,
       ),
     );
@@ -8373,10 +8466,15 @@ function hasCrew(kind: BuildingKind): boolean {
 }
 
 /** Ce qu'un humain garde en changeant de métier : son id — donc son prénom —, son sexe, sa place, son âge, ses jauges, son lit. */
-type Person = Pick<Worker, 'id' | 'sex' | 'x' | 'y' | 'prevX' | 'prevY' | 'facing' | 'moving' | 'age' | 'needs' | 'meal' | 'happiness' | 'bed' | 'sleepingOut'>;
+type Person = Pick<Worker, 'id' | 'sex' | 'trait' | 'alias' | 'x' | 'y' | 'prevX' | 'prevY' | 'facing' | 'moving' | 'age' | 'needs' | 'meal' | 'happiness' | 'bed' | 'sleepingOut'>;
 
-function personOf({ id, sex, x, y, prevX, prevY, facing, moving, age, needs, meal, happiness, bed, sleepingOut }: Laborer): Person {
-  return { id, sex, x, y, prevX, prevY, facing, moving, age, needs, meal, happiness, bed, sleepingOut };
+function personOf({ id, sex, trait, alias, x, y, prevX, prevY, facing, moving, age, needs, meal, happiness, bed, sleepingOut }: Laborer): Person {
+  return { id, sex, ...bornOf({ trait, alias }), x, y, prevX, prevY, facing, moving, age, needs, meal, happiness, bed, sleepingOut };
+}
+
+/** Son trait et le nom que le joueur lui a donné, s'il en a : ce qu'il garde en changeant de métier. */
+function bornOf({ trait, alias }: Pick<Born, 'trait' | 'alias'>): Pick<Born, 'trait' | 'alias'> {
+  return { ...(trait !== undefined && { trait }), ...(alias !== undefined && { alias }) };
 }
 
 /** Un ouvrier libre, là où il se tient : il ira flâner devant la mairie `hallId`. */

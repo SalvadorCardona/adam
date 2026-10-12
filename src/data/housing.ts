@@ -30,6 +30,8 @@ export const HAPPINESS = {
   contentFrom: 70,
   /** L'allure d'un malheureux, en part de son allure normale. Adam n'en a pas : il ne dort jamais dehors. */
   unhappyPace: 0.7,
+  /** L'allure d'un content : un souffle de plus, pas de quoi déséquilibrer. */
+  contentPace: 1.05,
 } as const;
 
 /**
@@ -42,6 +44,12 @@ export const MOOD = {
   bed: 15,
   /** Une nuit dehors, faute de lit. */
   outside: -10,
+  /** Affamé au matin. */
+  hungry: -10,
+  /** Assoiffé au matin. */
+  thirsty: -10,
+  /** Un ennemi s'est approché pendant la nuit (le poids de sa peur est celui de son trait). */
+  scared: -8,
 } as const satisfies Record<string, number>;
 
 export type MoodCause = keyof typeof MOOD;

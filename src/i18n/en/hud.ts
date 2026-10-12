@@ -85,7 +85,7 @@ export const hud: Messages['hud'] = {
     destroyed: (building: string): string => `${building} destroyed`,
     siteCancelled: (building: string, toTown: boolean): string =>
       `Site cancelled: ${building} — ${toTown ? 'deliveries go back to town' : 'deliveries stay on the ground'}`,
-    childBorn: 'A child was born at the nursery!',
+    childBorn: (name: string): string => `${name} was born at the nursery!`,
     mutantStunned: 'A mutant knocked out! Touch it to take it to the clinic',
     patientFollowing: 'It limps along behind you — off to the clinic',
     patientAdmitted: 'Admitted to the clinic: one night of care',

@@ -57,6 +57,10 @@ describe('creatureView', () => {
       `Métier : ${jack.sex === 'male' ? 'Bûcheron' : 'Bûcheronne'}`,
     ]);
     expect(view.facts[3]!.label).toBe('Activité');
+    // Son trait, puis sa petite biographie ; le champ de nom est ouvert.
+    expect(view.facts[4]!.label).toBe('Trait');
+    expect(view.facts.map((fact) => fact.label)).toContain('Biographie');
+    expect(view.renamable).toBe(true);
     expect(rows(view)).toContain('Travaille pour : Cabane de bûcheron');
     // La petite base n'a pas de Maison : il dort dehors, et son bonheur se lit sous ses jauges.
     expect(rows(view)).toContain('Dort à : dehors, faute de lit');

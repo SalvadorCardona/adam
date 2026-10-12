@@ -8,6 +8,7 @@
  */
 
 import { NEED_IDS, NEEDS, type NeedId } from '../data/needs.ts';
+import { TRAITS, type TraitId } from '../data/traits.ts';
 
 /** Une jauge par besoin, de 0 (à bout) à 1 (comblé). */
 export type Needs = Record<NeedId, number>;
@@ -26,11 +27,13 @@ export function fullNeeds(): Needs {
 }
 
 /** Un tick de temps qui passe : chaque jauge baisse, plus vite au travail. */
-export function drainNeeds(needs: Needs, working: boolean): void {
+export function drainNeeds(needs: Needs, working: boolean, trait?: TraitId): void {
+  const drain: Partial<Record<NeedId, number>> = trait === undefined ? {} : (TRAITS[trait] as { drain?: Partial<Record<NeedId, number>> }).drain ?? {};
+
   for (const id of NEED_IDS) {
     const need = NEEDS[id];
 
-    needs[id] = Math.max(0, needs[id] - 1 / (working ? need.workTicks : need.restTicks));
+    needs[id] = Math.max(0, needs[id] - (drain[id] ?? 1) / (working ? need.workTicks : need.restTicks));
   }
 }
 

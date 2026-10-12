@@ -71,6 +71,7 @@ import { COMPANION_CLASSES } from '../data/companions.ts';
 import { CHIEF, ENEMIES, LOOT_DROPS, SPITTER } from '../data/enemies.ts';
 import { SLAM_MARK_RADIUS } from '../art/spitter.ts';
 import type { NeedId } from '../data/needs.ts';
+import type { ReactionId } from '../data/traits.ts';
 import { SPRITES } from '../data/sprites.ts';
 import type { Beast, Mobile, MobileId, Mutant, Pickup } from '../sim/types.ts';
 import { terrainAt } from '../sim/terrain.ts';
@@ -115,7 +116,7 @@ const SPAWN_MS = 500;
 const COMPANION_SWING_MS = 260;
 
 /** La bulle d'un habitant à bout d'un besoin : l'épi de la faim, la goutte de la soif ; ou la moue d'un malheureux. */
-type Bubble = 'hungry' | 'thirsty' | 'unhappy';
+type Bubble = 'hungry' | 'thirsty' | 'unhappy' | ReactionId;
 
 const NEED_BUBBLES: Record<NeedId, Bubble> = { hunger: 'hungry', thirst: 'thirsty' };
 const DEATH_MS = 520;
@@ -538,13 +539,13 @@ export class MobileLayer {
   /**
    * La bulle « affamé » — ou « assoiffé » — flotte au-dessus de la tête d'un
    * habitant à court de nourriture ou d'eau ; s'il manque des deux, celle du
-   * besoin le plus bas. Sinon, la moue d'un ouvrier malheureux, qui a trop
-   * dormi dehors : la faim et la soif pressent davantage.
+   * besoin le plus bas. Sinon, une réaction brève (peur, joie, fatigue : `World.reaction`),
+   * puis la moue d'un ouvrier malheureux, qui a trop dormi dehors : la faim et la soif pressent davantage.
    */
   private starve(view: MobileView, mobile: Inhabitant): void {
     const bubble = view.hungry!;
     const need = deprivedNeed(mobile.needs);
-    const shown: Bubble | null = need !== null ? NEED_BUBBLES[need] : mobile.kind !== 'kid' && moodOf(mobile.happiness) === 'unhappy' ? 'unhappy' : null;
+    const shown: Bubble | null = need !== null ? NEED_BUBBLES[need] : (this.world.reaction(mobile) ?? (mobile.kind !== 'kid' && moodOf(mobile.happiness) === 'unhappy' ? 'unhappy' : null));
 
     bubble.visible = shown !== null;
     if (shown !== null && view.need !== shown) {

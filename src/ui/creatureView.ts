@@ -2,7 +2,7 @@
  * Ce que la fenêtre d'un bâtiment montre quand on tape une créature : un
  * habitant (enfant, ouvrier, bûcheron, forestier) ou un ennemi (mutant, bête).
  *
- * Son nom — le prénom d'un habitant (`nameOf`), le surnom d'un ennemi
+ * Son nom — celui d'un habitant (`World.nameFor` : son prénom, ou celui que le joueur lui a donné), le surnom d'un ennemi
  * (`foeName`) —, son portrait (le sprite de son pantin, celui de son sexe),
  * ses points de vie s'il en a, et ce que le jeu sait de lui, en tableau —
  * un libellé, une valeur, une ligne par donnée : son sexe, son âge, son
@@ -17,7 +17,7 @@ import type { Sex } from '../data/inhabitants.ts';
 import type { ItemId } from '../data/items.ts';
 import { NEED_IDS, type NeedId } from '../data/needs.ts';
 import type { SpriteId } from '../data/sprites.ts';
-import { foeName, nameOf } from '../sim/inhabitants.ts';
+import { bioRank, foeName } from '../sim/inhabitants.ts';
 import type { EntityId, Mobile, MobileId } from '../sim/types.ts';
 import type { Inhabitant, World } from '../sim/world.ts';
 import { t } from '../i18n/locale.ts';
@@ -48,6 +48,8 @@ export const SEX_SYMBOLS = { male: '♂', female: '♀' } as const satisfies Rec
 
 export interface CreatureView {
   name: string;
+  /** Le joueur peut-il le renommer ? Un habitant oui, un ennemi non. */
+  renamable: boolean;
   /** Le sprite du portrait, celui que le rendu donne à son pantin. */
   portrait: SpriteId;
   /** Une femme ou un homme ; `null` pour un ennemi. */
@@ -94,6 +96,10 @@ function inhabitantView(world: World, person: Inhabitant): CreatureView {
     { label: field.role, value: (person.sex === 'female' ? text.roleFemale : text.role)[roleOf(person)] },
     { label: field.doing, value: occupation.charAt(0).toUpperCase() + occupation.slice(1) },
   ];
+  const trait = world.traitFor(person);
+
+  // Son trait et son petit effet, puis sa biographie d’une ligne : tirés de la seed et de son id.
+  facts.splice(4, 0, { label: field.trait, value: `${text.trait[trait].name} — ${text.trait[trait].effect}` });
 
   // Un ouvrier libre ne travaille pour personne : il attend devant la mairie qu'un bâtiment le prenne.
   if (person.kind !== 'worker' || !person.free) facts.push({ label: field.employer, value: home ? t().buildings[home.proto].label : text.homeless });
@@ -105,9 +111,11 @@ function inhabitantView(world: World, person: Inhabitant): CreatureView {
     facts.push({ label: field.bed, value: bed ? t().buildings[bed.proto].label : text.outside });
   }
 
+  facts.push({ label: field.bio, value: text.bios[trait][bioRank(world.seed, person.id)]! });
   if (carry) facts.push({ label: field.carry, value: t().panel.recipeAmount(carry.amount, t().items[carry.item]) });
   return {
-    name: nameOf(world.seed, person.id, person.sex),
+    name: world.nameFor(person),
+    renamable: true,
     portrait: portraitOf(person),
     sex: person.sex,
     age: person.age,
@@ -140,6 +148,7 @@ function foeView(world: World, foe: Extract<Creature, { kind: 'mutant' | 'beast'
 
   return {
     name: foeName(world.seed, foe.id),
+    renamable: false,
     portrait: portraitOf(foe),
     sex: null,
     age: foe.age,

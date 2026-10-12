@@ -25,6 +25,7 @@ import { MAX_GEAR } from '../data/gear.ts';
 import { XP_SHARE, type Shooter } from '../data/levels.ts';
 import { HAPPINESS } from '../data/housing.ts';
 import { COLONY, SEXES, type Sex } from '../data/inhabitants.ts';
+import { TRAIT_IDS } from '../data/traits.ts';
 import { ITEMS, type ItemId } from '../data/items.ts';
 import { NEED_IDS, NEEDS, type NeedId } from '../data/needs.ts';
 import { OBJECTIVES } from '../data/objectives.ts';
@@ -36,7 +37,7 @@ import { RESOURCES, type ResourceId } from '../data/resources.ts';
 import type { SavedFog } from './fog.ts';
 import type { PlantedTree, ResourceStage, TileLook } from './resources.ts';
 import type { SchedulerSnapshot } from './scheduler.ts';
-import { ADAM_SALT, adultAge, sexOf } from './inhabitants.ts';
+import { ADAM_SALT, NAME_MAX, adultAge, sexOf, traitOf } from './inhabitants.ts';
 import { freshHousing, type Housing } from './housing.ts';
 import { freshNeeds, fullNeeds } from './needs.ts';
 import { canPause, clampStaff, isWorkPriority, type StaffPost } from './staffing.ts';
@@ -55,6 +56,7 @@ import type {
   ForesterState,
   Job,
   LumberjackState,
+  Born,
   Mobile,
   Mutant,
   Needful,
@@ -748,6 +750,12 @@ function parseMobile(raw: unknown, seed: number): Mobile {
   const base = { id: int(mobile['id']), ...moving(mobile) };
   // Absent d'une sauvegarde d'avant le sexe des habitants : celui que la seed lui tire, qui garde son prénom.
   const sex = (): Sex => (mobile['sex'] === undefined ? sexOf(seed, base.id) : oneOfList(mobile['sex'], SEXES));
+  // Absents d'une sauvegarde d'avant les traits : celui que la seed lui tire, sans nom donné.
+  const born = (): Born => ({
+    sex: sex(),
+    trait: mobile['trait'] === undefined ? traitOf(seed, base.id) : oneOfList(mobile['trait'], TRAIT_IDS),
+    ...(mobile['alias'] !== undefined && { alias: string(mobile['alias']).slice(0, NAME_MAX) }),
+  });
 
   switch (mobile['kind']) {
     case 'mutant': {
@@ -831,7 +839,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
       return {
         ...base,
         kind: 'kid',
-        sex: sex(),
+        ...born(),
         age: age(mobile['age']),
         ...needful(mobile),
         homeId: int(mobile['homeId']),
@@ -865,7 +873,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
       return {
         ...base,
         kind: 'worker',
-        sex: sex(),
+        ...born(),
         age: age(mobile['age']),
         ...needful(mobile),
         ...housed(mobile),
@@ -895,7 +903,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
       return {
         ...base,
         kind: 'lumberjack',
-        sex: sex(),
+        ...born(),
         age: age(mobile['age']),
         ...needful(mobile),
         ...housed(mobile),
@@ -917,7 +925,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
       return {
         ...base,
         kind: 'forester',
-        sex: sex(),
+        ...born(),
         age: age(mobile['age']),
         ...needful(mobile),
         ...housed(mobile),
@@ -940,7 +948,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
       return {
         ...base,
         kind: 'farmer',
-        sex: sex(),
+        ...born(),
         age: age(mobile['age']),
         ...needful(mobile),
         ...housed(mobile),

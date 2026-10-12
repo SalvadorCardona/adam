@@ -351,6 +351,9 @@ describe('bûcherons', () => {
     const world = colony({ house: true });
     let chopped = 0;
 
+    // De quoi boire et manger : un bûcheron mort de soif avec son bois sur le dos le ferait disparaître du compte.
+    hallOf(world).store.add('water', 400);
+    hallOf(world).store.add('food', 400);
     world.events.on('treeChopped', () => (chopped += 1));
     run(world, 6000, () => expect(woodCensus(world)).toBe(chopped));
 

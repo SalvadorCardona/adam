@@ -247,6 +247,23 @@ portrait, nom, âge, métier ou espèce, ce qu'il fait, où il loge, ce qu'il
 porte, points de vie d'un ennemi. Un ennemi a un âge sauvegardé (bornes
 `age` de son proto, un an par aube) et un surnom haché (`foeName`, `FOE_NAMES`).
 
+**Traits, noms et réactions** (`data/traits.ts`, `sim/inhabitants.ts`) — chaque
+habitant a un `trait` (travailleur, gourmand, peureux, costaud, rêveur) tiré de
+la seed et de son id (`traitOf`, hachage), sauvegardé, gardé en changeant de
+métier ; une ancienne sauvegarde le retrouve au chargement. Un petit effet,
+lu en un point : l'allure (`traitPace`, avec l'humeur : `moodPace`, content
+×1,05, malheureux ×0,7), la vitesse des jauges (`drainNeeds`), le poids de la
+peur au moral de l'aube (`nightlyMood`). Un enfant qui naît prend parfois le
+trait d'un adulte (`bornTrait`, `TRAIT_INHERIT`). Le nom est le prénom tiré de
+la seed (`World.nameFor`), sauf si le joueur l'a changé (commande
+`renameInhabitant`, `alias` sauvegardé, champ sous la fiche) ; naissance et
+mort le nomment. Le moral de l'aube suit aussi la faim, la soif (`MOOD`) et la
+peur d'un ennemi approché (`REACTIONS.fearTiles`). Bulles brèves et rares,
+non sauvegardées (`World.reaction`) : peur, joie (un ouvrier sur trois après
+une naissance), fatigue (la nuit, à tour de rôle) ; faim et soif gardent les
+leurs, et passent devant. La fiche dit trait, effet et une ligne de biographie
+(`bioRank`, `t().panel.creature.bios`).
+
 **Faim et soif** (`data/needs.ts`, `sim/needs.ts`) — ouvriers, bûcherons et
 enfants ont une jauge par besoin (`Needful.needs`, sauvegardée ; une
 ancienne sauvegarde part rassasiée et désaltérée), qui baisse plus vite au
