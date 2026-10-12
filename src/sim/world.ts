@@ -142,7 +142,7 @@ import { compassOf, stepMutant, stepQueen, surfacePoint, type Compass, type Muta
 import { BIOMES, REGION_GUARDIAN, REGION_RINGS, type BiomeId } from '../data/regions.ts';
 import { HOME_REGION_ID, REGION_COUNT, placeRegions, regionAt, type Region } from './regions.ts';
 import { createEve, currentQuest, harvestYieldWithTools, isUnlocked, mostDamaged, questProgress, rideHome, walkTo } from './eve.ts';
-import { ADAM_SALT, adultAge, bornTrait, canWork, cleanName, foeAge, nameOf, sexOf, traitOf, yearsToWork } from './inhabitants.ts';
+import { ADAM_SALT, adultAge, bornTrait, canWork, cleanName, foeAge, nameOf, pickName, sexOf, traitOf, yearsToWork } from './inhabitants.ts';
 import { KID_SPRINT, stepKid } from './kids.ts';
 import { drainNeeds, stuntingNeed, freshNeeds, needState, needsPace, pacedTick, urgentNeed, type Needs } from './needs.ts';
 import { decorMoodAt, type DecorSpot } from './decor.ts';
@@ -984,6 +984,8 @@ export class World {
 
   /** Cache des tanières par chunk : un calcul pur, gardé pour ne pas le refaire à chaque passage. */
   private readonly denCache = new Map<string, Den[]>();
+  /** Le prénom de chaque habitant vivant, par id : tiré à sa venue sans doublon (`pickName`), sauvegardé sous `names`. */
+  private readonly givenNames = new Map<MobileId, string>();
   /** Le coffre de chaque chunk déjà regardé, tel que la seed le pose (`sim/chests.ts`). */
   private readonly chestCache = new Map<string, Chest | null>();
   /** Les coffres qu'Adam a ouverts, par id : c'est tout ce qui est de l'état. */
@@ -1144,6 +1146,9 @@ export class World {
    * non plus — la sauvegarde se prend quand la file est vide.
    */
   public snapshot(): WorldState {
+    // Les venus depuis la dernière seconde ont leur prénom avant d'être rangés.
+    this.settleNames(false);
+
     const { inventory, look, wardrobe, unseenPieces, ...player } = this.player;
 
     return {
@@ -1196,6 +1201,7 @@ export class World {
       entities: [...this.entities.values()].map(saveEntity),
       mobiles: [...this.mobiles.values()].map(copyMobile),
       dens: [...this.dens].map(([id, den]) => ({ id, ...den })),
+      names: [...this.givenNames].map(([id, name]) => ({ id, name })),
       chests: [...this.openedChests],
       spots: [...this.foundSpots],
       scheduler: this.scheduler.toJSON(this.tickCount),
@@ -1303,6 +1309,11 @@ export class World {
 
     this.mobiles.clear();
     for (const mobile of state.mobiles) this.mobiles.set(mobile.id, copyMobile(mobile));
+
+    // Une sauvegarde d'avant les prénoms uniques garde ceux que la seed tirait : `settleNames` les range tels quels.
+    this.givenNames.clear();
+    for (const { id, name } of state.names ?? []) this.givenNames.set(id, name);
+    this.settleNames(state.names === undefined);
 
     this.dens.clear();
     for (const { id, members, readyTick } of state.dens) this.dens.set(id, { members, readyTick });
@@ -4386,7 +4397,10 @@ export class World {
   private stepMobiles(): void {
     if (this.lodging) this.lodgeCrews();
     // Une fois par seconde : les lits suivent les maisons finies ou tombées, les ouvriers venus ou partis.
-    if (this.tickCount % HOUSING.assignTicks === 0) this.settleBeds();
+    if (this.tickCount % HOUSING.assignTicks === 0) {
+      this.settleBeds();
+      this.settleNames(false);
+    }
 
     // La viande déposée à la mairie devient de la nourriture.
     if (this.tickCount % HUNTING.convertTicks === 0) this.butcherMeat();
@@ -6894,7 +6908,44 @@ export class World {
 
   /** Son nom : celui que le joueur lui a donné, sinon son prénom tiré de la seed. */
   public nameFor(person: Pick<Born, 'alias' | 'sex'> & { id: MobileId }): string {
-    return person.alias ?? nameOf(this.seed, person.id, person.sex);
+    return person.alias ?? this.givenNames.get(person.id) ?? this.giveName(person);
+  }
+
+  /** Les habitants qui ont un prénom : les ouvriers et les enfants, dans l'ordre de leur id. */
+  private namedInhabitants(): (Laborer | Kid)[] {
+    const people: (Laborer | Kid)[] = [];
+
+    for (const mobile of this.mobiles.values()) {
+      if (isLaborer(mobile) || mobile.kind === 'kid') people.push(mobile);
+    }
+    return people.sort((a, b) => a.id - b.id);
+  }
+
+  /** Donne son prénom à un habitant : un que nul autre vivant ne porte. */
+  private giveName(person: Pick<Born, 'sex'> & { id: MobileId }): string {
+    const name = pickName(this.seed, person.id, person.sex, new Set(this.givenNames.values()));
+
+    this.givenNames.set(person.id, name);
+    return name;
+  }
+
+  /**
+   * Range les prénoms : les morts rendent le leur, les venus sans prénom en
+   * reçoivent un. `legacy` : une sauvegarde d'avant eux, dont chacun garde le
+   * prénom que la seed lui tirait, doublon ou non.
+   */
+  private settleNames(legacy: boolean): void {
+    const people = this.namedInhabitants();
+    const living = new Set(people.map(({ id }) => id));
+
+    for (const id of [...this.givenNames.keys()]) {
+      if (!living.has(id)) this.givenNames.delete(id);
+    }
+    for (const person of people) {
+      if (this.givenNames.has(person.id)) continue;
+      if (legacy) this.givenNames.set(person.id, nameOf(this.seed, person.id, person.sex));
+      else this.giveName(person);
+    }
   }
 
   /** Les traits des adultes de la colonie, par id : de quoi hériter pour un enfant qui naît. */

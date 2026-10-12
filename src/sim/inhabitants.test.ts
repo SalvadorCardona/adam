@@ -3,13 +3,13 @@ import { TILE_SIZE } from '../core/grid.ts';
 import { hash3 } from '../core/rng.ts';
 import { BUILDINGS } from '../data/buildings.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
-import { AGES, COLONY, NAMES, NURSERY_CARE, SEXES, STORY_SEXES } from '../data/inhabitants.ts';
+import { AGES, COLONY, CORE_NAMES, NAMES, NURSERY_CARE, SEXES, STORY_SEXES } from '../data/inhabitants.ts';
 import type { ItemId } from '../data/items.ts';
 import { RECIPES } from '../data/recipes.ts';
 import { IDLE } from '../data/workers.ts';
 import { ENEMIES, FOE_NAMES, WILDLIFE } from '../data/enemies.ts';
 import { CYCLE_TICKS, ticksToDawn } from './dayNight.ts';
-import { ADAM_SALT, adultAge, foeAge, foeName, nameOf, sexOf, yearsToWork } from './inhabitants.ts';
+import { ADAM_SALT, adultAge, foeAge, foeName, nameOf, pickName, sexOf, yearsToWork } from './inhabitants.ts';
 import { freshNeeds } from './needs.ts';
 import { SAVE_VERSION, decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isWalkable, terrainAt } from './terrain.ts';
@@ -463,8 +463,49 @@ describe('sexe des habitants', () => {
 
   it('le sexe tiré garde le prénom d’avant : aucun habitant d’une ancienne partie ne change de nom', () => {
     for (let id = 0; id < 200; id += 1) {
-      expect(nameOf(9, id, sexOf(9, id))).toBe(NAMES[hash3(9, id, 0x4a3e) % NAMES.length]);
+      expect(nameOf(9, id, sexOf(9, id))).toBe(NAMES[hash3(9, id, 0x4a3e) % CORE_NAMES]);
     }
+  });
+
+  it('pas de doublon parmi cinquante habitants, même si le hasard les fait tous du même sexe', () => {
+    for (const seed of [1, 1234, 77]) {
+      const taken = new Set<string>();
+
+      for (let id = 1; id <= 50; id += 1) {
+        const sex = id % 5 === 0 ? 'male' : sexOf(seed, id);
+        const name = pickName(seed, id, sex, taken);
+
+        expect(taken.has(name)).toBe(false);
+        taken.add(name);
+      }
+    }
+  });
+
+  it('le prénom tiré par la seed reste le premier choix quand il est libre', () => {
+    expect(pickName(9, 12, sexOf(9, 12), new Set())).toBe(nameOf(9, 12, sexOf(9, 12)));
+  });
+
+  it('une sauvegarde d’avant les prénoms uniques garde ceux que la seed tirait', () => {
+    const file = JSON.parse(encodeSave(new World(1234), 1)) as { state: { names?: unknown } };
+
+    delete file.state.names;
+
+    const loaded = decodeSave(JSON.stringify(file));
+
+    if (!loaded.ok) throw new Error(`sauvegarde refusée : ${loaded.reason}`);
+    for (const mobile of loaded.world.mobiles.values()) {
+      if (mobile.kind === 'worker') expect(loaded.world.nameFor(mobile)).toBe(nameOf(1234, mobile.id, mobile.sex));
+    }
+  });
+
+  it('les prénoms des vivants de la colonie sont tous différents, et se rechargent à l’identique', () => {
+    const names = (world: World): string[] => [...world.mobiles.values()].filter((mobile): mobile is Worker => mobile.kind === 'worker').map((worker) => world.nameFor(worker));
+    const world = new World(1234);
+    const loaded = decodeSave(encodeSave(world, 1));
+
+    if (!loaded.ok) throw new Error(`sauvegarde refusée : ${loaded.reason}`);
+    expect(new Set(names(world)).size).toBe(names(world).length);
+    expect(names(loaded.world)).toEqual(names(world));
   });
 
   it('les dix ouvriers du départ ont le sexe de la seed, et une colonie a des femmes et des hommes', () => {

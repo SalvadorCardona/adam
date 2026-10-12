@@ -11,7 +11,7 @@
 
 import { hash3 } from '../core/rng.ts';
 import { FOE_NAMES, type AgeRange } from '../data/enemies.ts';
-import { AGES, NAMES, SEXES, type Sex } from '../data/inhabitants.ts';
+import { AGES, CORE_NAMES, NAMES, SEXES, type Sex } from '../data/inhabitants.ts';
 import { BIO_COUNT, TRAIT_IDS, TRAIT_INHERIT, type TraitId } from '../data/traits.ts';
 import type { MobileId } from './types.ts';
 
@@ -25,9 +25,9 @@ export function adultAge(seed: number, id: MobileId): number {
   return AGES.adultMin + (hash3(seed, id, 0x0a9e) % span);
 }
 
-/** Le rang de `NAMES` que la seed et l'id tirent pour un habitant. */
+/** Le rang de `NAMES` (parmi les `CORE_NAMES` d'origine) que la seed et l'id tirent pour un habitant. */
 function nameRank(seed: number, id: MobileId): number {
-  return hash3(seed, id, 0x4a3e) % NAMES.length;
+  return hash3(seed, id, 0x4a3e) % CORE_NAMES;
 }
 
 /**
@@ -48,6 +48,27 @@ export function nameOf(seed: number, id: MobileId, sex: Sex): string {
 
   // Le rang voisin est de l'autre sexe : un prénom de femme pour une femme, quoi qu'ait tiré le hachage.
   return NAMES[SEXES[rank % SEXES.length] === sex ? rank : rank ^ 1]!;
+}
+
+/**
+ * Le prénom d'un habitant qui vient, sans doublon parmi `taken` (les prénoms
+ * des vivants) : celui que tire `nameOf` s'il est libre, sinon le premier libre
+ * de ceux de son sexe, à partir d'un rang haché. Tous pris : celui de `nameOf`.
+ */
+export function pickName(seed: number, id: MobileId, sex: Sex, taken: ReadonlySet<string>): string {
+  const first = nameOf(seed, id, sex);
+
+  if (!taken.has(first)) return first;
+
+  const pool = NAMES.filter((_, rank) => SEXES[rank % SEXES.length] === sex);
+  const start = hash3(seed, id, 0x9e17) % pool.length;
+
+  for (let step = 0; step < pool.length; step++) {
+    const name = pool[(start + step) % pool.length]!;
+
+    if (!taken.has(name)) return name;
+  }
+  return first;
 }
 
 /**

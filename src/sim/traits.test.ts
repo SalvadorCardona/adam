@@ -144,8 +144,9 @@ describe('noms', () => {
 
   it('une ancienne sauvegarde sans trait donne à chacun celui de la seed, et son prénom', () => {
     const world = new World(11);
-    const file = JSON.parse(encodeSave(world, 1)) as { state: { mobiles: Record<string, unknown>[] } };
+    const file = JSON.parse(encodeSave(world, 1)) as { state: { mobiles: Record<string, unknown>[]; names?: unknown } };
 
+    delete file.state.names;
     for (const mobile of file.state.mobiles) {
       delete mobile['trait'];
       delete mobile['alias'];
