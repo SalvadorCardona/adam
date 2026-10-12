@@ -742,10 +742,6 @@ export const content: Content = {
       label: 'Fast drills',
       description: 'Coal-tempered bits: the drills dig faster.',
     },
-    fertileFarms: {
-      label: 'Fertile farms',
-      description: 'A fertilizer of mutant goo, diluted. Very diluted.',
-    },
     amberBows: {
       label: 'Amber-varnished bows',
       description: 'Forest amber stiffens the bow: every arrow hits harder.',
@@ -758,9 +754,9 @@ export const content: Content = {
       label: 'Quartz bits',
       description: 'Mountain quartz never dulls: drills dig faster.',
     },
-    sporeCompost: {
-      label: 'Spore compost',
-      description: 'Spores from the polluted lands, buried in the field: the harvest nearly doubles.',
+    sporeFilters: {
+      label: 'Spore filters',
+      description: 'Spores from the polluted lands, packed into the filters: the station cleans faster.',
     },
     brickmaking: {
       label: 'Brick firing',

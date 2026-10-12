@@ -16,7 +16,7 @@
 import { BIOMES, HOME_REGION, REGION_RINGS, type BiomeProto, type RegionRing } from './regions.ts';
 import { TILE_SIZE } from '../core/grid.ts';
 import { PALETTE, auditSvg } from './artDirection.ts';
-import { BUILDINGS, RUIN, START_BUILDINGS, type BuildingProto } from './buildings.ts';
+import { BUILDINGS, RUIN, START_BUILDINGS, type BuildingId, type BuildingProto } from './buildings.ts';
 import { DAWN_REWARD, DAY_CYCLE } from './dayNight.ts';
 import { BASE_XP, KILL_XP, LEVEL_GAINS, MAX_LEVEL, XP_CURVE, XP_SHARE } from './levels.ts';
 import { ENEMY_BASE, ENEMY_BASE_LEVELS, FIREBALL, GUARD_RANGE, RAIDS, type EnemyBaseLevel } from './enemyBases.ts';
@@ -31,7 +31,7 @@ import { OBJECTIVES, type ObjectiveProto } from './objectives.ts';
 import { PERKS, type PerkProto } from './perks.ts';
 import { QUESTS, QUEST_IDS, TOOLS, type QuestProto } from './quests.ts';
 import { RECIPES, type RecipeProto } from './recipes.ts';
-import { RESEARCH, RESEARCH_STATS, type ResearchProto } from './research.ts';
+import { RESEARCH, RESEARCH_STATS, type ResearchProto, type ResearchStatProto } from './research.ts';
 import { ERAS, type EraProto } from './eras.ts';
 import { RESOURCES, ROCK_OF_ORE } from './resources.ts';
 import { TEST_SCENARIOS, type TestScenarioProto } from './testScenario.ts';
@@ -897,6 +897,9 @@ function researchErrors(): string[] {
     if (research.effect !== null) {
       if (!(research.effect.stat in RESEARCH_STATS)) errors.push(`RESEARCH.${id} : statistique inconnue « ${research.effect.stat} »`);
       if (research.effect.amount === 0) errors.push(`RESEARCH.${id} : effet nul`);
+      const concerned: readonly BuildingId[] | undefined = (RESEARCH_STATS as Record<string, ResearchStatProto>)[research.effect.stat]?.buildings;
+
+      if (concerned && !concerned.some((building) => BUILDINGS[building].menu)) errors.push(`RESEARCH.${id} : « ${research.effect.stat} » ne concerne aucun bâtiment au menu`);
     }
     for (const building of research.unlocks) {
       const proto: BuildingProto | undefined = BUILDINGS[building];

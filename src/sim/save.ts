@@ -498,7 +498,8 @@ function parseState(raw: unknown): WorldState {
     // Absents d'une sauvegarde d'avant le jardin : une colonie partie sans bonus.
     perks: array(state['perks'] ?? []).map((id) => oneOf(id, PERKS) as PerkId),
     giftedSites: array(state['giftedSites'] ?? []).map((id) => oneOf(id, BUILDINGS) as BuildingId),
-    researchDone: [...new Set(array(state['researchDone'] ?? []).map((id) => oneOf(id, RESEARCH) as ResearchId))],
+    // Une recherche retirée du jeu (la ferme n'est plus au menu) s'oublie, sans refuser la sauvegarde.
+    researchDone: [...new Set(array(state['researchDone'] ?? []).filter((id) => typeof id === 'string' && Object.hasOwn(RESEARCH, id)) as ResearchId[])],
     seenBuildings: [...new Set(array(state['seenBuildings'] ?? []).map((id) => oneOf(id, BUILDINGS) as BuildingId))],
     ...(state['openBuildings'] !== undefined && { openBuildings: [...new Set(array(state['openBuildings']).map((id) => oneOf(id, BUILDINGS) as BuildingId))] }),
     ...(state['era'] !== undefined && { era: Math.min(LAST_ERA, int(state['era'])) }),
@@ -774,12 +775,15 @@ function parseEntity(raw: unknown): SavedEntity {
       return { ...built, kind, training: training && { role: training['role'] as CompanionClassId, endTick: int(training['endTick']) } };
     }
     case 'lab': {
-      const research = entity['research'] === null ? null : (oneOf(entity['research'], RESEARCH) as ResearchId);
-      const endTick = int(entity['endTick']);
+      // Une recherche retirée du jeu (« Fermes fertiles ») s'oublie : le labo repart à vide, sans refuser la sauvegarde.
+      const known = (id: unknown): boolean => typeof id === 'string' && Object.hasOwn(RESEARCH, id);
+      const retired = entity['research'] !== null && !known(entity['research']);
+      const research = entity['research'] === null || retired ? null : (oneOf(entity['research'], RESEARCH) as ResearchId);
+      const endTick = retired ? 0 : int(entity['endTick']);
 
       if (endTick < 0 || (research === null && endTick > 0)) throw new SaveError('compte à rebours sans recherche');
       // Absente d'une sauvegarde d'avant la file : rien en attente.
-      const queue = entity['queue'] === undefined ? [] : array(entity['queue']).map((id) => oneOf(id, RESEARCH) as ResearchId);
+      const queue = entity['queue'] === undefined ? [] : array(entity['queue']).filter(known).map((id) => oneOf(id, RESEARCH) as ResearchId);
 
       if (queue.length > PRODUCTION.queueSize || new Set(research === null ? queue : [research, ...queue]).size !== queue.length + (research === null ? 0 : 1)) {
         throw new SaveError('file de recherche invalide');

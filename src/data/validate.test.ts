@@ -26,6 +26,21 @@ describe('prototypes', () => {
     }
   });
 
+  it('refuse une recherche dont la statistique ne concerne aucun bâtiment au menu', () => {
+    const farm = BUILDINGS.farm;
+    const research = RESEARCH.fastDrills as ResearchProto;
+    const effect = research.effect;
+
+    research.effect = { stat: 'farmYield', amount: 1 };
+    try {
+      expect(farm.menu).toBe(false);
+      expect(validatePrototypes()).toContain('RESEARCH.fastDrills : « farmYield » ne concerne aucun bâtiment au menu');
+    } finally {
+      research.effect = effect;
+    }
+    expect(validatePrototypes()).toEqual([]);
+  });
+
   it('refuse un objet récoltable sans débouché', () => {
     // Sans la forge, l'aciérie, les recherches au charbon du labo ni l'étage 2 de l'antenne, le charbon ne servirait à rien : la validation doit le dire.
     const forge = RECIPES.smeltPlate as RecipeProto;
