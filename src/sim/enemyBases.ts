@@ -178,13 +178,15 @@ export interface Brood {
  * Un tick de jour d'une base, la veille de la nuit `night` : son compte
  * avance vers le prochain assaillant tant qu'elle n'est pas pleine, et vers
  * le prochain gardien tant qu'il lui en manque. Abattue, elle ne fait rien.
+ * `raiding` à faux : la réserve commune est au plafond (`earlyCap`), elle ne
+ * produit pas d'assaillant.
  */
-export function breed(base: EnemyBase, night: number): Brood {
+export function breed(base: EnemyBase, night: number, raiding = true): Brood {
   const brood = { raider: false, guard: false };
 
   if (!isStanding(base)) return brood;
 
-  if (base.raiders < raidCapacity(base.level, night)) {
+  if (raiding && base.raiders < raidCapacity(base.level, night)) {
     base.brood += 1;
 
     const ticks = raidTicks(base.level, night);

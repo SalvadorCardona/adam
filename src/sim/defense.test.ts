@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TILE_SIZE } from '../core/grid.ts';
 import { BUILDINGS, REPAIR, buildingLevel, type BuildingId } from '../data/buildings.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
-import { ENEMIES, QUEEN, nightBosses, queenWave } from '../data/enemies.ts';
+import { ENEMIES, QUEEN, WAVE_STRENGTH, nightBosses, queenWave } from '../data/enemies.ts';
 import type { ItemId } from '../data/items.ts';
 import { isTargetable } from './combat.ts';
 import { CYCLE_TICKS } from './dayNight.ts';
@@ -541,5 +541,63 @@ describe('Reine des flaques — équilibre', () => {
       tower.hp = buildingLevel(tower.proto, 2).hp;
     }
     expect(queenNight(world).slain).toBe(true);
+  }, 60_000);
+});
+
+/*
+ * La grâce des premières nuits : l'effectif ne tient plus au nombre de bases
+ * proches (de un à huit mutants la nuit 2 selon la carte), et un joueur neuf
+ * passe la nuit 1 sans tour.
+ */
+describe('premières nuits', () => {
+  const SEEDS = [1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 42, 99, 100, 1234];
+  const SPREAD = 3;
+
+  /** L'effectif annoncé au crépuscule de chacune des `nights` premières nuits, mairie debout, sans tour. */
+  function raidsOf(seed: number, nights: number): number[] {
+    const world = worldWithTownHall(seed);
+    const counts: number[] = [];
+
+    for (let i = 0; i < CYCLE_TICKS * (nights + 1) && counts.length < nights; i += 1) {
+      world.tick();
+
+      const clock = world.clock();
+
+      if (clock?.phase === 'dusk' && clock.cycle === counts.length + 1) counts.push(world.raidSize(clock.cycle).count);
+    }
+    return counts;
+  }
+
+  it('les nuits 1 à 3 plafonnent l’effectif, et il varie peu d’une carte à l’autre', () => {
+    const all = SEEDS.map((seed) => raidsOf(seed, 3));
+
+    for (const [index, cap] of WAVE_STRENGTH.earlyCaps.entries()) {
+      const night = all.map((counts) => counts[index]!);
+
+      expect(Math.max(...night)).toBeLessThanOrEqual(cap);
+      expect(Math.max(...night) - Math.min(...night)).toBeLessThanOrEqual(SPREAD);
+    }
+  }, 120_000);
+
+  it('l’annonce longue donne le même effectif que la vague', () => {
+    const world = worldWithTownHall(1234);
+    let announced = 0;
+
+    world.events.on('waveAnnounced', (forecast) => {
+      announced = forecast.count;
+    });
+    for (let i = 0; i < CYCLE_TICKS && world.clock()?.phase !== 'dusk'; i += 1) world.tick();
+
+    expect(announced).toBeGreaterThan(0);
+    expect(announced).toBe(world.raidSize(1).count);
+  }, 60_000);
+
+  it.each(SEEDS)('seed %i : sans tour, Adam sous la mairie passe la nuit 1', (seed) => {
+    const world = worldWithTownHall(seed);
+
+    playThroughNight(world, 1);
+
+    expect(world.defeated).toBe(false);
+    expect(world.night).toBe(1);
   }, 60_000);
 });
