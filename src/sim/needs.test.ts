@@ -10,7 +10,7 @@ import { doorOf } from './jobs.ts';
 import { canGrow, deprivedNeed, drainNeeds, fullNeeds, needState, needsPace, pacedTick, stuntingNeed, urgentNeed } from './needs.ts';
 import { freshNeeds } from './needs.ts';
 import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
-import { isWalkable, terrainAt, touchesWater } from './terrain.ts';
+import { isBuildable, isWalkable, terrainAt, touchesWater } from './terrain.ts';
 import type { Entity, Kid, Mobile, Worker } from './types.ts';
 import { World } from './world.ts';
 
@@ -580,6 +580,34 @@ describe('puits', () => {
     for (let y = hall.ty; y <= hall.ty + 3; y += 1) for (let x = hall.tx + 4; x <= hall.tx + 7; x += 1) world.resources.clear(x, y);
     expect(world.canPlace('well', hall.tx + 5, hall.ty + 1)).toBe('shore');
   });
+
+  /*
+   * Bot headless sur 200 seeds : une sur douze n'avait aucune rive dans la
+   * prairie de départ — la plus proche dans une région à conquérir ou la zone
+   * d'une base —, et la colonie mourait de soif vers vingt minutes.
+   */
+  it('trouve une rive où poser le puits dans la prairie de départ, hors des zones des bases, sur 1 000 seeds', () => {
+    const reach = 36;
+    const offsets: [number, number][] = [];
+
+    for (let dy = -reach; dy <= reach; dy += 1) for (let dx = -reach; dx <= reach; dx += 1) offsets.push([dx, dy]);
+    offsets.sort((a, b) => a[0] ** 2 + a[1] ** 2 - (b[0] ** 2 + b[1] ** 2));
+
+    for (let seed = 0; seed < 1000; seed += 1) {
+      const world = new World(seed);
+      const hall = world.entities.get(world.townHallId)!;
+      const usable = (tx: number, ty: number): boolean =>
+        isBuildable(terrainAt(seed, tx, ty)) && world.isConquered(tx, ty) && world.enemyZoneAt(tx, ty) === null && world.land.at(tx, ty) === null;
+      const found = offsets.some(([dx, dy]) => {
+        const tx = hall.tx + 1 + dx;
+        const ty = hall.ty + 1 + dy;
+
+        return [0, 1].every((y) => [0, 1].every((x) => usable(tx + x, ty + y))) && touchesWater(seed, tx, ty, 2, 2);
+      });
+
+      expect({ seed, found }).toEqual({ seed, found: true });
+    }
+  }, 120_000);
 
   it('sans ouvrier, il ne tire rien', () => {
     const world = colony({ food: 50 });

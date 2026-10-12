@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RIVER, decorAt, findSpawn, inRiver, oreAt, resourceAt, terrainAt, touchesWater } from './terrain.ts';
+import { RIVER, decorAt, findSpawn, homePond, inRiver, oreAt, resourceAt, terrainAt, touchesWater } from './terrain.ts';
 
 describe('terrain', () => {
   /*
@@ -198,6 +198,23 @@ describe('foyer', () => {
       expect({ seed, ok: trees <= 6 && stone <= 12 && iron <= 20 }).toEqual({ seed, ok: true });
     }
   }, 30_000);
+
+  it('creuse une mare à portée de pas quand la prairie n’a pas de rive, et seulement alors', () => {
+    // La seed 37 n'avait d'eau qu'à 28 tuiles, hors de la prairie : la colonie mourait de soif.
+    const pond = homePond(37)!;
+    const [sx, sy] = findSpawn(37);
+
+    expect(pond).not.toBeNull();
+    expect(terrainAt(37, pond.tx, pond.ty)).toBe('water');
+    expect(Math.hypot(pond.tx - sx, pond.ty - sy - 1)).toBeLessThanOrEqual(14);
+
+    // Une prairie qui a sa rive garde sa carte, et ses anciennes sauvegardes avec.
+    let ponds = 0;
+
+    for (let seed = 0; seed < 100; seed += 1) if (homePond(seed)) ponds += 1;
+    expect(homePond(100)).toBeNull();
+    expect(ponds).toBeLessThan(15);
+  });
 
   it('se tire de la seed : même seed, mêmes filons', () => {
     const [sx, sy] = findSpawn(42);

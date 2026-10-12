@@ -298,7 +298,10 @@ d'une rivière ou d'un lac (`shore` de `data/buildings.ts`, `touchesWater` de
 Les rivières (`RIVER`, `inRiver` de `sim/terrain.ts`) sont des lits de 3 à 5
 tuiles qui serpentent, coupés de gués, taillés dans la seed ; aucune à moins
 de 30 tuiles de l'origine, pour que le départ et les anciennes sauvegardes ne
-bougent pas. Un puits d'une ancienne sauvegarde, loin de l'eau, tourne toujours. 
+bougent pas. Sans rive où poser un puits dans la prairie de départ (région,
+zone de base, pollution), le foyer creuse une **mare** de 3 × 3 à 9–14 tuiles
+d'Adam (`homePond`, `HOME_POND`) ; une prairie qui a sa rive garde sa carte.
+Un puits d'une ancienne sauvegarde, loin de l'eau, tourne toujours. 
 Elle n'entre dans aucune recette : un besoin est son
 débouché (`validatePrototypes()`). Une sauvegarde d'avant l'eau (version 8)
 reçoit l'eau de départ dans sa mairie (`migrateV8`).
@@ -1097,7 +1100,8 @@ Rien ne joue avant un geste du joueur.
   tire de la seed, avec son foyer : bosquet, filon de pierre (≤ 12 tuiles) et
   de fer (≤ 20) à portée de pas d'Adam, chacun avec un bord où poser une
   foreuse — `terrain.test.ts` et `footing.test.ts` le vérifient sur
-  1 000 seeds — et une clairière qui ouvre sur au moins 400 tuiles (l'eau et
+  1 000 seeds —, une rive où poser le puits dans la prairie, hors des zones
+  des bases (sinon la mare du foyer ; `needs.test.ts`, 1 000 seeds), et une clairière qui ouvre sur au moins 400 tuiles (l'eau et
   les rochers ferment, pas les arbres).
 - Sauvegarde automatique : `sim/save.ts` sérialise le monde (format versionné
   `{ version, savedAt, state }`, validé à la lecture) ; `storage/localSave.ts`
