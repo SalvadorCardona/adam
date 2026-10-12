@@ -3798,6 +3798,7 @@ export class World {
     const carriers = this.hasCarriers();
     const carry = new Map<EntityId, number>();
     const woodLeft = new Map<EntityId, number>();
+    const felled = new Map<EntityId, number>();
     const births = new Map<EntityId, number>();
     const research = new Map<EntityId, number>();
     let working = 1;
@@ -3805,7 +3806,7 @@ export class World {
     for (const entity of this.entities.values()) {
       if (entity.kind === 'nursery') births.set(entity.id, entity.hungry ? 0 : entity.nextBirthTick - this.tickCount);
       if (entity.kind === 'lab' && entity.endTick > 0) research.set(entity.id, entity.endTick - this.tickCount);
-      if (entity.kind === 'lumberCamp') woodLeft.set(entity.id, this.treesLeft(entity) * LUMBERJACKS.carry);
+      if (entity.kind === 'lumberCamp') woodLeft.set(entity.id, this.standingWood(entity));
     }
 
     for (let done = 0; done < total; done += OFFLINE.stepTicks) {
@@ -3816,7 +3817,11 @@ export class World {
 
         const made = this.offlineOutput(entity, span * (employs(entity.proto) ? working : 1), woodLeft);
 
-        if (made) this.offlineYield(entity, made.item, wholeUnits(carry, entity.id, made.amount), carriers, report, alerts);
+        if (made) {
+          const kept = this.offlineYield(entity, made.item, wholeUnits(carry, entity.id, made.amount), carriers, report, alerts);
+
+          if (entity.kind === 'lumberCamp') felled.set(entity.id, (felled.get(entity.id) ?? 0) + kept);
+        }
         if (entity.kind === 'forge') this.offlineForge(entity, span * working, carry, carriers, report, alerts);
       }
       for (const entity of this.entities.values()) {
@@ -3824,6 +3829,13 @@ export class World {
         if (entity.kind === 'lab') this.offlineResearch(entity, span, research, carriers, report);
       }
       working = this.offlineMeals(hall.store, span, report, alerts);
+    }
+
+    // Le bois rapporté a un prix : les arbres de la cabane, du plus proche au plus loin, perdent autant d'unités.
+    for (const [id, units] of felled) {
+      const camp = this.entities.get(id);
+
+      if (camp?.kind === 'lumberCamp') this.fellTrees(camp, units);
     }
 
     // Les comptes à rebours repartent d'où le rattrapage les a laissés ; un ancien réveil, en avance, ne sonne plus pour rien.
@@ -3909,15 +3921,41 @@ export class World {
   }
 
   /** Range une production hors ligne : en ville si des porteurs font la tournée, sinon dans le coffre du bâtiment, tant qu'il a la place. */
-  private offlineYield(entity: Building, item: ItemId, amount: number, carriers: boolean, report: OfflineReport, alerts: Set<OfflineAlertId>): void {
-    if (amount <= 0) return;
+  private offlineYield(entity: Building, item: ItemId, amount: number, carriers: boolean, report: OfflineReport, alerts: Set<OfflineAlertId>): number {
+    if (amount <= 0) return 0;
 
     const kept = carriers ? (this.townStock()?.add(item, amount) ?? 0) : entity.store.add(item, Math.min(amount, Math.max(0, entity.store.freeSpace())));
 
     if (kept < amount) alerts.add('storeFull');
-    if (kept <= 0) return;
+    if (kept <= 0) return 0;
     count(report.gained, item, kept);
     this.tally(item, kept);
+    return kept;
+  }
+
+  /** Les unités de bois qui restent aux arbres debout dans le rayon d'une cabane. */
+  private standingWood(camp: LumberCamp): number {
+    let units = 0;
+
+    for (const tree of treesInRange(camp, this.resources, this.harvestable)) units += this.resources.at(tree.tx, tree.ty)?.remaining ?? 0;
+    return units;
+  }
+
+  /** Abat `units` unités de bois dans le rayon de la cabane, l'arbre le plus proche d'abord : les mêmes prises qu'un coup de hache. */
+  private fellTrees(camp: LumberCamp, units: number): void {
+    let left = units;
+
+    for (const tree of treesInRange(camp, this.resources, this.harvestable)) {
+      while (left > 0) {
+        const taken = this.resources.take(tree.tx, tree.ty);
+
+        if (!taken || taken.resource.id !== 'tree') break;
+        left -= 1;
+        if (taken.stageChanged) this.dirtyTile(tree.tx, tree.ty);
+        if (taken.resource.remaining <= 0) break;
+      }
+      if (left <= 0) return;
+    }
   }
 
   /**

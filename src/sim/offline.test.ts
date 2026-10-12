@@ -11,7 +11,8 @@ import { awayMs, countedMs, feedNeed } from './offline.ts';
 import type { OfflineReport } from './offline.ts';
 import { decodeSave, encodeSave } from './save.ts';
 import { stageScenario } from './testScenario.ts';
-import type { Lab, Nursery } from './types.ts';
+import { LUMBERJACKS } from '../data/workers.ts';
+import type { Lab, LumberCamp, Nursery } from './types.ts';
 import { STEP_MS, World } from './world.ts';
 
 const MINUTE = 60 * 1000;
@@ -276,6 +277,26 @@ describe('hors ligne — la ville rattrape', () => {
       expect(report!.spent[item] ?? 0).toBeGreaterThanOrEqual(amount);
       expect(world.townStock()!.count(item)).toBe(before[item]! + (report!.gained[item] ?? 0) - (report!.spent[item] ?? 0));
     }
+  });
+
+  it('le bois produit abat les arbres : deux absences de 8 h ne rapportent pas plus que ce qui est debout', () => {
+    const world = stageScenario(TEST_SCENARIOS.base);
+    const camp = [...world.entities.values()].find((entity): entity is LumberCamp => entity.kind === 'lumberCamp')!;
+    const yard = [...world.entities.values()].find((entity) => entity.proto === 'constructionPost')!;
+
+    world.push({ type: 'setWorkers', id: yard.id, count: 0 });
+    build(world, 'logisticsPost');
+    for (let i = 0; i < 40; i += 1) world.tick();
+
+    const standing = world.treesLeft(camp);
+    const wood = (report: OfflineReport | null): number => report?.gained.wood ?? 0;
+    const first = wood(catchUp(world, 8 * HOUR));
+    const second = wood(catchUp(world, 8 * HOUR));
+
+    expect(standing).toBeGreaterThan(0);
+    expect(first).toBeGreaterThan(0);
+    expect(first + second).toBeLessThanOrEqual(standing * LUMBERJACKS.carry);
+    expect(world.treesLeft(camp)).toBeLessThan(standing);
   });
 
   it('une sauvegarde relue rattrape son absence comme la partie d’origine', () => {
