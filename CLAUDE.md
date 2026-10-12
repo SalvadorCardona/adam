@@ -890,7 +890,7 @@ Les règles, en résumé :
   ville sur un téléphone), l'**horloge du jour** juste à sa droite et l'alerte
   de vivres ; au centre (`.hud-main`) la barre ; à droite (`.hud-right`) la
   météo. Pause, Réglages, la carte du monde et le zoom forment une rangée de
-  disques en haut à droite (`.hud-zoom`, dernière rangée de la grille de `.hud-top`) ; le bord droit n'a plus de colonne. Tous les boutons du HUD prennent
+  disques en haut à droite (`.hud-zoom`, dernière rangée de la grille de `.hud-top`) ; le bord droit n'a plus de colonne. Sous 600 px (téléphone en portrait), les six boutons passent en colonne sur ce bord, à côté de la barre, de la ville et de la population : la quête, ouverte sous la barre, ne les couvre jamais. Tous les boutons du HUD prennent
   `--btn` (48 px, 44 px sous 400 px de large) et `--btn-icon`, posés sur `.hud`. **Une seule variable de hauteur, `--hud-h`**, posée sur `.hud-top` et
   ajustée par paliers (34, 36, 38, 42 px ; 38 sur un téléphone couché) : la
   barre et chaque bloc des deux groupes la prennent, sans marge ni `top` ni
