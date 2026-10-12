@@ -16,5 +16,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/{sim,core,data,art,input,ui,storage,render,audio,i18n}/**/*.test.ts'],
+    // Plusieurs tests de sim/ déroulent des minutes de partie tick par tick
+    // (porteurs, carrière, forge…) : 2 à 5 s sur une machine calme, davantage
+    // sur un runner de CI ou une machine chargée. Les 5 s par défaut les
+    // faisaient échouer au hasard ; 30 s laisse la marge sans masquer une
+    // vraie boucle infinie.
+    testTimeout: 30_000,
   },
 });
