@@ -451,13 +451,29 @@ coût manque, le labo porte au-dessus de lui la rangée d’un chantier
 d'ennemis** : gelée de mutant, croc de loup, pince de crabe, objets qu'on ne
 récolte nulle part. Un effet est un modificateur additif sur une
 statistique, lu en un seul point, `World.bonus(stat)` ; les données ne
-bougent pas. Une recherche peut aussi **débloquer des bâtiments**
-(`unlocks` : la Fonderie, forge et four à charbon ; la Médecine de fortune,
-la clinique), lus par `World.isUnlocked` ; aucun objectif ni quête n'en
-demande un (`validatePrototypes()`), et Ève envoie au labo quand il faut
+bougent pas — Adam (arc, sac, pas, PV max `maxHp`), les habitants (allure
+`workerSpeed` lue par `World.walkStep`, cadence `workSpeed` par
+`World.toil`, faim et soif `hungerResist`/`thirstResist` par `drainNeeds`),
+foreuses, dépollution (`purifyTicks`). Le labo est **de départ**
+(`START_BUILDINGS`) : sans lui, rien ne s'ouvrirait. Une recherche peut
+**débloquer des bâtiments** (`unlocks` : la Fonderie, forge et four à
+charbon ; la Médecine de fortune, la clinique ; la Milice, la caserne ; la
+Dépollution, la station), lus par `World.isUnlocked` ; aucun objectif ni
+quête n'en demande un. Elle peut aussi **ouvrir** un bâtiment de base
+qu'une colonie neuve n'a pas (`opens` : puits, cabane et maison du
+forestier, tour, carrière et foreuse, poste de construction) ; ceux-là, une
+quête ou un objectif peut les demander, leur recherche ne coûtant que ce qui
+se récolte. `validatePrototypes()` vérifie que chaque bâtiment du menu a son
+chemin (départ, plan, objectif, labo). Ève envoie au labo quand le bâtiment
+qu'elle conseille n'y est pas encore (`labOpen`, `labResearch`) ou qu'il faut
 des plaques. `researchDone` est de l'état ; la recherche en cours est celle
-du labo. La fenêtre du labo est le panneau Recherche (`ui/researchPanel.ts`) :
-chaque recherche y dit ce qu'elle débloque, vignette et nom.
+du labo. Une sauvegarde d'avant (version 9) tient pour finies les
+recherches qui ouvrent ce qu'elle avait déjà (`migrateV9`). La fenêtre du
+labo est le panneau Recherche (`ui/researchPanel.ts`) : en tête ce qu'il
+mène (relevé du coût, puis la barre verte « m:ss »), puis trois onglets
+— Bâtiments, Ouvriers, Personnage (`theme`) — dont chaque recherche dit son
+icône (`icon`), son effet ou ce qu'elle débloque, son coût, sa durée, son
+état (verrouillée : le prérequis nommé) et « Lancer ».
 
 **Objectifs** — la partie est une chaîne d'objectifs en données
 (`src/data/objectives.ts`, jugés par `src/sim/objectives.ts`) : mairie,
@@ -664,8 +680,8 @@ champ de bruit (`CONTAMINATION` : taille des plaques, seuils, clairière
 épargnée), jamais stockés : la **polluée** (boue violette) et, au cœur des
 plaques, la **radioactive** (orange, trèfle jaune). Aucune ne se bâtit
 (refus `polluted` / `radioactive`, cases en corail au fantôme). La **station
-de dépollution** (`purifier`, 2 × 2, sans ouvrier, `PURIFIER` : objectif de
-déblocage 5, rayon 4 depuis le bord de l'emprise, une case toutes les 60
+de dépollution** (`purifier`, 2 × 2, sans ouvrier, `PURIFIER` : débloquée
+au labo, « Dépollution », rayon 4 depuis le bord de l'emprise, une case toutes les 60
 ticks, la plus proche d'abord) rend saine la terre polluée de son rayon ;
 les cases nettoyées sont de l'état (`cleaned`, absent d'une ancienne
 sauvegarde : aucune). La radioactive ne se nettoie pas ; ce qu'elle permet
@@ -810,7 +826,7 @@ Les règles, en résumé :
   Production, Attaque, Logistique, Habitat, Recherche ; icônes `data/categoryIcons.ts`,
   logique `ui/buildFilter.ts`) : « Tous », puis les familles qui ont une carte au menu ; la
   famille choisie tient toute la partie, et s'applique avec le texte (« 2 résultats dans
-  Tous » si elle n'a rien pour lui). Une colonie neuve (`World.newColony`) n'y propose que `START_BUILDINGS` (`data/buildings.ts` : Maison, Nurserie, Poste de logistique, Labo de recherche — une colonie sauvegardée sans lui le retrouve au chargement) ; les autres, sans plan, recherche ni objectif qui les gouverne, restent masqués (`World.openBuildings`, sauvegardé ; une sauvegarde d'avant les ouvre tous). Ce qui vient d'y entrer (labo, plan, objectif) porte « Nouveau » jusqu'à ce qu'on
+  Tous » si elle n'a rien pour lui). Une colonie neuve (`World.newColony`) n'y propose que `START_BUILDINGS` (`data/buildings.ts` : Maison, Nurserie, Poste de logistique, Labo — une colonie sauvegardée sans lui le retrouve au chargement) ; les bâtiments de base attendent la recherche qui les ouvre (`opens`), les autres leur plan, leur recherche ou leur objectif (`World.openBuildings`, sauvegardé ; une sauvegarde d'avant les ouvre tous). Ce qui vient d'y entrer (labo, plan, objectif) porte « Nouveau » jusqu'à ce qu'on
   le choisisse ou le pose (`seeBuilding`, `World.seenBuildings`, sauvegardé) et s'annonce en
   toast (`buildingsUnlocked`).
 - La fenêtre d'un bâtiment (`ui/buildingPanel.ts`) laisse voir le jeu : vignette

@@ -4549,9 +4549,10 @@ button:disabled,
 /* ------------------------------------------------------- panneau Recherche */
 
 /*
- * La fenêtre du labo : la recherche en cours dans une carte lavande, puis la
- * liste des recherches, groupées par thème, qui défile. Lisible en 390 px :
- * une colonne, des lignes qui passent à la ligne plutôt que de rétrécir.
+ * La fenêtre du labo : la recherche en cours dans une carte lavande, puis
+ * trois onglets — Bâtiments, Ouvriers, Personnage — dont chaque liste défile.
+ * Lisible en 390 px : une colonne, des lignes qui passent à la ligne plutôt
+ * que de rétrécir, « Lancer » sur toute la largeur, pour le pouce.
  */
 .building-panel[data-kind='lab'] {
   width: min(400px, calc(100vw - 28px));
@@ -4575,6 +4576,82 @@ button:disabled,
   font-size: 19px;
   font-weight: 700;
   color: var(--violet-shade);
+}
+
+.research-current-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.research-current-titles {
+  min-width: 0;
+}
+
+.research-current-icon {
+  display: contents;
+}
+
+.research-current-icon > .icon {
+  flex: none;
+}
+
+/* L'icône d'une recherche : une pastille blanche, l'objet, le bâtiment ou le pictogramme dedans. */
+.research-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--paper-shade);
+  overflow: hidden;
+}
+
+.research-current .research-icon {
+  background: var(--paper);
+}
+
+.research-icon[data-kind='building'] {
+  background: var(--grass);
+}
+
+.research-queue .research-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.research-timer {
+  margin-top: 10px;
+}
+
+.research-timer[hidden] {
+  display: none;
+}
+
+.research-timer .building-panel-bar {
+  margin-top: 0;
+}
+
+.research-timer .building-panel-meter-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--good);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Les onglets du labo : trois mots qui doivent tenir en 390 px — sous 420 px, sans leur pictogramme. */
+.research-tabs button {
+  gap: 4px;
+  padding: 0 6px;
+  font-size: 15px;
+}
+
+@media (max-width: 420px) {
+  .research-tabs button .icon {
+    display: none;
+  }
 }
 
 .research-current .building-panel-bar {
@@ -4636,8 +4713,8 @@ button:disabled,
 }
 
 .research-list {
-  max-height: min(36dvh, 340px);
-  margin-top: 12px;
+  max-height: min(42dvh, 380px);
+  margin-top: 10px;
   padding-right: 2px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -4671,14 +4748,60 @@ button:disabled,
 .research-row-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
 .research-name {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-size: 17px;
   font-weight: 700;
+}
+
+/* L'état d'une recherche, à droite de son nom : terminée, en cours, en file, verrouillée. */
+.research-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  max-width: 50%;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--paper-shade);
+  color: var(--violet-shade);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.research-row[data-status='done'] .research-badge {
+  background: var(--mint);
+  color: var(--paper);
+}
+
+.research-row[data-status='running'] .research-badge,
+.research-row[data-status='collecting'] .research-badge {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.research-row[data-status='locked'] .research-badge {
+  color: var(--danger);
+}
+
+.research-duration {
+  align-self: center;
+  color: var(--muted);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.research-row > .research-launch {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 8px;
+  font-size: 17px;
 }
 
 .research-effect {

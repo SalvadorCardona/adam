@@ -5,10 +5,14 @@ export const researchPanel = {
   abandon: 'Abandonner',
   takeRest: 'Prendre le reste',
   noneTitle: 'Aucune recherche en cours',
-  noneHint: 'Choisissez-en une ci-dessous, puis apportez son coût.',
+  noneHint: 'Choisissez-en une dans les onglets, puis apportez son coût.',
   approach: 'Rapprochez-vous pour déposer — ou laissez faire les porteurs.',
   transferBoth: 'Transférez le sac et la ville, heurtez le labo, ou laissez faire les porteurs.',
   transferBag: 'Transférez le sac, heurtez le labo, ou laissez faire les porteurs.',
+  /** La rangée d'onglets du labo, pour un lecteur d'écran. */
+  tabsLabel: 'Recherches',
+  /** Le badge d'une recherche dont un prérequis manque. */
+  locked: 'Verrouillée',
   /** L'état d'une ligne de la liste, recherche en cours. */
   running: 'En cours',
   launch: 'Lancer',

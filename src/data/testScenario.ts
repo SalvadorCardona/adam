@@ -113,13 +113,16 @@ export const TEST_SCENARIOS = {
   },
   /**
    * Le labo fini à côté d'Adam, et de quoi payer la Fonderie en ville : on
-   * la lance, on transfère, et la forge entre au menu de construction.
+   * la lance, on transfère, et la forge entre au menu de construction. Ses
+   * trois onglets ont chacun de quoi se lancer ; les Flèches à croc sont
+   * déjà finies.
    */
   lab: {
     label: 'Labo',
     seed: 100,
     buildings: [{ building: 'lab', dx: 4, dy: 5 }],
-    town: { wood: 40, stone: 30, ironOre: 12, food: 12, water: 12 },
+    town: { wood: 40, stone: 30, ironOre: 12, food: 24, water: 20 },
+    research: ['sharpArrows'],
     bag: {},
     adam: { dx: 3, dy: 4 },
   },

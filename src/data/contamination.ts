@@ -47,13 +47,12 @@ export const CONTAMINATION = {
   safeRadius: 26,
 } as const;
 
-/** La station de dépollution : quand elle se débloque, jusqu'où elle porte, à quelle vitesse elle agit. */
+/**
+ * La station de dépollution : jusqu'où elle porte, à quelle vitesse elle agit.
+ * Elle se débloque au labo (recherche « Dépollution ») ; « Filtres doubles »
+ * raccourcit son intervalle (`purifyTicks`).
+ */
 export const PURIFIER = {
-  /**
-   * L'objectif à atteindre (son index dans `OBJECTIVES`) avant de pouvoir la
-   * bâtir : 5 = « Tenir 5 nuits », une fois le premier enfant né.
-   */
-  unlockObjective: 5,
   /** Portée en tuiles, mesurée depuis le bord de son emprise. */
   radius: 4,
   /** Une case polluée redevient saine tous les tant de ticks (20 ticks = 1 s), la plus proche d'abord. */

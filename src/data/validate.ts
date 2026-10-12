@@ -16,7 +16,7 @@
 import { BIOMES, ERAS, HOME_REGION, REGION_RINGS, type BiomeProto, type RegionRing } from './regions.ts';
 import { TILE_SIZE } from '../core/grid.ts';
 import { PALETTE, auditSvg } from './artDirection.ts';
-import { BUILDINGS, RUIN, type BuildingProto } from './buildings.ts';
+import { BUILDINGS, RUIN, START_BUILDINGS, type BuildingProto } from './buildings.ts';
 import { DAWN_REWARD, DAY_CYCLE } from './dayNight.ts';
 import { BASE_XP, KILL_XP, LEVEL_GAINS, MAX_LEVEL, XP_CURVE, XP_SHARE } from './levels.ts';
 import { ENEMY_BASE, ENEMY_BASE_LEVELS, FIREBALL, GUARD_RANGE, RAIDS, type EnemyBaseLevel } from './enemyBases.ts';
@@ -792,8 +792,12 @@ export function wardrobeErrors(): string[] {
  * Et un labo pour les mener.
  *
  * Un bâtiment débloqué au labo ne l'est que par une recherche, n'attend ni
- * plan ni objectif, et aucune quête ni aucun objectif ne demande de le bâtir :
- * jamais le joueur ne bute sur un bâtiment absent du menu.
+ * plan ni objectif, et aucune quête ni aucun objectif ne demande de le bâtir.
+ * Un bâtiment de base hors de `START_BUILDINGS` s'ouvre au labo (`opens`) ;
+ * une quête ou un objectif peut le demander, si sa recherche et ses
+ * prérequis ne coûtent que ce qui se récolte. Le labo est de départ, et
+ * chaque bâtiment du menu a son chemin : jamais le joueur ne bute sur un
+ * bâtiment absent du menu.
  */
 function researchErrors(): string[] {
   const errors: string[] = [];
@@ -801,8 +805,11 @@ function researchErrors(): string[] {
   const room = Math.min(...labs.map(([, building]) => building.storage));
   const entries = Object.entries(RESEARCH) as [string, ResearchProto][];
   const unlockedBy = new Map<string, string>();
+  const openedBy = new Map<string, string>();
+  const start: readonly string[] = START_BUILDINGS;
 
   if (labs.length === 0) errors.push('RESEARCH : aucun labo pour mener les recherches');
+  if (!labs.some(([id]) => start.includes(id))) errors.push('START_BUILDINGS : aucun labo au départ, rien ne pourrait se débloquer');
 
   for (const [id, research] of entries) {
     if (research.label.trim() === '' || research.description.trim() === '') errors.push(`RESEARCH.${id} : libellé ou description vide`);
@@ -813,7 +820,7 @@ function researchErrors(): string[] {
       if (!Number.isInteger(amount) || amount <= 0) errors.push(`RESEARCH.${id} : coût nul ou fractionnaire en « ${itemId} »`);
     }
     if (sum(research.cost) > room) errors.push(`RESEARCH.${id} : le coffre du labo ne peut pas contenir son coût`);
-    if (research.effect === null && research.unlocks.length === 0) errors.push(`RESEARCH.${id} : ni effet ni déblocage`);
+    if (research.effect === null && research.unlocks.length === 0 && research.opens.length === 0) errors.push(`RESEARCH.${id} : ni effet ni déblocage`);
     if (research.effect !== null) {
       if (!(research.effect.stat in RESEARCH_STATS)) errors.push(`RESEARCH.${id} : statistique inconnue « ${research.effect.stat} »`);
       if (research.effect.amount === 0) errors.push(`RESEARCH.${id} : effet nul`);
@@ -829,6 +836,19 @@ function researchErrors(): string[] {
       if (proto.plan || proto.unlockObjective !== undefined) errors.push(`RESEARCH.${id} : « ${building} » a déjà sa condition de déblocage`);
       if (unlockedBy.has(building)) errors.push(`RESEARCH.${id} : « ${building} » déjà débloqué par ${unlockedBy.get(building)}`);
       unlockedBy.set(building, id);
+    }
+    for (const building of research.opens) {
+      const proto: BuildingProto | undefined = BUILDINGS[building];
+
+      if (!proto) {
+        errors.push(`RESEARCH.${id} : ouvre un bâtiment inconnu « ${building} »`);
+        continue;
+      }
+      if (!proto.menu || proto.kind === 'lab') errors.push(`RESEARCH.${id} : « ${building} » ne peut pas s'ouvrir au labo`);
+      if (start.includes(building)) errors.push(`RESEARCH.${id} : « ${building} » est déjà au menu de départ`);
+      if (proto.plan || proto.unlockObjective !== undefined) errors.push(`RESEARCH.${id} : « ${building} » a déjà sa condition de déblocage`);
+      if (openedBy.has(building) || unlockedBy.has(building)) errors.push(`RESEARCH.${id} : « ${building} » déjà au labo, par ${openedBy.get(building) ?? unlockedBy.get(building)}`);
+      openedBy.set(building, id);
     }
     for (const required of research.requires) {
       if (!(required in RESEARCH)) errors.push(`RESEARCH.${id} : prérequis inconnu « ${required} »`);
@@ -860,8 +880,28 @@ function researchErrors(): string[] {
     ),
   ];
 
+  // Ce qu'Adam récolte : de quoi payer une recherche sans avoir à combattre.
+  const harvested = new Set<string>(Object.values(RESOURCES).map((resource) => resource.item));
+  const affordable = (id: string, seen = new Set<string>()): boolean => {
+    const research: ResearchProto | undefined = (RESEARCH as Record<string, ResearchProto>)[id];
+
+    if (!research || seen.has(id)) return research !== undefined;
+    seen.add(id);
+    return Object.keys(research.cost).every((item) => harvested.has(item)) && research.requires.every((required) => affordable(required, seen));
+  };
+
   for (const [at, building] of asked) {
     if (unlockedBy.has(building)) errors.push(`${at} : demande « ${building} », qui n'arrive qu'au labo`);
+
+    const opening = openedBy.get(building);
+
+    if (opening !== undefined && !affordable(opening)) errors.push(`${at} : demande « ${building} », dont la recherche coûte du butin`);
+  }
+
+  // Chaque bâtiment du menu a son chemin : de départ, un plan, un objectif ou le labo.
+  for (const [id, building] of Object.entries(BUILDINGS) as [string, BuildingProto][]) {
+    if (!building.menu || start.includes(id) || building.plan || building.unlockObjective !== undefined) continue;
+    if (!unlockedBy.has(id) && !openedBy.has(id)) errors.push(`BUILDINGS.${id} : n'entre jamais au menu d'une colonie neuve`);
   }
 
   const labels = new Set<string>();

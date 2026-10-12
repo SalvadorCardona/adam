@@ -27,16 +27,16 @@ describe('prototypes', () => {
   });
 
   it('refuse un objet récoltable sans débouché', () => {
-    // Sans la forge, les foreuses rapides du labo ni l'étage 2 de l'antenne, le charbon ne servirait à rien : la validation doit le dire.
+    // Sans la forge, les recherches au charbon du labo ni l'étage 2 de l'antenne, le charbon ne servirait à rien : la validation doit le dire.
     const forge = RECIPES.smeltPlate as RecipeProto;
-    const drills = RESEARCH.fastDrills as ResearchProto;
+    const researches = [RESEARCH.fastDrills, RESEARCH.purification, RESEARCH.charcoalFilters] as ResearchProto[];
     const floor = BUILDINGS.antenna.upgrades[0] as BuildingUpgrade;
     const inputs = forge.inputs;
-    const cost = drills.cost;
+    const costs = researches.map((research) => research.cost);
     const floorCost = floor.cost;
 
     forge.inputs = { ironOre: 2 };
-    drills.cost = { ironOre: 10 };
+    for (const research of researches) research.cost = { ironOre: 10 };
     floor.cost = { ironPlate: 40, radCore: 1 };
     try {
       expect(validatePrototypes()).toContain(
@@ -44,7 +44,7 @@ describe('prototypes', () => {
       );
     } finally {
       forge.inputs = inputs;
-      drills.cost = cost;
+      researches.forEach((research, index) => (research.cost = costs[index]!));
       floor.cost = floorCost;
     }
     expect(validatePrototypes()).toEqual([]);
@@ -73,5 +73,31 @@ describe('prototypes', () => {
     } finally {
       boots.unlocks = unlocks;
     }
+  });
+
+  it('refuse un bâtiment du menu qui n’entre jamais au menu d’une colonie neuve', () => {
+    const mining = RESEARCH.mining as ResearchProto;
+    const opens = mining.opens;
+
+    mining.opens = ['quarry'];
+    try {
+      expect(validatePrototypes()).toContain("BUILDINGS.drill : n'entre jamais au menu d'une colonie neuve");
+    } finally {
+      mining.opens = opens;
+    }
+    expect(validatePrototypes()).toEqual([]);
+  });
+
+  it('refuse un objectif qui demande un bâtiment dont la recherche coûte du butin', () => {
+    const mining = RESEARCH.mining as ResearchProto;
+    const cost = mining.cost;
+
+    mining.cost = { wood: 10, wolfFang: 2 };
+    try {
+      expect(validatePrototypes()).toContain('OBJECTIVES[3] : demande « drill », dont la recherche coûte du butin');
+    } finally {
+      mining.cost = cost;
+    }
+    expect(validatePrototypes()).toEqual([]);
   });
 });

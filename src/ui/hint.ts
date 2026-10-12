@@ -13,7 +13,7 @@
  * Fonction pure, sans DOM : `hud.ts` l'affiche, les tests la lisent.
  */
 
-import { BUILDINGS, REPAIR, buildingLevel } from '../data/buildings.ts';
+import { BUILDINGS, REPAIR, buildingLevel, type BuildingId } from '../data/buildings.ts';
 import { EVE } from '../data/eve.ts';
 import { COLONY } from '../data/inhabitants.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
@@ -21,7 +21,7 @@ import type { Goal } from '../data/objectives.ts';
 import { RESEARCH_IDS } from '../data/research.ts';
 import { RESOURCES } from '../data/resources.ts';
 import { currentObjective, objectiveWait, type GoalWait } from '../sim/objectives.ts';
-import { researchStatus } from '../sim/research.ts';
+import { openingResearch, researchStatus, unlockingResearch } from '../sim/research.ts';
 import type { Building } from '../sim/types.ts';
 import { TICKS_PER_SECOND, type World } from '../sim/world.ts';
 import { t } from '../i18n/locale.ts';
@@ -77,6 +77,21 @@ export function uselessBagHint(world: World): string | null {
   return bulk ? t().eve.hints.bagUseless.replace('{item}', t().hud.hint.inSentence(t().items[bulk])) : null;
 }
 
+/**
+ * Le conseil de bâtir `building`, s'il est au menu ; sinon, le chemin du labo
+ * qui l'ouvre : le bâtir d'abord, puis y lancer la recherche.
+ */
+function viaLab(world: World, building: BuildingId, line: string): string {
+  const research = openingResearch(building) ?? unlockingResearch(building);
+
+  if (world.isUnlocked(building) || research === null) return line;
+
+  const lines = t().eve.hints;
+  const name = t().buildings[building].label;
+
+  return (world.labs().length > 0 ? lines.labResearch.replace('{research}', t().research[research].label) : lines.labOpen).replace('{building}', name);
+}
+
 export function tutorialHint(world: World, progress: HintProgress, towers: boolean, mutants: number): string | null {
   return tutorialAdvice(world, progress, towers, mutants)?.text ?? null;
 }
@@ -110,9 +125,9 @@ export function tutorialAdvice(world: World, progress: HintProgress, towers: boo
   const welled = [...world.entities.values()].some((entity) => entity.proto === 'well');
   const water = world.townStock()?.available('water') ?? 0;
 
-  if (mutants === 0 && !welled && (water < COLONY.startingStock.water / 2 || world.needAlert()?.need === 'thirst')) return say(lines.well);
+  if (mutants === 0 && !welled && (water < COLONY.startingStock.water / 2 || world.needAlert()?.need === 'thirst')) return say(viaLab(world, 'well', lines.well));
 
-  if (world.night === 0 && !towers) return say(lines.tower);
+  if (world.night === 0 && !towers) return say(viaLab(world, 'watchtower', lines.tower));
   if (mutants > 0 && world.night <= 2) return say(lines.bow);
 
   // Entre deux vagues, la mairie entamée d'au moins un bois, et Ève pas encore là pour la réparer : à Adam de le faire.
@@ -123,7 +138,7 @@ export function tutorialAdvice(world: World, progress: HintProgress, towers: boo
   // La pierre manque en ville, et rien n'en produit : la carrière, avant que les rochers ne soient vidés.
   const quarried = [...world.entities.values()].some((entity) => entity.proto === 'quarry');
 
-  if (mutants === 0 && !quarried && (world.townStock()?.available('stone') ?? 0) === 0) return say(lines.quarry);
+  if (mutants === 0 && !quarried && (world.townStock()?.available('stone') ?? 0) === 0) return say(viaLab(world, 'quarry', lines.quarry));
 
   // Entre deux nuits, tant qu'elle n'est pas là : elle annonce son arrivée.
   if (mutants === 0 && world.night > 0 && world.night < EVE.arrivalNight && !world.eve()) {

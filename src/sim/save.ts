@@ -16,7 +16,7 @@
  */
 
 import { CHUNK_TILES } from '../core/grid.ts';
-import { BUILDINGS, MENU_BUILDING_IDS, maxLevel, type BuildingId } from '../data/buildings.ts';
+import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, maxLevel, type BuildingId } from '../data/buildings.ts';
 import { COMPANION_CLASSES, isCompanionClass, type CompanionClassId } from '../data/companions.ts';
 import { RARE_OFFERS, type RareOfferId } from '../data/caravan.ts';
 import { ENEMY_BASE_LEVELS, RAIDS, enemyBaseLevel } from '../data/enemyBases.ts';
@@ -32,7 +32,7 @@ import { OBJECTIVES } from '../data/objectives.ts';
 import { JOB_PRIORITY, WORK_PRIORITY, type JobPriority, type WorkPriority } from '../data/workers.ts';
 import { PERKS, type PerkId } from '../data/perks.ts';
 import { PRODUCTION } from '../data/production.ts';
-import { RESEARCH, type ResearchId } from '../data/research.ts';
+import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../data/research.ts';
 import { RESOURCES, type ResourceId } from '../data/resources.ts';
 import type { SavedFog } from './fog.ts';
 import type { PlantedTree, ResourceStage, TileLook } from './resources.ts';
@@ -75,7 +75,7 @@ import { World } from './world.ts';
  * `WorldState` ; une migration de l'ancienne version se branche alors dans
  * `decodeSave`, sinon l'ancienne sauvegarde est ignorée.
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 /** Une entité telle qu'elle est rangée : son coffre devient un simple stock. */
 export type SavedEntity = Stored<Entity>;
@@ -246,14 +246,15 @@ export function decodeSave(text: string): DecodedSave {
   if (!isRecord(file) || typeof file['version'] !== 'number') return { ok: false, reason: 'corrupt' };
   const version = file['version'];
 
-  if (version !== SAVE_VERSION && version !== 8 && version !== 7 && version !== 6 && version !== 5 && version !== 4) return { ok: false, reason: 'version' };
+  if (version !== SAVE_VERSION && version !== 9 && version !== 8 && version !== 7 && version !== 6 && version !== 5 && version !== 4) return { ok: false, reason: 'version' };
 
   try {
     const v5 = version === 4 ? migrateV4(file['state']) : file['state'];
     const v6 = version === 4 || version === 5 ? migrateV5(v5) : v5;
     const v7 = version <= 6 ? migrateV6(v6) : v6;
     const v8 = version <= 7 ? migrateV7(v7) : v7;
-    const state = version === SAVE_VERSION ? v8 : migrateV8(v8);
+    const v9 = version <= 8 ? migrateV8(v8) : v8;
+    const state = version === SAVE_VERSION ? v9 : migrateV9(v9);
 
     return { ok: true, world: deserialize(state), savedAt: finite(file['savedAt']) };
   } catch {
@@ -388,6 +389,38 @@ function migrateV8(raw: unknown): unknown {
 
   return { ...raw, entities };
 }
+
+/**
+ * Version 9 : le labo n'était pas au menu d'une colonie neuve, ni puits,
+ * cabane, tour, carrière, foreuse et poste de construction ; la station de
+ * dépollution venait avec l'objectif 5. Désormais le labo est de départ, il
+ * ouvre les bâtiments de base (`opens`) et débloque la station. Une partie
+ * garde ce qu'elle avait : la recherche qui ouvre un bâtiment déjà ouvert
+ * (toute une sauvegarde d'avant `openBuildings`) est tenue pour finie, de
+ * même « Dépollution » passé l'objectif 5 ; et le labo s'ouvre.
+ */
+function migrateV9(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+
+  const done: unknown[] = Array.isArray(raw['researchDone']) ? raw['researchDone'] : [];
+  const open: unknown[] | null = Array.isArray(raw['openBuildings']) ? raw['openBuildings'] : null;
+  const opened = RESEARCH_IDS.filter((id) => {
+    const opens: readonly BuildingId[] = RESEARCH[id].opens;
+
+    return opens.length > 0 && (open === null || opens.some((building) => open.includes(building)));
+  });
+  const purified = typeof raw['objective'] === 'number' && raw['objective'] >= V9_PURIFIER_OBJECTIVE ? (['purification'] as const) : [];
+  const granted = [...opened, ...purified].filter((id) => !done.includes(id));
+
+  return {
+    ...raw,
+    researchDone: [...done, ...granted],
+    ...(open !== null && { openBuildings: [...new Set([...open, ...START_BUILDINGS])] }),
+  };
+}
+
+/** L'objectif qui débloquait la station de dépollution en version 9. */
+const V9_PURIFIER_OBJECTIVE = 5;
 
 /** Les recherches qui débloquent ce que la première nuit débloquait en version 7. */
 const NIGHT_ONE_RESEARCH: readonly ResearchId[] = ['metalworking', 'fieldMedicine'];

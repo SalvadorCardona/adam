@@ -5,11 +5,12 @@ import { ENEMIES, WILDLIFE } from '../data/enemies.ts';
 import type { ItemId } from '../data/items.ts';
 import { COLONY } from '../data/inhabitants.ts';
 import { PRODUCTION } from '../data/production.ts';
-import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../data/research.ts';
+import { RESEARCH, RESEARCH_IDS, RESEARCH_THEMES, type ResearchId, type ResearchTheme } from '../data/research.ts';
 import { validatePrototypes } from '../data/validate.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import type { ResearchRejection } from './commands.ts';
 import { INVENTORY_CAPACITY } from './player.ts';
+import { fullNeeds, drainNeeds } from './needs.ts';
 import { STAT_BASE, researchBonus, researchCost, researchStatus, unlockingResearch } from './research.ts';
 import { SAVE_VERSION, decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isWalkable, terrainAt } from './terrain.ts';
@@ -127,10 +128,11 @@ function finish(world: World, research: ResearchId): void {
 }
 
 describe('recherches — données', () => {
-  it('passe la validation, de six à seize recherches (quatre pour les spécialités des régions)', () => {
+  it('passe la validation, au moins quatre recherches par onglet (et les spécialités des régions)', () => {
     expect(validatePrototypes()).toEqual([]);
-    expect(RESEARCH_IDS.length).toBeGreaterThanOrEqual(6);
-    expect(RESEARCH_IDS.length).toBeLessThanOrEqual(16);
+    for (const theme of Object.keys(RESEARCH_THEMES) as ResearchTheme[]) {
+      expect(RESEARCH_IDS.filter((id) => RESEARCH[id].theme === theme).length).toBeGreaterThanOrEqual(4);
+    }
   });
 
   it('mêle objets communs et butin : le combat nourrit la recherche, la récolte aussi', () => {
@@ -463,6 +465,71 @@ describe('labo de recherche', () => {
   });
 });
 
+describe('recherche — ouvriers et Adam', () => {
+  it('gilet rembourré : Adam gagne des PV max, et ceux-là arrivent pleins', () => {
+    const { world, lab } = withLab();
+    const before = world.maxHp();
+    const gain = RESEARCH.paddedVest.effect.amount;
+
+    pay(world, 'paddedVest');
+    while (world.tickCount < lab.endTick - 1) world.tick();
+    world.player.hp = 2;
+    world.tick();
+    expect(world.researchDone).toContain('paddedVest');
+    expect(world.maxHp()).toBe(before + gain);
+    expect(world.player.hp).toBeGreaterThanOrEqual(2 + gain);
+  });
+
+  it('sandales tressées : les habitants vont plus loin en un tick', () => {
+    // Le plus grand pas d'un ouvrier libre qui flâne devant la mairie, sur quelques secondes.
+    const stride = (sandals: boolean): number => {
+      const { world } = withLab();
+
+      if (sandals) world.researchDone.push('sandals');
+
+      const workers = [...world.mobiles.values()].filter((mobile) => mobile.kind === 'worker');
+      let best = 0;
+
+      expect(workers.length).toBeGreaterThan(0);
+      for (let i = 0; i < 20 * 20; i += 1) {
+        world.tick();
+        for (const worker of workers) best = Math.max(best, Math.hypot(worker.x - worker.prevX, worker.y - worker.prevY));
+      }
+      return best;
+    };
+
+    expect(stride(true)).toBeCloseTo(stride(false) * (1 + RESEARCH.sandals.effect.amount), 5);
+  });
+
+  it('rations et gourdes : la faim et la soif baissent d’un quart moins vite', () => {
+    const plain = fullNeeds();
+    const spared = fullNeeds();
+
+    for (let i = 0; i < 20 * 60; i += 1) {
+      drainNeeds(plain, true);
+      drainNeeds(spared, true, undefined, { hunger: RESEARCH.rations.effect.amount, thirst: RESEARCH.canteens.effect.amount });
+    }
+    expect(1 - spared.hunger).toBeCloseTo((1 - plain.hunger) * 0.75, 6);
+    expect(1 - spared.thirst).toBeCloseTo((1 - plain.thirst) * 0.75, 6);
+  });
+
+  it('la ville lit la recherche finie : faim et soif ralenties pour ses habitants', () => {
+    const { world } = withLab();
+    const worker = [...world.mobiles.values()].find((mobile) => mobile.kind === 'worker')!;
+
+    world.researchDone.push('rations', 'canteens');
+    worker.needs = fullNeeds();
+    for (let i = 0; i < 20 * 10; i += 1) world.tick();
+
+    const { thirst } = worker.needs;
+    const plain = fullNeeds();
+
+    // Au repos ou au travail, jamais plus vite que le repos sans gourde : la recherche compte.
+    for (let i = 0; i < 20 * 10; i += 1) drainNeeds(plain, false);
+    expect(1 - thirst).toBeLessThan(1 - plain.thirst);
+  });
+});
+
 /** Le labo d'un monde à porteurs : une maison des constructeurs posée d'un coup, ses porteurs s'y installent au chargement. */
 function withPorters(): { world: World; lab: Lab } {
   const built = withLab().world;
@@ -783,9 +850,14 @@ describe('recherche — bâtiments débloqués', () => {
     expect(world.inMenu('forge')).toBe(false);
     expect(world.inMenu('charcoalKiln')).toBe(false);
 
+    // La Fonderie demande l'Extraction (qui ouvre carrière et foreuse) : on la tient pour faite.
+    world.researchDone.push('mining');
     finish(world, 'metalworking');
 
-    expect(events).toEqual([['forge', 'charcoalKiln']]);
+    expect(events).toEqual([
+      ['quarry', 'drill'],
+      ['forge', 'charcoalKiln'],
+    ]);
     expect(world.isNewInMenu('forge')).toBe(true);
     expect(world.isNewInMenu('charcoalKiln')).toBe(true);
     expect(world.inMenu('clinic')).toBe(false);
@@ -805,6 +877,7 @@ describe('recherche — bâtiments débloqués', () => {
     expect(world.inMenu('forge')).toBe(false);
     expect(world.canPlace('forge', 0, 0)).toBe('locked');
 
+    world.researchDone.push('mining');
     finish(world, 'metalworking');
 
     expect(events).toEqual([['forge', 'charcoalKiln']]);
@@ -837,6 +910,7 @@ describe('recherche — bâtiments débloqués', () => {
   it('les badges et les déblocages survivent au rechargement, sans nouvelle annonce', () => {
     const { world } = withLab();
 
+    world.researchDone.push('mining');
     finish(world, 'metalworking');
     world.push({ type: 'seeBuilding', building: 'forge' });
     world.tick();
@@ -875,7 +949,7 @@ describe('recherche — bâtiments débloqués', () => {
     const events = unlocked(loaded);
 
     loaded.tick();
-    expect(loaded.researchDone).toEqual(['metalworking', 'fieldMedicine']);
+    expect(loaded.researchDone.filter((id) => RESEARCH[id].opens.length === 0)).toEqual(['metalworking', 'fieldMedicine']);
     expect(menu(loaded)).toEqual(expect.arrayContaining(['forge', 'charcoalKiln', 'clinic']));
     expect(MENU_BUILDING_IDS.filter((id) => loaded.isNewInMenu(id))).toEqual([]);
     expect(events).toEqual([]);
@@ -886,7 +960,46 @@ describe('recherche — bâtiments débloqués', () => {
     const decoded = decodeSave(version7(world, 0));
 
     if (!decoded.ok) throw new Error(decoded.reason);
-    expect(decoded.world.researchDone).toEqual([]);
+    expect(decoded.world.researchDone.filter((id) => RESEARCH[id].opens.length === 0)).toEqual([]);
     expect(decoded.world.inMenu('forge')).toBe(false);
+  });
+
+  /** Une sauvegarde version 9 : le labo hors du départ, la station au cinquième objectif. */
+  function version9(world: World, change: (state: Record<string, unknown>) => void): string {
+    const file = JSON.parse(encodeSave(world, 0)) as { version: number; state: Record<string, unknown> };
+
+    file.version = 9;
+    change(file.state);
+    return JSON.stringify(file);
+  }
+
+  it('une colonie neuve d’avant le labo de départ trouve le labo au menu, et le reste au labo', () => {
+    const world = World.newColony(drySeed());
+    const decoded = decodeSave(version9(world, (state) => (state['openBuildings'] = ['home', 'nursery', 'logisticsPost'])));
+
+    if (!decoded.ok) throw new Error(decoded.reason);
+
+    const loaded = decoded.world;
+
+    expect(loaded.isUnlocked('lab')).toBe(true);
+    expect(loaded.isUnlocked('drill')).toBe(false);
+    expect(loaded.researchDone).toEqual([]);
+  });
+
+  it('une partie d’avant les bâtiments de départ garde puits, tours, foreuses… et la station passé l’objectif 5', () => {
+    const { world } = withLab();
+    const decoded = decodeSave(
+      version9(world, (state) => {
+        delete state['openBuildings'];
+        state['objective'] = 5;
+      }),
+    );
+
+    if (!decoded.ok) throw new Error(decoded.reason);
+
+    const loaded = decoded.world;
+
+    expect(loaded.researchDone).toEqual(expect.arrayContaining(['waterWell', 'woodcraft', 'lookout', 'mining', 'organizedSites', 'purification']));
+    for (const id of ['well', 'drill', 'watchtower', 'constructionPost', 'purifier'] as const) expect(loaded.isUnlocked(id)).toBe(true);
   });
 });

@@ -12,7 +12,6 @@
  * sépare de la mairie, et la mairie elle-même. À zéro, il disparaît.
  */
 
-import { PURIFIER } from './contamination.ts';
 import type { ItemId } from './items.ts';
 import { LORE } from './lore.ts';
 import type { SpriteId } from './sprites.ts';
@@ -588,8 +587,7 @@ export const BUILDINGS = {
     minWorkers: 0,
     menu: true,
     unique: false,
-    // Pas dès le départ : la pollution se nettoie une fois la colonie sur pied (`PURIFIER`, `data/contamination.ts`).
-    unlockObjective: PURIFIER.unlockObjective,
+    // Pas dès le départ : elle se débloque au labo (recherche « Dépollution », `data/research.ts`).
     plan: false,
     sprite: 'purifier',
     weapon: null,
@@ -702,9 +700,10 @@ export const MENU_BUILDING_IDS = BUILDING_IDS.filter((id) => BUILDINGS[id].menu)
 
 /**
  * Les bâtiments au menu dès le début de la partie. Les autres attendent leur
- * déblocage (plan d'Ève, recherche, objectif) ou, faute d'y être rattachés,
- * restent masqués. Le labo en est : c'est lui qui découvre la suite (forge,
- * four, clinique, caserne). Seul endroit où la liste est définie.
+ * déblocage : un plan d'Ève, un objectif, ou une recherche — d'où le labo,
+ * sans lequel rien d'autre ne s'ouvrirait. `validatePrototypes()` vérifie
+ * que chaque bâtiment du menu a son chemin. Seul endroit où la liste est
+ * définie.
  */
 export const START_BUILDINGS = ['home', 'nursery', 'logisticsPost', 'lab'] as const satisfies readonly BuildingId[];
 

@@ -12,6 +12,14 @@ describe('textes du panneau Recherche', () => {
     expect(effectLine('walkingBoots', [])).toBe('Vitesse d’Adam : 4,5 cases/s → 5,4 cases/s');
   });
 
+  it('dit ce que la recherche fait pour les ouvriers et pour Adam, et les bâtiments qu’elle ouvre', () => {
+    expect(effectLine('sandals', [])).toBe('Vitesse des habitants : 0 % → +15 %');
+    expect(effectLine('rations', [])).toBe('Faim en moins : 0 % → +25 %');
+    expect(effectLine('paddedVest', [])).toBe('Points de vie d’Adam : 10 → 14');
+    expect(effectLine('charcoalFilters', [])).toBe('Temps par case dépolluée : 3 s → 1,5 s');
+    expect(effectLine('woodcraft', [])).toBe('Débloque : Cabane de bûcheron, Maison du forestier');
+  });
+
   it('compte les places du jardin dans le sac qu’Adam porte', () => {
     expect(effectLine('bigBag', [], ['bigBag'])).toBe(`Places du sac : ${INVENTORY_CAPACITY + 10} → ${INVENTORY_CAPACITY + 25}`);
   });

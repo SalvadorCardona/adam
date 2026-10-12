@@ -19,6 +19,7 @@ import { CHUNK_TILES, TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { BUILDINGS } from '../data/buildings.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
 import type { ItemId } from '../data/items.ts';
+import { RESEARCH, RESEARCH_IDS } from '../data/research.ts';
 import { SCENARIO_REVEAL, type TestScenarioProto } from '../data/testScenario.ts';
 import { copyLook } from '../data/wardrobe.ts';
 import type { Chest } from './chests.ts';
@@ -44,6 +45,10 @@ export function stageScenario(scenario: TestScenarioProto): World {
   world.revealAround(hx + 1, hy + 1, scenario.reveal ?? SCENARIO_REVEAL);
   deliver(world, world.townHallId, BUILDINGS.townHall.cost);
   for (const research of scenario.research ?? []) world.researchDone.push(research);
+  // Une base de test a tout ouvert d'emblée : ce que le labo ouvrirait y est déjà, ses recherches comptent pour finies.
+  for (const id of RESEARCH_IDS) {
+    if (RESEARCH[id].opens.length > 0 && !world.researchDone.includes(id)) world.researchDone.push(id);
+  }
 
   for (const { building, dx, dy, delivered } of scenario.buildings) {
     const tx = hx + dx;

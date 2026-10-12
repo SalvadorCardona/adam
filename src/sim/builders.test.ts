@@ -317,6 +317,23 @@ describe('poste de construction', () => {
     expect(alone.ticks).toBeGreaterThanOrEqual(siteWork({ proto: 'farm' } as Site));
   });
 
+  it('outils de qualité (labo) : chaque coup de marteau abat plus d’ouvrage', () => {
+    const strikes = (tools: boolean): number => {
+      const world = colony({}, [{ ...YARD, staff: 1 }, { proto: 'farm', ...NEAR_A, site: true, delivered: BUILDINGS.farm.cost }]);
+      const site = siteAt(world, NEAR_A);
+
+      if (tools) world.researchDone.push('goodTools');
+      until(world, () => site.work > 0);
+
+      const from = site.work;
+
+      for (let i = 0; i < 40; i += 1) world.tick();
+      return site.work - from;
+    };
+
+    expect(strikes(true)).toBe(Math.round(strikes(false) * 1.25));
+  });
+
   it('plusieurs chantiers en parallèle, sans rien perdre ni dupliquer, sans jamais promettre deux fois', () => {
     const world = colony({ wood: 40, stone: 20, ironOre: 4 }, [
       YARD,

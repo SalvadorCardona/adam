@@ -44,6 +44,36 @@ describe('tutorialHint', () => {
     expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.tower);
   });
 
+  it('dans une colonie neuve, la tour passe par le labo : le bâtir, puis y lancer le Guet', () => {
+    const world = World.newColony(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    const tower = BUILDINGS.watchtower.label;
+
+    expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.labOpen.replace('{building}', tower));
+
+    const { tx, ty } = worldToTile(world.player.x, world.player.y);
+    let id: EntityId | null = null;
+
+    world.events.on('buildingPlaced', (event) => (id = event.id));
+    for (let r = 2; r < 8 && id === null; r += 1) {
+      if (world.canPlace('lab', tx + r, ty) !== null) continue;
+      world.push({ type: 'placeBuilding', building: 'lab', tx: tx + r, ty });
+      world.tick();
+    }
+    world.player.inventory.add('wood', 14);
+    world.player.inventory.add('stone', 10);
+    world.player.inventory.add('ironOre', 4);
+    world.push({ type: 'transferToSite', id: id! });
+    world.tick();
+    expect(world.labs()).toHaveLength(1);
+    expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.labResearch.replace('{research}', 'Guet').replace('{building}', tower));
+  });
+
   it('ne parle jamais d’un bouton « Construire »', () => {
     const world = new World(1);
     const hints: (string | null)[] = [tutorialHint(world, FRESH, false, 0)];
