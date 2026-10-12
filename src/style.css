@@ -4678,13 +4678,25 @@ button:disabled,
 /* ------------------------------------------------------- panneau Recherche */
 
 /*
- * La fenêtre du labo : la recherche en cours dans une carte lavande, puis
- * trois onglets — Bâtiments, Ouvriers, Personnage — dont chaque liste défile.
- * Lisible en 390 px : une colonne, des lignes qui passent à la ligne plutôt
- * que de rétrécir, « Lancer » sur toute la largeur, pour le pouce.
+ * La fenêtre du labo : la recherche en cours dans une carte lavande (une
+ * simple ligne quand rien ne tourne), puis les onglets — Bâtiments, Ouvriers,
+ * Personnage, une ère par palier — dont chaque grille de cartes défile.
+ * Lisible en 390 px : une colonne, en panneau du bas ; dès 700 px, une fenêtre
+ * centrée large où les cartes se rangent en deux ou trois colonnes.
  */
 .building-panel[data-kind='lab'] {
-  width: min(400px, calc(100vw - 28px));
+  width: calc(100vw - 16px);
+  bottom: calc(var(--safe-bottom) + 8px);
+}
+
+@media (min-width: 700px) and (min-height: 480px) {
+  .building-panel[data-kind='lab'] {
+    top: 50%;
+    bottom: auto;
+    width: min(1040px, calc(100vw - 48px));
+    max-height: min(calc(100dvh - var(--safe-top) - var(--safe-bottom) - 32px), 860px);
+    translate: 0 -50%;
+  }
 }
 
 .research[hidden],
@@ -4740,6 +4752,50 @@ button:disabled,
 
 .research-current .research-icon {
   background: var(--paper);
+}
+
+/* Rien ne tourne : une simple ligne discrète, sans icône ni bouton. */
+.research-current[data-state='idle'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 6px 12px;
+}
+
+.research-current[data-state='idle'] .research-current-icon {
+  display: none;
+}
+
+.research-current[data-state='idle'] h3 {
+  font-size: 15px;
+}
+
+.research-current[data-state='idle'] .research-status {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Une recherche tourne : le titre et le compte à rebours côte à côte quand la place le permet. */
+.research-current[data-state='running'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+
+.research-current[data-state='running'] .research-current-head {
+  flex: 1 1 220px;
+}
+
+.research-current[data-state='running'] .research-timer {
+  flex: 1 1 200px;
+  margin-top: 0;
+}
+
+.research-current[data-state='running'] .building-panel-actions {
+  flex: none;
+  margin-top: 0;
 }
 
 .research-icon[data-kind='building'] {
@@ -4841,13 +4897,24 @@ button:disabled,
   color: var(--ink);
 }
 
+/* La grille : deux ou trois colonnes quand la fenêtre est large, une sur téléphone. Le remplissage laisse voir l'anneau du focus manette. */
 .research-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-content: start;
+  gap: 8px;
   max-height: min(42dvh, 380px);
-  margin-top: 10px;
-  padding-right: 2px;
+  margin: 2px -8px -8px;
+  padding: 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
+}
+
+@media (min-width: 700px) and (min-height: 480px) {
+  .research-list {
+    max-height: min(calc(100dvh - 300px), 640px);
+  }
 }
 
 .research-group + .research-group {
@@ -4870,8 +4937,24 @@ button:disabled,
   box-shadow: 0 3px 0 var(--paper-shade);
 }
 
-.research-row + .research-row {
+.research-queue .research-row + .research-row {
   margin-top: 8px;
+}
+
+.research-list .research-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Hors de portée du porte-monnaie : légèrement estompée, redevient nette au doigt ou au focus. */
+.research-row[data-affordable='false'] {
+  opacity: 0.8;
+}
+
+.research-row[data-affordable='false']:hover,
+.research-row[data-affordable='false']:focus-within {
+  opacity: 1;
 }
 
 .research-row-head {
@@ -4880,11 +4963,16 @@ button:disabled,
   gap: 10px;
 }
 
+.research-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
 .research-name {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -4931,16 +5019,27 @@ button:disabled,
   font-variant-numeric: tabular-nums;
 }
 
-.research-row > .research-launch {
-  width: 100%;
-  min-height: 46px;
-  margin-top: 8px;
-  font-size: 17px;
+.research-row-head > .research-launch {
+  flex: none;
+  min-width: 72px;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 15px;
+}
+
+.research-row .research-cost {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.research-row .research-status {
+  margin: 0;
+  font-size: 14px;
 }
 
 .research-effect {
   margin: 2px 0 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--ink-light);
   font-variant-numeric: tabular-nums;

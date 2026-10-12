@@ -490,7 +490,7 @@ du labo. Une sauvegarde d'avant (version 9) tient pour finies les
 recherches qui ouvrent ce qu'elle avait déjà (`migrateV9`). La fenêtre du
 labo est le panneau Recherche (`ui/researchPanel.ts`) : en tête ce qu'il
 mène (relevé du coût, puis la barre verte « m:ss »), puis trois onglets
-— Bâtiments, Ouvriers, Personnage (`theme`) — dont chaque recherche dit son
+— Bâtiments, Ouvriers, Personnage (`theme`), chacun portant le nombre de recherches à lancer —, en grille de cartes compactes (2 à 3 colonnes dans la fenêtre large du bureau, une sur téléphone ; abordables d'abord, les autres estompées, verrouillées et finies au bout) dont chaque recherche dit son
 icône (`icon`), son effet ou ce qu'elle débloque, son coût, sa durée, son
 état (verrouillée : le prérequis nommé) et « Lancer ».
 
