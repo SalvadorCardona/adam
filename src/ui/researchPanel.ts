@@ -10,8 +10,8 @@
  * construction, ce qui tourne mieux —, **Ouvriers** — tous les habitants de
  * la ville —, **Personnage** — Adam ; puis un onglet par ère atteinte après
  * le Campement (`data/eras.ts`, Bourg, Ville, Cité industrielle), le nom de
- * l'ère et l'icône de sa ressource, qui porte ses recherches. Chaque onglet est une liste qui défile :
- * par recherche, son icône, son nom, son effet chiffré (« Dégâts de l'arc :
+ * l'ère et l'icône de sa ressource, qui porte ses recherches. Chaque onglet est une grille de cartes (une colonne sur téléphone), qui défile, et son libellé dit combien
+ * de recherches s'y lancent : par recherche, son icône, son nom, son effet chiffré (« Dégâts de l'arc :
  * 1 → 1,5 ») ou les bâtiments qu'elle fait entrer au menu, vignette et nom,
  * son coût en icônes — rouge ce qui manque, sac et ville comptés ensemble —,
  * sa durée, et son état : terminée, en cours, en file, verrouillée (le
@@ -66,9 +66,10 @@ function eraTabIcon(era: number): HTMLElement {
 /** L'ordre d'une liste : ce que mène un labo, ce qui se lance, ce qui est verrouillé, ce qui est fini. Stable : les données gardent leur ordre. */
 const STATUS_ORDER: Record<ResearchStatus, number> = { running: 0, collecting: 0, queued: 1, available: 2, taken: 3, locked: 4, done: 5 };
 
-/** Le rang d'une recherche dans sa liste : la conseillée qui se lance passe devant tout. */
-function order(advised: boolean, status: ResearchStatus): number {
-  return advised && status === 'available' ? -1 : STATUS_ORDER[status];
+/** Le rang d'une recherche dans sa liste : la conseillée qui se lance passe devant tout, puis celles qu'on peut payer. */
+function order(advised: boolean, status: ResearchStatus, affordable: boolean): number {
+  if (status !== 'available') return STATUS_ORDER[status];
+  return advised ? -1 : affordable ? STATUS_ORDER.available : STATUS_ORDER.available + 0.5;
 }
 
 /** Le pictogramme de chaque onglet. */
@@ -105,6 +106,8 @@ export class ResearchPanel {
   private lastCurrent = '';
   private lastQueue = '';
   private lastList = '';
+  /** Le nombre de recherches à lancer par onglet : écrit à côté de son libellé. */
+  private readonly counts = new Map<ResearchTab, number>();
   /** La recherche que le conseil d'Ève envoie lancer : en tête de sa liste. */
   private advised: () => ResearchId | null = () => null;
 
@@ -181,9 +184,19 @@ export class ResearchPanel {
       this.cancelButton.textContent = text.abandon;
       this.takeButton.textContent = text.takeRest;
       this.tabs.bar.setAttribute('aria-label', text.tabsLabel);
-      for (const theme of THEMES) this.tabs.setLabel(theme, t().researchThemes[theme]);
-      for (const era of ERA_TABS) this.tabs.setLabel(`era${era}`, t().eras[era]!.label);
+      this.writeTabLabels();
     });
+  }
+
+  /** Le libellé de chaque onglet, suivi de ce qu'il y a à lancer (« Bâtiments 3 »). */
+  private writeTabLabels(): void {
+    const label = (tab: ResearchTab): string => (tab.startsWith('era') ? t().eras[Number(tab.slice(3))]!.label : t().researchThemes[tab as ResearchTheme]);
+
+    for (const tab of this.lists.keys()) {
+      const count = this.counts.get(tab) ?? 0;
+
+      this.tabs.setLabel(tab, count > 0 ? `${label(tab)} ${count}` : label(tab));
+    }
   }
 
   /** Qui dit quelle recherche le conseil demande (`Hud.adviceResearch`). */
@@ -380,30 +393,40 @@ export class ResearchPanel {
     this.lastList = key;
 
     for (const [tab, list] of this.lists) {
-      // Ce qui se mène d'abord, puis ce qui attend un prérequis, les recherches finies au bout : le pouce n'a pas à les traverser.
-      const rows = statuses
+      // Ce qui se mène d'abord, puis ce qu'on peut payer, ce qui attend un prérequis, les recherches finies au bout : le pouce n'a pas à les traverser.
+      const shown = statuses
         .filter(([id]) => tabOf(id) === tab && RESEARCH[id].era <= world.era)
-        .sort(([ia, a], [ib, b]) => order(ia === advised, a) - order(ib === advised, b))
-        .map(([id, status]) => this.row(id, status, lab, id === advised));
+        .map(([id, status]) => ({ id, status, affordable: this.affordable(id) }))
+        .sort((a, b) => order(a.id === advised, a.status, a.affordable) - order(b.id === advised, b.status, b.affordable));
 
-      list.replaceChildren(...rows);
+      this.counts.set(tab, shown.filter(({ status }) => status === 'available').length);
+      list.replaceChildren(...shown.map(({ id, status, affordable }) => this.row(id, status, lab, id === advised, affordable)));
     }
+    this.writeTabLabels();
   }
 
-  /** Une recherche : icône, nom, effet chiffré, coût et durée, état, et « Lancer » si on peut. */
-  private row(id: ResearchId, status: ResearchStatus, lab: Lab, advised: boolean): HTMLElement {
+  /** Sac et ville réunis couvrent-ils tout le coût ? */
+  private affordable(id: ResearchId): boolean {
+    return researchCost(id).every(([item, amount]) => this.owned(item) >= amount);
+  }
+
+  /** Une recherche : icône, nom, effet chiffré et « Lancer » sur une ligne ; dessous, coût et durée. */
+  private row(id: ResearchId, status: ResearchStatus, lab: Lab, advised: boolean, affordable: boolean): HTMLElement {
     const { world } = this;
     const text = t().researchPanel;
     const row = element('article', 'research-row');
     const head = element('div', 'research-row-head');
+    const body = element('div', 'research-row-body');
     const name = element('h4', 'research-name');
     const effect = element('p', 'research-effect');
 
     row.dataset['status'] = status;
+    if (status === 'available') row.dataset['affordable'] = String(affordable);
     if (advised && status === 'available') row.dataset['advised'] = 'true';
     name.textContent = t().research[id].label;
     effect.append(...this.effect(id));
-    head.append(researchIcon(id, 40), name);
+    body.append(name, effect);
+    head.append(researchIcon(id, 36), body);
 
     if (advised && status === 'available') {
       const badge = element('span', 'research-badge');
@@ -418,7 +441,19 @@ export class ResearchPanel {
       badge.append(status === 'running' ? text.running : status === 'locked' ? text.locked : statusLine(id, status, world.researchDone));
       head.append(badge);
     }
-    row.append(head, effect);
+
+    if (status === 'available') {
+      const launch = element('button', 'inventory-action research-launch') as HTMLButtonElement;
+
+      launch.type = 'button';
+      launch.dataset['tone'] = 'deposit';
+      // Une recherche tourne déjà : celle-ci se met en file, tant qu'il y a de la place.
+      launch.textContent = lab.endTick > 0 ? text.enqueue : text.launch;
+      launch.disabled = lab.endTick > 0 && queueFull(lab);
+      launch.addEventListener('click', () => world.push({ type: 'startResearch', lab: lab.id, research: id }));
+      head.append(launch);
+    }
+    row.append(head);
 
     // Le coût et la durée, tant que la recherche reste à mener : sac et ville comptés ensemble, le manque en rouge.
     if (status === 'available' || status === 'locked') {
@@ -436,18 +471,6 @@ export class ResearchPanel {
 
       requires.textContent = statusLine(id, status, world.researchDone);
       row.append(requires);
-    }
-
-    if (status === 'available') {
-      const launch = element('button', 'inventory-action research-launch') as HTMLButtonElement;
-
-      launch.type = 'button';
-      launch.dataset['tone'] = 'deposit';
-      // Une recherche tourne déjà : celle-ci se met en file, tant qu'il y a de la place.
-      launch.textContent = lab.endTick > 0 ? text.enqueue : text.launch;
-      launch.disabled = lab.endTick > 0 && queueFull(lab);
-      launch.addEventListener('click', () => world.push({ type: 'startResearch', lab: lab.id, research: id }));
-      row.append(launch);
     }
     return row;
   }
