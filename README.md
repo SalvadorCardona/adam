@@ -82,11 +82,18 @@ sur la même carte, ce qui rend un bug de génération reproductible. En dev,
 
 | Commande            | Effet                                    |
 | ------------------- | ---------------------------------------- |
-| `npm run dev`       | serveur de développement                 |
+| `npm run dev`       | serveur de développement (jeu hors ligne) |
+| `npm run dev:all`   | jeu + back-end local, branchés ensemble  |
+| `npm run dev:server`| back-end seul (`server/`, port 8790)     |
 | `npm run build`     | typecheck puis build de production       |
 | `npm run lint`      | ESLint, garde-fou d'isolation compris    |
 | `npm run typecheck` | TypeScript strict                        |
 | `npm test`          | Vitest, headless, sans canvas            |
+
+Le back-end (`server/` : Hono, `ws`, SQLite embarqué dans Node) est
+facultatif : le jeu se joue entièrement sans lui. Sa configuration est dans
+`server/.env.example`, son image dans `server/Dockerfile`
+(`docker build -f server/Dockerfile .`).
 
 ## Jouer à la manette (et sur Steam Deck)
 

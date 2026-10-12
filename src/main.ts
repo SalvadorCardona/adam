@@ -87,6 +87,7 @@ import { testBanner, testScenarioOf } from './ui/testRoute.ts';
 import { ZoomControls } from './ui/zoomControls.ts';
 import { SeenArea } from './ui/mapSight.ts';
 import { WorldMap } from './ui/worldMap.ts';
+import { Connection } from './net/connection.ts';
 
 /**
  * Clamp anti-spirale de la mort.
@@ -240,12 +241,21 @@ async function main(): Promise<void> {
   // La ville a vécu pendant que le jeu était fermé : elle rattrape ce temps au premier tick, borné au plafond.
   if (loaded.status === 'ok') world.push({ type: 'catchUp', awayMs: awayMs(loaded.savedAt, Date.now()) });
 
+  /*
+   * Le back-end, s'il y en a un (`VITE_API_URL`) : une sonde qui ne retarde
+   * rien et n'empêche rien. Hors ligne par défaut ; serveur coupé ou absent,
+   * le jeu se joue exactement pareil.
+   */
+  const connection = Connection.browser();
+
+  connection.start();
+
   const renderer = await GameRenderer.create(world, mount);
   const audio = new AudioEngine();
 
   // En dev seulement : le monde sous la main dans la console du navigateur,
   // pour provoquer une vague ou une naissance sans attendre trois minutes.
-  if (import.meta.env.DEV) Object.assign(window, { mobileFactory: { world, audio } });
+  if (import.meta.env.DEV) Object.assign(window, { mobileFactory: { world, audio, connection } });
 
   const joystick = new Joystick();
   const stick = new JoystickView(joystick);
@@ -784,7 +794,7 @@ async function main(): Promise<void> {
   settings.setGamepad(gamepadPrefs.rumble, gamepadPrefs.deadZone);
   document.body.append(pad.cursor.root);
   // En dev : la manette aussi sous la main dans la console, pour poser son curseur sans stick.
-  if (import.meta.env.DEV) Object.assign(window, { mobileFactory: { world, audio, pad } });
+  if (import.meta.env.DEV) Object.assign(window, { mobileFactory: { world, audio, pad, connection } });
   wireRumble(world, pad);
 
   // Les étiquettes de la manette sur le sac (△ / Y) et « Bâtir » (□ / X) : visibles seulement en mode manette.

@@ -1149,7 +1149,8 @@ Rien ne joue avant un geste du joueur.
   commande `applyPerks`, au départ d'une nouvelle colonie seulement.
 - Le contenu est de la donnée (`src/data/*.ts`, `as const satisfies`).
   `validatePrototypes()` tourne au démarrage en dev et dans les tests.
-- Pas d'ECS, pas de moteur physique, pas de multijoueur.
+- Pas d'ECS, pas de moteur physique. Le multijoueur viendra par le back-end
+  (voir Back-end), jamais au prix du jeu hors ligne.
 - **Langue** (FR / EN) : tout texte visible passe par `t()` (`src/i18n/locale.ts`).
   Le dictionnaire français (`src/i18n/fr/`) fait foi et reprend les textes
   de `data/` ; l'anglais (`src/i18n/en/`) doit en avoir chaque clé (typecheck,
@@ -1181,6 +1182,68 @@ build copie `index.html` sous chaque route (`vite.config.ts`).
 dans l'app Claude Code (onglet Code), l'aperçu lance le jeu et le recharge à
 chaque modification (HMR). Le jeu est sous `/mobile-factory/`, la partie de
 test sous `/mobile-factory/test`.
+
+## Back-end
+
+**Règle d'or : le jeu reste 100 % jouable hors connexion, sans compte.** Les
+sauvegardes restent locales ; le serveur n'ajoute que des fonctions en ligne
+(comptes, parties entre amis, à venir). Injoignable ou absent, le jeu démarre
+et se joue exactement pareil.
+
+Monorepo léger, workspaces npm : la racine est le client, `server/` le
+back-end (`@mobile-factory/server`), `shared/` le contrat que les deux
+importent (`shared/api.ts` : `API_VERSION`, `API_PATHS`, `HealthResponse`,
+messages du WebSocket — ni DOM ni Node, ESLint le garde). Un `npm ci` à la
+racine installe tout ; lint, typecheck, tests (`server/src/**/*.test.ts`,
+même Vitest) et build couvrent les deux.
+
+- **Node 24 sans build** : Node exécute le TypeScript en effaçant les types
+  (`node server/src/main.ts`) — d'où `erasableSyntaxOnly` et les imports en
+  `.ts` (`server/tsconfig.json`). Le « build » du serveur est son typecheck.
+- **HTTP : Hono** (`server/src/app.ts`, `createApp`) sur `@hono/node-server` ;
+  testé par `app.request()`, sans port. CORS par `CORS_ORIGINS`.
+- **WebSocket : `ws`**, sur le même port, chemin `/ws`
+  (`server/src/socket.ts`) : `hello` à la connexion, `ping` → `pong`,
+  heartbeat qui ferme les connexions mortes, origine vérifiée comme le CORS.
+  Le jeu à deux s'y branchera.
+- **SQLite : `node:sqlite`** (embarqué dans Node, aucun module natif), SQL
+  écrit à la main et préparé, pas d'ORM (`server/src/db.ts`). WAL, clés
+  étrangères. **Migrations** : `server/migrations/NNNN_nom.sql`, numérotées
+  à la suite, jamais modifiées une fois publiées ; chacune dans sa
+  transaction, inscrite dans `schema_migrations`, appliquée au démarrage
+  (`startServer`) ou par `npm run migrate -w server`. Une base plus récente
+  que le code, ou une migration renommée, arrête le démarrage.
+- **Routes** : `GET /health` → `{ ok, service, api, schema, uptime }`
+  (503 si la base ne répond plus), sonde du jeu et du conteneur.
+- **Config** : variables d'environnement seulement (`server/src/config.ts`,
+  `loadConfig`), liste dans `server/.env.example` : `PORT` (8790 — 8787 est
+  pris par Ponos en local), `HOST`, `DATABASE_PATH`, `CORS_ORIGINS`
+  (par défaut `localhost` sur tout port). `server/.env` est lu s'il existe
+  (`readEnv`), sans écraser l'environnement.
+- **Docker** : `server/Dockerfile`, construit depuis la racine
+  (`docker build -f server/Dockerfile .`) : `node:24-alpine`, dépendances du
+  serveur seules, base dans le volume `/data`, `HEALTHCHECK` sur `/health`,
+  utilisateur `node`, arrêt propre sur SIGTERM.
+
+**Côté client** (`src/net/`) — `api.ts` : l'URL du serveur est fixée au
+build (`VITE_API_URL`, `.env.example` ; `apiBaseUrl`), `probeHealth`
+(délai `PROBE_TIMEOUT_MS`, jamais d'exception ; une autre version de
+l'API ou un autre service = hors ligne), `socketUrl`. `connection.ts` :
+`Connection` tient l'état `online` / `offline` (hors ligne par défaut,
+`subscribe`), sonde au démarrage sans le retarder, puis chaque minute en
+ligne, de plus en plus rarement hors ligne (`OFFLINE_BACKOFF_MS`, jusqu'à
+5 min) ; rien onglet caché ni sans réseau (`navigator.onLine`), resonde à
+leur retour. `main.ts` la crée et la démarre ; en dev, elle est sous
+`window.mobileFactory.connection`. **Sans `VITE_API_URL` (le build de
+GitHub Pages, `npm run dev`), aucune requête n'est faite.** Avec une URL et
+le serveur coupé, le navigateur inscrit lui-même l'échec de la sonde dans la
+console (aucun script ne peut l'en empêcher) : le backoff en limite le
+nombre, le jeu n'en voit rien.
+
+**Scripts** : `npm run dev:all` lance serveur (`dev:server`, `node --watch`)
+et client branché dessus (`dev:online` = `vite --mode online`, qui lit
+`.env.online` → `http://localhost:8790`) ; `npm run dev` reste le jeu seul,
+hors ligne. La base de dev est `server/data/` (ignorée par git).
 
 ## Vérifier avant de pousser
 
