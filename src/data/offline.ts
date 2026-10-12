@@ -11,7 +11,7 @@
  * Ce qui n'avance pas : la journée (ni nuit, ni vague, ni aube, donc ni âge
  * ni bonheur), les ennemis, la météo, les chantiers, les mouvements. Aucune
  * attaque, aucune mort hors ligne : un habitant sans vivres attend, affamé
- * (`starvedGauge`), et sa jauge reprend au retour avec un avertissement.
+ * (`returnGauge`), et sa jauge reprend au retour avec un avertissement.
  */
 
 /** Ticks de simulation par minute (20 TPS). */
@@ -29,12 +29,13 @@ export const OFFLINE = {
   /** Le pas du calcul agrégé, en ticks : une minute de jeu. Huit heures font 480 pas. */
   stepTicks: MINUTE,
   /**
-   * La jauge d'un habitant que la ville n'a pas pu nourrir (ou abreuver) ne
-   * descend pas plus bas hors ligne : il est affamé (sous `weakBelow`,
-   * `data/needs.ts`), mais pas à zéro — le compte à rebours de la mort ne
-   * démarre qu'en jeu, s'il continue d'y descendre.
+   * Le niveau où l'on retrouve un habitant que la ville n'a pas pu nourrir
+   * (ou abreuver) : ni à zéro, ni sous le seuil de mort — le compte à rebours
+   * de la mort ne démarre qu'en jeu, et le délai de grâce laisse trois minutes
+   * au moins (la soif au travail : 0,7 × 2 min 30 + 1 min 30) pour poser un
+   * puits ou une ferme avant que le premier ne meure.
    */
-  starvedGauge: 0.1,
+  returnGauge: 0.7,
   /**
    * Bois rapporté par minute par un bûcheron au travail : un arbre de cinq
    * unités par aller-retour, marche et coups de hache compris, attentes aussi.

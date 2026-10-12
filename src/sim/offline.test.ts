@@ -98,7 +98,7 @@ describe('hors ligne — l’absence mesurée', () => {
 
     const starved = feedNeed('hunger', 1, workTicks * 2, true, () => false);
 
-    expect(starved).toEqual({ level: OFFLINE.starvedGauge, meals: 0, starved: true });
+    expect(starved).toEqual({ level: OFFLINE.returnGauge, meals: 0, starved: true });
   });
 });
 
@@ -203,11 +203,14 @@ describe('hors ligne — la ville rattrape', () => {
     expect(report!.alerts).toContain('thirst');
     expect(world.colonists).toBe(colonists);
     expect(world.mobiles.size).toBe(people);
-    for (const person of world.wantingInhabitants()) {
-      expect(person.needs.hunger).toBeCloseTo(OFFLINE.starvedGauge, 2);
-      expect(person.needs.thirst).toBeCloseTo(OFFLINE.starvedGauge, 2);
+    for (const person of world.mobiles.values()) {
+      if (!('needs' in person)) continue;
+      // Reposés au niveau de retour, ou une minute de jauge plus bas : jamais près de zéro.
+      for (const need of ['hunger', 'thirst'] as const) {
+        expect(person.needs[need]).toBeGreaterThan(NEEDS[need].seekBelow);
+        expect(person.needs[need]).toBeLessThanOrEqual(OFFLINE.returnGauge);
+      }
     }
-    expect(world.wantingInhabitants().length).toBeGreaterThan(0);
 
     // La jauge reprend en jeu : rien ne meurt avant d'être retombé à zéro.
     let starved = 0;
@@ -216,6 +219,29 @@ describe('hors ligne — la ville rattrape', () => {
     for (let i = 0; i < 20 * 30; i += 1) world.tick();
     off();
     expect(starved).toBe(0);
+  });
+
+  it('après deux heures sans eau ni vivres, personne ne meurt dans les trois minutes qui suivent la reprise', () => {
+    const world = stageScenario(TEST_SCENARIOS.base);
+    const town = world.townStock()!;
+
+    town.remove('food', town.count('food'));
+    town.remove('water', town.count('water'));
+    for (const entity of world.entities.values()) {
+      if (entity.kind === 'farm' || entity.kind === 'quarry') entity.paused = true;
+    }
+
+    const colonists = world.colonists;
+
+    catchUp(world, 2 * HOUR);
+
+    let starved = 0;
+    const off = world.events.on('workerStarved', () => (starved += 1));
+
+    for (let i = 0; i < 20 * 60 * 3; i += 1) world.tick();
+    off();
+    expect(starved).toBe(0);
+    expect(world.colonists).toBe(colonists);
   });
 
   it('la nurserie : un enfant toutes les trois minutes, nourri par la ville, et pas un de plus au retour', () => {

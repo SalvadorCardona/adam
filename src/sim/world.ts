@@ -3774,7 +3774,7 @@ export class World {
    * qui entre en vient ; sans eux, chaque coffre se remplit seul.
    *
    * L'horloge du jour, elle, ne bouge pas : ni nuit, ni vague, ni mort. Un
-   * habitant sans vivres s'arrête affamé (`OFFLINE.starvedGauge`), et le
+   * habitant sans vivres s'arrête affamé (`OFFLINE.returnGauge`), et le
    * récap le dit. Rien sans mairie bâtie, ni sous `OFFLINE.minMs`.
    */
   private catchUp(awayMs: number): void {
