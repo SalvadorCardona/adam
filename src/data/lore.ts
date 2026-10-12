@@ -105,6 +105,21 @@ export const LORE = {
         'il faut y apporter du bois et de la pierre pour l’achever.',
       description: 'Le cœur de la colonie : si elle tombe, tout est perdu.',
       effect: 'Le cœur de la colonie : si elle tombe, tout est perdu.',
+      /** Les niveaux 2 et 3, gagnés depuis la fenêtre du bâtiment : `BUILDINGS[id].upgrades`. */
+      levels: [
+        {
+          name: 'Mairie de pierre',
+          action: 'Bâtir en pierre',
+          description:
+            'Les murs de planches cèdent la place à un soubassement de pierre : la mairie voit plus large, son rayon logistique s’étend et son fanion corail claque plus haut.',
+        },
+        {
+          name: 'Hôtel de ville',
+          action: 'Bâtir en brique',
+          description:
+            'Briques rouges, lanternes aux piliers et grand étendard doré : la ville entière se range sous son rayon.',
+        },
+      ],
     },
     lumberCamp: {
       name: 'Cabane de bûcheron',
@@ -152,6 +167,21 @@ export const LORE = {
       site: 'Un bâti de pierre qui attend son fer. Posée au bord d’un filon, elle l’extraira seule.',
       description: 'Machine de récupération qui extrait le filon sous elle.',
       effect: 'Extrait seule le minerai du filon sous elle.',
+      /** Les niveaux 2 et 3, gagnés depuis la fenêtre du bâtiment : `BUILDINGS[id].upgrades`. */
+      levels: [
+        {
+          name: 'Foreuse de pierre',
+          action: 'Consolider',
+          description:
+            'Un massif de pierre sous le derrick : la foreuse mord un cycle sur cinq plus vite.',
+        },
+        {
+          name: 'Foreuse de brique',
+          action: 'Mécaniser',
+          description:
+            'Un fût de briques, un étendard doré : la foreuse tourne presque deux fois plus vite qu’à ses débuts.',
+        },
+      ],
     },
     nursery: {
       name: 'Nurserie',
@@ -181,6 +211,21 @@ export const LORE = {
         'Quatre habitants y dorment au chaud : sans lit, on dort dehors, on se lève malheureux ' +
         'et on traîne les pieds.',
       effect: '4 lits : 4 habitants dorment au chaud.',
+      /** Les niveaux 2 et 3, gagnés depuis la fenêtre du bâtiment : `BUILDINGS[id].upgrades`. */
+      levels: [
+        {
+          name: 'Maison de pierre',
+          action: 'Agrandir',
+          description:
+            'Un soubassement de pierre, un lit de plus à l’étage : six habitants dorment au chaud.',
+        },
+        {
+          name: 'Maison de brique',
+          action: 'Surélever',
+          description:
+            'Briques rouges, lanterne au pignon et fanion doré : huit habitants y trouvent un lit.',
+        },
+      ],
     },
     quarry: {
       name: 'Carrière',
@@ -191,6 +236,21 @@ export const LORE = {
         'y taillent la pierre dans les ruines du vieux monde et la rangent dans son coffre, ' +
         'que les porteurs vident à la mairie. Pas besoin de rocher : les ruines ne manquent pas.',
       effect: '3 ouvriers taillent la pierre, sans rocher.',
+      /** Les niveaux 2 et 3, gagnés depuis la fenêtre du bâtiment : `BUILDINGS[id].upgrades`. */
+      levels: [
+        {
+          name: 'Carrière de pierre',
+          action: 'Consolider',
+          description:
+            'Une grue mieux haubanée et un soubassement taillé : les ouvriers taillent un cycle sur cinq plus vite.',
+        },
+        {
+          name: 'Grande carrière',
+          action: 'Mécaniser',
+          description:
+            'Palans de briques et fanion doré : la carrière tourne presque deux fois plus vite qu’à ses débuts.',
+        },
+      ],
     },
     well: {
       name: 'Puits',
@@ -246,6 +306,51 @@ export const LORE = {
         'Trois pieux taillés en pointe, liés de corde. Un mutant ne contourne rien : ' +
         'il s’arrête et la casse, le temps que les tours le criblent.',
       effect: 'Arrête les mutants le temps qu’ils la cassent.',
+    },
+    flowerBed: {
+      name: 'Parterre de fleurs',
+      sign: 'Parterre',
+      site: 'Un carré de terre retournée et quelques graines qui attendent.',
+      description:
+        'Un petit parterre de fleurs corail, jaunes et violettes. Rien ne le justifie, et c’est ' +
+        'bien pour ça que les ouvriers alentour se lèvent de meilleure humeur.',
+      effect: '+1 bonheur chaque aube aux ouvriers à 4 cases.',
+    },
+    bench: {
+      name: 'Banc',
+      sign: 'Banc',
+      site: 'Deux planches et quatre pieds, en kit, à clouer.',
+      description:
+        'Un banc de planches, un coin d’ombre. On s’y assoit en fin de journée pour regarder ' +
+        'la colonie vivre, et ça fait du bien.',
+      effect: '+1 bonheur chaque aube aux ouvriers à 5 cases.',
+    },
+    streetLamp: {
+      name: 'Lampadaire',
+      sign: 'Lampadaire',
+      site: 'Un mât planté, sa lanterne encore dans la caisse.',
+      description:
+        'Un mât d’indigo et sa lanterne jaune, allumée dès le crépuscule. ' +
+        'La nuit paraît moins longue quand on voit sa maison de loin.',
+      effect: '+2 bonheur chaque aube aux ouvriers à 6 cases.',
+    },
+    fountain: {
+      name: 'Fontaine',
+      sign: 'Fontaine',
+      site: 'Une vasque de pierre à monter, l’eau viendra après.',
+      description:
+        'Une vasque de pierre, un jet qui retombe en perles : un décor trouvé en explorant, ' +
+        'et la place la plus agréable de la colonie.',
+      effect: '+3 bonheur chaque aube aux ouvriers à 8 cases. Se débloque en explorant 500 cases.',
+    },
+    adamStatue: {
+      name: 'Statue d’Adam',
+      sign: 'Statue',
+      site: 'Un socle de pierre vide, et un sculpteur qui prend les mesures.',
+      description:
+        'Adam, l’arc en main, le sac sur le dos et l’écharpe au vent. ' +
+        'Les survivants se redressent en passant devant : c’est lui qui a tenu.',
+      effect: '+4 bonheur chaque aube aux ouvriers à 10 cases. Se débloque après la fin de l’acte I.',
     },
     forge: {
       name: 'Forge',

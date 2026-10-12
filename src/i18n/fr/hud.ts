@@ -105,6 +105,9 @@ export const hud = {
     bagFullSite: 'Sac plein — allez livrer le chantier',
     bagFullDrop: 'Sac plein — tapez le sac, puis « Jeter »',
     upgradeMissing: 'Il manque de quoi payer — ni dans le sac, ni en ville',
+    upgradeLocked: 'Ce niveau attend une recherche du labo',
+    /** `building` : le nom de la décoration, avec sa majuscule. */
+    decorRemoved: (building: string, toTown: boolean): string => `${building} retiré — ${toTown ? 'le coût retourne en ville' : 'le coût reste au sol'}`,
     /** `item` : le nom de l'objet, avec sa majuscule. */
     repairedFromTown: (amount: number, item: string): string => `Réparé avec ${amount} ${lower(item)} de la ville`,
     /** Ève prévient de la Reine alors qu'elle n'est pas encore arrivée. */

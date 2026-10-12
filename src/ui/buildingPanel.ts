@@ -73,7 +73,7 @@
  * seule si l'entité disparaît — rasée par un mutant, ennemi abattu.
  */
 
-import { BUILDINGS, REPAIR, bedsOf, buildingLevel, maxLevel, nextUpgrade, type BuildingId, type BuildingLevel } from '../data/buildings.ts';
+import { BUILDINGS, REPAIR, bedsOf, buildingLevel, logisticRadiusOf, maxLevel, nextUpgrade, type BuildingId, type BuildingLevel, type BuildingProto } from '../data/buildings.ts';
 import { CLINIC } from '../data/clinic.ts';
 import { enemyBaseLevel } from '../data/enemyBases.ts';
 import { GEAR_WORKSHOP, gearOf } from '../data/gear.ts';
@@ -379,6 +379,11 @@ export class BuildingPanel {
     this.cancelButton.dataset['tone'] = 'cancel';
     this.cancelButton.addEventListener('click', () => {
       if (this.entityId === null) return;
+      // Une décoration debout se retire d'un tap : rien n'est perdu, son coût retourne en ville.
+      if (this.world.entities.get(this.entityId)?.kind === 'decor') {
+        this.world.push({ type: 'removeDecor', id: this.entityId });
+        return;
+      }
       if (!this.cancelArmed) {
         this.cancelArmed = true;
         return;
@@ -788,7 +793,8 @@ export class BuildingPanel {
       this.pauseButton.textContent = entity.paused ? text.resume : text.pause;
       this.pauseButton.dataset['tone'] = entity.paused ? 'resume' : 'pause';
       this.refreshCrew(entity);
-      this.cancelButton.hidden = true;
+      this.cancelButton.hidden = entity.kind !== 'decor';
+      this.cancelButton.textContent = text.decor.remove;
       this.transferButton.hidden = !consumer && !floor;
       this.transferButton.textContent = this.world.inTownRange(entity) ? text.transferButton : text.transferBag;
       this.transferButton.disabled = !inReach || !this.world.canSupply(entity);
@@ -811,13 +817,14 @@ export class BuildingPanel {
       switch (entity.kind) {
         case 'townHall': {
           const { adults, children, workers } = this.world.population();
+          const radius = logisticRadiusOf(entity.proto, entity.level);
 
           stats.push(
             { icon: 'people', value: String(adults), label: text.townHall.adults(adults) },
             { icon: 'child', value: String(children), label: text.townHall.children(children) },
             { icon: 'worker', value: String(workers), label: text.townHall.workers(workers) },
             { icon: 'moon', value: String(this.world.night), label: text.townHall.nights(this.world.night) },
-            { icon: 'range', value: String(proto.logisticRadius), label: text.townHall.radius(proto.logisticRadius) },
+            { icon: 'range', value: String(radius), label: text.townHall.radius(radius) },
           );
           break;
         }
@@ -1019,8 +1026,14 @@ export class BuildingPanel {
         }
       }
 
+      // Une décoration : ce qu'elle ajoute au bonheur, et jusqu'où.
+      const decor: BuildingProto = BUILDINGS[entity.proto];
+      const mood = entity.kind === 'decor' ? decor.mood : undefined;
+
+      if (mood) stats.push({ icon: 'heart', value: `+${mood.amount}`, label: text.decor.mood(mood.amount, mood.radius) });
+
       // Ses lits : combien sont pris, sur combien — sa part de l'Habitation.
-      const beds = bedsOf(entity.proto);
+      const beds = bedsOf(entity.proto, entity.level);
 
       if (beds > 0) {
         const used = this.world.sleepersIn(entity.id).length;
@@ -1373,7 +1386,11 @@ export class BuildingPanel {
 
     this.upgradeButton.disabled = !upgrade || !inReach || short;
 
-    const key = `${entity.id}:${entity.level}:${inReach}:${JSON.stringify(missing)}`;
+    const locked = this.world.upgradeLocked(entity);
+
+    this.upgradeButton.disabled = !upgrade || !inReach || short || locked !== null;
+
+    const key = `${entity.id}:${entity.level}:${inReach}:${locked}:${JSON.stringify(missing)}`;
 
     if (key === this.lastUpgrade) return;
     this.lastUpgrade = key;
@@ -1393,7 +1410,9 @@ export class BuildingPanel {
 
     this.upgradeEffect.hidden = false;
     this.upgradeEffect.textContent =
-      text.effect(action, upgradeEffect(buildingLevel(entity.proto, entity.level), upgrade)) + (inReach ? '' : text.comeCloser);
+      text.effect(action, upgradeEffect(buildingLevel(entity.proto, entity.level), upgrade)) +
+      (locked === null ? '' : ` ${text.needsResearch(t().research[locked].label)}`) +
+      (inReach ? '' : text.comeCloser);
     this.upgradeCost.hidden = false;
     this.upgradeCost.replaceChildren(
       ...(Object.entries(upgrade.cost) as [ItemId, number][]).map(([item, needed]) => {
@@ -1539,6 +1558,9 @@ export function upgradeEffect(from: BuildingLevel, to: BuildingLevel): string {
 
     parts.push(text.rate(faster));
   }
+  if (to.beds !== undefined && to.beds !== (from.beds ?? 0)) parts.push(text.beds(from.beds ?? 0, to.beds));
+  if (to.logisticRadius !== undefined && to.logisticRadius !== (from.logisticRadius ?? 0)) parts.push(text.logistic(from.logisticRadius ?? 0, to.logisticRadius));
+  if (to.speed !== undefined && to.speed !== (from.speed ?? 1)) parts.push(text.speed(Math.round((1 / to.speed - 1 / (from.speed ?? 1)) * 100)));
   return parts.join(', ');
 }
 

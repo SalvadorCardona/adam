@@ -64,7 +64,7 @@ describe('niveaux de bâtiment', () => {
     expect(Object.keys(BUILDINGS)).not.toContain('reinforcedTower');
     expect(MENU_BUILDING_IDS).not.toContain('reinforcedTower');
     expect(maxLevel('watchtower')).toBe(2);
-    expect(maxLevel('drill')).toBe(1);
+    expect(maxLevel('forge')).toBe(1);
     expect(nextUpgrade('watchtower', 2)).toBeNull();
   });
 

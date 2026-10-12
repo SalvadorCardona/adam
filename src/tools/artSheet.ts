@@ -24,7 +24,7 @@ import { GROUND_TILES, cornerTile, edgeTile, shadowTile } from '../art/terrain.t
 import { UI_ICONS, dayDialSvg } from '../art/ui.ts';
 import { DIAL_ARCS } from '../sim/dayNight.ts';
 import { GROUND, PALETTE, rect, svg, type Ground } from '../data/artDirection.ts';
-import { BUILDINGS, BUILDING_IDS } from '../data/buildings.ts';
+import { BUILDINGS, BUILDING_IDS, type BuildingProto } from '../data/buildings.ts';
 import { ITEM_ICONS } from '../data/icons.ts';
 import { JOB_ICONS } from '../data/jobIcons.ts';
 import { ROAD_LINK } from '../data/roads.ts';
@@ -79,7 +79,34 @@ function buildingRows(): Cell[][] {
   });
 }
 
+/**
+ * La planche des niveaux : une ligne par bâtiment qui monte, ses niveaux
+ * côte à côte (bois, pierre, brique) puis le dernier endommagé ; et les
+ * décorations, finies, avec leur chantier.
+ */
+function levelRows(): Cell[][] {
+  const levelled = BUILDING_IDS.filter((id) => BUILDINGS[id].upgrades.length > 0 && BUILDINGS[id].kind !== 'antenna' && BUILDINGS[id].kind !== 'tower');
+  const upgrades = levelled.map((id): Cell[] => {
+    const proto: BuildingProto = BUILDINGS[id];
+    const sprites = [proto.sprite, ...proto.upgrades.map((upgrade) => upgrade.sprite)];
+    const last = SPRITES[sprites[sprites.length - 1] ?? proto.sprite].parts as Record<string, string>;
+
+    return [
+      ...sprites.map((sprite, index) => cell(`${id} niveau ${index + 1}`, (SPRITES[sprite].parts as Record<string, string>)['built'] ?? '')),
+      cell(`${id} niveau ${sprites.length} abîmé`, last['damaged'] ?? ''),
+    ];
+  });
+  const decor = BUILDING_IDS.filter((id) => BUILDINGS[id].kind === 'decor').flatMap((id): Cell[] => {
+    const parts = SPRITES[BUILDINGS[id].sprite].parts as Record<string, string>;
+
+    return BUILDING_PARTS.map((part) => cell(`${id}.${part}`, parts[part] ?? ''));
+  });
+
+  return [...upgrades, ...rows(decor)];
+}
+
 const allSections: [string, Cell[][]][] = [
+  ['Niveaux', levelRows()],
   ['Bâtiments', buildingRows()],
   [
     'Sprites',

@@ -395,6 +395,18 @@ export const panel = {
     range: (from: number, to: number): string => `portée ${from} → ${to}`,
     /** Le gain de cadence de tir, en pour cent. */
     rate: (percent: number): string => `cadence ${percent > 0 ? '+' : ''}${percent} %`,
+    beds: (from: number, to: number): string => `lits ${from} → ${to}`,
+    logistic: (from: number, to: number): string => `rayon ${from} → ${to} cases`,
+    /** Le gain de vitesse de production, en pour cent. */
+    speed: (percent: number): string => `production +${percent} %`,
+    /** `research` : le nom de la recherche du labo qui ouvre le niveau. */
+    needsResearch: (research: string): string => `Recherche « ${research} » requise au labo.`,
+  },
+
+  decor: {
+    /** La puce d'une décoration : ce qu'elle ajoute au bonheur, et jusqu'où. */
+    mood: (amount: number, radius: number): string => `+${amount} bonheur par aube aux ouvriers à ${radius} cases`,
+    remove: 'Retirer',
   },
 
   /** D'où vient la famine d'une forge ou d'une nurserie. */

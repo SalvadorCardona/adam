@@ -387,7 +387,8 @@ export class EntityLayer {
 
     let sign: Sprite | null = null;
 
-    if (entity.kind !== 'site') {
+    // Une décoration n'a pas de pancarte : elle est trop petite pour en porter une.
+    if (entity.kind !== 'site' && entity.kind !== 'decor') {
       // Plantée au pied de la façade, au milieu : devant le bâtiment, sous sa barre et ses bulles.
       sign = new Sprite();
       sign.anchor.set(0.5, 1);

@@ -709,7 +709,8 @@ function parseEntity(raw: unknown): SavedEntity {
     ...placed,
     store: stock(entity['store']),
     hp: int(entity['hp']),
-    level: int(entity['level']),
+    // Absent d'une sauvegarde d'avant les niveaux : le niveau 1, tel que bâti.
+    level: entity['level'] === undefined ? 1 : int(entity['level']),
     // Absents des sauvegardes d'avant la pause et les effectifs : en marche, au complet.
     paused: entity['paused'] === undefined ? false : bool(entity['paused']) && canPause(proto),
     staff: entity['staff'] === undefined ? BUILDINGS[proto].workers : clampStaff(proto, int(entity['staff'])),
@@ -747,6 +748,7 @@ function parseEntity(raw: unknown): SavedEntity {
       return { ...built, kind, blocked: bool(entity['blocked']) };
     case 'townHall':
     case 'house':
+    case 'decor':
     case 'clinic':
     case 'purifier':
     case 'wall':

@@ -55,6 +55,12 @@ export const BUILD_PRESTIGE = {
   barracks: 3,
   lab: 4,
   antenna: 10,
+  // Les décorations ne rapportent rien : un parterre de plus ne dit pas qu'on a bâti.
+  flowerBed: 0,
+  bench: 0,
+  streetLamp: 0,
+  fountain: 0,
+  adamStatue: 0,
 } as const satisfies Record<BuildingId, number>;
 
 /** Ce que rapporte un ennemi vaincu — abattu ou assommé. Plus il est fort, plus il rapporte. */
