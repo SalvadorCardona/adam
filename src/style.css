@@ -1842,6 +1842,33 @@ button:disabled,
   }
 }
 
+/*
+ * Un téléphone en portrait : les six boutons passent en colonne sur le bord
+ * droit, le long de la barre, de la ville et de la population — ces trois
+ * rangées restent seules à la gauche, et le haut de l'écran n'a plus de rangée
+ * de boutons. La quête, qui s'ouvre sous la barre dans la colonne de gauche,
+ * ne couvre donc jamais Pause ni Réglages.
+ */
+@media (max-width: 599px) {
+  .hud-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'main controls'
+      'left controls'
+      'right controls';
+  }
+
+  .hud-zoom {
+    flex-direction: column;
+    height: auto;
+    align-self: start;
+  }
+
+  .hud-pause {
+    margin: 6px 0 0;
+  }
+}
+
 /* Un téléphone couché : la grille se serre, la carte garde sa place. */
 @media (min-width: 600px) and (max-height: 499px) {
   .hud-top {
