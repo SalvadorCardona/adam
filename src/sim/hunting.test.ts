@@ -42,8 +42,8 @@ describe('chasse', () => {
     expect(town.count('meat')).toBe(2);
   });
 
-  it('plus aucune ferme au menu : la nourriture vient de la chasse', () => {
-    expect(BUILDINGS.farm.menu).toBe(false);
-    expect(withTown().inMenu('farm')).toBe(false);
+  it('la ferme est au menu dès le départ : la chasse seule ne suit pas la population', () => {
+    expect(BUILDINGS.farm.menu).toBe(true);
+    expect(withTown().inMenu('farm')).toBe(true);
   });
 });

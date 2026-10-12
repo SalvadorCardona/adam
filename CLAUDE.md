@@ -961,7 +961,7 @@ Les règles, en résumé :
   Production, Attaque, Logistique, Habitat, Recherche ; icônes `data/categoryIcons.ts`,
   logique `ui/buildFilter.ts`) : « Tous », puis les familles qui ont une carte au menu ; la
   famille choisie tient toute la partie, et s'applique avec le texte (« 2 résultats dans
-  Tous » si elle n'a rien pour lui). Une colonie neuve (`World.newColony`) n'y propose que `START_BUILDINGS` (`data/buildings.ts` : Maison, Nurserie, Poste de logistique, Labo — une colonie sauvegardée sans lui le retrouve au chargement) ; les bâtiments de base attendent la recherche qui les ouvre (`opens`), les autres leur plan, leur recherche ou leur objectif (`World.openBuildings`, sauvegardé ; une sauvegarde d'avant les ouvre tous). Ce qui vient d'y entrer (labo, plan, objectif) porte « Nouveau » jusqu'à ce qu'on
+  Tous » si elle n'a rien pour lui). Une colonie neuve (`World.newColony`) n'y propose que `START_BUILDINGS` (`data/buildings.ts` : Maison, Nurserie, Poste de logistique, Labo, Ferme — une colonie sauvegardée sans lui le retrouve au chargement) ; les bâtiments de base attendent la recherche qui les ouvre (`opens`), les autres leur plan, leur recherche ou leur objectif (`World.openBuildings`, sauvegardé ; une sauvegarde d'avant les ouvre tous). Ce qui vient d'y entrer (labo, plan, objectif) porte « Nouveau » jusqu'à ce qu'on
   le choisisse ou le pose (`seeBuilding`, `World.seenBuildings`, sauvegardé) et s'annonce en
   toast (`buildingsUnlocked`).
 - La fenêtre d'un bâtiment (`ui/buildingPanel.ts`) laisse voir le jeu : vignette

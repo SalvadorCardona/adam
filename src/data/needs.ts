@@ -75,7 +75,8 @@ export const NEEDS = {
 export type NeedId = keyof typeof NEEDS;
 
 /**
- * La chasse : la nourriture ne se récolte plus, elle se chasse. Les bêtes
+ * La chasse : la nourriture se chasse, ou se cultive à la ferme (`farm`,
+ * qui rapporte la sienne à son coffre). Les bêtes
  * sauvages (`WILDLIFE`) lâchent de la viande ; déposée à la mairie, elle y
  * devient de la nourriture, `foodPerMeat` pour une, à la cadence de
  * `convertTicks`. Les bêtes reviennent avec leur tanière (`respawnTicks`) :

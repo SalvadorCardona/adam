@@ -22,7 +22,7 @@
  * dépollution. Tant qu'elle n'est pas finie, ils n'apparaissent pas au menu
  * de construction ; le labo est l'endroit où l'on découvre ce qui arrive
  * ensuite (`World.isUnlocked`). Les bâtiments de base qu'une colonie neuve
- * n'a pas (`START_BUILDINGS` : Maison, Nurserie, Poste de logistique, Labo),
+ * n'a pas (`START_BUILDINGS` : Maison, Nurserie, Poste de logistique, Labo, Ferme),
  * le labo les **ouvre** (`opens`) : puits, cabane, tour, carrière, foreuse,
  * poste de construction. Ceux-là, un objectif ou une quête peut les
  * demander : leur recherche ne coûte que ce qui se récolte.

@@ -1586,7 +1586,7 @@ describe('bâtiments de départ', () => {
 
     expect(START_BUILDINGS).toContain('lab');
     for (const id of START_BUILDINGS) expect(free(world, id)).toBe(true);
-    for (const id of ['drill', 'farm', 'well', 'quarry', 'lumberCamp', 'foresterHouse', 'watchtower', 'constructionPost', 'purifier', 'forge', 'charcoalKiln', 'clinic'] as const) {
+    for (const id of ['drill', 'well', 'quarry', 'lumberCamp', 'foresterHouse', 'watchtower', 'constructionPost', 'purifier', 'forge', 'charcoalKiln', 'clinic'] as const) {
       expect(free(world, id)).toBe(false);
     }
   });

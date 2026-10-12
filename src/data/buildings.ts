@@ -577,8 +577,8 @@ export const BUILDINGS = {
     hp: 50,
     workers: 4,
     minWorkers: 0,
-    // Retirée du menu : la nourriture vient de la chasse (`HUNTING`). Une ferme d'une ancienne sauvegarde reste debout.
-    menu: false,
+    // Au menu dès le départ : la chasse seule ne suit pas la population, la ferme est la nourriture qu'on automatise.
+    menu: true,
     unique: false,
     plan: false,
     sprite: 'farm',
@@ -1074,7 +1074,7 @@ export const MENU_BUILDING_IDS = BUILDING_IDS.filter((id) => BUILDINGS[id].menu)
  * que chaque bâtiment du menu a son chemin. Seul endroit où la liste est
  * définie.
  */
-export const START_BUILDINGS = ['home', 'nursery', 'logisticsPost', 'lab'] as const satisfies readonly BuildingId[];
+export const START_BUILDINGS = ['home', 'nursery', 'logisticsPost', 'lab', 'farm'] as const satisfies readonly BuildingId[];
 
 /** Le bonus d'un niveau : celui du plus haut niveau, jusqu'à `level`, qui le fixe ; `base` sinon. */
 function bonusAt<K extends 'beds' | 'logisticRadius' | 'speed'>(id: BuildingId, level: number, key: K, base: number): number {

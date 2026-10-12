@@ -11,6 +11,11 @@
  * un. Un bâtiment n'en crée aucun — il les emploie. Le rythme des naissances
  * est la durée de la recette `raiseChild` (`data/recipes.ts`), la durée de
  * l'enfance `AGES.work - AGES.nursery` aubes.
+ *
+ * Le premier ouvrier né arrive donc une enfance après la première naissance :
+ * trois minutes de recette, puis quatre aubes (~17 min). C'est voulu — un
+ * ouvrier de plus est un événement, pas un flux ; la nourriture, elle, doit
+ * tenir seule (ferme) pendant ce temps.
  */
 
 import type { ItemId } from './items.ts';
