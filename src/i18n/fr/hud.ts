@@ -25,7 +25,6 @@ export const hud = {
   /** Pourquoi un bâtiment armé ne se pose pas (`PlacementRejection`). */
   rejection: {
     occupied: 'Emplacement déjà occupé',
-    road: 'Une route passe ici — retirez-la d’abord',
     terrain: 'Terrain non constructible',
     polluted: 'Terre polluée — une station de dépollution la nettoiera',
     radioactive: 'Terre radioactive — rien ne la nettoie, pas encore',
@@ -39,20 +38,6 @@ export const hud = {
     enemyZone: 'Une base mutante tient cette zone — abattez-la d’abord',
     unexplored: 'Zone inexplorée — allez-y d’abord',
     region: 'Région à conquérir — vainquez son gardien d’abord',
-  },
-  /** Ce que dit la bulle quand un tracé de route n'a pas été pavé en entier. */
-  road: {
-    /** `paved` tuiles l'ont été avant que la pierre manque. */
-    noStone: (paved: number): string => `Plus de pierre : route arrêtée après ${paved} tuile${s(paved)}`,
-    noStoneAtAll: 'Pas de pierre pour paver — ni dans le sac, ni en ville à portée',
-    terrain: 'Pas de route sur l’eau',
-    occupied: 'Une route ne passe pas sous un bâtiment',
-    resource: 'Arbres et rochers sautés : dégagez-les pour paver',
-    enemyZone: 'Pas de route dans la zone d’une base mutante',
-    unexplored: 'Pas de route dans l’inconnu : explorez d’abord',
-    region: 'Pas de route dans une région à conquérir : vainquez son gardien',
-    polluted: 'Pas de route sur la terre polluée — une station de dépollution la nettoiera',
-    radioactive: 'Pas de route sur la terre radioactive',
   },
   /** Pourquoi un arc n'a pas été forgé (`GearRejection`, hors `missing`). */
   gear: {

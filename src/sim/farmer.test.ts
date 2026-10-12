@@ -105,21 +105,15 @@ describe('ferme et fermiers', () => {
     expect(world.workforce()).toMatchObject({ assigned: BUILDINGS.farm.workers });
   });
 
-  it('ne cultive que l’herbe nue : ni eau, ni sable, ni route, ni bâti, ni filon, ni arbre', () => {
+  it('ne cultive que l’herbe nue : ni eau, ni sable, ni bâti, ni filon, ni arbre', () => {
     const world = colony();
     const farm = farmOf(world);
-    const road = world.farmField(farm).find((tile) => tile.state === 'free')!;
-
-    world.roads.add(road.tx, road.ty);
-    expect(world.farmField(farm).find((tile) => tile.tx === road.tx && tile.ty === road.ty)?.state).toBe('blocked');
-
     run(world, 4000);
 
     for (const tile of world.farmField(farm)) {
       if (tile.state === 'blocked' || tile.state === 'free') continue;
       expect(terrainAt(world.seed, tile.tx, tile.ty)).toBe('grass');
       expect(oreAt(world.seed, tile.tx, tile.ty)).toBeNull();
-      expect(world.roads.has(tile.tx, tile.ty)).toBe(false);
       expect(world.chunks.occupantAt(tile.tx, tile.ty)).toBeUndefined();
     }
     // L'emprise de la ferme n'est pas dans son champ.

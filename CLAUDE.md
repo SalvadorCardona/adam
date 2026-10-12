@@ -101,17 +101,14 @@ signalé). Ensuite la ville prend tout, sauf ce dont elle a déjà assez
 (`TOWN_PLENTY`, `data/items.ts`) : cet objet-là, il n'en ramasse plus en
 passant que pour un chantier ou une recette. Le conseil ne dit de livrer que si le sac contient ce qu'on attend.
 
-**Routes** — la pierre en trop devient des chemins (`data/roads.ts`,
-`sim/roads.ts` : un ensemble de tuiles par chunk, sauvegardé). Carte
-« Route » au bas du tiroir : on glisse le doigt de tuile en tuile (40 au
-plus), « Poser » pave, une pierre par tuile, sac puis ville dans son rayon,
-sans chantier (`paveRoad`, jugé par `World.roadPlan`). Adam, porteurs,
-bûcherons et bâtisseurs y vont 1,6 fois plus vite (`onRoad`, lu par
-`walkToward` et le pas d'Adam) ; mutants et bêtes, non. « Retirer » (le
-marteau, `removeRoad`) rend la pierre ; une route bloque la pose d'un
-bâtiment (refus `road`). Ni eau, ni terre polluée ou radioactive
-(refus `terrain`, `polluted`, `radioactive`, cases en corail au tracé). Dalles raccordées (`art/road.ts`, seize masques)
-bakées avec le sol : un pavage rebake le bloc.
+**Chemins** — décoratifs, jamais de l'état : une allée de terre battue
+relie la porte de la mairie bâtie à celle de chaque bâtiment fini à moins
+de 40 tuiles (`trailsOf` de `render/meadow.ts`, relus toutes les 30 frames
+par `renderer.ts`, bakés avec le sol par `chunkLayer.setTrails`). Ils
+apparaissent seuls à l'achèvement d'un bâtiment et disparaissent à sa chute ;
+aucun bonus de vitesse. Le joueur ne trace pas de route : les routes pavées
+(carte « Route », `paveRoad`) ont été retirées ; leurs dalles d'une ancienne
+sauvegarde (`roads`) sont ignorées au chargement.
 
 **Débouchés** — tout objet entre dans un coût de bâtiment, une entrée de
 recette (`src/data/recipes.ts`) ou un besoin (l'eau se boit) ; `validatePrototypes()` refuse une
@@ -156,7 +153,7 @@ La **maison du forestier** (`foresterHouse`, un ouvrier) loge un
 **forestier** (mobile `forester`, `FORESTERS` dans `src/data/workers.ts`,
 carré dans `src/sim/forester.ts`) : il plante un carré de `FORESTERS.plot`
 cases centré sur la maison (emprise et allée exclues), rang par rang, une
-pousse par case d'herbe nue — ni eau, ni bâti, ni route, ni filon
+pousse par case d'herbe nue — ni eau, ni bâti, ni filon
 (`World.forestPlot`). La pousse grandit au temps de jeu (`SAPLING`,
 `data/resources.ts` : pousse, jeune arbre, arbre) ; avant d'être adulte,
 elle n'est pas une ressource — ni coupée, ni récoltée, ni solide. Abattu,
@@ -173,7 +170,7 @@ semer. Deux fermiers ne visent jamais la même case (`plot`). La culture
 pousse au temps de jeu, la nuit aussi (`CROPS`, `data/resources.ts` : semis,
 pousse, mûre ; ~9 nourritures par minute pour un champ plein de 30 cases) ;
 elle n'est jamais une ressource — ni récoltée par Adam, ni solide — et bloque
-la pose d'un bâtiment ou d'une route comme une pousse. Sans ferme qui couvre
+la pose d'un bâtiment comme une pousse. Sans ferme qui couvre
 son champ, elle s'arrache. Pas de recette : toute la nourriture vient des
 récoltes. Coffre plein, les fermiers attendent à la porte (`storeFull`).
 Cultures sauvegardées sous `crops` (tuile → tick du semis) ; une ancienne
@@ -696,7 +693,7 @@ ne sont pas faites.
 PRNG du monde, sur des emprises libres ; la clairière (22 tuiles au moins)
 reste à bâtir. Une base debout tient une zone (`zoneRadius`, disque fluo
 pâle au sol, `render/enemyBaseLayer.ts`) : ni chantier (refus
-`enemyZone`), ni route, ni récolte d'Adam ou des bûcherons
+`enemyZone`), ni récolte d'Adam ou des bûcherons
 (`World.enemyZoneAt`) ; les mutants des vagues passent. Son emprise arrête
 Adam ; son arc la vise quand aucun ennemi n'est à portée, mais ne l'entame
 qu'avec un **arc** de son niveau au moins (`player.gear`, `data/gear.ts`,
@@ -744,7 +741,7 @@ trois anneaux (`REGION_RINGS` : 30–56, 56–80, au-delà de 80 tuiles ; 5, 6 e
 qui la marque le plus dans ce que la génération y pose (`regionBiomes` : part
 rapportée à la moyenne) — forêt, côte, montagne, terres polluées (`BIOMES`).
 Une région non conquise est voilée (`FOG_TINT.regionAlpha`,
-`render/fogLayer.ts`) et inconstructible (refus `region`, bâtiment et route).
+`render/fogLayer.ts`) et inconstructible (refus `region`).
 Son **gardien** — Grand loup, Crabe géant, Colosse des carrières, Roi des
 boues : une bête de `WILDLIFE` à l'habitat `region`, la bête d'origine en plus
 grand (`scale`) — veille sur son repaire (`Region.lair`) et ne se montre
@@ -759,7 +756,7 @@ haché) et que le labo emploie (quatre recherches). Une colonie neuve
 (`newColony`) ne tient que la prairie ; un `new World` les tient toutes.
 Sauvegardé sous `regions` (conquises, vie des gardiens blessés) ; une
 sauvegarde d'avant tient pour conquises la prairie et les régions où se tient
-du bâti ou une route. La carte du monde hachure de jaune les régions à
+du bâti. La carte du monde hachure de jaune les régions à
 conquérir (repaire en point corail), voile les verrouillées, borde chaque
 région d'un liseré, et sa légende le rappelle. Partie de test `/test/regions`.
 
@@ -1022,8 +1019,9 @@ Les règles, en résumé :
   résolution plafonnée à 2). L'herbe est une **prairie sans damier** (piste A,
   `render/meadow.ts`) : grandes taches claires ou denses aux bords ronds
   (jamais au contact d'un autre sol), brins et fleurettes semés hors de la
-  grille, tirés de la seed. Aucun chemin n'est tracé seul entre les
-  bâtiments : les seules routes sont celles que le joueur pave.
+  grille, tirés de la seed ; et des chemins de terre battue de la mairie
+  bâtie à chaque bâtiment fini, lus dans la ville — le bloc qu'un chemin
+  traverse se rebake quand il apparaît ou disparaît.
   Le décor ne se heurte pas et n'est jamais de l'état.
   L'eau n'est pas bakée (sous elle, la terre de sa rive) : un seul shader la
   peint par-dessus (`render/waterLayer.ts`, `waterShader.ts`), d'après un

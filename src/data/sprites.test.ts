@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { brandBanner, brandIcon } from '../art/brand.ts';
-import { ROAD_THUMB, ROAD_TILES } from '../art/road.ts';
 import { GROUND_TILES, cornerTile, edgeTile, shadowTile } from '../art/terrain.ts';
 import { UI_ICONS, dayDialSvg } from '../art/ui.ts';
 import { DIAL_ARCS } from '../sim/dayNight.ts';
@@ -28,10 +27,6 @@ function everySvg(): [string, string][] {
     [`terrain.shadow.${ground}`, shadowTile(ground)] as [string, string],
     [`terrain.corner.${ground}`, cornerTile(GROUND[ground].base, 'tl')] as [string, string],
   ]);
-  const roads = [
-    ...ROAD_TILES.map((svg, links): [string, string] => [`terrain.road.${links}`, svg]),
-    ['terrain.road.vignette', ROAD_THUMB] as [string, string],
-  ];
   const icons = [
     ...Object.entries(ITEM_ICONS).map(([item, svg]): [string, string] => [`icon.${item}`, svg]),
     ...Object.entries(JOB_ICONS).map(([building, svg]): [string, string] => [`job.${building}`, svg]),
@@ -45,7 +40,7 @@ function everySvg(): [string, string][] {
     ['brand.banner', brandBanner()],
   ];
 
-  return [...sprites, ...terrain, ...roads, ...icons, ...brand];
+  return [...sprites, ...terrain, ...icons, ...brand];
 }
 
 describe('sprites', () => {

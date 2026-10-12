@@ -888,19 +888,12 @@ async function main(): Promise<void> {
     // Une fois par seconde de jeu : les succès dont la condition vient d'être remplie.
     if (running && world.tickCount % TICKS_PER_SECOND === 0 && world.tickCount !== achievements.checkedAt) achievements.update();
 
-    const roadTool = placement.roadTool();
-
     // La carte du monde couvre l'écran : la scène du jeu ne se dessine plus, la carte si.
     renderer.setHidden(worldMap.open);
     if (hud.root.dataset['map'] !== String(worldMap.open)) hud.root.dataset['map'] = String(worldMap.open);
     worldMap.update(ticker.deltaMS);
 
-    renderer.draw(
-      accumulator / STEP_MS,
-      placement.armedBuilding(),
-      placement.ghost,
-      roadTool && { tool: roadTool, trail: placement.roadTrail() },
-    );
+    renderer.draw(accumulator / STEP_MS, placement.armedBuilding(), placement.ghost);
     hud.update(ticker.FPS, renderer.bakedChunks, renderer.atlasStats, renderer.waterStats, renderer.weatherParticles);
 
     // Lire la mise en page force un reflow : une fois tous les dix cadres suffit.
@@ -1093,8 +1086,6 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('companionHealed', () => audio.play('pickup'));
   world.events.on('siteCancelled', () => audio.play('deliver'));
   world.events.on('decorRemoved', () => audio.play('pickup'));
-  world.events.on('roadPaved', () => audio.play('deliver'));
-  world.events.on('roadRemoved', () => audio.play('pickup'));
   world.events.on('waveCountdown', ({ seconds }) => {
     if (seconds === WAVE_ANNOUNCE_SECONDS) audio.play('horn');
     audio.play('countdown');
@@ -1556,13 +1547,6 @@ function wireParticles(world: World, renderer: GameRenderer): void {
   });
   world.events.on('decorRemoved', ({ tx, ty }) => particles.burst((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, PARTICLES.rubble, 5, 0.06));
   world.events.on('siteCancelled', ({ tx, ty }) => particles.burst((tx + 1) * TILE_SIZE, (ty + 1) * TILE_SIZE, PARTICLES.rubble, 8, 0.08));
-  // Une poussière de pierre sur chaque dalle posée ou retirée.
-  const roadDust = ({ tiles }: { tiles: readonly { tx: number; ty: number }[] }): void => {
-    for (const { tx, ty } of tiles) particles.burst((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, PARTICLES.stone, 3, 0.06);
-  };
-
-  world.events.on('roadPaved', roadDust);
-  world.events.on('roadRemoved', roadDust);
   world.events.on('lootDropped', ({ x, y }) => particles.burst(x, y - 6, PARTICLES.confetti, 5, 0.08));
   world.events.on('mutantStunned', ({ x, y }) => particles.burst(x, y - 16, PARTICLES.star, 6, 0.1));
   world.events.on('mutantHealed', ({ x, y }) => particles.burst(x, y - 12, PARTICLES.confetti, 10, 0.14));

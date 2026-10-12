@@ -59,7 +59,8 @@ export const PALETTE = {
  * une transparence. `light` borde le sol côté lumière (le liseré du sable).
  *
  * L'herbe a ses taches de prairie, aux bords ronds : `meadow`, plus claire,
- * et `thicket`, plus dense.
+ * et `thicket`, plus dense ; et la terre battue de ses chemins, `trail`,
+ * avec la trace plus claire du milieu, `trailLight`.
  *
  * L'eau est un dégradé continu sur la distance à la rive (`render/waterShader.ts`) :
  * `shallow`, turquoise clair contre le sable, puis `base`, l'eau franche, et
@@ -75,6 +76,8 @@ export const GROUND = {
     light: '#b3f2c6',
     meadow: '#a8eebf',
     thicket: '#82d89c',
+    trail: '#ebd39a',
+    trailLight: '#f6e6bf',
   },
   sand: { base: '#ffd98a', alt: '#ffd382', shade: '#f2b766', light: '#ffe9b8' },
   water: { base: '#45d6ff', alt: '#3ccaf8', shallow: '#74ecec', deep: '#3a94f2', shade: '#2fb8ea', light: '#b8f1ff' },

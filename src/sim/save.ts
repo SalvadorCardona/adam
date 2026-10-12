@@ -200,8 +200,6 @@ export interface WorldState {
    * Absent d'avant les fermiers : les champs sont vides, les fermes resèment.
    */
   crops?: Record<string, number>;
-  /** Tuiles pavées : `"cx,cy"` → index des tuiles dans le chunk. */
-  roads: Record<string, number[]>;
   /** Terres polluées nettoyées : `"cx,cy"` → index des tuiles dans le chunk. Absent d'avant elles : aucune. */
   cleaned?: Record<string, number[]>;
   /**
@@ -523,10 +521,8 @@ function parseState(raw: unknown): WorldState {
     planted: parsePlanted(state['planted'] ?? {}),
     // Absentes d'une sauvegarde d'avant les fermiers : rien n'était semé.
     crops: parseCrops(state['crops'] ?? {}),
-    // Absentes d'une sauvegarde d'avant les routes : rien n'était pavé.
-    roads: parseRoads(state['roads'] ?? {}),
     // Absentes d'une sauvegarde d'avant les terres polluées : rien n'était nettoyé.
-    cleaned: parseRoads(state['cleaned'] ?? {}),
+    cleaned: parseTileSets(state['cleaned'] ?? {}),
     ...(state['fog'] !== undefined && { fog: parseFog(state['fog']) }),
     entities: unique(array(state['entities']).map(parseEntity)),
     mobiles: unique(array(state['mobiles']).map((mobile) => parseMobile(mobile, seed))),
@@ -638,7 +634,7 @@ function parseCrops(raw: unknown): Record<string, number> {
   return crops;
 }
 
-function parseRoads(raw: unknown): Record<string, number[]> {
+function parseTileSets(raw: unknown): Record<string, number[]> {
   const roads: Record<string, number[]> = {};
 
   for (const [key, tiles] of Object.entries(record(raw))) {

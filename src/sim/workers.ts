@@ -17,14 +17,12 @@
 import { TILE_SIZE, distanceSq, floorDiv } from '../core/grid.ts';
 import { hash3 } from '../core/rng.ts';
 import { CLINIC } from '../data/clinic.ts';
-import { ROADS } from '../data/roads.ts';
 import { NEEDS } from '../data/needs.ts';
 import { BUILDERS, EX_MUTANT, FARMERS, FORESTERS, LOGISTICIANS, LUMBERJACKS, PORTERS, WANDER } from '../data/workers.ts';
 import { KID_SPEED_TILES } from './kids.ts';
 import { facingOf } from './motion.ts';
 import { moodPace, traitPace } from './housing.ts';
 import { needsPace } from './needs.ts';
-import type { RoadTest } from './roads.ts';
 import { isWalkable, terrainAt } from './terrain.ts';
 import type { Farmer, Forester, Kid, Lumberjack, Patient, Wandering, Worker } from './types.ts';
 
@@ -72,15 +70,12 @@ export function carryOf(worker: Worker): number {
 /**
  * Avance d'un tick vers (x, y), en ligne droite. Renvoie `true` à
  * l'arrivée — le marcheur est alors posé exactement sur le point.
- * `onRoad` : sur une tuile pavée, le pas s'allonge (`ROADS.speed`) ; c'est la
- * tuile de départ du pas qui compte.
  */
-export function walkToward(worker: Walker, x: number, y: number, stepSeconds: number, onRoad?: RoadTest): boolean {
+export function walkToward(worker: Walker, x: number, y: number, stepSeconds: number): boolean {
   const dx = x - worker.x;
   const dy = y - worker.y;
   const distance = Math.hypot(dx, dy);
-  const paved = onRoad?.(floorDiv(worker.x, TILE_SIZE), floorDiv(worker.y, TILE_SIZE)) ?? false;
-  const speed = speedOf(worker) * (paved ? ROADS.speed : 1) * TILE_SIZE * stepSeconds;
+  const speed = speedOf(worker) * TILE_SIZE * stepSeconds;
 
   worker.prevX = worker.x;
   worker.prevY = worker.y;
@@ -134,7 +129,6 @@ export function wander(
   seed: number,
   tick: number,
   stepSeconds: number,
-  onRoad?: RoadTest,
 ): void {
   const range = WANDER.radius * TILE_SIZE;
 
@@ -154,7 +148,7 @@ export function wander(
   // Il rentre d'un job d'un bon pas ; il ne traîne les pieds qu'une fois devant chez lui.
   const far = distanceSq(walker.x, walker.y, home.x, home.y) > range * range;
 
-  if (!walkToward(walker, walker.wanderX, walker.wanderY, far ? stepSeconds : stepSeconds * WANDER.pace, onRoad)) return;
+  if (!walkToward(walker, walker.wanderX, walker.wanderY, far ? stepSeconds : stepSeconds * WANDER.pace)) return;
 
   const roll = (salt: number): number => hash3(seed ^ walker.id, tick, salt) / 4294967296;
   const angle = roll(1) * Math.PI * 2;

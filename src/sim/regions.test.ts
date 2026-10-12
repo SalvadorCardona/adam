@@ -104,7 +104,6 @@ describe('régions — conquête', () => {
     world.player.x = world.player.prevX = (lair.tx + 3.5) * TILE_SIZE;
     world.player.y = world.player.prevY = (lair.ty + 3.5) * TILE_SIZE;
     expect(world.canPlace('home', lair.tx, lair.ty)).toBe('region');
-    expect(world.roadBlock(lair.tx, lair.ty)).toBe('region');
   });
 
   it('sans l’ère de son anneau, le gardien ne se montre pas : la région est verrouillée', () => {

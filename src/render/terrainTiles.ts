@@ -24,6 +24,8 @@ import {
   MEADOW_SPRINKLES,
   PATCH_SIZE,
   SHADOW_SIZE,
+  TRAIL_DOTS,
+  TRAIL_WIDTH,
   cornerTile,
   edgeTile,
   shadowTile,
@@ -32,7 +34,6 @@ import {
   type PatchTone,
   type Side,
 } from '../art/terrain.ts';
-import { ROAD_TILES } from '../art/road.ts';
 import { hash3 } from '../core/rng.ts';
 import type { ContaminationKind } from '../data/contamination.ts';
 import { terrainAt, type TerrainKind } from '../sim/terrain.ts';
@@ -94,9 +95,10 @@ export function terrainSources(): SvgSource[] {
   for (const [kind, variants] of Object.entries(CONTAMINATION_TILES)) {
     variants.forEach((svg, variant) => add(`terrain.${kind}.${variant}`, svg));
   }
-  ROAD_TILES.forEach((svg, links) => add(`terrain.road.${links}`, svg));
   for (const [name, svg] of Object.entries(MEADOW_PATCHES)) add(`terrain.patch.${name}`, svg, PATCH_SIZE.width, PATCH_SIZE.height);
   for (const [name, svg] of Object.entries(MEADOW_SPRINKLES)) add(`terrain.${name}`, svg, 14, 12);
+  add('terrain.trail.outer', TRAIL_DOTS.outer, TRAIL_WIDTH.outer, TRAIL_WIDTH.outer);
+  add('terrain.trail.inner', TRAIL_DOTS.inner, TRAIL_WIDTH.inner, TRAIL_WIDTH.inner);
   return sources;
 }
 
@@ -138,9 +140,9 @@ export class TerrainTiles {
     return this.library.texture(`terrain.corner.${color}.${corner}`);
   }
 
-  /** La dalle d'une route dont les voisines pavées sont `links` (bits `ROAD_LINK`). */
-  public road(links: number): Texture {
-    return this.library.texture(`terrain.road.${links}`);
+  /** Un rond de terre battue (`outer`) ou de sa trace claire (`inner`). */
+  public trail(part: 'outer' | 'inner'): Texture {
+    return this.library.texture(`terrain.trail.${part}`);
   }
 
   /** Une tache de prairie : `PATCH_SIZE` px, à l'échelle que tire le bake. */

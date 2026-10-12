@@ -5,7 +5,8 @@
  * - l'**herbe** est une prairie continue, sans damier ni contour de case :
  *   un aplat, sur lequel le bake pose de grandes taches aux bords ronds,
  *   plus claires ou plus denses (`MEADOW_PATCHES`), des brins et des
- *   fleurettes semés hors de la grille (`MEADOW_SPRINKLES`). La grille ne se montre
+ *   fleurettes semés hors de la grille (`MEADOW_SPRINKLES`), et les chemins
+ *   de terre battue de la ville (`TRAIL_DOTS`). La grille ne se montre
  *   qu'en mode construction (`render/ghostLayer.ts`) ;
  * - le **sable** a un liseré clair côté lumière, là où il touche un autre sol ;
  * - l'**eau** n'est pas une tuile : le bake pose sous elle la terre de la
@@ -226,3 +227,15 @@ export const MEADOW_SPRINKLES = {
 } as const;
 
 export type MeadowSprinkle = keyof typeof MEADOW_SPRINKLES;
+
+/**
+ * Les chemins de terre battue : un trait épais tamponné en ronds le long
+ * d'une courbe — leur union fait une capsule qui tourne —, et la trace plus
+ * claire du milieu, là où l'on marche. Diamètres en pixels monde.
+ */
+export const TRAIL_WIDTH = { outer: 16, inner: 5 } as const;
+
+export const TRAIL_DOTS = {
+  outer: svg(TRAIL_WIDTH.outer, TRAIL_WIDTH.outer, circle(TRAIL_WIDTH.outer / 2, TRAIL_WIDTH.outer / 2, TRAIL_WIDTH.outer / 2, GROUND.grass.trail)),
+  inner: svg(TRAIL_WIDTH.inner, TRAIL_WIDTH.inner, circle(TRAIL_WIDTH.inner / 2, TRAIL_WIDTH.inner / 2, TRAIL_WIDTH.inner / 2, GROUND.grass.trailLight)),
+} as const;

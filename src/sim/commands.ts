@@ -8,7 +8,6 @@
  * - le canal vers un Web Worker est déjà défini, il ne restera qu'à le brancher.
  */
 
-import type { TileCoord } from '../core/grid.ts';
 import type { BuildingId } from '../data/buildings.ts';
 import type { CompanionClassId } from '../data/companions.ts';
 import type { ItemId } from '../data/items.ts';
@@ -183,19 +182,6 @@ export type Command =
    */
   | { type: 'trade'; caravan: MobileId; offer: number }
   /**
-   * Pave les tuiles du tracé, dans l'ordre, au plus `ROADS.maxTiles` : une
-   * pierre chacune, prise au sac d'abord, puis à la ville si la tuile est
-   * dans son rayon. Pas de chantier : la tuile payée est pavée. Une tuile
-   * déjà pavée ne coûte rien ; une tuile refusée (eau, bâti, arbre, rocher)
-   * est sautée ; sans pierre, le tracé s'arrête là.
-   */
-  | { type: 'paveRoad'; tiles: readonly TileCoord[] }
-  /**
-   * Retire au marteau les dalles du tracé, au plus `ROADS.maxTiles` : chacune
-   * rend sa pierre — au sac, à la ville s'il est plein, au sol sinon.
-   */
-  | { type: 'removeRoad'; tiles: readonly TileCoord[] }
-  /**
    * Les bonus plantés au jardin des souvenirs, au départ d'une nouvelle
    * colonie. Poussée avant le premier tick ; ignorée ensuite.
    */
@@ -355,32 +341,9 @@ export type RecruitRejection =
   /** Ni le sac, ni la ville à portée n'ont tout le coût. */
   | 'missingItems';
 
-/** Pourquoi une tuile d'un tracé de route n'a pas été pavée — remonté à l'UI par un événement. */
-export type RoadRejection =
-  /** De l'eau : on ne pave pas un lac. */
-  | 'terrain'
-  /** Un bâtiment ou un chantier occupe la tuile. */
-  | 'occupied'
-  /** Un arbre ou un rocher : il faut le récolter d'abord. */
-  | 'resource'
-  /** Une base mutante tient la zone : on n'y pave pas tant qu'elle est debout. */
-  | 'enemyZone'
-  /** Personne n'y est encore allé : on ne pave pas l'inconnu. */
-  | 'unexplored'
-  /** Une région pas encore conquise (`data/regions.ts`) : on n'y pave pas. */
-  | 'region'
-  /** Terre polluée : comme un bâtiment, on n'y pave pas (une station la nettoie). */
-  | 'polluted'
-  /** Terre radioactive : on n'y pave pas, et rien ne la nettoie. */
-  | 'radioactive'
-  /** Plus de pierre, ni dans le sac, ni en ville à portée. */
-  | 'noStone';
-
 /** Motif de refus d'un placement — remonté à l'UI par un événement. */
 export type PlacementRejection =
   | 'occupied'
-  /** Une route pave l'emprise : on la retire d'abord, au marteau. */
-  | 'road'
   /** Terre polluée : inconstructible tant qu'une station de dépollution ne l'a pas nettoyée. */
   | 'polluted'
   /** Terre radioactive : inconstructible, et rien ne la nettoie (pour l'instant). */

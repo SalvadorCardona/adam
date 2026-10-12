@@ -71,7 +71,6 @@ export const screens = {
     zoomOut: 'Dézoomer',
   },
   /** Le nom de la carte Route, pour l'image de sa vignette. */
-  road: 'Route',
   /** L'écran d'un onglet dépassé : la partie a été reprise dans un autre onglet. */
   tabLock: {
     title: 'Partie ouverte ailleurs',

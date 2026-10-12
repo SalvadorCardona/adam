@@ -61,7 +61,6 @@ export const screens: Messages['screens'] = {
     recenter: 'Back to Adam',
     zoomOut: 'Zoom out',
   },
-  road: 'Road',
   /** The screen of a superseded tab: the game was taken over in another tab. */
   tabLock: {
     title: 'Game open elsewhere',
