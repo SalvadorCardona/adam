@@ -850,9 +850,14 @@ describe('recherche — bâtiments débloqués', () => {
     expect(world.inMenu('forge')).toBe(false);
     expect(world.inMenu('charcoalKiln')).toBe(false);
 
+    // La Fonderie demande l'Extraction (qui ouvre carrière et foreuse) : on la tient pour faite.
+    world.researchDone.push('mining');
     finish(world, 'metalworking');
 
-    expect(events).toEqual([['forge', 'charcoalKiln']]);
+    expect(events).toEqual([
+      ['quarry', 'drill'],
+      ['forge', 'charcoalKiln'],
+    ]);
     expect(world.isNewInMenu('forge')).toBe(true);
     expect(world.isNewInMenu('charcoalKiln')).toBe(true);
     expect(world.inMenu('clinic')).toBe(false);
