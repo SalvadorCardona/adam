@@ -904,12 +904,10 @@ button:disabled,
 }
 
 /*
- * Le bouton de la carte du monde, au milieu de la rangée. Carte ouverte, il
- * passe en jaune — la carte est là — et la rangée reste par-dessus elle.
+ * Le bouton de la carte du monde, au début de la rangée. Carte ouverte, il
+ * passe en jaune — la carte est là. La rangée passe sous elle : la croix de
+ * son en-tête, dans le même coin, doit rester libre.
  */
-.hud[data-map='true'] .hud-zoom {
-  z-index: 10;
-}
 
 .hud-map-button.is-active {
   background: var(--yellow);
