@@ -911,6 +911,26 @@ button:disabled,
 }
 
 /*
+ * Un écran modal (titre, « Recommencer ? », Réglages, pause…) recouvre tout le
+ * HUD : le voile est translucide, la rangée des contrôles s'efface plutôt que
+ * de rester dessinée sous — ou à travers — lui.
+ */
+.hud:has(.overlay:not([hidden])) .hud-zoom {
+  visibility: hidden;
+}
+
+/*
+ * L'engrenage de l'écran titre : seul dans son coin, en haut à droite, hors de
+ * la carte du pitch (sans cela il se rangeait à côté d'elle, dans le flux).
+ */
+.title-settings {
+  position: absolute;
+  top: calc(var(--safe-top) + 8px);
+  right: calc(var(--safe-right) + 8px);
+  z-index: 1;
+}
+
+/*
  * Le bouton de la carte du monde, au début de la rangée. Carte ouverte, il
  * passe en jaune — la carte est là. La rangée passe sous elle : la croix de
  * son en-tête, dans le même coin, doit rester libre.
