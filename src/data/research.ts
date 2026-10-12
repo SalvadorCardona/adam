@@ -85,6 +85,8 @@ export interface ResearchStatProto {
   ticks: boolean;
   /** Une part (0,25 → « +25 % ») plutôt qu'une quantité. */
   percent: boolean;
+  /** Les bâtiments que la statistique concerne : un au moins doit être au menu, sinon la recherche ne servirait à rien (`validatePrototypes()`). */
+  buildings?: readonly BuildingId[];
 }
 
 export const RESEARCH_STATS = {
@@ -99,9 +101,9 @@ export const RESEARCH_STATS = {
   hungerResist: { label: 'Faim en moins', unit: '', ticks: false, percent: true },
   thirstResist: { label: 'Soif en moins', unit: '', ticks: false, percent: true },
   woodYield: { label: 'Bois récolté en plus', unit: '', ticks: false, percent: true },
-  drillTicks: { label: 'Temps d’extraction', unit: ' s', ticks: true, percent: false },
-  purifyTicks: { label: 'Temps par case dépolluée', unit: ' s', ticks: true, percent: false },
-  farmYield: { label: 'Nourriture par récolte', unit: '', ticks: false, percent: false },
+  drillTicks: { label: 'Temps d’extraction', unit: ' s', ticks: true, percent: false, buildings: ['drill', 'quarry'] },
+  purifyTicks: { label: 'Temps par case dépolluée', unit: ' s', ticks: true, percent: false, buildings: ['purifier'] },
+  farmYield: { label: 'Nourriture par récolte', unit: '', ticks: false, percent: false, buildings: ['farm'] },
 } as const satisfies Record<ResearchStat, ResearchStatProto>;
 
 /**
@@ -322,19 +324,6 @@ export const RESEARCH = {
     opens: [],
     era: 0,
   },
-  fertileFarms: {
-    label: 'Fermes fertiles',
-    description: 'Un engrais de gelée de mutant, dilué. Beaucoup dilué.',
-    icon: { ui: 'wheat' },
-    theme: 'building',
-    cost: { food: 6, mutantGoo: 3 },
-    duration: 20 * 60,
-    requires: [],
-    effect: { stat: 'farmYield', amount: 1 },
-    unlocks: [],
-    opens: [],
-    era: 0,
-  },
 
   // ----------------------------------------------------------- Ouvriers
   sandals: {
@@ -548,15 +537,15 @@ export const RESEARCH = {
     opens: [],
     era: 0,
   },
-  sporeCompost: {
-    label: 'Compost de spores',
-    description: 'Les spores des terres polluées, enfouies au champ : la récolte double presque.',
+  sporeFilters: {
+    label: 'Filtres à spores',
+    description: 'Les spores des terres polluées, tassées dans les filtres : la station dépollue plus vite.',
     icon: { item: 'spore' },
     theme: 'building',
-    cost: { spore: 4, food: 6 },
+    cost: { spore: 4, wood: 10 },
     duration: 20 * 60,
-    requires: [],
-    effect: { stat: 'farmYield', amount: 1 },
+    requires: ['purification'],
+    effect: { stat: 'purifyTicks', amount: -15 },
     unlocks: [],
     opens: [],
     era: 0,
