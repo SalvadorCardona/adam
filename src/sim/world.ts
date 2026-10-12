@@ -137,7 +137,7 @@ import type {
 import { caravanBagBonus, caravanRoute, createCaravan, drawOffers, isCaravanDay, rideTo, tradeCost } from './caravan.ts';
 import type { WildlifeId } from '../data/enemies.ts';
 import { baseCenter, baseDoor, breed, canDamage, hitsBase, inBaseZone, isShielded, isStanding, onBase, placeEnemyBases } from './enemyBases.ts';
-import { waveEraOf, projectedRaiders, reinforcements, waveBounty } from './waves.ts';
+import { waveEraOf, earlyCap, projectedRaiders, reinforcements, waveBounty } from './waves.ts';
 import { compassOf, stepMutant, stepQueen, surfacePoint, type Compass, type MutantStep } from './enemies.ts';
 import { BIOMES, REGION_GUARDIAN, REGION_RINGS, type BiomeId } from '../data/regions.ts';
 import { HOME_REGION_ID, REGION_COUNT, placeRegions, regionAt, type Region } from './regions.ts';
@@ -6643,8 +6643,15 @@ export class World {
     let count = 0;
     let bases = 0;
 
+    // La grâce des premières nuits plafonne ce que les bases réunies auront produit.
+    let room = earlyCap(night);
+
     for (const base of this.enemyBases) {
-      const raiders = projectedRaiders(base, night, dayTicks) + (base.id === lead.id ? leaders : 0);
+      const produced = Math.min(room, projectedRaiders(base, night, dayTicks));
+
+      room -= produced;
+
+      const raiders = produced + (base.id === lead.id ? leaders : 0);
 
       if (raiders === 0) continue;
       count += raiders;
@@ -6695,8 +6702,15 @@ export class World {
 
   /** Un tick de jour pour chaque base : elle avance vers son prochain assaillant et son prochain gardien. */
   private breedBases(night: number): void {
+    // La grâce des premières nuits : la réserve commune des bases a un plafond.
+    let reserve = this.enemyBases.reduce((sum, base) => sum + (isStanding(base) ? base.raiders : 0), 0);
+    const cap = earlyCap(night);
+
     for (const base of this.enemyBases) {
-      if (breed(base, night).raider) this.events.emit('raiderBred', { id: base.id, raiders: base.raiders });
+      if (breed(base, night, reserve < cap).raider) {
+        reserve += 1;
+        this.events.emit('raiderBred', { id: base.id, raiders: base.raiders });
+      }
     }
   }
 

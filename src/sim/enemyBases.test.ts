@@ -8,6 +8,7 @@ import { MAX_GEAR, gearOf } from '../data/gear.ts';
 import type { ItemId } from '../data/items.ts';
 import { CYCLE_TICKS } from './dayNight.ts';
 import { baseCenter, baseDoor, breed, inBaseZone, isStanding, raidCapacity, raidTicks } from './enemyBases.ts';
+import { earlyCap } from './waves.ts';
 import { deserialize, serialize } from './save.ts';
 import type { Beast, EnemyBase, EntityId, Mutant } from './types.ts';
 import { World } from './world.ts';
@@ -336,10 +337,12 @@ describe('bases mutantes — production et sorties', () => {
     const dusk = world.cycleStartTick + DAY_CYCLE.day;
 
     for (let i = 0; i < 20 * 60; i += 1) world.tick();
-    const morning = world.enemyBases.map((base) => base.brood);
+    const morning = reserve();
 
     while (world.tickCount < dusk) world.tick();
-    expect(world.enemyBases.map((base) => base.brood)).not.toEqual(morning);
+    // La grâce de la première nuit : la réserve commune monte jusqu'au plafond, pas au-delà.
+    expect(reserve()).toBeGreaterThanOrEqual(morning);
+    expect(reserve()).toBe(earlyCap(1));
 
     // Le crépuscule : plus rien ne se produit.
     const evening = JSON.stringify(world.enemyBases);

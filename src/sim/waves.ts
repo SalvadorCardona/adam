@@ -39,6 +39,15 @@ export function reinforcements(era: number, buildings: number): number {
 }
 
 /**
+ * Le plafond des assaillants en réserve, toutes bases confondues, la veille
+ * de la nuit `night` (`WAVE_STRENGTH.earlyCaps`) ; sans plafond passé les
+ * premières nuits.
+ */
+export function earlyCap(night: number): number {
+  return WAVE_STRENGTH.earlyCaps[night - 1] ?? Infinity;
+}
+
+/**
  * Les assaillants qu'aura une base à la tombée de la nuit `night`, s'il lui
  * reste `dayTicks` ticks de jour pour produire : le déroulé exact de `breed`,
  * qui avance son compte d'un tick par tick tant qu'elle n'est pas pleine.

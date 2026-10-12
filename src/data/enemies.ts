@@ -210,8 +210,16 @@ export const WAVE_WARNING = {
  *   `freeBuildings` (palissades non comprises) : la ville qui grandit attire
  *   la convoitise.
  * Au plus `maxReinforcements`. Une jeune colonie n'en reçoit aucun.
+ *
+ * Les premières nuits, la **grâce** : `earlyCaps[n - 1]` plafonne les
+ * assaillants que les bases tiennent en réserve la nuit `n`, toutes bases
+ * confondues. Le nombre de bases du premier anneau tient à la carte (de un à
+ * huit mutants la nuit 2 selon la seed) ; le plafond fait qu'un joueur neuf
+ * a le temps de bâtir sa tour quelle que soit la carte. Les chefs et les
+ * renforts s'y ajoutent, et valent zéro à ces nuits-là.
  */
 export const WAVE_STRENGTH = {
+  earlyCaps: [2, 3, 4],
   perEra: 2,
   freeBuildings: 8,
   buildingsPerRaider: 6,
