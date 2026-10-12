@@ -689,6 +689,23 @@ arc-en-ciel radioactif (récolte doublée). Annoncée 10 s à l'avance ; une
 météo `harsh` ne tombe jamais sur une nuit de vagues (`spoilsNight`). Rendu en `ParticleContainer`
 (`render/weatherLayer.ts`).
 
+**Notifications** (`data/notifications.ts`, `ui/notifier.ts`,
+`storage/localNotifications.ts`, `public/sw.js`) — le navigateur prévient quand
+le jeu n'a pas la main (`document.hidden` ou sans focus) : recherche finie,
+enfant né, vivres bas (`World.needAlert`, au passage de « tout va bien » à
+« ça manque »), vague annoncée (`waveCountdown`, une fois par vague). Sans
+serveur ni Web Push : la partie s'arrête onglet caché et rien n'arrive page
+fermée, donc rien à notifier tant que le jeu n'a pas de temps hors ligne.
+Réglages (section Notifications, cachée si l'API manque) : un interrupteur par
+type et un plafond par jour (1, 3, 5, 10 ; `Notifier.cycleLimit`), gardés sur
+l'appareil (`mobile-factory:notifications`, jamais dans la partie). La
+permission n'est jamais demandée au lancement : `NotificationPrompt` explique
+d'abord, après la première recherche lancée (une fois, `explained`) ou depuis
+les réglages ; il arrête l'horloge. Android n'accepte que les notifications d'un
+service worker : `sw.js` les pose et ramène le jeu au premier plan au tap.
+iOS : seulement dans une PWA ajoutée à l'écran d'accueil (16.4+), et jamais
+sans que la page tourne.
+
 ## Direction artistique
 
 **Vectoriel « post-apo joyeux » : la vie reprend ses droits sur la ruine.**
