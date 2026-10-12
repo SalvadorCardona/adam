@@ -27,16 +27,18 @@ describe('prototypes', () => {
   });
 
   it('refuse une recherche dont la statistique ne concerne aucun bâtiment au menu', () => {
-    const farm = BUILDINGS.farm;
+    const farm = BUILDINGS.farm as { menu: boolean };
+    const menu = farm.menu;
     const research = RESEARCH.fastDrills as ResearchProto;
     const effect = research.effect;
 
     research.effect = { stat: 'farmYield', amount: 1 };
+    farm.menu = false;
     try {
-      expect(farm.menu).toBe(false);
       expect(validatePrototypes()).toContain('RESEARCH.fastDrills : « farmYield » ne concerne aucun bâtiment au menu');
     } finally {
       research.effect = effect;
+      farm.menu = menu;
     }
     expect(validatePrototypes()).toEqual([]);
   });
