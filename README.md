@@ -33,7 +33,8 @@ jouable dans le navigateur, sur téléphone :
 - boucle à pas fixe 20 TPS, rendu interpolé à la fréquence de l'écran ;
 - joystick virtuel fixe, toujours affiché au doigt, à sortie analogique ; sur PC, déplacement au
   clavier — ZQSD, WASD ou flèches, lu par position physique des touches, donc
-  sans réglage entre AZERTY et QWERTY ;
+  sans réglage entre AZERTY et QWERTY ; et **à la manette** (PlayStation, Xbox,
+  Steam Deck — voir [Jouer à la manette](#jouer-à-la-manette-et-sur-steam-deck)) ;
 - une foreuse qui extrait le gisement sous elle dans son coffre interne ;
 - placement au tap en deux temps, avec aperçu fantôme ;
 - récolte de proximité : Adam passe près d'un arbre ou d'un rocher et le
@@ -86,6 +87,53 @@ sur la même carte, ce qui rend un bug de génération reproductible. En dev,
 | `npm run lint`      | ESLint, garde-fou d'isolation compris    |
 | `npm run typecheck` | TypeScript strict                        |
 | `npm test`          | Vitest, headless, sans canvas            |
+
+## Jouer à la manette (et sur Steam Deck)
+
+Le jeu se joue entièrement à la manette, sans souris ni clavier, par l'API
+Gamepad du navigateur (mapping « standard » : un bouton a le même indice
+quelle que soit la marque). Branchez-la, appuyez sur un bouton : un curseur
+dessiné par le jeu paraît. Il disparaît dès que la souris bouge ou qu'un doigt
+touche l'écran, et revient au premier geste à la manette.
+
+| Bouton (PlayStation / Xbox, Steam Deck) | Action |
+| --- | --- |
+| Stick gauche | marcher (analogique) |
+| Stick droit | déplacer le curseur (vitesse selon l'inclinaison) |
+| ✕ / A | cliquer là où est le curseur — sur la carte comme dans les fenêtres ; tenu, glisser (tracer une route, tirer la carte du monde) |
+| Croix directionnelle | passer d'un bouton à l'autre dans les menus et fenêtres ; ← → règlent un curseur de volume |
+| ○ / B | retour : ferme la fenêtre ou le menu ouverts, annule un placement |
+| △ / Y | le sac (inventaire, habillement) |
+| □ / X | « Bâtir » |
+| L1 / R1 (LB / RB) | un cran de zoom arrière / avant |
+| L2 / R2 (LT / RT) | zoom continu |
+| R3 (clic du stick droit) | revenir sur Adam |
+| Options / Menu | pause |
+| Share / View | carte du monde |
+
+La zone morte des sticks (15 % par défaut) et la vibration de la manette se
+règlent dans **Réglages → Manette**, où « Contrôles manette » rappelle ce
+tableau avec les boutons de votre manette. Débranchée en pleine partie, la
+manette met le jeu en pause.
+
+**Steam Deck.** En mode Bureau, ouvrez le jeu dans le navigateur
+(https://cardona.digital/mobile-factory/) : la manette intégrée est reconnue
+directement. En mode Game :
+
+1. en mode Bureau, installez un navigateur (Chrome ou Firefox, depuis Discover),
+   puis dans Steam : *Jeux → Ajouter un jeu non-Steam* et choisissez-le ;
+2. dans les *Propriétés* du raccourci, mettez l'URL du jeu en option de
+   lancement — pour Chrome en Flatpak :
+   `--kiosk https://cardona.digital/mobile-factory/` (`--kiosk` pour un plein
+   écran sans barre d'adresse) ;
+3. *Contrôleur → Disposition* : choisissez le modèle **« Gamepad »** (manette),
+   pas « Web browser » — ce dernier transforme les sticks en souris et en
+   molette, et le jeu ne verrait plus de manette. Steam Input présente alors le
+   Steam Deck comme une manette Xbox : le jeu affiche A, B, X, Y.
+
+L'interface est lisible sur l'écran 1280 × 800 du Deck ; le curseur est plus
+grand que celui de la souris, cerné d'indigo, et l'élément choisi à la croix
+porte un anneau cyan.
 
 ## Stack
 

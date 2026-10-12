@@ -35,7 +35,7 @@ import { Inspect } from './input/inspect.ts';
 import { installCursors } from './ui/cursors.ts';
 import { Joystick } from './input/joystick.ts';
 import { Keyboard, isTyping, type KeyboardState } from './input/keyboard.ts';
-import { shortcutOf } from './input/shortcuts.ts';
+import { shortcutOf, type Shortcut } from './input/shortcuts.ts';
 import { Placement } from './input/placement.ts';
 import { PointerRouter } from './input/pointer.ts';
 import { Pinch, bindWheelZoom } from './input/zoom.ts';
@@ -52,6 +52,7 @@ import { LocalGarden } from './storage/localGarden.ts';
 import { LocalRecord } from './storage/localRecord.ts';
 import { LocalSave, type LoadResult } from './storage/localSave.ts';
 import { LocalLocale } from './storage/localLocale.ts';
+import { LocalGamepad, type GamepadPrefs } from './storage/localGamepad.ts';
 import { LocalHaptics } from './storage/localHaptics.ts';
 import { LocalNotifications } from './storage/localNotifications.ts';
 import { LocalSigns } from './storage/localSigns.ts';
@@ -65,6 +66,7 @@ import { CaravanPanel } from './ui/caravanPanel.ts';
 import { BagPanel } from './ui/bagPanel.ts';
 import { ResourcePanel } from './ui/resourcePanel.ts';
 import { escapeAction } from './ui/escape.ts';
+import { GamepadControls } from './ui/gamepadControls.ts';
 import { JoystickView } from './ui/joystick.ts';
 import { BuildMenu } from './ui/buildMenu.ts';
 import { rewardText } from './ui/collectionPanel.ts';
@@ -72,6 +74,9 @@ import { Hud, clock as clockText } from './ui/hud.ts';
 import { OfflineRecap } from './ui/offlineRecap.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
 import { haptics } from './ui/haptics.ts';
+import { PAD_POINTER_ID } from './ui/padCursor.ts';
+import { PadHelp } from './ui/padHelp.ts';
+import { PadHints } from './ui/padHints.ts';
 import { NotificationPrompt } from './ui/notificationPrompt.ts';
 import { Notifier, browserBackend } from './ui/notifier.ts';
 import { SettingsPanel } from './ui/settingsPanel.ts';
@@ -418,6 +423,9 @@ async function main(): Promise<void> {
     settings.setSigns(on);
   };
 
+  // L'aide « Contrôles manette », ouverte depuis les réglages, par-dessus eux.
+  const padHelp = new PadHelp();
+
   // Les réglages ouverts arrêtent l'horloge, comme la pause, sans en montrer l'écran.
   const settings = new SettingsPanel({
     setLocale: (locale) => {
@@ -437,6 +445,9 @@ async function main(): Promise<void> {
       showNotifications();
     },
     askNotifications: () => notifyPrompt.show(),
+    showPadHelp: () => padHelp.show(),
+    togglePadRumble: () => showGamepad({ ...gamepadPrefs, rumble: !gamepadPrefs.rumble }),
+    setDeadZone: (deadZone) => showGamepad({ ...gamepadPrefs, deadZone }),
     setSfxVolume: (volume) => audio.setSfxVolume(volume),
     setMusicVolume: (volume) => audio.setMusicVolume(volume),
     onToggle: (open) => {
@@ -588,7 +599,7 @@ async function main(): Promise<void> {
   hud.root.append(inventory.root);
   hud.root.append(eras.root, eras.screen);
   // Par-dessus tout, écran titre compris : la langue se choisit avant même de jouer.
-  hud.root.append(settings.root);
+  hud.root.append(settings.root, padHelp.root);
   mount.append(hud.root);
 
   /*
@@ -628,19 +639,24 @@ async function main(): Promise<void> {
     autosave.now();
   });
   window.addEventListener('pagehide', () => autosave.now());
-  // Les raccourcis du jeu (`input/shortcuts.ts`) : P, Échap, I, M, ². Le menu de construction a pris les siens avant.
-  window.addEventListener('keydown', (event) => {
-    const typing = isTyping(event.target);
-    const { code, key, repeat, ctrlKey, metaKey, altKey } = event;
-    const shortcut = shortcutOf({ code, key, repeat, ctrlKey, metaKey, altKey, typing });
-
+  /*
+   * Les raccourcis du jeu (`input/shortcuts.ts`) : P, Échap, I, M, ². Le menu
+   * de construction a pris les siens avant. La manette passe par la même
+   * table : ○ / B est Échap, Options la pause, △ / Y le sac, View la carte.
+   */
+  function runShortcut(shortcut: Shortcut | null, field: HTMLElement | null = null): void {
     if (shortcut === 'pause' && !settings.open) setPaused(!paused);
     // Échap ferme d'abord ce qui est au premier plan ; la pause, si rien ne l'est.
     if (shortcut === 'escape') {
       // Le champ qui avait le clavier le rend : les touches suivantes reviennent au jeu.
-      if (typing && event.target instanceof HTMLElement) event.target.blur();
+      field?.blur();
 
       if (notifyPrompt.open) notifyPrompt.dismiss();
+      // L'aide de la manette est par-dessus les réglages : elle se ferme la première.
+      if (padHelp.open) {
+        padHelp.close();
+        return;
+      }
 
       const action = escapeAction({
         settingsOpen: settings.open || notifyPrompt.open,
@@ -670,11 +686,79 @@ async function main(): Promise<void> {
       else if (started && !paused && !settings.open && !inventory.open && !world.defeated) worldMap.show();
     }
     if (shortcut === 'debug' && import.meta.env.DEV) hud.toggleDebug();
+  }
+
+  window.addEventListener('keydown', (event) => {
+    const typing = isTyping(event.target);
+    const { code, key, repeat, ctrlKey, metaKey, altKey } = event;
+
+    runShortcut(shortcutOf({ code, key, repeat, ctrlKey, metaKey, altKey, typing }), typing && event.target instanceof HTMLElement ? event.target : null);
     // Débogage : F lève ou rabat le brouillard de guerre — en dev, panneau de debug ouvert.
     if (event.code === 'KeyF' && import.meta.env.DEV && hud.debugOn && !isTyping(event.target)) {
       world.push({ type: 'setFog', enabled: !world.fog.enabled });
     }
   });
+
+  /*
+   * La manette (`ui/gamepadControls.ts`) : le stick gauche fait marcher Adam,
+   * le droit promène un curseur qui clique comme une souris, les boutons
+   * reprennent les raccourcis du clavier. Débranchée en pleine partie : pause.
+   */
+  const canOpenMenu = (): boolean => started && !paused && !settings.open && !inventory.open && !world.defeated && !worldMap.open;
+  const pad = new GamepadControls({
+    canvas: renderer.canvas,
+    canvasHand: (x, y) => placement.mode === 'idle' && (renderer.homeIndicatorAt(x, y) || inspect.hovers({ id: PAD_POINTER_ID, x, y, mouse: true })),
+    back: () => {
+      // Comme Échap : le menu de construction d'abord (il annule aussi un placement), puis le reste.
+      if (!buildMenu.handleKey('Escape', false, canOpenMenu())) runShortcut('escape', document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    },
+    pause: () => {
+      if (settings.open) settings.close();
+      else runShortcut('pause');
+    },
+    inventory: () => runShortcut('inventory'),
+    build: () => buildMenu.handleKey('Space', false, canOpenMenu()),
+    map: () => runShortcut('map'),
+    zoomStep: (direction) => (worldMap.open ? worldMap.stepZoom(direction) : renderer.stepZoom(direction)),
+    zoomBy: (factor) => {
+      if (!worldMap.open) renderer.zoomBy(factor, null, true);
+    },
+    recenter: () => (worldMap.open ? worldMap.recenter() : renderer.resetZoom()),
+    connected: (info) => {
+      hud.notify(t().gamepad.connected(t().gamepad.kinds[info.kind]), 'good');
+      padHelp.setPad(info.kind, info.id);
+    },
+    disconnected: () => {
+      setPaused(true);
+      hud.notify(t().gamepad.disconnected, 'bad');
+      padHelp.setPad(null, null);
+    },
+    modeChanged: (mode, kind) => {
+      document.documentElement.dataset['input'] = mode;
+      padHints.setKind(kind);
+    },
+  });
+  const padPrefs = scenario ? new LocalGamepad(null) : LocalGamepad.browser();
+  let gamepadPrefs = padPrefs.load();
+  const showGamepad = (prefs: GamepadPrefs): void => {
+    gamepadPrefs = prefs;
+    padPrefs.save(prefs);
+    pad.setPrefs(prefs);
+    settings.setGamepad(prefs.rumble, prefs.deadZone);
+  };
+
+  pad.setPrefs(gamepadPrefs);
+  settings.setGamepad(gamepadPrefs.rumble, gamepadPrefs.deadZone);
+  document.body.append(pad.cursor.root);
+  // En dev : la manette aussi sous la main dans la console, pour poser son curseur sans stick.
+  if (import.meta.env.DEV) Object.assign(window, { mobileFactory: { world, audio, pad } });
+  wireRumble(world, pad);
+
+  // Les étiquettes de la manette sur le sac (△ / Y) et « Bâtir » (□ / X) : visibles seulement en mode manette.
+  const padHints = new PadHints([
+    [hud.bag, 'north'],
+    [buildMenu.buildButton, 'west'],
+  ]);
 
   // Taper le repère de la mairie : sa fenêtre si Adam est à portée de
   // transfert, sinon un coup d'œil d'une seconde vers elle.
@@ -756,6 +840,10 @@ async function main(): Promise<void> {
 
   renderer.app.ticker.add((ticker) => {
     const running = started && !paused && !settings.open && !notifyPrompt.open && !inventory.dressing && !recap.open;
+
+    // La manette se lit une fois par frame, avant les ticks : l'axe de marche est frais.
+    pad.update(ticker.deltaMS, performance.now(), !worldMap.open);
+    if (pad.padMode) padHints.update();
 
     if (running && !celebrating) accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS);
 
@@ -852,7 +940,9 @@ async function main(): Promise<void> {
    */
   function pushAxisIfChanged(): void {
     const keys = buildMenu.isOpen || worldMap.open ? STILL : keyboard.state;
-    const { axisX, axisY } = joystick.state.active ? joystick.state : keys;
+    const stickAxis = pad.axis;
+    const padAxis = { active: stickAxis.x !== 0 || stickAxis.y !== 0, axisX: stickAxis.x, axisY: stickAxis.y };
+    const { axisX, axisY } = joystick.state.active ? joystick.state : padAxis.active ? padAxis : keys;
 
     if (
       Math.abs(axisX - lastAxisX) < AXIS_EPSILON &&
@@ -1261,6 +1351,15 @@ function wireHaptics(world: World): void {
   world.events.on('researchCompleted', () => haptics.pulse('win'));
   world.events.on('objectiveCompleted', () => haptics.pulse('win'));
   world.events.on('levelUp', () => haptics.pulse('win'));
+}
+
+/** La manette vibre, légèrement, à quelques moments clés : réglage « Vibrations de la manette ». */
+function wireRumble(world: World, pad: GamepadControls): void {
+  world.events.on('buildingCompleted', () => pad.rumble('done'));
+  world.events.on('objectiveCompleted', () => pad.rumble('done'));
+  world.events.on('levelUp', () => pad.rumble('done'));
+  world.events.on('playerHurt', () => pad.rumble('hurt'));
+  world.events.on('waveStarted', () => pad.rumble('alarm'));
 }
 
 /** Les éclats : copeaux à la coupe, sang vert à l'impact, gravats à l'effondrement. */

@@ -1,7 +1,7 @@
 /**
  * Le menu des réglages, derrière le bouton engrenage du HUD : la langue, les
  * sons, la musique et un volume pour chacun des deux, les pancartes des
- * bâtiments. Rien qui touche à la partie — ce sont des préférences de
+ * bâtiments, la manette (son aide, sa vibration, sa zone morte). Rien qui touche à la partie — ce sont des préférences de
  * l'appareil, gardées hors de la sauvegarde.
  *
  * Ouvert, il arrête l'horloge (`main.ts` lit `open`) ; il se ferme par sa
@@ -14,6 +14,7 @@
 
 import { LOCALES, messagesOf, onLocale, t, type Locale } from '../i18n/locale.ts';
 import { NOTIFICATION_KINDS, type NotificationKind } from '../data/notifications.ts';
+import { GAMEPAD } from '../input/gamepad.ts';
 import { uiIcon } from './icons.ts';
 import type { NotifyPermission } from './notifier.ts';
 
@@ -27,6 +28,11 @@ export interface SettingsActions {
   cycleNotificationLimit(): void;
   /** « Autoriser les notifications » : l'écran d'explication, puis la demande du navigateur. */
   askNotifications(): void;
+  /** « Contrôles manette » : l'aide, par-dessus les réglages. */
+  showPadHelp(): void;
+  togglePadRumble(): void;
+  /** La zone morte des sticks a bougé, en part de leur course. */
+  setDeadZone(zone: number): void;
   /** Un curseur de volume a bougé : de 0 à 1, à chaque cran pendant qu'on le glisse. */
   setSfxVolume(volume: number): void;
   setMusicVolume(volume: number): void;
@@ -51,6 +57,11 @@ export class SettingsPanel {
   private readonly musicButton: HTMLButtonElement;
   private readonly signsButton: HTMLButtonElement;
   private readonly hapticsButton: HTMLButtonElement;
+  private readonly padLabel: HTMLHeadingElement;
+  private readonly padHelpButton: HTMLButtonElement;
+  private readonly padRumbleButton: HTMLButtonElement;
+  private readonly deadZone: VolumeSlider;
+  private padRumble = true;
   private readonly notifyLabel: HTMLHeadingElement;
   private readonly notifyKinds = new Map<NotificationKind, HTMLButtonElement>();
   private readonly notifyLimit: HTMLButtonElement;
@@ -135,6 +146,22 @@ export class SettingsPanel {
     this.hapticsButton.className = 'button-secondary settings-toggle';
     this.hapticsButton.addEventListener('click', () => actions.toggleHaptics());
 
+    // La manette : son aide, sa vibration, la zone morte de ses sticks.
+    this.padLabel = document.createElement('h3');
+    this.padLabel.className = 'settings-label';
+    this.padHelpButton = document.createElement('button');
+    this.padHelpButton.type = 'button';
+    this.padHelpButton.className = 'button-secondary settings-toggle';
+    this.padHelpButton.addEventListener('click', () => actions.showPadHelp());
+    this.padRumbleButton = document.createElement('button');
+    this.padRumbleButton.type = 'button';
+    this.padRumbleButton.className = 'button-secondary settings-toggle';
+    this.padRumbleButton.addEventListener('click', () => actions.togglePadRumble());
+
+    const { min, max, step } = GAMEPAD.deadZoneRange;
+
+    this.deadZone = new VolumeSlider((zone) => actions.setDeadZone(zone), { min: min * 100, max: max * 100, step: step * 100 });
+
     this.notifyLabel = document.createElement('h3');
     this.notifyLabel.className = 'settings-label';
     this.notifyAllow = document.createElement('button');
@@ -173,6 +200,10 @@ export class SettingsPanel {
       this.musicVolume.root,
       this.signsButton,
       this.hapticsButton,
+      this.padLabel,
+      this.padHelpButton,
+      this.padRumbleButton,
+      this.deadZone.root,
       this.notifyLabel,
       this.notifyAllow,
       this.notifyDenied,
@@ -192,6 +223,10 @@ export class SettingsPanel {
       this.setMusic(this.music);
       this.setSigns(this.signs);
       this.setHaptics(this.haptics);
+      this.padLabel.textContent = t().gamepad.heading;
+      this.padHelpButton.replaceChildren(uiIcon('hint', 22), t().gamepad.helpTitle);
+      this.setPadRumble(this.padRumble);
+      this.deadZone.setName(t().gamepad.deadZone);
       this.renderNotifications();
       this.sfxVolume.setName(text.sfxVolume);
       this.musicVolume.setName(text.musicVolume);
@@ -248,6 +283,17 @@ export class SettingsPanel {
     toggleLabel(this.hapticsButton, on, uiIcon(on ? 'vibrateOn' : 'vibrateOff', 22), t().settings.haptics);
   }
 
+  /** La vibration de la manette et la zone morte de ses sticks (en part de leur course). */
+  public setGamepad(rumble: boolean, deadZone: number): void {
+    this.setPadRumble(rumble);
+    this.deadZone.setValue(deadZone);
+  }
+
+  private setPadRumble(on: boolean): void {
+    this.padRumble = on;
+    toggleLabel(this.padRumbleButton, on, uiIcon(on ? 'vibrateOn' : 'vibrateOff', 22), t().gamepad.rumble);
+  }
+
   /** La section Notifications ; cachée tant que le navigateur n'en sait pas. */
   public setNotifications(state: NotificationState | null): void {
     this.notifications = state;
@@ -288,7 +334,8 @@ class VolumeSlider {
   private readonly percent: HTMLSpanElement;
   private readonly input: HTMLInputElement;
 
-  public constructor(onChange: (volume: number) => void) {
+  /** `range` : bornes et pas du curseur, en pour cent (un volume va de 0 à 100). */
+  public constructor(onChange: (volume: number) => void, range = { min: 0, max: 100, step: 5 }) {
     this.root = document.createElement('label');
     this.root.className = 'settings-volume';
     this.name = document.createElement('span');
@@ -297,9 +344,9 @@ class VolumeSlider {
     this.percent.className = 'settings-volume-percent';
     this.input = document.createElement('input');
     this.input.type = 'range';
-    this.input.min = '0';
-    this.input.max = '100';
-    this.input.step = '5';
+    this.input.min = String(range.min);
+    this.input.max = String(range.max);
+    this.input.step = String(range.step);
     this.input.addEventListener('input', () => {
       this.showPercent();
       onChange(Number(this.input.value) / 100);

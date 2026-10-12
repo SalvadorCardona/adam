@@ -917,6 +917,29 @@ Les règles, en résumé :
   table pure (`input/shortcuts.ts`, testée) que `main.ts` applique. Une
   touche tapée dans un champ (`isTyping`) ou avec Ctrl, Alt, Cmd n'est
   jamais un raccourci — sauf Échap, qui rend la main au jeu.
+- **Manette** (PlayStation, Xbox, Steam Deck ; API Gamepad, mapping standard) :
+  logique pure dans `input/gamepad.ts` (zone morte radiale `deadZone`, courbe
+  du curseur `cursorVelocity`, nouvel appui `PadReader.pressed` — rien au
+  premier instantané —, croix répétée, bascule `InputMode`, navigation
+  `nearestInDirection`), testée avec une manette simulée ; `navigator` dans
+  `input/gamepadDevice.ts` (la dernière manette qui sert, branchement à chaud,
+  `vibrationActuator`) ; câblage dans `ui/gamepadControls.ts`, lu à chaque
+  frame par la boucle de rendu. Stick gauche : l'axe de marche (le doigt
+  passe devant, le clavier derrière) ; stick droit : le **curseur virtuel**
+  (`ui/padCursor.ts`), une souris synthétique — `elementFromPoint` puis
+  `pointermove` / `pointerdown` / `pointerup` / `click` en `pointerType:
+  'mouse'`, `pointerId` `PAD_POINTER_ID` — : canvas, HUD et fenêtres n'en
+  savent rien. ✕ / A clique (tenu, glisse), croix : focus voisin parmi les
+  éléments que rien ne recouvre (`.pad-focus`, anneau cyan), ○ / B : Échap,
+  △ / Y : sac (I), □ / X : « Bâtir » (Espace), L1/R1 et L2/R2 : zoom, R3 :
+  revenir sur Adam, Options : pause (P), Share/View : carte (M) — la même
+  `runShortcut` que le clavier. Une vraie souris ou un doigt (`isTrusted`)
+  masque le curseur ; `data-input="pad"` sur `<html>` cache le joystick
+  tactile et montre les étiquettes (`ui/padHints.ts`, △ sur le sac, □ sur
+  « Bâtir »). Débranchée en partie : pause et bulle. Pictogrammes des boutons
+  dans `art/padGlyphs.ts` ; aide « Contrôles manette » (`ui/padHelp.ts`) et
+  section Manette des Réglages (zone morte, vibration ;
+  `mobile-factory:gamepad`, `storage/localGamepad.ts`). Steam Deck : README.
 - `src/ui/icons.ts` sert icônes d'objets, vignettes de bâtiments et
   pictogrammes (`src/art/ui.ts`) en `data:` URL SVG pour le DOM. Le menu de construction est un tiroir derrière un
   seul bouton, « Bâtir » — aucun autre bouton ne porte ce libellé ; armer un bâtiment passe la carte en mode construction
