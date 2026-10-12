@@ -72,4 +72,10 @@ export const screens = {
   },
   /** Le nom de la carte Route, pour l'image de sa vignette. */
   road: 'Route',
+  /** L'écran d'un onglet dépassé : la partie a été reprise dans un autre onglet. */
+  tabLock: {
+    title: 'Partie ouverte ailleurs',
+    body: 'Cette partie est jouée dans un autre onglet. Pour ne pas écraser sa progression, celui-ci a cessé de sauvegarder.',
+    take: 'Reprendre la main ici',
+  },
 };

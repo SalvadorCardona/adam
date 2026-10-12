@@ -94,6 +94,7 @@ export const hud = {
   },
   /** Les bulles empilées des événements. */
   toast: {
+    saveFailed: 'Sauvegarde impossible — le stockage du navigateur est plein ou bloqué',
     depositFar: 'Trop loin de la mairie — rapprochez-vous pour déposer',
     depositNoTown: 'Pas encore de ville : bâtissez d’abord la mairie',
     siteNothing: 'Rien dans le sac que ce chantier attende',

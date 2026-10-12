@@ -77,6 +77,7 @@ export const hud: Messages['hud'] = {
     marker: { chest: 'Chest', ruin: 'Ruin', secret: 'Stash' },
   },
   toast: {
+    saveFailed: 'Saving failed — browser storage is full or blocked',
     depositFar: 'Too far from the town hall — get closer to drop off',
     depositNoTown: 'No town yet: build the town hall first',
     siteNothing: 'Nothing in the bag this site needs',

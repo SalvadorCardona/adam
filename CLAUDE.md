@@ -1109,6 +1109,7 @@ Rien ne joue avant un geste du joueur.
   y est dans un try/catch. Un nouvel état de simulation doit entrer dans
   `World.snapshot()` / `restore()` — sinon il se perd au rechargement ; un
   changement incompatible incrémente `SAVE_VERSION`.
+- **Deux onglets, une partie** : `storage/localTab.ts` (`TabLock`, clé `mobile-factory:tab`) donne la main au dernier onglet arrivé ; un onglet dépassé n'écrit plus, saute son rattrapage au retour et affiche `ui/tabLockPanel.ts` (« Reprendre la main » recharge). Un échec d'écriture (`LocalSave.save` à `false`) lève un toast une fois. La sauvegarde de fermeture attend le tick qui consomme un `catchUp` en attente (`Autosave.hold`).
 - Le **jardin des souvenirs** (graines laissées par chaque colonie tombée ou refondée après le Signal — « Fonder une nouvelle colonie » de l'écran de victoire verse les graines du bilan, `ColonyScore` : nuits, enfants, bâtiments, bases abattues, habitants, temps, Signal, puis repart sur une carte neuve ;
   bonus plantés, « Partie pure ») n'est pas l'état d'une partie : format
   versionné dans `sim/garden.ts`, clé dédiée `mobile-factory:garden`

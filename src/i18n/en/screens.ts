@@ -62,4 +62,10 @@ export const screens: Messages['screens'] = {
     zoomOut: 'Zoom out',
   },
   road: 'Road',
+  /** The screen of a superseded tab: the game was taken over in another tab. */
+  tabLock: {
+    title: 'Game open elsewhere',
+    body: 'This game is being played in another tab. To avoid overwriting its progress, this tab has stopped saving.',
+    take: 'Take over here',
+  },
 };
