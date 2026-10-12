@@ -69,6 +69,12 @@ export interface TestScenarioProto {
    */
   nearChest?: number;
   /**
+   * Une colonie qui ne tient que la prairie de départ (`data/regions.ts`),
+   * Adam à tant de tuiles du repaire du gardien de la première région, ses
+   * abords explorés, plutôt qu'à `adam`.
+   */
+  nearLair?: number;
+  /**
    * La garde-robe d'Adam : les pièces déjà trouvées, ce qu'il porte, et
    * l'éditeur de personnage ouvert d'emblée (`open`).
    */
@@ -290,6 +296,21 @@ export const TEST_SCENARIOS = {
       },
       open: true,
     },
+  },
+  /**
+   * La prairie de départ seule conquise : Adam au bord de la première région
+   * à conquérir, voilée, son gardien devant son repaire. On l'abat, la région
+   * se dévoile et se bâtit ; la carte du monde montre conquises, à conquérir
+   * et verrouillées.
+   */
+  regions: {
+    label: 'Régions',
+    seed: 100,
+    buildings: [],
+    town: { wood: 40, stone: 30, food: 12, water: 12 },
+    bag: {},
+    adam: { dx: 1, dy: 4 },
+    nearLair: 8,
   },
 } as const satisfies Record<string, TestScenarioProto>;
 

@@ -100,6 +100,10 @@ export const ITEM_TONES: Record<ItemId, Tone> = {
   wolfFang: 'paper',
   crabClaw: FAMILY_TONES.humans,
   radCore: FAMILY_TONES.mutants,
+  amber: FAMILY_TONES.colony,
+  pearl: FAMILY_TONES.water,
+  quartz: FAMILY_TONES.ruins,
+  spore: FAMILY_TONES.ruins,
 };
 
 /** Durée du repère d'une alerte de la ville, en ms : le temps de regarder, puis de marcher. */

@@ -38,6 +38,7 @@ export const hud = {
     nearHall: `Trop près de la mairie — l’antenne se dresse à ${BUILDINGS.antenna.hallDistance} cases au moins`,
     enemyZone: 'Une base mutante tient cette zone — abattez-la d’abord',
     unexplored: 'Zone inexplorée — allez-y d’abord',
+    region: 'Région à conquérir — vainquez son gardien d’abord',
   },
   /** Ce que dit la bulle quand un tracé de route n'a pas été pavé en entier. */
   road: {
@@ -49,6 +50,7 @@ export const hud = {
     resource: 'Arbres et rochers sautés : dégagez-les pour paver',
     enemyZone: 'Pas de route dans la zone d’une base mutante',
     unexplored: 'Pas de route dans l’inconnu : explorez d’abord',
+    region: 'Pas de route dans une région à conquérir : vainquez son gardien',
     polluted: 'Pas de route sur la terre polluée — une station de dépollution la nettoiera',
     radioactive: 'Pas de route sur la terre radioactive',
   },
@@ -159,6 +161,10 @@ export const hud = {
     betterGear: (gear: string, level: number): string => `Il vous faut un meilleur équipement : ${gear} (niveau ${level}) — forgez-le à la forge`,
     enemyZone: (level: number): string => `Zone d’une base mutante (niveau ${level}) : ni récolte ni construction tant qu’elle tient`,
     baseDestroyed: (prestige: number): string => `Base mutante détruite ! +${prestige} Prestige, sa zone est libre`,
+    /** `biome` et `guardian` : leurs noms, avec leur majuscule. */
+    regionOpen: (biome: string, guardian: string): string => `${biome} à conquérir : vainquez son gardien, ${guardian}, pour y bâtir`,
+    regionLocked: (biome: string, era: string): string => `${biome} verrouillée : il faut l’ère « ${era} » pour que son gardien se montre`,
+    regionConquered: (biome: string, prestige: number): string => `${biome} conquise ! +${prestige} Prestige — on peut y bâtir`,
     baseShielded: 'Son chef la protège : abattez-le d’abord, le bouclier tombera avec lui',
     levelUp: (level: number, maxHp: number, bowDamage: number): string =>
       `Niveau ${level} ! +${maxHp} PV max, +${String(Math.round(bowDamage * 100) / 100).replace('.', ',')} dégâts d’arc`,

@@ -5,13 +5,15 @@
  * peint. Un texel par tuile, sur la fenêtre de tuiles qui couvre l'écran
  * plus une marge : indigo plein sur l'inconnu (`FOG_TINT.unexplored`), voile
  * indigo à demi sur ce qui est exploré hors de vue (`FOG_TINT.explored`),
- * rien sur ce qui est vu. La texture est adoucie d'un flou en tente (1-2-1)
+ * rien sur ce qui est vu ; un voile plus léger sur une région pas encore
+ * conquise (`FOG_TINT.regionAlpha`), même vue. La texture est adoucie d'un flou en tente (1-2-1)
  * puis agrandie 32 fois en filtrage linéaire : les bords sont des fondus
  * d'une tuile ou deux, jamais des marches d'escalier — des coussins de
  * brume plutôt que des carrés.
  *
  * Pas de filtre ni de shader : une boucle sur quelques milliers de texels,
- * refaite seulement quand une case change d'état (`FogOfWar.revision`) ou
+ * refaite seulement quand une case change d'état (`FogOfWar.revision`), qu'une
+ * région est conquise (`World.regionRevision`), ou
  * que l'écran sort de la fenêtre, puis un envoi de texture. Brouillard levé
  * (réglage de débogage), le voile est caché et ne coûte rien.
  */
@@ -44,10 +46,14 @@ export class FogLayer {
   private width = 0;
   private height = 0;
   private revision = -1;
+  private regionRevision = -1;
   /** État de chaque tuile de la fenêtre, puis les deux champs adoucis. */
   private states = new Uint8Array(0);
   private dark = new Float32Array(0);
   private veil = new Float32Array(0);
+  /** La région de chaque tuile de la fenêtre, lue une fois par fenêtre ; puis la part voilée, adoucie. */
+  private regionIds = new Int16Array(0);
+  private locked = new Float32Array(0);
 
   private readonly unexplored = rgb(hex(FOG_TINT.unexplored));
   private readonly explored = rgb(hex(FOG_TINT.explored));
@@ -78,10 +84,12 @@ export class FogLayer {
       this.left = view.minCx - MARGIN;
       this.top = view.minCy - MARGIN;
       this.resize(width, height);
+      this.regionIds.fill(-1);
       this.revision = -1;
     }
-    if (this.revision === fog.revision) return;
+    if (this.revision === fog.revision && this.regionRevision === this.world.regionRevision) return;
     this.revision = fog.revision;
+    this.regionRevision = this.world.regionRevision;
     this.paint();
   }
 
@@ -92,6 +100,8 @@ export class FogLayer {
     this.states = new Uint8Array(width * height);
     this.dark = new Float32Array(width * height);
     this.veil = new Float32Array(width * height);
+    this.locked = new Float32Array(width * height);
+    this.regionIds = new Int16Array(width * height).fill(-1);
 
     this.source?.destroy();
     this.canvas = document.createElement('canvas');
@@ -138,6 +148,17 @@ export class FogLayer {
       }
     }
 
+    // Les régions de la fenêtre, lues une fois : elles ne bougent pas, seule leur conquête change.
+    const { regionIds } = this;
+
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const index = y * width + x;
+
+        if (regionIds[index] === -1) regionIds[index] = this.world.regionAt(left + x, top + y);
+      }
+    }
+
     this.soften();
 
     const context = this.canvas!.getContext('2d')!;
@@ -147,7 +168,7 @@ export class FogLayer {
 
     for (let index = 0; index < width * height; index += 1) {
       const dark = this.dark[index]!;
-      const veil = this.veil[index]! * strength;
+      const veil = Math.max(this.veil[index]! * strength, this.locked[index]! * FOG_TINT.regionAlpha);
       const alpha = dark + veil * (1 - dark);
       const mix = alpha > 0 ? dark / alpha : 0;
       const at = index * 4;
@@ -167,13 +188,15 @@ export class FogLayer {
    * 3 × 3 : un coin de disque s'arrondit, une case seule ne fait pas un trou.
    */
   private soften(): void {
-    const { width, height, states, dark, veil } = this;
+    const { width, height, states, dark, veil, locked, regionIds } = this;
+    const { conquered } = this.world;
 
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         let unknown = 0;
         let hidden = 0;
         let weight = 0;
+        let unconquered = 0;
 
         for (let dy = -1; dy <= 1; dy += 1) {
           const ny = y + dy;
@@ -191,10 +214,12 @@ export class FogLayer {
             if (state === UNEXPLORED) unknown += w;
             // Une case inconnue voile aussi : entre l'inconnu et le vu, il y a toujours le voile.
             if (state !== 0) hidden += w;
+            if (!conquered.has(regionIds[ny * width + nx]!)) unconquered += w;
           }
         }
         dark[y * width + x] = unknown / weight;
         veil[y * width + x] = hidden / weight;
+        locked[y * width + x] = unconquered / weight;
       }
     }
   }

@@ -610,6 +610,33 @@ cracheurs sont sauvegardés ; une sauvegarde d'avant charge ses bases à
 réserve vide, chef et cracheurs au complet. Partie de test `/test/raid` :
 Adam devant la base la plus proche, l'arc cerclé de fer au poing.
 
+**Régions à conquérir** (`data/regions.ts`, `sim/regions.ts`) — la carte se
+découpe en régions autour de la mairie, tirées de la seed, jamais stockées :
+la **prairie de départ** (disque de `HOME_REGION.radius`, 30 tuiles), puis
+trois anneaux (`REGION_RINGS` : 30–56, 56–80, au-delà de 80 tuiles ; 5, 6 et
+8 secteurs aux bords ondulés), 20 régions en tout. Chacune prend le **biome**
+qui la marque le plus dans ce que la génération y pose (`regionBiomes` : part
+rapportée à la moyenne) — forêt, côte, montagne, terres polluées (`BIOMES`).
+Une région non conquise est voilée (`FOG_TINT.regionAlpha`,
+`render/fogLayer.ts`) et inconstructible (refus `region`, bâtiment et route).
+Son **gardien** — Grand loup, Crabe géant, Colosse des carrières, Roi des
+boues : une bête de `WILDLIFE` à l'habitat `region`, la bête d'origine en plus
+grand (`scale`) — veille sur son repaire (`Region.lair`) et ne se montre
+qu'une fois l'**ère** de l'anneau atteinte (`ERAS` : Fondation dès le départ,
+Colonie après 2 objectifs, Signal après l'acte I ; `World.era()`,
+`regionState` : `conquered` / `open` / `locked`). Plus loin, plus coriace
+(`hpScale`, `damageScale`). Abattu (`World.conquer`, événement
+`regionConquered`), la région est conquise : Prestige, XP, et sa
+**spécialité** au sol (ambre, nacre, quartz, spore violette), qu'Adam déniche
+aussi en récoltant dans les régions conquises du biome (`findChance`, tirage
+haché) et que le labo emploie (quatre recherches). Une colonie neuve
+(`newColony`) ne tient que la prairie ; un `new World` les tient toutes.
+Sauvegardé sous `regions` (conquises, vie des gardiens blessés) ; une
+sauvegarde d'avant tient pour conquises la prairie et les régions où se tient
+du bâti ou une route. La carte du monde hachure de jaune les régions à
+conquérir (repaire en point corail), voile les verrouillées, borde chaque
+région d'un liseré, et sa légende le rappelle. Partie de test `/test/regions`.
+
 **Brouillard de guerre** (`data/fog.ts`, `sim/fog.ts`, `render/fogLayer.ts`)
 — trois états par case, comme Age of Empires : inexplorée (indigo plein),
 explorée hors de vue (voile indigo, capture figée), visible. Sources de

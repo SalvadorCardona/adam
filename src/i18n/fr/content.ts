@@ -18,6 +18,7 @@ import { OBJECTIVES, type ObjectiveProto } from '../../data/objectives.ts';
 import { PERKS } from '../../data/perks.ts';
 import { QUESTS, TOOLS } from '../../data/quests.ts';
 import { RECIPES } from '../../data/recipes.ts';
+import { BIOMES, ERAS } from '../../data/regions.ts';
 import { COMPANION_CLASSES } from '../../data/companions.ts';
 import { RESEARCH, RESEARCH_STATS, RESEARCH_THEMES } from '../../data/research.ts';
 import { RESOURCES } from '../../data/resources.ts';
@@ -84,6 +85,9 @@ export const content = {
   companionClasses: mapTable(COMPANION_CLASSES, ({ label, effect }): { label: string; effect: string } => ({ label, effect })),
   enemies: mapTable(ENEMIES, (enemy): string => enemy.label),
   wildlife: mapTable(WILDLIFE, (beast): string => beast.label),
+  /** Les biomes des régions, et les ères de la colonie (`data/regions.ts`). */
+  biomes: mapTable(BIOMES, (biome): string => biome.label),
+  eras: ERAS.map((era): string => era.label),
   enemyBase: { label: ENEMY_BASE.label, description: ENEMY_BASE.description },
   /** Les arcs d'Adam, du niveau 0 au dernier. */
   gear: GEAR.map(({ label }): string => label),

@@ -48,8 +48,8 @@ export function densOfChunk(seed: number, cx: number, cy: number): Den[] {
   for (const [index, species] of WILDLIFE_IDS.entries()) {
     const proto = WILDLIFE[species];
 
-    // Les gardiens n'ont pas de tanière : c'est leur base qui les loge.
-    if (proto.habitat === 'base') continue;
+    // Les gardiens n'ont pas de tanière : c'est leur base, ou leur région, qui les loge.
+    if (proto.habitat === 'base' || proto.habitat === 'region') continue;
 
     for (let draw = 0; draw < proto.densPerChunk; draw += 1) {
       const id = hash3(hash3(seed ^ 0x6a09e667, index, draw), cx, cy);
@@ -117,8 +117,8 @@ export function stepBeast(
   const aggro = proto.aggroRadius * TILE_SIZE;
   const giveUp = proto.giveUpRadius * TILE_SIZE;
   const leash = proto.leashRadius * TILE_SIZE;
-  const guard = proto.habitat === 'base';
-  // Un gardien mesure Adam depuis sa base : c'est la zone qu'il défend.
+  const guard = proto.habitat === 'base' || proto.habitat === 'region';
+  // Un gardien mesure Adam depuis sa base, ou son repaire : c'est la zone qu'il défend.
   const watchSq = guard ? (player.x - beast.homeX) ** 2 + (player.y - beast.homeY) ** 2 : playerSq;
 
   switch (beast.state) {

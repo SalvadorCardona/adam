@@ -435,6 +435,8 @@ export interface Beast extends Moving {
   denId: number;
   /** Le gardien d'une base mutante (`WILDLIFE.guardian`) : l'id de sa base, qui le loge et le refait. */
   guardOf?: number;
+  /** Le gardien d'une région à conquérir (`data/regions.ts`) : l'id de sa région ; sa mort la conquiert. */
+  regionOf?: number;
   homeX: number;
   homeY: number;
   state: BeastState;

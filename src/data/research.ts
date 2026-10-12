@@ -223,6 +223,47 @@ export const RESEARCH = {
     effect: { stat: 'farmYield', amount: 1 },
     unlocks: [],
   },
+  // Les spécialités des régions conquises (`data/regions.ts`) : une recherche par biome.
+  amberBows: {
+    label: 'Arcs vernis d’ambre',
+    description: 'L’ambre de la forêt raidit le bois de l’arc : chaque flèche frappe plus fort.',
+    theme: 'combat',
+    cost: { amber: 4, wood: 10 },
+    duration: 20 * 60,
+    requires: [],
+    effect: { stat: 'bowDamage', amount: 0.5 },
+    unlocks: [],
+  },
+  pearlBag: {
+    label: 'Sac cousu de nacre',
+    description: 'Des boucles de nacre de la côte : le sac s’ouvre plus grand.',
+    theme: 'town',
+    cost: { pearl: 4, wood: 8 },
+    duration: 20 * 60,
+    requires: [],
+    effect: { stat: 'bagCapacity', amount: 10 },
+    unlocks: [],
+  },
+  quartzBits: {
+    label: 'Mèches de quartz',
+    description: 'Le quartz de la montagne ne s’émousse pas : les foreuses creusent plus vite.',
+    theme: 'harvest',
+    cost: { quartz: 4, ironOre: 6 },
+    duration: 20 * 60,
+    requires: [],
+    effect: { stat: 'drillTicks', amount: -6 },
+    unlocks: [],
+  },
+  sporeCompost: {
+    label: 'Compost de spores',
+    description: 'Les spores des terres polluées, enfouies au champ : la récolte double presque.',
+    theme: 'harvest',
+    cost: { spore: 4, food: 6 },
+    duration: 20 * 60,
+    requires: [],
+    effect: { stat: 'farmYield', amount: 1 },
+    unlocks: [],
+  },
 } as const satisfies Record<string, ResearchProto>;
 
 export type ResearchId = keyof typeof RESEARCH;

@@ -127,10 +127,10 @@ function finish(world: World, research: ResearchId): void {
 }
 
 describe('recherches — données', () => {
-  it('passe la validation, de six à douze recherches', () => {
+  it('passe la validation, de six à seize recherches (quatre pour les spécialités des régions)', () => {
     expect(validatePrototypes()).toEqual([]);
     expect(RESEARCH_IDS.length).toBeGreaterThanOrEqual(6);
-    expect(RESEARCH_IDS.length).toBeLessThanOrEqual(12);
+    expect(RESEARCH_IDS.length).toBeLessThanOrEqual(16);
   });
 
   it('mêle objets communs et butin : le combat nourrit la recherche, la récolte aussi', () => {

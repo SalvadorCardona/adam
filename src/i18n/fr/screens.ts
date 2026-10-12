@@ -62,6 +62,8 @@ export const screens = {
     title: 'Carte du monde',
     close: 'Fermer la carte (Échap)',
     hint: 'Glissez pour parcourir · touchez pour y aller',
+    /** La légende des régions (`data/regions.ts`). */
+    regions: { conquered: 'Conquise', open: 'À conquérir', locked: 'Verrouillée' },
   },
   zoom: {
     zoomIn: 'Zoomer',

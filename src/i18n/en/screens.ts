@@ -54,6 +54,7 @@ export const screens: Messages['screens'] = {
     title: 'World map',
     close: 'Close the map (Esc)',
     hint: 'Drag to explore · tap to go there',
+    regions: { conquered: 'Conquered', open: 'To conquer', locked: 'Locked' },
   },
   zoom: {
     zoomIn: 'Zoom in',

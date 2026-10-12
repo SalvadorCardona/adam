@@ -28,6 +28,7 @@ export const hud: Messages['hud'] = {
     nearHall: `Too close to the town hall — the antenna stands at least ${BUILDINGS.antenna.hallDistance} tiles away`,
     enemyZone: 'A mutant base holds this zone — take it down first',
     unexplored: 'Unexplored area — go there first',
+    region: 'Unconquered region — defeat its guardian first',
   },
   road: {
     noStone: (paved: number): string => `Out of stone: road stopped after ${paved} tile${s(paved)}`,
@@ -37,6 +38,7 @@ export const hud: Messages['hud'] = {
     resource: 'Skipped trees and rocks: clear them to pave',
     enemyZone: 'No roads inside a mutant base’s zone',
     unexplored: 'No roads into the unknown: explore first',
+    region: 'No roads in an unconquered region: defeat its guardian',
     polluted: 'No roads on polluted land — a purifier will clean it',
     radioactive: 'No roads on radioactive land',
   },
@@ -131,6 +133,9 @@ export const hud: Messages['hud'] = {
     betterGear: (gear: string, level: number): string => `You need better gear: ${gear} (level ${level}) — forge it at the forge`,
     enemyZone: (level: number): string => `Mutant base zone (level ${level}): no harvesting or building while it stands`,
     baseDestroyed: (prestige: number): string => `Mutant base destroyed! +${prestige} Prestige, its zone is free`,
+    regionOpen: (biome: string, guardian: string): string => `${biome} to conquer: defeat its guardian, the ${guardian.toLowerCase()}, to build there`,
+    regionLocked: (biome: string, era: string): string => `${biome} locked: its guardian shows up in the “${era}” era`,
+    regionConquered: (biome: string, prestige: number): string => `${biome} conquered! +${prestige} Prestige — you can build there`,
     baseShielded: 'Its chief shields it: bring him down first, the shield falls with him',
     levelUp: (level: number, maxHp: number, bowDamage: number): string =>
       `Level ${level}! +${maxHp} max HP, +${Math.round(bowDamage * 100) / 100} bow damage`,

@@ -20,7 +20,7 @@ import { PRESTIGE } from './prestige.ts';
 export const ICON_SIZE = 24;
 
 const S = ICON_SIZE;
-const { ink, orange, yellow, cyan, mint, toxic, paper, coral } = PALETTE;
+const { ink, orange, yellow, cyan, mint, toxic, paper, coral, violet } = PALETTE;
 
 export const ITEM_ICONS: Record<ItemId, string> = {
   /** Une bûche orange, sa tranche jaune et ses cernes — comme sur la maquette. */
@@ -152,6 +152,53 @@ export const ITEM_ICONS: Record<ItemId, string> = {
     circle(12, 8.4, 1.7, ink.base),
     circle(15.6, 14.6, 1.7, ink.base),
     circle(8.4, 14.6, 1.7, ink.base),
+  ),
+  /** Une goutte d'ambre de la forêt, une feuille menthe prise dedans. */
+  amber: svg(
+    S,
+    S,
+    circle(12, 14, 8.5, orange.base),
+    circle(11.4, 13.2, 7.6, yellow.shade),
+    polygon([12, 2.5, 18, 10, 6, 10], yellow.shade),
+    pill(10.5, 10, 6, 3, mint.shade),
+    pill(10.5, 10, 5, 2, mint.base),
+    pill(7, 9.5, 2.4, 5, yellow.light),
+  ),
+  /** Un coquillage cyan de la côte, sa perle blanche au creux. */
+  pearl: svg(
+    S,
+    S,
+    polygon([12, 21, 3, 9, 21, 9], cyan.shade),
+    circle(12, 9, 9, cyan.shade),
+    circle(11.4, 8.4, 8.2, cyan.base),
+    pill(6, 4.5, 6, 2.4, cyan.light),
+    circle(12.5, 13.5, 3.6, paper.shade),
+    circle(12, 13, 3, paper.base),
+  ),
+  /** Trois prismes de quartz violet, sortis de la montagne. */
+  quartz: svg(
+    S,
+    S,
+    rect(3, 9, 6, 12, violet.shade, RADIUS.small),
+    rect(15, 7, 6, 14, violet.shade, RADIUS.small),
+    rect(9, 3, 7, 18, violet.shade, RADIUS.small),
+    rect(9, 3, 6, 16, violet.base, RADIUS.small),
+    rect(3, 9, 5, 10, violet.base, RADIUS.small),
+    rect(15, 7, 5, 12, violet.base, RADIUS.small),
+    pill(10.5, 5, 2, 8, violet.light),
+  ),
+  /** Un champignon des terres polluées : chapeau violet tacheté de jaune, pied blanc. */
+  spore: svg(
+    S,
+    S,
+    rect(9, 11, 6, 10, paper.shade, RADIUS.small),
+    rect(9, 11, 5, 9, paper.base, RADIUS.small),
+    pill(2, 5, 20, 9, violet.shade),
+    pill(2, 4, 19, 8, violet.base),
+    pill(5, 5, 5, 2, violet.light),
+    circle(14, 7, 1.6, yellow.base),
+    circle(9, 9, 1.3, yellow.base),
+    circle(18, 9.5, 1.1, yellow.base),
   ),
 };
 

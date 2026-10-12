@@ -42,6 +42,7 @@ import { freshHousing, type Housing } from './housing.ts';
 import { freshNeeds, fullNeeds } from './needs.ts';
 import { canPause, clampStaff, isWorkPriority, type StaffPost } from './staffing.ts';
 import { readLook, readUnseen, readWardrobe } from './wardrobe.ts';
+import { REGION_COUNT } from './regions.ts';
 import type { Store, StoreSnapshot } from './store.ts';
 import type {
   BeastState,
@@ -99,6 +100,12 @@ export interface SavedDen {
 }
 
 /** Tout l'état de la simulation, en données JSON. */
+/** Les régions telles qu'elles sont rangées : les conquises, et les gardiens blessés. */
+export interface SavedRegions {
+  conquered: number[];
+  guardians: { id: number; hp: number }[];
+}
+
 export interface WorldState {
   seed: number;
   tick: number;
@@ -158,6 +165,12 @@ export interface WorldState {
   staffPosts?: SavedStaffPost[];
   /** Les bases mutantes et leurs points de vie. Absent d'avant elles : elles se posent au chargement, hors du bâti. */
   enemyBases?: EnemyBase[];
+  /**
+   * Les régions conquises et la vie des gardiens blessés (`data/regions.ts`).
+   * Absent d'avant les régions : la prairie de départ, et toute région où se
+   * tient déjà un bâtiment ou une route.
+   */
+  regions?: SavedRegions;
   stats: WorldStats;
   /** Les compteurs au début de l'objectif en cours. */
   objectiveBase: WorldStats;
@@ -449,6 +462,7 @@ function parseState(raw: unknown): WorldState {
     ...(state['staffPosts'] !== undefined && { staffPosts: unique(array(state['staffPosts']).map(parseStaffPost)) }),
     ...parseObjectives(state),
     ...(state['enemyBases'] !== undefined && { enemyBases: unique(array(state['enemyBases']).map(parseEnemyBase)) }),
+    ...(state['regions'] !== undefined && { regions: parseRegions(state['regions']) }),
     player: parsePlayer(state['player']),
     resources: parseResources(state['resources']),
     // Absents d'une sauvegarde d'avant le forestier : rien n'était planté.
@@ -792,6 +806,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
         age: mobile['age'] === undefined ? WILDLIFE[proto].age.min : age(mobile['age']),
         denId: int(mobile['denId']),
         ...(mobile['guardOf'] !== undefined && { guardOf: int(mobile['guardOf']) }),
+        ...(mobile['regionOf'] !== undefined && { regionOf: int(mobile['regionOf']) }),
         homeX: finite(mobile['homeX']),
         homeY: finite(mobile['homeY']),
         state: state as BeastState,
@@ -1088,6 +1103,28 @@ function parseRareTrades(raw: unknown): Partial<Record<RareOfferId, number>> {
     result[oneOf(id, RARE_OFFERS) as RareOfferId] = taken;
   }
   return result;
+}
+
+/** Les régions d'une sauvegarde : ids connus, sans doublon ; une vie de gardien positive. */
+function parseRegions(raw: unknown): SavedRegions {
+  const regions = record(raw);
+  const known = (id: number): number => {
+    if (id < 0 || id >= REGION_COUNT) throw new SaveError(`région inconnue : ${id}`);
+    return id;
+  };
+
+  return {
+    conquered: [...new Set(array(regions['conquered']).map((id) => known(int(id))))],
+    guardians: unique(
+      array(regions['guardians'] ?? []).map((raw) => {
+        const guardian = record(raw);
+        const hp = finite(guardian['hp']);
+
+        if (hp <= 0) throw new SaveError(`gardien de région sans vie : ${hp}`);
+        return { id: known(int(guardian['id'])), hp };
+      }),
+    ),
+  };
 }
 
 function parseEnemyBase(raw: unknown): EnemyBase {

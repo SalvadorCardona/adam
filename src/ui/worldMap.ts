@@ -20,6 +20,12 @@
  *   bâtiments et bases mutantes à leur emprise, habitants et ennemis en
  *   points, Adam en gros point, et le cadre de ce que montre la caméra.
  *
+ * **Les régions** (`data/regions.ts`) : une conquise se montre telle
+ * quelle ; une à conquérir — son gardien l'attend — est hachurée de jaune,
+ * son repaire marqué d'un point corail ; une verrouillée — il faut une ère
+ * plus avancée — est voilée d'indigo. Un liseré blanc borde chaque région ;
+ * la légende le rappelle.
+ *
  * **Le brouillard.** La carte ne montre que ce que `MapSight` lui permet :
  * rien d'une case inexplorée ; d'une case explorée, le sol et le bâti sous
  * un voile indigo, personne dessus ; le reste en direct.
@@ -102,6 +108,18 @@ const TAINT_COLORS: Record<ContaminationKind, Color> = {
 
 const ROAD_COLOR: Color = PALETTE.paper.shade;
 const VEIL_COLOR: Color = PALETTE.ink.base;
+/** Une région à conquérir : ses hachures jaunes, une diagonale sur `HATCH`, et leur part. */
+const OPEN_COLOR: Color = PALETTE.yellow.base;
+const HATCH = 4;
+const OPEN_MIX = 0.45;
+/** Une région verrouillée : un voile indigo de plus. */
+const LOCKED_MIX = 0.4;
+/** Le liseré entre deux régions. */
+const BORDER_COLOR: Color = PALETTE.paper.base;
+const BORDER_MIX = 0.55;
+/** Le repaire d'un gardien qui attend. */
+const LAIR_COLOR: Color = PALETTE.coral.base;
+
 /** L'inexploré : la nuit indigo, pas du noir. */
 const UNEXPLORED_COLOR: Color = PALETTE.ink.shade;
 
@@ -177,7 +195,23 @@ export class WorldMap {
     const hint = document.createElement('p');
 
     hint.className = 'world-map-hint';
-    this.root.append(this.canvas, header, hint);
+
+    // La légende des régions : conquise, à conquérir, verrouillée.
+    const legend = document.createElement('ul');
+    const chips = (['conquered', 'open', 'locked'] as const).map((state) => {
+      const chip = document.createElement('li');
+      const swatch = document.createElement('span');
+      const label = document.createElement('span');
+
+      chip.className = 'world-map-legend-chip';
+      swatch.className = `world-map-swatch world-map-swatch-${state}`;
+      chip.append(swatch, label);
+      legend.append(chip);
+      return { state, label };
+    });
+
+    legend.className = 'world-map-legend';
+    this.root.append(this.canvas, header, legend, hint);
 
     onLocale(() => {
       const { worldMap } = t().screens;
@@ -189,6 +223,7 @@ export class WorldMap {
       this.closeButton.title = worldMap.close;
       this.closeButton.setAttribute('aria-label', worldMap.close);
       hint.textContent = worldMap.hint;
+      for (const { state, label } of chips) label.textContent = worldMap.regions[state];
     });
 
     const router = new PointerRouter(this.canvas);
@@ -351,6 +386,9 @@ export class WorldMap {
     const size = BLOCK * BLOCK_PX;
     const image = context.createImageData(size, size);
     const { seed, resources, roads, land } = this.world;
+    const [or, og, ob] = this.colorOf(OPEN_COLOR);
+    const [lr, lg, lb] = this.colorOf(VEIL_COLOR);
+    const [br, bgr, bb] = this.colorOf(BORDER_COLOR);
 
     for (let ly = 0; ly < BLOCK; ly += 1) {
       for (let lx = 0; lx < BLOCK; lx += 1) {
@@ -360,7 +398,18 @@ export class WorldMap {
 
         if (sight === 'unexplored') continue;
 
-        const [r, g, b] = this.colorOf(tileColor(seed, tx, ty, roads.has(tx, ty), resources.at(tx, ty)?.id ?? null, land.at(tx, ty)));
+        let [r, g, b] = this.colorOf(tileColor(seed, tx, ty, roads.has(tx, ty), resources.at(tx, ty)?.id ?? null, land.at(tx, ty)));
+        const region = this.world.regionAt(tx, ty);
+        const state = this.world.regionState(region);
+
+        if (state === 'open' && (((tx + ty) % HATCH) + HATCH) % HATCH === 0) {
+          [r, g, b] = [r + (or - r) * OPEN_MIX, g + (og - g) * OPEN_MIX, b + (ob - b) * OPEN_MIX];
+        } else if (state === 'locked') {
+          [r, g, b] = [r + (lr - r) * LOCKED_MIX, g + (lg - g) * LOCKED_MIX, b + (lb - b) * LOCKED_MIX];
+        }
+        if (this.world.regionAt(tx + 1, ty) !== region || this.world.regionAt(tx, ty + 1) !== region) {
+          [r, g, b] = [r + (br - r) * BORDER_MIX, g + (bgr - g) * BORDER_MIX, b + (bb - b) * BORDER_MIX];
+        }
         const veil = sight === 'explored' ? VEIL : 0;
         const [vr, vg, vb] = this.colorOf(VEIL_COLOR);
 
@@ -417,6 +466,7 @@ export class WorldMap {
     }
 
     this.drawBuildings();
+    this.drawLairs();
     this.drawMobiles();
     this.drawPlayer();
     this.drawCameraFrame();
@@ -431,6 +481,18 @@ export class WorldMap {
     for (const base of this.world.enemyBases) {
       if (this.sightOf(base.tx + ENEMY_BASE.width / 2, base.ty + ENEMY_BASE.height / 2) === 'unexplored') continue;
       this.footprint(base.tx, base.ty, ENEMY_BASE.width, ENEMY_BASE.height, isStanding(base) ? 'base' : 'ruin');
+    }
+  }
+
+  /** Le repaire du gardien de chaque région à conquérir, une fois exploré : un point corail cerclé de blanc. */
+  private drawLairs(): void {
+    const r = Math.max(3, this.view.scale * 0.7);
+
+    for (const region of this.world.regions) {
+      if (!region.lair || this.world.regionState(region.id) !== 'open') continue;
+      if (this.sightOf(region.lair.tx, region.lair.ty) === 'unexplored') continue;
+      this.dot(region.lair.tx + 0.5, region.lair.ty + 0.5, r + 1.5, PALETTE.paper.base);
+      this.dot(region.lair.tx + 0.5, region.lair.ty + 0.5, r, LAIR_COLOR);
     }
   }
 

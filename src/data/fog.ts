@@ -54,4 +54,6 @@ export const FOG_TINT = {
   unexplored: PALETTE.ink.shade,
   explored: PALETTE.ink.base,
   exploredAlpha: 0.42,
+  /** Le voile, plus léger, d'une région pas encore conquise (`data/regions.ts`), même vue. */
+  regionAlpha: 0.26,
 } as const;

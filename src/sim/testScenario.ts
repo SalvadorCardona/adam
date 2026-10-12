@@ -26,6 +26,7 @@ import { baseCenter } from './enemyBases.ts';
 import { isWalkable, resourceAt, terrainAt } from './terrain.ts';
 import type { Store } from './store.ts';
 import type { EntityId } from './types.ts';
+import { HOME_REGION_ID } from './regions.ts';
 import { World, siteMissing } from './world.ts';
 
 type Amounts = Partial<Record<ItemId, number>>;
@@ -73,6 +74,7 @@ export function stageScenario(scenario: TestScenarioProto): World {
   if (scenario.gear !== undefined) world.player.gear = scenario.gear;
   if (scenario.nearBase !== undefined) besideBase(world, scenario.nearBase);
   if (scenario.nearChest !== undefined) besideChest(world, scenario.nearChest);
+  if (scenario.nearLair !== undefined) besideLair(world, scenario.nearLair);
   if (scenario.wardrobe) {
     world.player.wardrobe = [...scenario.wardrobe.found];
     if (scenario.wardrobe.look) world.player.look = copyLook(scenario.wardrobe.look);
@@ -167,6 +169,24 @@ function besideChest(world: World, tiles: number): void {
   if (!best) throw new Error('scénario de test : pas de coffre près de la mairie');
   world.revealAround(best.tx, best.ty, tiles + 6);
   teleport(world, (best.tx - tiles + 0.5) * TILE_SIZE, (best.ty + 0.5) * TILE_SIZE);
+}
+
+/** Seule la prairie de départ est conquise ; Adam à `tiles` tuiles du repaire de la première région, côté mairie. */
+function besideLair(world: World, tiles: number): void {
+  const lair = world.regions[1]?.lair;
+  const hall = world.entities.get(world.townHallId);
+
+  if (!lair || !hall) throw new Error('scénario de test : pas de repaire de gardien');
+  world.conquered = new Set([HOME_REGION_ID]);
+
+  const x = (lair.tx + 0.5) * TILE_SIZE;
+  const y = (lair.ty + 0.5) * TILE_SIZE;
+  const hx = (hall.tx + hall.width / 2) * TILE_SIZE;
+  const hy = (hall.ty + hall.height / 2) * TILE_SIZE;
+  const length = Math.hypot(hx - x, hy - y) || 1;
+
+  world.revealAround(lair.tx, lair.ty, tiles + 8);
+  teleport(world, x + ((hx - x) / length) * tiles * TILE_SIZE, y + ((hy - y) / length) * tiles * TILE_SIZE);
 }
 
 function teleport(world: World, x: number, y: number): void {

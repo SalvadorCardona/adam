@@ -132,6 +132,8 @@ import { caravanBagBonus, caravanRoute, createCaravan, drawOffers, isCaravanDay,
 import type { WildlifeId } from '../data/enemies.ts';
 import { baseCenter, baseDoor, breed, canDamage, hitsBase, inBaseZone, isShielded, isStanding, onBase, placeEnemyBases } from './enemyBases.ts';
 import { compassOf, stepMutant, stepQueen, surfacePoint, type Compass, type MutantStep } from './enemies.ts';
+import { BIOMES, REGION_GUARDIAN, REGION_RINGS, eraOf, type BiomeId } from '../data/regions.ts';
+import { HOME_REGION_ID, REGION_COUNT, placeRegions, regionAt, type Region } from './regions.ts';
 import { createEve, currentQuest, harvestYieldWithTools, isUnlocked, mostDamaged, questProgress, rideHome, walkTo } from './eve.ts';
 import { ADAM_SALT, adultAge, bornTrait, canWork, cleanName, foeAge, nameOf, sexOf, traitOf, yearsToWork } from './inhabitants.ts';
 import { KID_SPRINT, stepKid } from './kids.ts';
@@ -308,6 +310,9 @@ const GUARD_POST = 2.6;
 const SPITTER_POST = 4;
 /** Hauteur de la bouche d'un cracheur, et du corps d'Adam qu'il vise, en pixels au-dessus des pieds. */
 const SPIT_MOUTH = 14;
+
+/** Sel du tirage qui déniche la spécialité d'une région conquise en récoltant (`findSpecialty`). */
+const SPECIALTY_SALT = 0x2f1a9c3b;
 
 /** Les espèces que loge une base mutante. */
 type GuardKind = 'guardian' | 'spitter' | 'chief';
@@ -715,6 +720,15 @@ export type WorldEvents = {
   enemyChiefDefeated: { baseId: number; level: number; prestige: number; x: number; y: number };
   /** Adam entre dans la zone d'une base debout : on n'y bâtit ni n'y récolte. */
   enemyZoneEntered: { id: number; level: number };
+  /**
+   * Adam entre dans une région pas encore conquise : `open`, son gardien
+   * l'attend ; `locked`, il faut d'abord l'ère `era` (indice dans `ERAS`).
+   */
+  regionEntered: { id: number; biome: BiomeId; state: 'open' | 'locked'; era: number };
+  /** Le gardien d'une région est tombé : elle est conquise, sa spécialité au sol. */
+  regionConquered: { id: number; biome: BiomeId; prestige: number; x: number; y: number };
+  /** Adam a déniché la spécialité d'une région conquise en y récoltant. */
+  specialtyFound: { item: ItemId; amount: number; tx: number; ty: number };
   /** Un arc forgé : `level` est le nouveau niveau d'équipement. */
   gearCrafted: { level: number; fromBag: [ItemId, number][] };
   gearRejected: { reason: GearRejection };
@@ -948,6 +962,28 @@ export class World {
   /** La base dont Adam est dans la zone, pour ne l'annoncer qu'en y entrant. Jamais sauvegardé. */
   private zoneBase: number | null = null;
 
+  /**
+   * Les régions de la carte (`sim/regions.ts`) et le repaire de leur gardien :
+   * tirés de la seed et des bases mutantes, jamais sauvegardés.
+   */
+  public readonly regions: readonly Region[];
+
+  /**
+   * Les régions conquises, la prairie de départ toujours. Un monde neuf les
+   * tient toutes — les tests, une partie de test — ; une colonie neuve
+   * (`newColony`) n'a que la prairie. Sauvegardé.
+   */
+  public conquered = new Set<number>(Array.from({ length: REGION_COUNT }, (_, id) => id));
+
+  /** La vie des gardiens blessés, par région ; absent : intact. Sauvegardé. */
+  private readonly guardianHp = new Map<number, number>();
+
+  /** Avance à chaque conquête : le voile et la carte du monde se repeignent. Jamais sauvegardé. */
+  public regionRevision = 0;
+
+  /** La région où se tient Adam, pour ne l'annoncer qu'en y entrant. Jamais sauvegardé. */
+  private hereRegion: number = HOME_REGION_ID;
+
   /** Depuis quel tick chaque ouvrier dehors est sans travail, cf. `isIdle()`. Jamais sauvegardé. */
   private readonly idleSince = new Map<MobileId, number>();
   /** Jusqu'à quel tick chacun a peur d'un ennemi vu de près (`REACTIONS.fearTicks`) : la bulle. Rien n'est sauvegardé. */
@@ -967,6 +1003,8 @@ export class World {
     const world = new World(seed);
 
     world.openBuildings = new Set(START_BUILDINGS);
+    // Une seule région : la prairie de départ. Le reste se conquiert.
+    world.conquered = new Set([HOME_REGION_ID]);
 
     return world;
   }
@@ -1000,6 +1038,9 @@ export class World {
       { x: this.target.x / TILE_SIZE, y: this.target.y / TILE_SIZE },
       (tx, ty) => isBuildable(terrainAt(this.seed, tx, ty)) && !this.resources.at(tx, ty) && this.chunks.isFree(tx, ty, 1, 1),
     );
+
+    // Les régions, et le repaire de chaque gardien : loin des bases mutantes et de leur zone.
+    this.regions = placeRegions(this.seed, (tx, ty) => this.chunks.isFree(tx, ty, 1, 1) && !this.enemyBases.some((base) => inBaseZone(base, tx, ty)));
 
     // Les dix ouvriers de la colonie attendent, libres, devant le chantier de la mairie.
     this.settleColonists();
@@ -1067,6 +1108,7 @@ export class World {
       colonists: this.colonists,
       staffPosts: [...(this.posts ?? [])].map(([id, { filled, since }]) => ({ id, filled, since })),
       enemyBases: this.enemyBases.map((base) => ({ ...base })),
+      regions: { conquered: [...this.conquered].sort((a, b) => a - b), guardians: [...this.guardianHp].map(([id, hp]) => ({ id, hp })) },
       stats: copyStats(this.stats),
       objectiveBase: copyStats(this.objectiveBase),
       player: { ...player, look: copyLook(look), wardrobe: [...wardrobe], unseenPieces: [...unseenPieces], inventory: inventory.toJSON() },
@@ -1195,6 +1237,16 @@ export class World {
         ? this.enemyBases.filter((base) => !this.zoneBuilt(base) && !this.playerOnBase(base))
         : state.enemyBases.map((base) => ({ ...base }));
 
+    // Une sauvegarde d'avant les régions : la prairie, et toute région où tient déjà un bâtiment ou une route.
+    this.guardianHp.clear();
+    if (state.regions) {
+      this.conquered = new Set([HOME_REGION_ID, ...state.regions.conquered]);
+      for (const { id, hp } of state.regions.guardians) this.guardianHp.set(id, hp);
+    } else {
+      this.conquered = this.builtRegions();
+    }
+    this.hereRegion = this.regionAt(floorDiv(this.player.x, TILE_SIZE), floorDiv(this.player.y, TILE_SIZE));
+
     this.scheduler.restore(state.scheduler);
     this.restoreJobs();
     this.restoreLumberjacks();
@@ -1267,6 +1319,7 @@ export class World {
     if (!this.dead) {
       this.handleContact(contact);
       this.watchZone();
+      this.watchRegion();
       this.harvestNearby();
       this.openChests();
     }
@@ -1279,6 +1332,7 @@ export class World {
     this.stepRespawn();
     this.stepWildlife();
     this.stepGuards();
+    this.stepRegionGuardians();
     this.stepBaseFire();
     this.watchOverColony();
     if (!this.dead) this.shootPlayerBow();
@@ -2104,6 +2158,27 @@ export class World {
     if (taken.stageChanged) this.dirtyTile(tx, ty);
 
     this.events.emit('resourceHarvested', { tx, ty, item, amount, remaining: taken.resource.remaining });
+    this.findSpecialty(tx, ty, taken.resource.remaining);
+  }
+
+  /**
+   * Dans une région conquise, une récolte déniche parfois sa spécialité
+   * (`BIOMES[].findChance`) — un tirage haché de la tuile, de ce qu'il en
+   * reste et du tick, pas du PRNG du monde. Sac plein, elle reste où elle était.
+   */
+  private findSpecialty(tx: number, ty: number, remaining: number): void {
+    const id = this.regionAt(tx, ty);
+
+    if (id === HOME_REGION_ID || !this.conquered.has(id)) return;
+
+    const biome = BIOMES[this.regions[id]!.biome];
+
+    if (!biome.specialty) return;
+    if (hash3(hash3(this.seed ^ SPECIALTY_SALT, tx, ty), remaining, this.tickCount) / 4294967296 >= biome.findChance) return;
+
+    const amount = this.player.inventory.add(biome.specialty, 1);
+
+    if (amount > 0) this.events.emit('specialtyFound', { item: biome.specialty, amount, tx, ty });
   }
 
   /**
@@ -2722,6 +2797,11 @@ export class World {
 
     if (unknown.length > 0) return { reason: 'unexplored', tiles: unknown };
 
+    // Une région pas encore conquise : on n'y bâtit pas avant d'avoir vaincu son gardien.
+    const unconquered = tiles((x, y) => !this.isConquered(x, y));
+
+    if (unconquered.length > 0) return { reason: 'region', tiles: unconquered };
+
     // Une foreuse au bord d'un filon : moitié gisement, moitié herbe. L'eau et le sable y sont des cases
     // fautives comme les autres ; le rocher du filon se casse ensuite (« resource »).
     const footing = this.footing(building, tx, ty);
@@ -2788,6 +2868,7 @@ export class World {
    */
   public roadBlock(tx: number, ty: number): Exclude<RoadRejection, 'noStone'> | null {
     if (!this.known(tx, ty)) return 'unexplored';
+    if (!this.isConquered(tx, ty)) return 'region';
     if (!isWalkable(terrainAt(this.seed, tx, ty))) return 'terrain';
     if (this.chunks.occupantAt(tx, ty) !== undefined) return 'occupied';
     if (this.resources.isTaken(tx, ty)) return 'resource';
@@ -4887,6 +4968,8 @@ export class World {
 
     // Les points de vie d'un chef sont ceux de sa base : rentré, il les garde.
     if (home) home.chief = Math.max(0, beast.hp);
+    // Ceux d'un gardien de région aussi : il rentre à son repaire avec ce qu'il lui reste.
+    if (beast.regionOf !== undefined && beast.hp > 0) this.guardianHp.set(beast.regionOf, beast.hp);
 
     if (beast.hp > 0) {
       if (beast.state === 'roam') beast.state = 'chase';
@@ -4901,6 +4984,9 @@ export class World {
     this.mobiles.delete(beast.id);
 
     // Un gardien ou un cracheur de moins : sa base le refera, le jour. Son chef, jamais : le bouclier tombe avec lui.
+    const realm = beast.regionOf === undefined ? undefined : this.regions[beast.regionOf];
+
+    if (realm) this.conquer(realm, beast, shooter);
     if (base && beast.proto === 'chief') {
       this.defeatChief(base, beast);
     } else if (base) {
@@ -4943,18 +5029,52 @@ export class World {
     this.findPiece('chief', base.id, base.level, chief.x, chief.y);
   }
 
-  /** Les points de vie d'une bête au plus : ceux de son espèce, ou, pour un chef, ceux de sa base. */
+  /**
+   * Le gardien d'une région tombe : elle est conquise pour de bon — on y
+   * bâtit, on y pave, sa spécialité s'y déniche —, le Prestige et l'XP de son
+   * anneau s'ajoutent aux siens, et sa spécialité tombe au sol.
+   */
+  private conquer(region: Region, guardian: Beast, shooter: Shooter): void {
+    const ring = REGION_RINGS[region.ring];
+    const { specialty } = BIOMES[region.biome];
+
+    this.conquered.add(region.id);
+    this.guardianHp.delete(region.id);
+    this.regionRevision += 1;
+    if (!ring) return;
+    this.events.emit('regionConquered', {
+      id: region.id,
+      biome: region.biome,
+      prestige: ring.prestige + KILL_PRESTIGE[guardian.proto],
+      x: guardian.x,
+      y: guardian.y,
+    });
+    this.gainPrestige(ring.prestige, guardian.x, guardian.y);
+    this.gainXp(ring.xp, shooter, guardian.x, guardian.y);
+    if (specialty) this.dropLoot([{ item: specialty, ...ring.spoils, chance: 1 }], guardian.x, guardian.y);
+  }
+
+  /** Les points de vie d'une bête au plus : ceux de son espèce, ou, pour un chef, ceux de sa base, pour un gardien de région, ceux de son anneau. */
   public beastMaxHp(beast: Beast): number {
     const base = beast.proto === 'chief' && beast.guardOf !== undefined ? this.enemyBase(beast.guardOf) : undefined;
 
-    return base ? enemyBaseLevel(base.level).chief.hp : WILDLIFE[beast.proto].hp;
+    if (base) return enemyBaseLevel(base.level).chief.hp;
+    return Math.round(WILDLIFE[beast.proto].hp * this.guardianRing(beast).hpScale);
   }
 
-  /** Ce qu'une bête retire à Adam par coup : son espèce, ou, pour un chef, sa base. */
+  /** Ce qu'une bête retire à Adam par coup : son espèce, ou, pour un chef, sa base, pour un gardien de région, son anneau. */
   private beastDamage(beast: Beast): number {
     const base = beast.proto === 'chief' && beast.guardOf !== undefined ? this.enemyBase(beast.guardOf) : undefined;
 
-    return base ? enemyBaseLevel(base.level).chief.damage : WILDLIFE[beast.proto].damage;
+    if (base) return enemyBaseLevel(base.level).chief.damage;
+    return Math.round(WILDLIFE[beast.proto].damage * this.guardianRing(beast).damageScale);
+  }
+
+  /** Les multiplicateurs d'un gardien de région ; une autre bête, aucun. */
+  private guardianRing(beast: Beast): { hpScale: number; damageScale: number } {
+    const region = beast.regionOf === undefined ? undefined : this.regions[beast.regionOf];
+
+    return (region && REGION_RINGS[region.ring]) ?? { hpScale: 1, damageScale: 1 };
   }
 
   /** Un cracheur crache sur Adam : de sa bouche, vers le corps d'Adam là où il est. */
@@ -5147,8 +5267,8 @@ export class World {
     let alive = 0;
 
     for (const beast of this.beasts()) {
-      // Les gardiens sont l'affaire de leur base (`stepGuards`) : ni rangés ici, ni sous le plafond de la faune.
-      if (beast.guardOf !== undefined) continue;
+      // Les gardiens sont l'affaire de leur base (`stepGuards`) ou de leur région : ni rangés ici, ni sous le plafond de la faune.
+      if (beast.guardOf !== undefined || beast.regionOf !== undefined) continue;
       if (beast.state !== 'chase' && distanceSq(player.x, player.y, beast.x, beast.y) > despawn * despawn) {
         // Rangée, pas tuée : la tanière se repeuplera sans attendre au retour d'Adam.
         this.mobiles.delete(beast.id);
@@ -5246,6 +5366,146 @@ export class World {
       this.postGuards(base, 'spitter', base.spitters - count.spitter);
       if (base.chief > 0) this.postGuards(base, 'chief', 1 - count.chief);
     }
+  }
+
+  /**
+   * Les gardiens des régions, une fois par seconde, comme ceux des bases :
+   * celui d'une région à conquérir — son ère atteinte — sort de son repaire
+   * quand Adam passe à `REGION_GUARDIAN.showTiles` tuiles, et y rentre,
+   * avec ce qu'il lui reste de vie, quand Adam s'éloigne au-delà de
+   * `hideTiles`, sauf s'il le charge. Hors combat, il se refait.
+   */
+  private stepRegionGuardians(): void {
+    if (this.tickCount % WILDLIFE_SPAWN.checkTicks !== 0) return;
+
+    const { player } = this;
+    const show = REGION_GUARDIAN.showTiles * TILE_SIZE;
+    const hide = REGION_GUARDIAN.hideTiles * TILE_SIZE;
+    const out = new Map<number, Beast>();
+
+    for (const beast of [...this.beasts()]) {
+      if (beast.regionOf === undefined) continue;
+
+      const away = distanceSq(player.x, player.y, beast.homeX, beast.homeY) > hide * hide;
+
+      if (this.regionState(beast.regionOf) !== 'open' || (beast.state !== 'chase' && away)) {
+        this.mobiles.delete(beast.id);
+        continue;
+      }
+      out.set(beast.regionOf, beast);
+    }
+
+    const regen = this.tickCount % REGION_GUARDIAN.regenTicks === 0;
+
+    for (const region of this.regions) {
+      if (!region.lair || this.regionState(region.id) !== 'open') continue;
+
+      const proto = BIOMES[region.biome].guardian;
+
+      if (!proto) continue;
+
+      const guardian = out.get(region.id);
+      const hp = this.guardianHp.get(region.id);
+
+      // Hors combat, il regagne un point toutes les `regenTicks`, sorti ou rentré.
+      if (regen && hp !== undefined && guardian?.state !== 'chase') {
+        const max = Math.round(WILDLIFE[proto].hp * REGION_RINGS[region.ring]!.hpScale);
+        const mended = Math.min(max, Math.floor(hp) + 1);
+
+        if (mended >= max) this.guardianHp.delete(region.id);
+        else this.guardianHp.set(region.id, mended);
+        if (guardian) guardian.hp = mended;
+      }
+      if (guardian) continue;
+
+      const x = (region.lair.tx + 0.5) * TILE_SIZE;
+      const y = (region.lair.ty + 0.5) * TILE_SIZE;
+
+      if (distanceSq(player.x, player.y, x, y) > show * show) continue;
+
+      const id = this.nextMobileId++;
+      const beast: Beast = {
+        kind: 'beast',
+        id,
+        proto,
+        x,
+        y,
+        prevX: x,
+        prevY: y,
+        facing: 'down',
+        moving: false,
+        hp: 0,
+        age: foeAge(this.seed, id, WILDLIFE[proto].age),
+        denId: 0,
+        regionOf: region.id,
+        homeX: x,
+        homeY: y,
+        state: 'roam',
+        dirX: 0,
+        dirY: 0,
+        wanderTicks: 0,
+        attackCooldown: 0,
+      };
+
+      beast.hp = this.guardianHp.get(region.id) ?? this.beastMaxHp(beast);
+      this.mobiles.set(beast.id, beast);
+    }
+  }
+
+  /* --------------------------------------------------------------- régions */
+
+  /** La région de la tuile (`sim/regions.ts`). */
+  public regionAt(tx: number, ty: number): number {
+    return regionAt(this.seed, tx, ty);
+  }
+
+  /** La tuile est-elle dans une région conquise ? On n'y bâtit et n'y pave qu'à cette condition. */
+  public isConquered(tx: number, ty: number): boolean {
+    return this.conquered.has(this.regionAt(tx, ty));
+  }
+
+  /**
+   * Où en est une région : `conquered` ; `open`, son ère atteinte, son
+   * gardien l'attend ; `locked`, il faut d'abord une ère plus avancée.
+   */
+  public regionState(id: number): 'conquered' | 'open' | 'locked' {
+    if (this.conquered.has(id)) return 'conquered';
+
+    const ring = REGION_RINGS[this.regions[id]?.ring ?? -1];
+
+    return ring && this.era() >= ring.era ? 'open' : 'locked';
+  }
+
+  /** L'ère de la colonie (indice dans `ERAS`), lue dans les objectifs réussis. */
+  public era(): number {
+    return eraOf(this.objective);
+  }
+
+  /** Les régions où tient du bâti ou une route : conquises d'office pour une sauvegarde d'avant les régions. */
+  private builtRegions(): Set<number> {
+    const built = new Set([HOME_REGION_ID]);
+
+    for (const entity of this.entities.values()) {
+      for (let ty = entity.ty; ty < entity.ty + entity.height; ty += 1) {
+        for (let tx = entity.tx; tx < entity.tx + entity.width; tx += 1) built.add(this.regionAt(tx, ty));
+      }
+    }
+    for (const { tx, ty } of this.roads.tiles()) built.add(this.regionAt(tx, ty));
+    return built;
+  }
+
+  /** Adam entre dans une région pas encore conquise : le HUD le dit, une fois par entrée. */
+  private watchRegion(): void {
+    const id = this.regionAt(floorDiv(this.player.x, TILE_SIZE), floorDiv(this.player.y, TILE_SIZE));
+
+    if (id === this.hereRegion) return;
+    this.hereRegion = id;
+
+    const state = this.regionState(id);
+    const region = this.regions[id];
+
+    if (state === 'conquered' || !region) return;
+    this.events.emit('regionEntered', { id, biome: region.biome, state, era: REGION_RINGS[region.ring]?.era ?? 0 });
   }
 
   /**

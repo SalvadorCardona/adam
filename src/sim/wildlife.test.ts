@@ -92,7 +92,7 @@ function findHabitat(seed: number, habitat: 'shore' | 'forest', solid: (tx: numb
 describe('tanières', () => {
   it('ne mettent les crabes que sur la rive, et les loups qu’en forêt', () => {
     // Les gardiens n'ont pas de tanière : leur base les loge.
-    const count = { crab: 0, wolf: 0, guardian: 0, spitter: 0, chief: 0 };
+    const count: Record<WildlifeId, number> = { crab: 0, wolf: 0, guardian: 0, spitter: 0, chief: 0, greatWolf: 0, giantCrab: 0, colossus: 0, sludgeKing: 0 };
 
     for (const seed of SEEDS) {
       for (let cy = -4; cy <= 4; cy += 1) {

@@ -35,6 +35,11 @@ export const KILL_XP = {
   spitter: 5,
   /** Plus l'XP de sa base (`BASE_XP[].chief`). */
   chief: 10,
+  /** Les gardiens de région : plus la conquête (`REGION_RINGS[].prestige`, `xp`). */
+  greatWolf: 15,
+  giantCrab: 15,
+  colossus: 15,
+  sludgeKing: 15,
 } as const satisfies Record<EnemyId | WildlifeId, number>;
 
 /**

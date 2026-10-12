@@ -68,7 +68,7 @@ import { Container, Graphics, Sprite, type Texture, type Ticker } from 'pixi.js'
 import { TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { PALETTE, hex } from '../data/artDirection.ts';
 import { COMPANION_CLASSES } from '../data/companions.ts';
-import { CHIEF, ENEMIES, LOOT_DROPS, SPITTER } from '../data/enemies.ts';
+import { CHIEF, ENEMIES, LOOT_DROPS, SPITTER, WILDLIFE } from '../data/enemies.ts';
 import { SLAM_MARK_RADIUS } from '../art/spitter.ts';
 import type { NeedId } from '../data/needs.ts';
 import type { ReactionId } from '../data/traits.ts';
@@ -488,7 +488,8 @@ export class MobileLayer {
           if ((mobile.kind === 'mutant' || mobile.kind === 'beast') && view.hp) {
             const max = mobile.kind === 'mutant' ? ENEMIES[mobile.proto].hp : this.world.beastMaxHp(mobile);
             const queen = mobile.kind === 'mutant' && mobile.proto === 'queen';
-            const chief = mobile.kind === 'beast' && mobile.proto === 'chief';
+            // Le gardien d'une région porte la barre d'un chef : c'est lui qu'il faut user.
+            const chief = mobile.kind === 'beast' && (mobile.proto === 'chief' || mobile.regionOf !== undefined);
 
             // La Reine et un chef de base portent leur barre dès qu'ils sortent : on voit d'emblée ce qu'il faut user.
             view.hp.visible = queen || chief || mobile.hp < max;
@@ -899,7 +900,7 @@ export class MobileLayer {
       const { id, ...options } = puppetOf(mobile);
       const puppet = new Puppet(this.library, id, this.tiles.shadow('grass'), options);
       // Le gros mutant est un mutant en plus grand, ombre comprise.
-      const scale = mobile.kind === 'mutant' ? ENEMIES[mobile.proto].scale : 1;
+      const scale = mobile.kind === 'mutant' ? ENEMIES[mobile.proto].scale : mobile.kind === 'beast' ? WILDLIFE[mobile.proto].scale : 1;
       let hp: Graphics | null = null;
 
       puppet.root.scale.set(scale);
@@ -913,7 +914,7 @@ export class MobileLayer {
         const proto = SPRITES[id];
 
         hp = new Graphics();
-        hp.position.set(-(id === 'queen' ? QUEEN_HP_WIDTH : id === 'chief' ? CHIEF_HP_WIDTH : HP_WIDTH) / 2, -proto.height * proto.anchorY * scale - 2);
+        hp.position.set(-(id === 'queen' ? QUEEN_HP_WIDTH : id === 'chief' || (mobile.kind === 'beast' && mobile.regionOf !== undefined) ? CHIEF_HP_WIDTH : HP_WIDTH) / 2, -proto.height * proto.anchorY * scale - 2);
         hp.visible = false;
         root.addChild(hp);
         root.alpha = 0;

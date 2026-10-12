@@ -34,6 +34,11 @@ export const ITEMS = {
   crabClaw: { label: 'Pince de crabe', stack: 50 },
   // Le cœur de la Reine des flaques : un seul par Reine abattue.
   radCore: { label: 'Cœur radioactif', stack: 10 },
+  // Les spécialités des régions conquises (`data/regions.ts`) : chacune vient d'un biome, et ne sert qu'au labo.
+  amber: { label: 'Ambre', stack: 50 },
+  pearl: { label: 'Nacre', stack: 50 },
+  quartz: { label: 'Quartz', stack: 50 },
+  spore: { label: 'Spore violette', stack: 50 },
 } as const satisfies Record<string, ItemProto>;
 
 export type ItemId = keyof typeof ITEMS;

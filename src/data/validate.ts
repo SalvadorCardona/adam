@@ -13,13 +13,14 @@
  * du labo, un effet qui porte sur une statistique connue.
  */
 
+import { BIOMES, ERAS, HOME_REGION, REGION_RINGS, type BiomeProto, type RegionRing } from './regions.ts';
 import { TILE_SIZE } from '../core/grid.ts';
 import { PALETTE, auditSvg } from './artDirection.ts';
 import { BUILDINGS, RUIN, type BuildingProto } from './buildings.ts';
 import { DAWN_REWARD, DAY_CYCLE } from './dayNight.ts';
 import { BASE_XP, KILL_XP, LEVEL_GAINS, MAX_LEVEL, XP_CURVE, XP_SHARE } from './levels.ts';
 import { ENEMY_BASE, ENEMY_BASE_LEVELS, FIREBALL, GUARD_RANGE, RAIDS, type EnemyBaseLevel } from './enemyBases.ts';
-import { CHIEF, ENEMIES, LOOT_DROPS, SPITTER, NIGHT_BOSSES, WAVES, WILDLIFE, WILDLIFE_SPAWN, type LootTable, type WaveSpec, type WildlifeProto } from './enemies.ts';
+import { CHIEF, ENEMIES, LOOT_DROPS, SPITTER, NIGHT_BOSSES, WAVES, WILDLIFE, WILDLIFE_IDS, WILDLIFE_SPAWN, type LootTable, type WaveSpec, type WildlifeProto } from './enemies.ts';
 import { EVE } from './eve.ts';
 import { ICON_SIZE, ITEM_ICONS, PRESTIGE_ICON } from './icons.ts';
 import { CATEGORY_ICONS } from './categoryIcons.ts';
@@ -425,6 +426,33 @@ export function validatePrototypes(): string[] {
   }
   NIGHT_BOSSES.forEach((night: WaveSpec, index) => {
     if (Object.values(night).some((count) => count < 0)) errors.push(`NIGHT_BOSSES[${index}] : effectif négatif`);
+  });
+
+  // Les régions : un gardien de région par biome à conquérir, sa spécialité ; des anneaux qui s'éloignent et durcissent.
+  for (const [id, biome] of Object.entries(BIOMES) as [string, BiomeProto][]) {
+    if (id === HOME_REGION.biome) continue;
+    if (!biome.guardian || WILDLIFE[biome.guardian].habitat !== 'region') errors.push(`BIOMES.${id} : son gardien doit être une bête d'habitat « region »`);
+    if (!biome.specialty) errors.push(`BIOMES.${id} : une région à conquérir rapporte une spécialité`);
+    if (biome.findChance <= 0 || biome.findChance >= 1) errors.push(`BIOMES.${id}.findChance : entre 0 et 1, exclus`);
+  }
+  for (const id of WILDLIFE_IDS) {
+    if (WILDLIFE[id].habitat === 'region' && !Object.values(BIOMES).some((biome: BiomeProto) => biome.guardian === id)) {
+      errors.push(`WILDLIFE.${id} : un gardien de région sans biome`);
+    }
+  }
+  REGION_RINGS.forEach((ring: RegionRing, index) => {
+    const previous: RegionRing | undefined = REGION_RINGS[index - 1];
+    const inner = previous ? previous.outer : HOME_REGION.radius;
+
+    if (ring.inner !== inner || ring.outer <= ring.inner || ring.lair <= ring.inner || ring.lair >= ring.outer) {
+      errors.push(`REGION_RINGS[${index}] : bande ou repaire incohérents`);
+    }
+    if (ring.sectors < 1 || ring.era < 0 || ring.era >= ERAS.length || ring.spoils.min < 1 || ring.spoils.max < ring.spoils.min) {
+      errors.push(`REGION_RINGS[${index}] : secteurs, ère ou butin incohérents`);
+    }
+    if (previous && (ring.hpScale <= previous.hpScale || ring.era < previous.era)) {
+      errors.push(`REGION_RINGS[${index}] : un anneau plus lointain doit avoir un gardien plus coriace, d'une ère au moins égale`);
+    }
   });
 
   for (const [index, level] of ENEMY_BASE_LEVELS.entries()) {

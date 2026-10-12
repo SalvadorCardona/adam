@@ -339,6 +339,8 @@ export type RoadRejection =
   | 'enemyZone'
   /** Personne n'y est encore allé : on ne pave pas l'inconnu. */
   | 'unexplored'
+  /** Une région pas encore conquise (`data/regions.ts`) : on n'y pave pas. */
+  | 'region'
   /** Terre polluée : comme un bâtiment, on n'y pave pas (une station la nettoie). */
   | 'polluted'
   /** Terre radioactive : on n'y pave pas, et rien ne la nettoie. */
@@ -380,6 +382,8 @@ export type PlacementRejection =
   | 'enemyZone'
   /** Le brouillard couvre une case de l'emprise : personne n'y est encore allé. */
   | 'unexplored'
+  /** Une case de l'emprise est dans une région pas encore conquise : il faut vaincre son gardien. */
+  | 'region'
   /** Un seul par colonie, et il y en a déjà un — chantier compris. */
   | 'unique';
 

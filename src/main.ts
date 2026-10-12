@@ -116,6 +116,10 @@ const ITEM_PARTICLES: Record<ItemId, ParticleStyle> = {
   wolfFang: PARTICLES.bone,
   crabClaw: PARTICLES.claw,
   radCore: PARTICLES.mutant,
+  amber: PARTICLES.food,
+  pearl: PARTICLES.water,
+  quartz: PARTICLES.iron,
+  spore: PARTICLES.fur,
 };
 
 /**
@@ -159,6 +163,11 @@ const BEAST_PARTICLES: Record<WildlifeId, ParticleStyle> = {
   guardian: PARTICLES.mutant,
   spitter: PARTICLES.mutant,
   chief: PARTICLES.mutant,
+  // Les gardiens des régions : la bête qu'ils ont été, en plus grand.
+  greatWolf: PARTICLES.fur,
+  giantCrab: PARTICLES.claw,
+  colossus: PARTICLES.mutant,
+  sludgeKing: PARTICLES.mutant,
 };
 /** Les éclats d'un mur frappé : ceux de la pierre, dans l'ombre de la roche. */
 const CHIP_PARTICLES: ParticleStyle = { ...PARTICLES.stone, colors: [GROUND.rock.shade] };
@@ -848,6 +857,7 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('baseFired', () => audio.play('gloop'));
   world.events.on('chiefSlammed', () => audio.play('thud'));
   world.events.on('enemyChiefDefeated', () => audio.play('objective'));
+  world.events.on('regionConquered', () => audio.play('objective'));
   world.events.on('levelUp', () => audio.play('objective'));
   world.events.on('gearCrafted', () => audio.play('upgrade'));
   world.events.on('companionTraining', () => audio.play('upgrade'));
@@ -1192,6 +1202,11 @@ function wireParticles(world: World, renderer: GameRenderer): void {
   world.events.on('chestOpened', ({ x, y }) => {
     particles.burst(x, y - 8, PARTICLES.confetti, 14, 0.15);
     particles.burst(x, y - 8, PARTICLES.star, 6, 0.1);
+  });
+  // Une région conquise : confettis et étoiles là où son gardien est tombé.
+  world.events.on('regionConquered', ({ x, y }) => {
+    particles.burst(x, y - 16, PARTICLES.confetti, 18, 0.18);
+    particles.burst(x, y - 16, PARTICLES.star, 8, 0.12);
   });
   // Un niveau de plus : une gerbe de confettis et d'étoiles autour d'Adam.
   world.events.on('levelUp', ({ x, y }) => {

@@ -58,6 +58,7 @@ import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
 import { COMPANIONS, COMPANION_CLASSES } from '../data/companions.ts';
 import type { ItemId } from '../data/items.ts';
 import { NEED_IDS, type NeedId } from '../data/needs.ts';
+import { BIOMES } from '../data/regions.ts';
 import { SIGNAL_WAVES } from '../data/artDirection.ts';
 import { OBJECTIVES, type Goal } from '../data/objectives.ts';
 import { seedsFor } from '../data/perks.ts';
@@ -658,6 +659,15 @@ export class Hud {
     world.events.on('enemyBaseShielded', () => this.notify(t().hud.toast.baseShielded, 'bad'));
     world.events.on('enemyChiefDefeated', ({ prestige }) => this.notify(t().hud.toast.chiefDefeated(prestige), 'good'));
     world.events.on('enemyZoneEntered', ({ level }) => this.notify(t().hud.toast.enemyZone(level), 'info'));
+    world.events.on('regionEntered', ({ id, biome, state, era }) => {
+      const guardian = BIOMES[biome].guardian;
+      const name = t().biomes[biome];
+
+      if (state === 'locked') this.notify(t().hud.toast.regionLocked(name, t().eras[era] ?? ''), 'info');
+      else if (guardian && world.regions[id]?.lair) this.notify(t().hud.toast.regionOpen(name, t().wildlife[guardian]), 'info');
+    });
+    world.events.on('regionConquered', ({ biome, prestige }) => this.notify(t().hud.toast.regionConquered(t().biomes[biome], prestige), 'good'));
+    world.events.on('specialtyFound', ({ item, amount }) => this.float(item, amount));
     // Le « +N Prestige » monte déjà de la base (`prestigeGained`) : il ne reste que le bandeau.
     world.events.on('enemyBaseDestroyed', ({ prestige }) => this.notify(t().hud.toast.baseDestroyed(prestige), 'good'));
     world.events.on('gearCrafted', ({ level, fromBag }) => {

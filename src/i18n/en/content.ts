@@ -30,6 +30,10 @@ export const content: Content = {
     wolfFang: 'Wolf fang',
     crabClaw: 'Crab claw',
     radCore: 'Radioactive core',
+    amber: 'Amber',
+    pearl: 'Mother-of-pearl',
+    quartz: 'Quartz',
+    spore: 'Violet spore',
   },
   buildings: {
     townHall: {
@@ -268,7 +272,19 @@ export const content: Content = {
     guardian: 'Base guardian',
     spitter: 'Base spitter',
     chief: 'Base chief',
+    greatWolf: 'Great wolf',
+    giantCrab: 'Giant crab',
+    colossus: 'Quarry colossus',
+    sludgeKing: 'Sludge king',
   },
+  biomes: {
+    meadow: 'Meadow',
+    forest: 'Forest',
+    coast: 'Coast',
+    mountain: 'Mountain',
+    wasteland: 'Polluted lands',
+  },
+  eras: ['Founding', 'Colony', 'Signal'],
   enemyBase: {
     label: 'Mutant base',
     description: 'A camp of ruins and glowing puddles. While it stands, nobody builds or harvests in its zone.',
@@ -500,6 +516,22 @@ export const content: Content = {
       label: 'Fertile farms',
       description: 'A fertilizer of mutant goo, diluted. Very diluted.',
     },
+    amberBows: {
+      label: 'Amber-varnished bows',
+      description: 'Forest amber stiffens the bow: every arrow hits harder.',
+    },
+    pearlBag: {
+      label: 'Pearl-stitched bag',
+      description: 'Mother-of-pearl buckles from the coast: the bag opens wider.',
+    },
+    quartzBits: {
+      label: 'Quartz bits',
+      description: 'Mountain quartz never dulls: drills dig faster.',
+    },
+    sporeCompost: {
+      label: 'Spore compost',
+      description: 'Spores from the polluted lands, buried in the field: the harvest nearly doubles.',
+    },
   },
   achievements: {
     firstRoof: {
@@ -708,5 +740,6 @@ export const content: Content = {
     raid: 'Mutant base',
     chest: 'Chest to open',
     wardrobe: 'Wardrobe',
+    regions: 'Regions',
   },
 };

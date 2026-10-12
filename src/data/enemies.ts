@@ -338,8 +338,11 @@ export function queenWave(night: number): number | null {
  *   tirée de la seed (`densPerChunk` nul) : c'est la base qui les loge et les
  *   refait (`data/enemyBases.ts`). Ils chargent Adam dès qu'il entre dans
  *   leur laisse, et n'en sortent jamais, même en chargeant.
+ * - `region` : le repaire du gardien d'une région à conquérir
+ *   (`data/regions.ts`). Pas de tanière non plus : la région le loge, il
+ *   tient sa laisse comme un gardien de base, et sa mort conquiert la région.
  */
-export type Habitat = 'shore' | 'forest' | 'base';
+export type Habitat = 'shore' | 'forest' | 'base' | 'region';
 
 export interface WildlifeProto {
   label: string;
@@ -373,6 +376,8 @@ export interface WildlifeProto {
   /** Ce qu'elle lâche au sol quand l'arc l'abat (`LOOT_DROPS`). */
   loot: LootTable;
   sprite: SpriteId;
+  /** Taille du sprite à l'écran : 1 pour une bête ordinaire, plus pour le gardien d'une région. */
+  scale: number;
   halfW: number;
   halfH: number;
   /** Son âge à l'apparition, en années, comme un mutant. */
@@ -403,6 +408,7 @@ export const WILDLIFE = {
       { item: 'crabClaw', min: 1, max: 1, chance: 0.4 },
     ],
     sprite: 'crab',
+    scale: 1,
     halfW: 8,
     halfH: 5,
     age: { min: 1, max: 6 },
@@ -431,6 +437,7 @@ export const WILDLIFE = {
       { item: 'wolfFang', min: 1, max: 1, chance: 0.5 },
     ],
     sprite: 'wolf',
+    scale: 1,
     halfW: 9,
     halfH: 6,
     age: { min: 1, max: 9 },
@@ -466,6 +473,7 @@ export const WILDLIFE = {
       { item: 'ironOre', min: 1, max: 2, chance: 1 },
     ],
     sprite: 'guardian',
+    scale: 1,
     halfW: 9,
     halfH: 6,
     age: { min: 20, max: 60 },
@@ -502,6 +510,7 @@ export const WILDLIFE = {
       { item: 'ironOre', min: 1, max: 1, chance: 0.5 },
     ],
     sprite: 'spitter',
+    scale: 1,
     halfW: 7,
     halfH: 5,
     age: { min: 15, max: 45 },
@@ -535,10 +544,127 @@ export const WILDLIFE = {
     // Sa gelée, toujours ; sa base y ajoute ce qu'elle a de rare (`chief.loot`).
     loot: [{ item: 'mutantGoo', min: 1, max: 2, chance: 1 }],
     sprite: 'chief',
+    scale: 1,
     // Ses pieds : une tuile de large au plus, comme tout ennemi.
     halfW: 13,
     halfH: 8,
     age: { min: 40, max: 90 },
+  },
+  /*
+   * Les gardiens des régions à conquérir (`BIOMES[].guardian`) : un par
+   * biome, une bête de la carte qui a trop poussé. Ces chiffres sont ceux du
+   * premier anneau ; `REGION_RINGS[].hpScale` et `damageScale` les font
+   * grandir avec la distance. Ils tiennent leur repaire comme un gardien de
+   * base : chargent qui y entre, le lâchent qui s'éloigne, ne le quittent
+   * jamais. Abattus, la région est conquise.
+   */
+  /** Le loup de la forêt, en deux fois plus grand : vif, il cogne souvent. */
+  greatWolf: {
+    label: 'Grand loup',
+    hp: 30,
+    speed: 1.4,
+    chargeSpeed: 3,
+    damage: 3,
+    attackTicks: 24,
+    aggroRadius: 7,
+    giveUpRadius: 12,
+    leashRadius: 9,
+    habitat: 'region',
+    throughTrees: true,
+    densPerChunk: 0,
+    groupMin: 1,
+    groupMax: 1,
+    respawnTicks: 0,
+    loot: [
+      { item: 'meat', min: 4, max: 6, chance: 1 },
+      { item: 'wolfFang', min: 1, max: 2, chance: 1 },
+    ],
+    sprite: 'wolf',
+    scale: 1.8,
+    halfW: 14,
+    halfH: 9,
+    age: { min: 8, max: 15 },
+  },
+  /** Le crabe de la plage, grand comme une barque : lent, une carapace épaisse. */
+  giantCrab: {
+    label: 'Crabe géant',
+    hp: 40,
+    speed: 0.8,
+    chargeSpeed: 2,
+    damage: 4,
+    attackTicks: 30,
+    aggroRadius: 6,
+    giveUpRadius: 11,
+    leashRadius: 9,
+    habitat: 'region',
+    throughTrees: true,
+    densPerChunk: 0,
+    groupMin: 1,
+    groupMax: 1,
+    respawnTicks: 0,
+    loot: [
+      { item: 'meat', min: 4, max: 6, chance: 1 },
+      { item: 'crabClaw', min: 1, max: 2, chance: 1 },
+    ],
+    sprite: 'crab',
+    scale: 2.2,
+    halfW: 15,
+    halfH: 9,
+    age: { min: 20, max: 60 },
+  },
+  /** Un gardien casqué qui a grandi dans les carrières : très lent, très solide. */
+  colossus: {
+    label: 'Colosse des carrières',
+    hp: 50,
+    speed: 0.6,
+    chargeSpeed: 1.6,
+    damage: 5,
+    attackTicks: 36,
+    aggroRadius: 6,
+    giveUpRadius: 11,
+    leashRadius: 9,
+    habitat: 'region',
+    throughTrees: true,
+    densPerChunk: 0,
+    groupMin: 1,
+    groupMax: 1,
+    respawnTicks: 0,
+    loot: [
+      { item: 'stone', min: 4, max: 6, chance: 1 },
+      { item: 'ironOre', min: 3, max: 5, chance: 1 },
+    ],
+    sprite: 'guardian',
+    scale: 1.8,
+    halfW: 15,
+    halfH: 9,
+    age: { min: 40, max: 90 },
+  },
+  /** Un cracheur gonflé de boue violette : il ne crache plus, il écrase. */
+  sludgeKing: {
+    label: 'Roi des boues',
+    hp: 36,
+    speed: 0.9,
+    chargeSpeed: 2.2,
+    damage: 4,
+    attackTicks: 28,
+    aggroRadius: 7,
+    giveUpRadius: 12,
+    leashRadius: 9,
+    habitat: 'region',
+    throughTrees: true,
+    densPerChunk: 0,
+    groupMin: 1,
+    groupMax: 1,
+    respawnTicks: 0,
+    loot: [
+      { item: 'mutantGoo', min: 2, max: 4, chance: 1 },
+      { item: 'coal', min: 2, max: 3, chance: 1 },
+    ],
+    sprite: 'spitter',
+    scale: 1.9,
+    halfW: 14,
+    halfH: 9,
+    age: { min: 30, max: 80 },
   },
 } as const satisfies Record<string, WildlifeProto>;
 

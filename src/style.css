@@ -996,6 +996,51 @@ button:disabled,
   pointer-events: none;
 }
 
+/* La légende des régions, en bas à gauche, au-dessus de la consigne. */
+.world-map-legend {
+  position: absolute;
+  left: calc(var(--safe-left) + 12px);
+  bottom: calc(var(--safe-bottom) + 64px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.world-map-legend-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: var(--face);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--violet-shade);
+}
+
+.world-map-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.world-map-swatch-conquered {
+  background: var(--grass);
+}
+
+.world-map-swatch-open {
+  background: repeating-linear-gradient(45deg, var(--yellow) 0 3px, var(--grass) 3px 6px);
+}
+
+.world-map-swatch-locked {
+  background: var(--ink-light);
+}
+
 /* ------------------------------------------------------------ ville et sac */
 
 /*

@@ -39,10 +39,11 @@ export function puppetOf(
     case 'farmer':
       return { id: 'farmer', shadowWidth: 16, stride: 3, woman: mobile.sex === 'female' };
     case 'beast':
-      if (mobile.proto === 'guardian') return { id: WILDLIFE.guardian.sprite, shadowWidth: 24, stride: 4 };
-      if (mobile.proto === 'spitter') return { id: WILDLIFE.spitter.sprite, shadowWidth: 18, stride: 3 };
+      if (mobile.proto === 'guardian' || mobile.proto === 'colossus') return { id: WILDLIFE.guardian.sprite, shadowWidth: 24, stride: 4 };
+      if (mobile.proto === 'spitter' || mobile.proto === 'sludgeKing') return { id: WILDLIFE.spitter.sprite, shadowWidth: 18, stride: 3 };
       if (mobile.proto === 'chief') return { id: WILDLIFE.chief.sprite, shadowWidth: 38, stride: 7 };
-      return mobile.proto === 'crab'
+      // Les gardiens des régions : la bête qu'ils ont été, en plus grand (`WildlifeProto.scale`).
+      return mobile.proto === 'crab' || mobile.proto === 'giantCrab'
         ? { id: WILDLIFE.crab.sprite, shadowWidth: 22, stride: 8, gait: 'scuttle' }
         : { id: WILDLIFE.wolf.sprite, shadowWidth: 26, stride: 3 };
   }
