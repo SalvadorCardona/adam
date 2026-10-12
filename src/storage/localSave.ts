@@ -14,6 +14,9 @@ import type { World } from '../sim/world.ts';
 /** La clé de la partie en cours. */
 export const SAVE_KEY = 'mobile-factory:save';
 
+/** Où part une sauvegarde illisible avant qu'une nouvelle partie n'écrase la clé principale. */
+export const CORRUPT_SAVE_KEY = 'mobile-factory:save:corrupt';
+
 /** Ce dont la sauvegarde a besoin d'un `Storage` — de quoi le remplacer en test. */
 export type SaveStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -56,8 +59,20 @@ export class LocalSave {
 
     const decoded = decodeSave(text);
 
-    if (!decoded.ok) return { status: decoded.reason };
+    if (!decoded.ok) {
+      this.keepUnreadable(text);
+      return { status: decoded.reason };
+    }
     return { status: 'ok', world: decoded.world, savedAt: decoded.savedAt };
+  }
+
+  /** Garde une copie de ce qu'on ne sait pas relire : la prochaine autosave écrasera la clé principale. */
+  private keepUnreadable(text: string): void {
+    try {
+      this.storage?.setItem(CORRUPT_SAVE_KEY, text);
+    } catch {
+      // Quota plein : la copie est un filet, elle ne doit pas empêcher de jouer.
+    }
   }
 
   /** Écrit la partie. Renvoie `false` si le stockage l'a refusée — le jeu continue quand même. */

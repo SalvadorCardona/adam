@@ -1176,7 +1176,8 @@ function parseRegions(raw: unknown): SavedRegions {
 function parseEnemyBase(raw: unknown): EnemyBase {
   const base = record(raw);
   const level = int(base['level']);
-  const hp = int(base['hp']);
+  // Décimaux : un bonus d'arc fractionnaire (niveau, recherche) entame la base d'une fraction de point.
+  const hp = finite(base['hp']);
 
   if (level < 1 || level > ENEMY_BASE_LEVELS.length) throw new SaveError(`niveau de base mutante inconnu : ${level}`);
   if (hp < 0) throw new SaveError('base mutante aux points de vie négatifs');
