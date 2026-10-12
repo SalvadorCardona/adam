@@ -303,7 +303,7 @@ export class EntityLayer {
     const art: SpriteProto = SPRITES[sprite];
     const shown = entity.kind === 'site' ? 'site' : this.faceOf(entity);
     const main = footSprite(this.library.texture(`${sprite}.${shown}`), entity);
-    const moving = entity.kind === 'site' ? null : (['wheel', 'crops', 'smoke'] as const).find((part) => art.parts[part]) ?? null;
+    const moving = entity.kind === 'site' ? null : (['wheel', 'crops', 'smoke', 'pigs1'] as const).find((part) => art.parts[part]) ?? null;
     let movingSprite: Sprite | null = null;
 
     root.addChild(main);
@@ -708,6 +708,16 @@ export class EntityLayer {
   /** La roue tourne quand la foreuse travaille ; les cultures ondulent ; le labo fume quand il cherche, le four à charbon quand il cuit. */
   private animate(view: EntityView, entity: Entity, now: number): void {
     if (!view.moving) return;
+
+    if (entity.kind === 'pigPen') {
+      // Les cochons logés se montrent dans l'enclos, un exemplaire par cochon ; ils se dandinent doucement.
+      view.moving.visible = entity.pigs > 0;
+      if (entity.pigs > 0) {
+        view.moving.texture = this.library.texture(`pigPen.pigs${Math.min(3, entity.pigs)}`);
+        view.moving.scale.y = 1 + Math.sin(now * 0.005 + entity.id) * 0.02;
+      }
+      return;
+    }
 
     // À l'arrêt, tout se fige.
     if (entity.kind !== 'site' && canPause(entity.proto) && this.world.stopped(entity)) return;

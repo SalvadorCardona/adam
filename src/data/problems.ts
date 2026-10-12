@@ -16,6 +16,8 @@ export const PROBLEM_ORDER = [
   'noWorker',
   /** Un consommateur — la nurserie, une forge — n'a pas de quoi lancer son prochain cycle : il attend une livraison. */
   'starved',
+  /** L'élevage de cochons n'a aucun cochon : il attend qu'on en ramène un de la forêt. */
+  'noPig',
 ] as const;
 
 export type ProblemId = (typeof PROBLEM_ORDER)[number];

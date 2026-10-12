@@ -38,6 +38,8 @@ export function puppetOf(
       return { id: 'forester', shadowWidth: 16, stride: 3, woman: mobile.sex === 'female' };
     case 'farmer':
       return { id: 'farmer', shadowWidth: 16, stride: 3, woman: mobile.sex === 'female' };
+    case 'pig':
+      return { id: 'pig', shadowWidth: 18, stride: 2.5 };
     case 'beast':
       if (mobile.proto === 'guardian' || mobile.proto === 'colossus') return { id: WILDLIFE.guardian.sprite, shadowWidth: 24, stride: 4 };
       if (mobile.proto === 'spitter' || mobile.proto === 'sludgeKing') return { id: WILDLIFE.spitter.sprite, shadowWidth: 18, stride: 3 };

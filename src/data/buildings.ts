@@ -25,6 +25,7 @@ export type BuildingKind =
   | 'tower'
   | 'house'
   | 'farm'
+  | 'pigPen'
   | 'quarry'
   | 'forge'
   | 'clinic'
@@ -366,6 +367,30 @@ export const BUILDINGS = {
     plan: false,
     shore: true,
     sprite: 'well',
+    weapon: null,
+    upgrades: [],
+  },
+  pigPen: {
+    label: LORE.buildings.pigPen.name,
+    sign: LORE.buildings.pigPen.sign,
+    siteDescription: LORE.buildings.pigPen.site,
+    description: LORE.buildings.pigPen.description,
+    effect: LORE.buildings.pigPen.effect,
+    // Un producteur sans ouvrier : ce sont ses cochons qui travaillent (`data/pigs.ts`).
+    kind: 'pigPen',
+    category: 'production',
+    width: 2,
+    height: 2,
+    cost: { wood: 14, stone: 4 },
+    storage: 20,
+    logisticRadius: 0,
+    hp: 50,
+    workers: 0,
+    minWorkers: 0,
+    menu: true,
+    unique: false,
+    plan: false,
+    sprite: 'pigPen',
     weapon: null,
     upgrades: [],
   },

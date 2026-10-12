@@ -148,6 +148,21 @@ export interface Farm extends Built {
   kind: 'farm';
 }
 
+/**
+ * L'élevage de cochons (`data/pigs.ts`) : les cochons qu'on y a ramenés y
+ * vivent — ils ne sont plus des mobiles — et donnent de la viande à chaque
+ * cycle dans son coffre, que les porteurs vident.
+ */
+export interface PigPen extends Built {
+  kind: 'pigPen';
+  /** Cochons logés, de 0 à `PIG_FARM.capacity`. */
+  pigs: number;
+  /** Tick de la fin du cycle en cours ; 0 sans cochon ni cycle. */
+  endTick: number;
+  /** Vrai quand l'élevage ne se replanifie plus : coffre plein, ou sans cochon. */
+  blocked: boolean;
+}
+
 /** La carrière : ses ouvriers taillent de la pierre dans son coffre, à la cadence de la recette, comme une ferme. */
 export interface Quarry extends Built {
   kind: 'quarry';
@@ -283,6 +298,7 @@ export type Entity =
   | House
   | Decor
   | Farm
+  | PigPen
   | Quarry
   | Forge
   | Clinic
@@ -473,6 +489,33 @@ export interface SlamState {
   x: number;
   y: number;
   ticks: number;
+}
+
+/**
+ * Ce que fait un cochon :
+ * - `wild` : il flâne autour de son point, `tame` monte tant qu'Adam reste près ;
+ * - `follow` : apprivoisé, il suit Adam ; `loose` compte ses ticks trop loin de lui ;
+ * - `flee` : effrayé ou abandonné, il détale `ticks` ticks puis redevient sauvage.
+ */
+export type PigState = 'wild' | 'follow' | 'flee';
+
+/** Un cochon sauvage ou apprivoisé (`data/pigs.ts`) : paisible, il n'a pas de points de vie et l'arc ne le vise pas. */
+export interface Pig extends Moving {
+  kind: 'pig';
+  state: PigState;
+  /** Le point d'où il vient (`denId`, 0 s'il s'est enfui d'un élevage) et où il flâne. */
+  denId: number;
+  homeX: number;
+  homeY: number;
+  dirX: number;
+  dirY: number;
+  wanderTicks: number;
+  /** Jauge d'apprivoisement, de 0 à `PIGS.tame.ticks`. */
+  tame: number;
+  /** Ticks passés trop loin d'Adam, une fois apprivoisé. */
+  loose: number;
+  /** Ticks de fuite restants ; la direction est celle de `dirX`, `dirY`. */
+  fleeTicks: number;
 }
 
 /** Ce que les arcs peuvent viser : un mutant ou une bête. */
@@ -894,7 +937,7 @@ export interface Caravan extends Moving {
   met: boolean;
 }
 
-export type Mobile = Mutant | Beast | Arrow | Spit | Fireball | Kid | Eve | Worker | Lumberjack | Forester | Farmer | Pickup | Patient | Companion | Caravan;
+export type Mobile = Mutant | Beast | Arrow | Spit | Fireball | Kid | Eve | Worker | Lumberjack | Forester | Farmer | Pickup | Patient | Companion | Caravan | Pig;
 
 /**
  * Les compteurs de la partie, que les objectifs lisent. Ils ne font que

@@ -72,6 +72,8 @@ import { DUST_RING, PARTICLE_FX } from '../art/particles.ts';
 import { PAUSED } from '../art/paused.ts';
 import { PRIORITY } from '../art/priority.ts';
 import { QUARRY } from '../art/quarry.ts';
+import { PIG } from '../art/pig.ts';
+import { PIG_PEN } from '../art/pigPen.ts';
 import { WELL } from '../art/well.ts';
 import { QUEEN_SPRITE } from '../art/queen.ts';
 import { PUDDLE } from '../art/puddle.ts';
@@ -139,6 +141,8 @@ export const SPRITES = {
   exMutant: EX_MUTANT_SPRITE,
   crab: CRAB,
   wolf: WOLF,
+  /** Le cochon sauvage, puis apprivoisé (`data/pigs.ts`). */
+  pig: PIG,
   /** Le gardien d'une base mutante : seau de ruine sur la tête, couvercle pour bouclier. */
   guardian: GUARDIAN,
   /** Le cracheur d'une base : jabot de gelée, lunettes de piscine violettes. */
@@ -238,6 +242,7 @@ export const SPRITES = {
   foresterHouse: FORESTER_HOUSE,
   quarry: QUARRY,
   well: WELL,
+  pigPen: PIG_PEN,
   logisticsPost: LOGISTICS_POST,
   constructionPost: CONSTRUCTION_POST,
   /** L'Antenne, étage par étage ; l'émetteur a aussi sa version allumée (`lit`), après le Signal. */

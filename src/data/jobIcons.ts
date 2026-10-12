@@ -327,6 +327,17 @@ export const JOB_DRAWINGS = {
     circle(12, 6.5, 3, coral.base),
     pill(14, 9.2, 5, 1.8, coral.shade),
   ),
+  /** L'élevage de cochons : une tête de cochon, ses oreilles et son groin. */
+  pigPen: job(
+    pill(5.5, 5.5, 4.4, 6.4, skin.shade),
+    pill(14.1, 5.5, 4.4, 6.4, skin.shade),
+    shadedCircle(12, 12.5, 6.6, 'skin'),
+    circle(9.8, 10.8, 1.1, ink.base),
+    circle(14.2, 10.8, 1.1, ink.base),
+    pill(8.6, 13, 6.8, 4.6, coral.base),
+    circle(10.6, 15.3, 0.8, coral.shade),
+    circle(13.4, 15.3, 0.8, coral.shade),
+  ),
   /** L'Antenne : le pylône et son émetteur, qui appellent au loin. */
   antenna: job(
     polygon([9.5, 20.5, 14.5, 20.5, 12, 7], ink.base),

@@ -33,7 +33,7 @@ import type { EntityId } from './types.ts';
  * Ce qu'on peut mettre en pause : ce qu'un producteur fait tourner, et le
  * poste de construction — en pause, ses chantiers reviennent aux porteurs.
  */
-const PAUSABLE: ReadonlySet<BuildingKind> = new Set<BuildingKind>(['drill', 'farm', 'quarry', 'forge', 'nursery', 'lumberCamp', 'foresterHouse', 'yard']);
+const PAUSABLE: ReadonlySet<BuildingKind> = new Set<BuildingKind>(['drill', 'farm', 'quarry', 'forge', 'nursery', 'lumberCamp', 'foresterHouse', 'yard', 'pigPen']);
 
 /** Le bâtiment produit-il quelque chose qu'on puisse arrêter ? */
 export function canPause(proto: BuildingId): boolean {

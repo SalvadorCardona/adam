@@ -52,6 +52,7 @@ import { CARAVAN, RARE_OFFERS, type RareOfferId } from '../data/caravan.ts';
 import { CLINIC } from '../data/clinic.ts';
 import { DEATH } from '../data/death.ts';
 import { COMPANIONS, COMPANION_CLASSES, type CompanionClassId } from '../data/companions.ts';
+import { PIGS, PIG_FARM } from '../data/pigs.ts';
 import { DAWN_REWARD, DAY_CYCLE, SURVIVORS } from '../data/dayNight.ts';
 import {
   CHIEF,
@@ -149,6 +150,7 @@ import { rollLoot, stepPickup } from './loot.ts';
 import { copyStats, emptyStats, objectiveDone } from './objectives.ts';
 import { eraReady, nextEra, withEraThreat } from './eras.ts';
 import { denSize, densOfChunk, stepBeast, type Den } from './wildlife.ts';
+import { pigSpotsOfChunk, stepPig as stepPigBody, type PigSpot } from './pigs.ts';
 import { FULL_TILE, blockingTile, facingOf, type TileBox } from './motion.ts';
 import {
   BUILD_REACH_TILES,
@@ -243,6 +245,8 @@ import type {
   Mutant,
   Nursery,
   Patient,
+  Pig,
+  PigPen,
   Pickup,
   Player,
   Site,
@@ -255,7 +259,7 @@ import type {
 } from './types.ts';
 
 /** Ce qui remplit un coffre qu'Adam vient vider : foreuse, ferme, forge, cabane de bûcheron. */
-type Producer = Drill | Farm | Quarry | Forge | LumberCamp;
+type Producer = Drill | Farm | Quarry | PigPen | Forge | LumberCamp;
 
 /** 20 ticks de simulation par seconde. */
 export const TICKS_PER_SECOND = 20;
@@ -773,6 +777,14 @@ export type WorldEvents = {
   pieceFound: { piece: PieceId; source: LootSource | 'achievement' };
   /** Une source donnait des pièces, mais Adam a déjà toute la garde-robe : du Prestige à la place (`WARDROBE_SPARE`). */
   piecesSpared: { source: LootSource; prestige: number };
+  /** Un cochon sauvage se laisse apprivoiser : il suit Adam. */
+  pigTamed: { id: MobileId; x: number; y: number };
+  /** Le cochon qui suivait Adam détale : effrayé par une bête (`scare`), ou resté trop loin (`lost`). Il redeviendra sauvage. */
+  pigFled: { id: MobileId; reason: 'scare' | 'lost' };
+  /** Un cochon entre dans l'élevage `id`, qui en loge maintenant `pigs`. */
+  pigPenned: { id: EntityId; pigs: number };
+  /** L'élevage `id` est tombé : `count` cochons s'échappent. */
+  pigsEscaped: { id: EntityId; count: number };
   /** Adam ouvre un coffre de la carte, au centre (x, y) de sa case. */
   chestOpened: { id: number; tx: number; ty: number; x: number; y: number };
   /**
@@ -966,6 +978,7 @@ export class World {
 
   /** Cache des tanières par chunk : un calcul pur, gardé pour ne pas le refaire à chaque passage. */
   private readonly denCache = new Map<string, Den[]>();
+  private readonly pigSpotCache = new Map<string, readonly PigSpot[]>();
   /** Le prénom de chaque habitant vivant, par id : tiré à sa venue sans doublon (`pickName`), sauvegardé sous `names`. */
   private readonly givenNames = new Map<MobileId, string>();
   /** Le coffre de chaque chunk déjà regardé, tel que la seed le pose (`sim/chests.ts`). */
@@ -1403,6 +1416,7 @@ export class World {
     this.recover();
     this.stepRespawn();
     this.stepWildlife();
+    this.stepPigs();
     this.stepGuards();
     this.stepRegionGuardians();
     this.stepBaseFire();
@@ -2190,7 +2204,7 @@ export class World {
     if (this.contactTicks % DELIVER_TICKS !== 0) return;
 
     if (entity?.kind === 'site') this.deliver(entity);
-    else if (entity?.kind === 'drill' || entity?.kind === 'farm' || entity?.kind === 'quarry' || entity?.kind === 'lumberCamp') {
+    else if (entity?.kind === 'drill' || entity?.kind === 'farm' || entity?.kind === 'quarry' || entity?.kind === 'pigPen' || entity?.kind === 'lumberCamp') {
       this.collect(entity);
     }
     else if (entity?.kind === 'nursery') this.supplyOne(entity);
@@ -3231,6 +3245,10 @@ export class World {
         building = { ...base, kind: 'quarry', blocked: false };
         break;
 
+      case 'pigPen':
+        building = { ...base, kind: 'pigPen', pigs: 0, endTick: 0, blocked: true };
+        break;
+
       case 'forge':
         building = { ...base, kind: 'forge', blocked: true };
         break;
@@ -3311,6 +3329,10 @@ export class World {
 
       case 'quarry':
         this.scheduleFarm(building);
+        break;
+
+      case 'pigPen':
+        // Sans cochon, rien ne se planifie : c'est l'arrivée du premier qui lance le cycle.
         break;
 
       case 'forge':
@@ -3420,6 +3442,10 @@ export class World {
 
       case 'quarry':
         this.runFarm(entity);
+        break;
+
+      case 'pigPen':
+        this.runPigPen(entity);
         break;
 
       case 'forge':
@@ -3732,6 +3758,8 @@ export class World {
       if (entity.kind === 'barracks' && entity.training) {
         entity.training.endTick = Math.max(this.tickCount, entity.training.endTick - total);
       }
+      // Le cycle de l'élevage repart d'ici ; un ancien réveil, en avance, ne sonne plus pour rien.
+      if (entity.kind === 'pigPen' && entity.pigs > 0 && !entity.blocked) this.startPigPen(entity);
     }
 
     this.offlineLowStock(hall.store, alerts);
@@ -3773,6 +3801,9 @@ export class World {
 
         return { item, amount: (amount * ticks * share) / recipe.duration };
       }
+
+      case 'pigPen':
+        return entity.pigs > 0 ? { item: 'meat', amount: (PIG_FARM.meatPerPig * entity.pigs * ticks) / PIG_FARM.cycleTicks } : null;
 
       case 'lumberCamp': {
         const left = woodLeft.get(entity.id) ?? 0;
@@ -4428,6 +4459,10 @@ export class World {
 
         case 'caravan':
           this.stepCaravan(mobile);
+          break;
+
+        case 'pig':
+          this.stepPig(mobile);
           break;
       }
     }
@@ -6256,6 +6291,238 @@ export class World {
     this.dens.set(den.id, { members: size, readyTick: 0 });
   }
 
+  /* --------------------------------------------------------------- cochons */
+
+  /** Les points de cochon d'un chunk, calculés une fois. */
+  public pigSpotsAt(cx: number, cy: number): readonly PigSpot[] {
+    const key = coordKey(cx, cy);
+    let spots = this.pigSpotCache.get(key);
+
+    if (!spots) {
+      spots = pigSpotsOfChunk(this.seed, cx, cy);
+      this.pigSpotCache.set(key, spots);
+    }
+    return spots;
+  }
+
+  /** Les cochons de la carte, sauvages ou apprivoisés. */
+  public *pigs(): IterableIterator<Pig> {
+    for (const mobile of this.mobiles.values()) {
+      if (mobile.kind === 'pig') yield mobile;
+    }
+  }
+
+  /** Le cochon qui suit Adam, s'il y en a un. */
+  public followingPig(): Pig | undefined {
+    for (const pig of this.pigs()) {
+      if (pig.state === 'follow') return pig;
+    }
+    return undefined;
+  }
+
+  /**
+   * Un cochon sauvage sur la tuile (tx, ty). Posé sur un point de la seed
+   * (`spot`), le point est occupé jusqu'à ce que le cochon soit apprivoisé ou
+   * rangé ; sans point, c'est un cochon égaré, que rien ne repeuple.
+   */
+  public placePig(tx: number, ty: number, spot?: PigSpot): Pig {
+    if (spot) this.dens.set(spot.id, { members: 1, readyTick: 0 });
+    return this.makePig((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE, 'wild', spot?.id ?? 0);
+  }
+
+  private makePig(x: number, y: number, state: Pig['state'], denId: number): Pig {
+    const pig: Pig = {
+      kind: 'pig',
+      id: this.nextMobileId++,
+      x,
+      y,
+      prevX: x,
+      prevY: y,
+      facing: 'down',
+      moving: false,
+      state,
+      denId,
+      homeX: x,
+      homeY: y,
+      dirX: 0,
+      dirY: 0,
+      wanderTicks: 0,
+      tame: 0,
+      loose: 0,
+      fleeTicks: 0,
+    };
+
+    this.mobiles.set(pig.id, pig);
+    return pig;
+  }
+
+  /**
+   * Les points de cochon autour d'Adam, une fois par seconde, comme les
+   * tanières : range les cochons sauvages trop loin de lui, puis peuple les
+   * points libres des chunks voisins, hors de sa vue et loin du village. Un
+   * point d'où un cochon a été apprivoisé reste vide `PIGS.wild.respawnTicks`.
+   */
+  private stepPigs(): void {
+    if (this.tickCount % WILDLIFE_SPAWN.checkTicks !== 0) return;
+
+    const { player } = this;
+    const despawn = PIGS.wild.despawnDistance * TILE_SIZE;
+
+    for (const pig of [...this.pigs()]) {
+      if (pig.state === 'follow' || distanceSq(player.x, player.y, pig.x, pig.y) <= despawn * despawn) continue;
+
+      // Rangé, pas perdu : son point se repeuplera au retour d'Adam.
+      this.mobiles.delete(pig.id);
+
+      const spot = this.dens.get(pig.denId);
+
+      if (spot) spot.members = 0;
+    }
+
+    const { cx, cy } = this.playerChunk();
+    const radius = WILDLIFE_SPAWN.chunkRadius;
+    const near = WILDLIFE_SPAWN.minPlayerDistance * TILE_SIZE;
+    const hall = PIGS.wild.townHallClearance * TILE_SIZE;
+    const clearance = WILDLIFE_SPAWN.buildingClearance * TILE_SIZE;
+
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        for (const spot of this.pigSpotsAt(cx + dx, cy + dy)) {
+          const state = this.dens.get(spot.id);
+
+          if (state && (state.members > 0 || this.tickCount < state.readyTick)) continue;
+
+          const x = (spot.tx + 0.5) * TILE_SIZE;
+          const y = (spot.ty + 0.5) * TILE_SIZE;
+
+          if (distanceSq(player.x, player.y, x, y) < near * near) continue;
+          if (distanceSq(x, y, this.target.x, this.target.y) < hall * hall) continue;
+          if (this.isSolid(spot.tx, spot.ty)) continue;
+          if ([...this.entities.values()].some((entity) => distanceSq(x, y, (entity.tx + entity.width / 2) * TILE_SIZE, (entity.ty + entity.height / 2) * TILE_SIZE) < clearance * clearance)) continue;
+
+          this.placePig(spot.tx, spot.ty, spot);
+        }
+      }
+    }
+  }
+
+  /** Une bête sauvage ou un mutant sorti de sa flaque, assez près du cochon pour l'effrayer. */
+  private pigScare(pig: Pig): { x: number; y: number } | null {
+    const reach = PIGS.follow.scareDistance * TILE_SIZE;
+
+    for (const foe of this.foes()) {
+      if (foe.kind === 'mutant' && foe.emerge > 0) continue;
+      if (distanceSq(pig.x, pig.y, foe.x, foe.y) <= reach * reach) return foe;
+    }
+    return null;
+  }
+
+  /** Un tick de cochon : il flâne, se laisse apprivoiser, suit Adam jusqu'à l'élevage et y entre. */
+  private stepPig(pig: Pig): void {
+    const { player } = this;
+    const wasWild = pig.state === 'wild';
+    const reach = PIGS.tame.radius * TILE_SIZE;
+    // Un seul cochon à la fois derrière Adam : le calcul ne vaut que si celui-ci est tout près.
+    const canTame = !wasWild || distanceSq(player.x, player.y, pig.x, pig.y) > reach * reach || this.followingPig() === undefined;
+    const scare = pig.state === 'follow' ? this.pigScare(pig) : null;
+    const result = stepPigBody(pig, player, scare, canTame, this.isOpenGroundSolid, this.rng, STEP_SECONDS);
+
+    if (result === 'tamed') {
+      // Son point se vide un temps : on en retrouvera un plus tard.
+      const spot = this.dens.get(pig.denId);
+
+      if (spot) {
+        spot.members = 0;
+        spot.readyTick = this.tickCount + PIGS.wild.respawnTicks;
+      }
+      this.events.emit('pigTamed', { id: pig.id, x: pig.x, y: pig.y });
+    } else if (result === 'scared' || result === 'lost') {
+      this.events.emit('pigFled', { id: pig.id, reason: result === 'scared' ? 'scare' : 'lost' });
+    }
+
+    if (pig.state === 'follow') this.enterPen(pig);
+  }
+
+  /** Le cochon qui suit Adam arrive à un élevage qui a de la place : il y entre. */
+  private enterPen(pig: Pig): void {
+    for (const entity of this.entities.values()) {
+      if (entity.kind !== 'pigPen' || entity.pigs >= PIG_FARM.capacity) continue;
+
+      const reach = (Math.max(entity.width, entity.height) / 2 + PIGS.enterDistance) * TILE_SIZE;
+      const cx = (entity.tx + entity.width / 2) * TILE_SIZE;
+      const cy = (entity.ty + entity.height / 2) * TILE_SIZE;
+
+      if (distanceSq(pig.x, pig.y, cx, cy) > reach * reach) continue;
+
+      this.mobiles.delete(pig.id);
+      entity.pigs += 1;
+      this.events.emit('pigPenned', { id: entity.id, pigs: entity.pigs });
+      // Le premier cochon lance le cycle ; les suivants l'accélèrent au prochain.
+      if (entity.blocked) this.startPigPen(entity);
+      return;
+    }
+  }
+
+  /**
+   * Un cycle d'élevage : la viande de chaque cochon va au coffre. Coffre
+   * plein, il s'endort jusqu'à ce qu'on vienne le vider.
+   */
+  private runPigPen(pen: PigPen): void {
+    pen.endTick = 0;
+    // En pause, ou sans cochon : il s'endort jusqu'à ce qu'on le relance.
+    if (pen.pigs <= 0 || this.stopped(pen)) {
+      pen.blocked = true;
+      return;
+    }
+
+    const amount = PIG_FARM.meatPerPig * pen.pigs;
+
+    if (pen.store.add('meat', amount) < amount) {
+      pen.blocked = true;
+      return;
+    }
+    this.tally('meat', amount);
+    this.startPigPen(pen);
+  }
+
+  /**
+   * Lance le cycle suivant s'il y a un cochon. Si la ville a du grain en
+   * trop (`PIG_FARM.feed`), l'élevage en prend et le cycle va plus vite.
+   */
+  private startPigPen(pen: PigPen): void {
+    if (pen.pigs <= 0 || this.stopped(pen)) {
+      pen.blocked = true;
+      return;
+    }
+
+    const { item, amount, speed, keepInTown } = PIG_FARM.feed;
+    const town = this.townStockFor(pen);
+    const fed = town !== null && town.available(item) >= amount + keepInTown;
+
+    if (fed) town.remove(item, amount);
+    pen.blocked = false;
+    pen.endTick = this.tickCount + Math.ceil(PIG_FARM.cycleTicks * (fed ? speed : 1));
+    this.scheduler.schedule(pen.id, pen.endTick, this.tickCount);
+  }
+
+  /** L'élevage tombe : ses cochons s'échappent en tous sens, puis se calment et redeviennent sauvages. */
+  private releasePigs(pen: PigPen): void {
+    const x = (pen.tx + pen.width / 2) * TILE_SIZE;
+    const y = (pen.ty + pen.height / 2) * TILE_SIZE;
+    const spread = (Math.max(pen.width, pen.height) / 2 + PIG_FARM.escapeSpread) * TILE_SIZE;
+
+    for (let i = 0; i < pen.pigs; i += 1) {
+      const angle = this.rng() * Math.PI * 2;
+      const pig = this.makePig(x + Math.cos(angle) * spread, y + Math.sin(angle) * spread, 'flee', 0);
+
+      pig.dirX = Math.cos(angle);
+      pig.dirY = Math.sin(angle);
+      pig.fleeTicks = PIGS.flee.ticks;
+    }
+    if (pen.pigs > 0) this.events.emit('pigsEscaped', { id: pen.id, count: pen.pigs });
+    pen.pigs = 0;
+  }
+
   /* ------------------------------------------------------ jour, nuit, vagues */
 
   /** L'heure qu'il est, ou `null` tant que la mairie est en chantier : le cycle n'a pas commencé. */
@@ -6912,7 +7179,7 @@ export class World {
   private ageInhabitants(): void {
     this.player.age += AGES.yearsPerCycle;
     for (const mobile of [...this.mobiles.values()]) {
-      if (mobile.kind === 'arrow' || mobile.kind === 'spit' || mobile.kind === 'fireball' || mobile.kind === 'pickup' || mobile.kind === 'patient' || mobile.kind === 'companion' || mobile.kind === 'caravan') continue;
+      if (mobile.kind === 'arrow' || mobile.kind === 'spit' || mobile.kind === 'fireball' || mobile.kind === 'pickup' || mobile.kind === 'patient' || mobile.kind === 'companion' || mobile.kind === 'caravan' || mobile.kind === 'pig') continue;
       // Un enfant qui a faim ou soif ne grandit pas : il attend sa prochaine aube le ventre plein.
       const stunted = mobile.kind === 'kid' ? stuntingNeed(mobile.needs) : null;
 
@@ -8852,6 +9119,7 @@ export class World {
     this.entities.delete(building.id);
     this.rosterChanged();
     this.restartFarms();
+    if (building.kind === 'pigPen') this.releasePigs(building);
     this.chunks.release(building.id, building.tx, building.ty, building.width, building.height);
     this.dirtyTile(building.tx, building.ty);
     if (building.kind === 'yard') this.settleSites();
@@ -9034,6 +9302,8 @@ export class World {
       const amount = Object.values(quarryRecipe(building).outputs)[0] ?? 1;
 
       storeFull = building.blocked && store.total() + amount > store.capacity;
+    } else if (building.kind === 'pigPen') {
+      storeFull = building.blocked && building.pigs > 0 && store.total() + PIG_FARM.meatPerPig * building.pigs > store.capacity;
     } else if (building.kind === 'farm') {
       // Plus la place d'une récolte au coffre : les cultures mûres attendent sur pied.
       storeFull = store.total() + this.cropYield() > store.capacity;
@@ -9048,7 +9318,9 @@ export class World {
       ((building.kind === 'nursery' && building.hungry) ||
         (building.kind === 'forge' && building.blocked && !noWorker && isStarving(building)));
 
-    return { stoppedByPlayer, storeFull, noWorker, starved, drained: store.total() <= store.capacity * PROBLEMS.releaseRatio };
+    const noPig = building.kind === 'pigPen' && building.pigs === 0;
+
+    return { stoppedByPlayer, storeFull, noWorker, starved, noPig, drained: store.total() <= store.capacity * PROBLEMS.releaseRatio };
   }
 
   /** Un producteur à l'arrêt : en pause, ou sans un seul ouvrier en poste. */
@@ -9127,6 +9399,8 @@ export class World {
     } else if (building.kind === 'quarry' && building.blocked) {
       building.blocked = false;
       this.scheduleFarm(building);
+    } else if (building.kind === 'pigPen' && building.blocked && building.pigs > 0) {
+      this.startPigPen(building);
     } else if (building.kind === 'forge' && building.blocked) {
       this.startForge(building);
     } else if (
@@ -9142,7 +9416,7 @@ export class World {
   /** Les effectifs ont changé : une carrière ou un four qui n'avait plus personne peut repartir. */
   private restartFarms(): void {
     for (const entity of this.entities.values()) {
-      if (entity.kind === 'quarry' || entity.kind === 'forge') this.restart(entity);
+      if (entity.kind === 'quarry' || entity.kind === 'forge' || entity.kind === 'pigPen') this.restart(entity);
     }
   }
 
@@ -9188,6 +9462,7 @@ export class World {
       case 'drill':
       case 'farm':
       case 'quarry':
+      case 'pigPen':
       case 'lumberCamp':
         return { takeable: (item) => store.available(item), accepts: none };
 
@@ -9270,6 +9545,7 @@ export class World {
       entity?.kind !== 'drill' &&
       entity?.kind !== 'farm' &&
       entity?.kind !== 'quarry' &&
+      entity?.kind !== 'pigPen' &&
       entity?.kind !== 'forge' &&
       entity?.kind !== 'lab' &&
       entity?.kind !== 'lumberCamp'

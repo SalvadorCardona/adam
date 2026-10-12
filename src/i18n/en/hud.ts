@@ -63,6 +63,14 @@ export const hud: Messages['hud'] = {
     research: 'Something for the research',
     marker: { chest: 'Chest', ruin: 'Ruin', secret: 'Stash' },
   },
+  /** The pig pen: the toasts of the forest → base loop. */
+  pigs: {
+    tamed: 'The pig follows you! Lead it to the pig pen.',
+    fledScare: 'The pig got scared and ran off…',
+    fledLost: 'The pig lost you and ran off…',
+    penned: (pigs: number): string => `A pig joins the pen (${pigs})`,
+    escaped: (count: number): string => (count > 1 ? `${count} pigs got away!` : 'A pig got away!'),
+  },
   toast: {
     saveFailed: 'Saving failed — browser storage is full or blocked',
     depositFar: 'Too far from the town hall — get closer to drop off',

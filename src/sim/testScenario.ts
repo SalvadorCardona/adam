@@ -24,7 +24,7 @@ import { SCENARIO_REVEAL, type TestScenarioProto } from '../data/testScenario.ts
 import { copyLook } from '../data/wardrobe.ts';
 import type { Chest } from './chests.ts';
 import { baseCenter } from './enemyBases.ts';
-import { isWalkable, resourceAt, terrainAt } from './terrain.ts';
+import { habitatAt, isWalkable, resourceAt, terrainAt } from './terrain.ts';
 import type { Store } from './store.ts';
 import type { EntityId } from './types.ts';
 import { HOME_REGION_ID } from './regions.ts';
@@ -80,6 +80,7 @@ export function stageScenario(scenario: TestScenarioProto): World {
   if (scenario.nearBase !== undefined) besideBase(world, scenario.nearBase);
   if (scenario.nearChest !== undefined) besideChest(world, scenario.nearChest);
   if (scenario.nearLair !== undefined) besideLair(world, scenario.nearLair);
+  if (scenario.nearPig !== undefined) besidePig(world, scenario.nearPig);
   if (scenario.wardrobe) {
     world.player.wardrobe = [...scenario.wardrobe.found];
     if (scenario.wardrobe.look) world.player.look = copyLook(scenario.wardrobe.look);
@@ -174,6 +175,56 @@ function besideChest(world: World, tiles: number): void {
   if (!best) throw new Error('scénario de test : pas de coffre près de la mairie');
   world.revealAround(best.tx, best.ty, tiles + 6);
   teleport(world, (best.tx - tiles + 0.5) * TILE_SIZE, (best.ty + 0.5) * TILE_SIZE);
+}
+
+/**
+ * Adam à `tiles` tuiles à gauche d'un cochon sauvage posé en forêt (à défaut,
+ * sur l'herbe) le plus près possible de la mairie, au bout d'une ligne droite
+ * sans eau jusqu'à elle, que le cochon pourra suivre ; ses abords explorés.
+ */
+function besidePig(world: World, tiles: number): void {
+  const hall = world.entities.get(world.townHallId);
+
+  if (!hall) throw new Error('scénario de test : pas de mairie');
+
+  for (const habitat of ['forest', 'any'] as const) {
+    for (let radius = 14; radius < 60; radius += 1) {
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+
+          const tx = hall.tx + 1 + dx;
+          const ty = hall.ty + 1 + dy;
+
+          if (terrainAt(world.seed, tx, ty) !== 'grass' || resourceAt(world.seed, tx, ty) !== null) continue;
+          if (habitat === 'forest' && habitatAt(world.seed, tx, ty) !== 'forest') continue;
+          // Le chemin d'Adam jusqu'au cochon est libre : ni eau, ni arbre, ni rocher.
+          if (!Array.from({ length: tiles + 1 }, (_, i) => tx - i).every((x) => isWalkable(terrainAt(world.seed, x, ty)) && resourceAt(world.seed, x, ty) === null)) continue;
+          // Et le chemin du retour : une ligne droite sans eau jusqu'à la mairie.
+          if (!dryLine(world, tx, ty, hall.tx + 1, hall.ty + 4)) continue;
+
+          world.placePig(tx, ty);
+          world.revealAround(tx, ty, tiles + 8);
+          teleport(world, (tx - tiles + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE);
+          return;
+        }
+      }
+    }
+  }
+  throw new Error('scénario de test : pas de place pour un cochon près de la mairie');
+}
+
+/** La ligne droite de (ax, ay) à (bx, by) ne croise ni eau ni bâti, au demi-pas près. */
+function dryLine(world: World, ax: number, ay: number, bx: number, by: number): boolean {
+  const steps = Math.ceil(Math.hypot(bx - ax, by - ay) * 2);
+
+  for (let i = 0; i <= steps; i += 1) {
+    const tx = Math.floor(ax + ((bx - ax) * i) / steps);
+    const ty = Math.floor(ay + ((by - ay) * i) / steps);
+
+    if (!isWalkable(terrainAt(world.seed, tx, ty))) return false;
+  }
+  return true;
 }
 
 /** Seule la prairie de départ est conquise ; Adam à `tiles` tuiles du repaire de la première région, côté mairie. */

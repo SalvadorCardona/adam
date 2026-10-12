@@ -722,6 +722,8 @@ function mobileColor(mobile: Mobile): Color | null {
       return mobile.proto === 'guardian' ? PALETTE.toxic.shade : PALETTE.coral.base;
     case 'caravan':
       return PALETTE.yellow.shade;
+    case 'pig':
+      return PALETTE.skin.shade;
     case 'arrow':
     case 'pickup':
       return null;
