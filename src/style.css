@@ -3906,6 +3906,8 @@ button:disabled,
   left: 50%;
   bottom: calc(var(--safe-bottom) + 118px);
   transform: translateX(-50%);
+  /* Devant la quête (z-index 4) : l'en-tête et la croix restent visibles. */
+  z-index: 5;
   width: min(340px, calc(100vw - 28px));
   /* Jamais plus haute que l'écran : une fenêtre chargée (la mairie et sa zone d'échange) défile. */
   max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 92px - 12px);
