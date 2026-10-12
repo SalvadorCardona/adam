@@ -97,6 +97,10 @@ const ALARM_MS = 2500;
 /** Durée de vie d'un « +N Prestige », en ms (cf. `.hud-float-prestige` dans le CSS). */
 const PRESTIGE_FLOAT_MS = 1600;
 
+/** Le vol d'un objet trouvé vers le sac, en ms, et l'écart entre deux objets. */
+const FIND_FLY_MS = 900;
+const FLY_STAGGER_MS = 110;
+
 /** Durée de vie d'un gain flottant, en ms (cf. `hud-float-up` dans le CSS). */
 const FLOAT_MS = 1000;
 
@@ -640,6 +644,12 @@ export class Hud {
     });
     // Un coffre ouvert : « Coffre ouvert ! » monte au-dessus de lui.
     world.events.on('chestOpened', ({ tx, ty }) => this.celebrate({ tx, ty, width: 1, height: 1 }, t().wardrobe.chestOpened));
+    // Une ruine fouillée, un secret trouvé : le mot monte du lieu, et le butin vole vers le sac.
+    world.events.on('discoveryFound', ({ kind, tx, ty, x, y, items, plan }) => {
+      if (kind !== 'chest') this.celebrate({ tx, ty, width: 1, height: 1 }, t().hud.discovery[kind]);
+      if (plan) this.notify(t().hud.discovery.plan(t().buildings[plan].label), 'good');
+      this.flyFindsToBag(items, x, y);
+    });
     world.events.on('prestigeGained', ({ amount, x, y }) => this.floatPrestige(amount, x, y));
     world.events.on('xpGained', ({ amount, x, y }) => this.floatXp(amount, x, y));
     world.events.on('levelUp', ({ level, maxHp, bowDamage }) => {
@@ -1336,6 +1346,51 @@ export class Hud {
     this.countdown.style.animation = 'none';
     void this.countdown.offsetWidth;
     this.countdown.style.animation = '';
+  }
+
+  /**
+   * Le butin d'un point d'intérêt, objet par objet, qui s'envole de (x, y) — pixels monde — vers le
+   * bouton du sac, qui rebondit à chaque arrivée. Sous `prefers-reduced-motion`, il monte sur place
+   * comme un gain ordinaire.
+   */
+  private flyFindsToBag(items: readonly [ItemId, number][], worldX: number, worldY: number): void {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const origin = this.project(worldX, worldY - 16);
+    const field = this.floats.getBoundingClientRect();
+    const target = this.bag.getBoundingClientRect();
+    const dx = target.left + target.width / 2 - field.left - origin.x;
+    const dy = target.top + target.height / 2 - field.top - origin.y;
+
+    for (const [index, [item, amount]] of items.entries()) {
+      if (reduced) {
+        this.float(item, amount);
+        continue;
+      }
+
+      const flier = element('span', 'hud-fly');
+      const delay = index * FLY_STAGGER_MS;
+
+      flier.style.left = `${Math.round(origin.x)}px`;
+      flier.style.top = `${Math.round(origin.y)}px`;
+      flier.append(itemIcon(item, 22), `${amount}`);
+      this.floats.append(flier);
+
+      const flight = flier.animate(
+        [
+          { transform: 'translate(-50%, -50%) scale(0.4)', opacity: 0, offset: 0 },
+          { transform: 'translate(-50%, calc(-50% - 26px)) scale(1.25)', opacity: 1, offset: 0.25 },
+          { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px)) scale(0.55)`, opacity: 1, offset: 0.95 },
+          { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px)) scale(0.3)`, opacity: 0, offset: 1 },
+        ],
+        { duration: FIND_FLY_MS, delay, easing: 'cubic-bezier(0.4, 0, 0.6, 1)', fill: 'backwards' },
+      );
+
+      flight.onfinish = () => {
+        flier.remove();
+        this.bag.dataset['bump'] = 'true';
+        window.setTimeout(() => delete this.bag.dataset['bump'], 260);
+      };
+    }
   }
 
   /** Une icône et un delta qui montent de la tête d'Adam et s'effacent. */

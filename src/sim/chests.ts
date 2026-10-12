@@ -11,6 +11,7 @@
 import { CHUNK_TILES } from '../core/grid.ts';
 import { hash3 } from '../core/rng.ts';
 import { CHESTS } from '../data/chests.ts';
+import { DISCOVERIES, discoveryTier } from '../data/discoveries.ts';
 import { findSpawn, oreAt, resourceAt, terrainAt } from './terrain.ts';
 
 export interface Chest {
@@ -24,9 +25,11 @@ export interface Chest {
 export function chestOfChunk(seed: number, cx: number, cy: number): Chest | null {
   const id = hash3(seed ^ 0x2545f491, cx, cy);
 
-  if (hash3(id, 1, 0) / 4294967296 >= CHESTS.chance) return null;
-
   const [sx, sy] = findSpawn(seed);
+  // Plus on s'éloigne du départ, plus ils sont nombreux (`DISCOVERIES.chest.chance`, par palier).
+  const tier = discoveryTier(Math.hypot((cx + 0.5) * CHUNK_TILES - sx, (cy + 0.5) * CHUNK_TILES - sy));
+
+  if (hash3(id, 1, 0) / 4294967296 >= DISCOVERIES.chest.chance[tier]!) return null;
 
   for (let attempt = 0; attempt < CHESTS.tries; attempt += 1) {
     const roll = hash3(id, 2, attempt);

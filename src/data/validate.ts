@@ -55,6 +55,7 @@ import {
   type WardrobeDrop,
 } from './wardrobe.ts';
 import { CHESTS } from './chests.ts';
+import { DISCOVERIES, DISCOVERY_TIERS, RUIN_REWARDS, type DiscoveryLoot } from './discoveries.ts';
 import { PIECE_ART, adamLookParts, isFootPiece } from '../art/adamLook.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherProto } from './weather.ts';
 
@@ -764,7 +765,7 @@ export function wardrobeErrors(): string[] {
   for (const slot of LOOK_SLOTS) {
     if (piecesOf(slot).filter((id) => !isStarter(id)).length < 3) errors.push(`PIECES : moins de trois pièces à trouver pour « ${slot} »`);
   }
-  if (!(CHESTS.chance > 0 && CHESTS.chance <= 1)) errors.push('CHESTS.chance hors de ]0, 1]');
+  validateDiscoveries(errors);
   if (!(CHESTS.openTiles > 0) || !(CHESTS.tries >= 1) || !(CHESTS.minSpawnTiles >= 0)) errors.push('CHESTS : portée, tentatives ou distance invalides');
 
   // Une partie de test ne donne que des pièces à trouver, et n'habille Adam que de ce qu'il a.
@@ -962,5 +963,45 @@ export function assertPrototypes(): void {
 
   if (errors.length > 0) {
     throw new Error(`Prototypes invalides :\n- ${errors.join('\n- ')}`);
+  }
+}
+
+/** Les points d'intérêt : paliers croissants, chances dans ]0, 1], tables non vides, plans qui se débloquent bien par le menu. */
+function validateDiscoveries(errors: string[]): void {
+  const table = (name: string, loot: DiscoveryLoot): void => {
+    if (!(loot.rolls[0] >= 1 && loot.rolls[1] >= loot.rolls[0])) errors.push(`${name} : tirages invalides`);
+    if (loot.pool.length === 0) errors.push(`${name} : table vide`);
+    if (!(loot.rare.chance >= 0 && loot.rare.chance <= 1) || (loot.rare.chance > 0 && loot.rare.pool.length === 0)) errors.push(`${name} : objet rare invalide`);
+    for (const entry of [...loot.pool, ...loot.rare.pool]) {
+      if (!(entry.weight > 0 && entry.min >= 1 && entry.max >= entry.min)) errors.push(`${name} : ligne « ${entry.item} » invalide`);
+    }
+  };
+
+  if (DISCOVERY_TIERS[0] !== 0 || DISCOVERY_TIERS.some((from, index) => index > 0 && from <= DISCOVERY_TIERS[index - 1]!)) {
+    errors.push('DISCOVERY_TIERS : doit commencer à 0 et croître');
+  }
+  for (const kind of ['chest', 'ruin', 'secret'] as const) {
+    const { chance } = DISCOVERIES[kind];
+
+    if (chance.length !== DISCOVERY_TIERS.length || chance.some((value) => !(value > 0 && value <= 1))) errors.push(`DISCOVERIES.${kind}.chance : un nombre de ]0, 1] par palier`);
+    // Plus loin, plus dense.
+    if (chance.some((value, index) => index > 0 && value < chance[index - 1]!)) errors.push(`DISCOVERIES.${kind}.chance : décroît avec la distance`);
+  }
+  for (const [tier, loot] of DISCOVERIES.chest.loot.entries()) table(`DISCOVERIES.chest.loot[${tier}]`, loot);
+  for (const [tier, loot] of DISCOVERIES.secret.loot.entries()) table(`DISCOVERIES.secret.loot[${tier}]`, loot);
+  for (const [tier, loot] of DISCOVERIES.ruin.research.entries()) table(`DISCOVERIES.ruin.research[${tier}]`, loot);
+  if (!(DISCOVERIES.secret.findTiles > 0) || !(DISCOVERIES.ruin.searchTiles > 0)) errors.push('DISCOVERIES : portée de fouille invalide');
+  for (const [tier, weights] of DISCOVERIES.ruin.weights.entries()) {
+    if (RUIN_REWARDS.every((reward) => !(weights[reward] > 0))) errors.push(`DISCOVERIES.ruin.weights[${tier}] : aucune récompense`);
+  }
+  for (const [tier, plans] of DISCOVERIES.ruin.plans.entries()) {
+    for (const id of plans) {
+      const proto: BuildingProto = BUILDINGS[id];
+
+      // Un plan de ruine ouvre un bâtiment masqué du menu : un autre déblocage (plan d'Ève, objectif, labo) le gouverne déjà.
+      if (!proto.menu || proto.plan || proto.unlockObjective !== undefined || (Object.values(RESEARCH) as ResearchProto[]).some((research) => (research.unlocks as readonly string[]).includes(id))) {
+        errors.push(`DISCOVERIES.ruin.plans[${tier}] : « ${id} » n'est pas un bâtiment masqué du menu`);
+      }
+    }
   }
 }

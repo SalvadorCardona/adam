@@ -49,6 +49,8 @@ import { LOGISTICIAN } from '../art/logistician.ts';
 import { LOGISTICS_POST } from '../art/logisticsPost.ts';
 import { LOOT } from '../art/loot.ts';
 import { CHEST } from '../art/chest.ts';
+import { RUIN_SPRITE } from '../art/ruin.ts';
+import { SECRET_SPRITE } from '../art/secret.ts';
 import { LUMBER_CAMP } from '../art/lumberCamp.ts';
 import { HUNGRY } from '../art/hungry.ts';
 import { JOYFUL, SCARED, SLEEPY } from '../art/reactions.ts';
@@ -169,6 +171,10 @@ export const SPRITES = {
   loot: LOOT,
   /** Un coffre de la carte : fermé, puis ouvert (caisse, couvercle relevé, gerbe de lumière). */
   chest: CHEST,
+  /** Une ruine à fouiller (scintillante) puis fouillée. */
+  ruin: RUIN_SPRITE,
+  /** L'indice d'un secret : une touffe d'herbes haute au pied d'un arbre, un éclat entre deux brins. */
+  secret: SECRET_SPRITE,
   /** Le médaillon du métier de chaque bâtiment, sur sa pancarte : un morceau par bâtiment. */
   jobs: JOBS,
   /** La base mutante, et le badge de ses assaillants en réserve (`sign0` à `sign9`). */

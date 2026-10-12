@@ -84,6 +84,14 @@ export const hud = {
     west: 'par l’ouest',
     northWest: 'par le nord-ouest',
   },
+  /** Les points d'intérêt de la carte : ce qui flotte quand Adam en trouve un, et leur repère de bord. */
+  discovery: {
+    ruin: 'Ruine fouillée !',
+    secret: 'Cachette trouvée !',
+    plan: (building: string): string => `Plan trouvé : ${building}`,
+    research: 'De quoi avancer la recherche',
+    marker: { chest: 'Coffre', ruin: 'Ruine', secret: 'Cachette' },
+  },
   /** Les bulles empilées des événements. */
   toast: {
     depositFar: 'Trop loin de la mairie — rapprochez-vous pour déposer',

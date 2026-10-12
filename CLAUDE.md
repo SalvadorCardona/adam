@@ -580,6 +580,28 @@ coffre ouvert. Parties de test `/test/wardrobe` (l'éditeur ouvert, une
 partie des pièces trouvées) et `/test/chest` (Adam à trois pas d'un coffre).
 Captures dans `docs/wardrobe/`.
 
+**Points d'intérêt** (`data/discoveries.ts`, `sim/discoveries.ts`,
+`render/spotLayer.ts`) — explorer rapporte. Trois sortes, tirées de la seed
+par chunk, jamais stockées : le **coffre** (ci-dessus, qui donne en plus du
+butin), la **ruine** (sprite `ruin`, scintillante ; fouillée en passant à
+`searchTiles`, elle donne au poids de son palier un **plan** — un bâtiment masqué
+du menu, `World.openBuildings`, jamais redonné —, une pièce rare
+(`WARDROBE_LOOT.ruin`) ou du butin d'ennemis pour la recherche) et le **secret**
+(une touffe d'herbe à l'éclat discret au pied d'un arbre, sprite `secret`,
+sans repère de bord). Densité (`chance`) et tables de butin (`DiscoveryLoot`)
+sont par **palier** de distance au départ (`DISCOVERY_TIERS`, calés sur les
+anneaux de bases) : plus loin, plus dense et plus riche ; `validatePrototypes()`
+les vérifie. Le butin est haché de la seed et de l'id du point (pas le PRNG du
+monde) ; il va au sac (avant la mairie, sous `carryLimit` — le surplus attend
+au sol), événement `discoveryFound`, et le HUD le fait voler vers le sac
+(`Hud.flyFindsToBag`). Trouvés = `chests` (coffres) et `spots` (ruines, secrets)
+dans la sauvegarde ; une ancienne sauvegarde n'en a aucun. Le repère de bord
+(`IndicatorLayer.pointSpot`, violet, étincelle, distance en mètres comme la
+mairie et le gisement) et la carte du monde montrent coffres et ruines pas
+encore trouvés, sur les cases explorées. Les rencontres (voyageur, animal rare)
+ne sont pas faites.
+
+
 **Bases mutantes** (`src/data/enemyBases.ts`, `src/sim/enemyBases.ts`) —
 à la création de la partie, des anneaux de campements (`ENEMY_BASE_RINGS` :
 34, 54, 76 tuiles de la mairie, niveaux 1 à 3) se tirent de la seed, sans

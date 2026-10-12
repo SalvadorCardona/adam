@@ -939,6 +939,9 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('lootPicked', () => audio.play('pickup'));
   world.events.on('pieceFound', () => audio.play('pickup'));
   world.events.on('chestOpened', () => audio.play('eureka'));
+  world.events.on('discoveryFound', ({ kind }) => {
+    if (kind !== 'chest') audio.play(kind === 'ruin' ? 'eureka' : 'pickup');
+  });
   world.events.on('childBorn', () => audio.play('baby'));
   world.events.on('eveArrived', () => audio.play('build'));
   world.events.on('traded', () => audio.play('deliver'));
@@ -1292,6 +1295,12 @@ function wireParticles(world: World, renderer: GameRenderer): void {
   world.events.on('regionConquered', ({ x, y }) => {
     particles.burst(x, y - 16, PARTICLES.confetti, 18, 0.18);
     particles.burst(x, y - 16, PARTICLES.star, 8, 0.12);
+  });
+  // Une ruine fouillée, un secret trouvé : même gerbe qu'un coffre (le coffre a la sienne, plus haut).
+  world.events.on('discoveryFound', ({ kind, x, y }) => {
+    if (kind === 'chest') return;
+    particles.burst(x, y - 10, PARTICLES.confetti, 12, 0.14);
+    particles.burst(x, y - 10, PARTICLES.star, 5, 0.1);
   });
   // Un niveau de plus : une gerbe de confettis et d'étoiles autour d'Adam.
   world.events.on('levelUp', ({ x, y }) => {

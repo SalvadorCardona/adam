@@ -202,6 +202,8 @@ export interface WorldState {
   dens: SavedDen[];
   /** Les coffres déjà ouverts, par id (`sim/chests.ts`) ; les autres se relisent dans la seed. Absent d'avant eux : aucun. */
   chests?: number[];
+  /** Les ruines fouillées et les secrets trouvés, par id (`sim/discoveries.ts`). Absent d'avant eux : aucun. */
+  spots?: number[];
   scheduler: SchedulerSnapshot;
 }
 
@@ -511,6 +513,7 @@ function parseState(raw: unknown): WorldState {
     mobiles: unique(array(state['mobiles']).map((mobile) => parseMobile(mobile, seed))),
     dens: unique(array(state['dens']).map(parseDen)),
     chests: [...new Set(array(state['chests'] ?? []).map(int))],
+    spots: [...new Set(array(state['spots'] ?? []).map(int))],
     scheduler: parseScheduler(state['scheduler']),
   };
 }
