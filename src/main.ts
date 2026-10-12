@@ -372,8 +372,9 @@ async function main(): Promise<void> {
   world.events.on('lookRejected', () => hud.notify(t().wardrobe.rejected, 'bad'));
   world.events.on('piecesSpared', ({ prestige }) => hud.notify(t().wardrobe.spare(prestige), 'good'));
 
-  // La rangée du haut à droite : Pause, Réglages, la carte du monde, puis le zoom.
-  zoom.root.prepend(hud.pauseButton, hud.settingsButton, worldMap.button);
+  // La rangée du haut à droite : la carte du monde, le zoom, puis Pause et Réglages (en dernier).
+  zoom.root.prepend(worldMap.button);
+  zoom.root.append(hud.pauseButton, hud.settingsButton);
   hud.mountControls(zoom.root);
   // Les deux boutons du joueur, en bas à droite : le sac (inventaire et habillement), « Bâtir ».
   hud.actions.append(hud.bag, buildMenu.buildButton);

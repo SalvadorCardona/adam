@@ -868,9 +868,9 @@ button:disabled,
 
 /*
  * La rangée des contrôles, en haut à droite, dans la grille de `.hud-top`
- * (sous ce qui la précède, jamais dessus) : Pause et Réglages, la carte du
- * monde, puis les trois disques du zoom, dans cet ordre. Les petits écarts
- * font les groupes.
+ * (sous ce qui la précède, jamais dessus) : la carte du
+ * monde, les trois disques du zoom, puis Pause et Réglages (le dernier, dans
+ * le coin), dans cet ordre. Les petits écarts font les groupes.
  */
 .hud-zoom {
   grid-area: controls;
@@ -892,9 +892,9 @@ button:disabled,
   height: var(--btn-icon);
 }
 
-/* Réglages ferme le duo Pause / Réglages : un écart avant la carte du monde. */
-.hud-settings {
-  margin-right: 6px;
+/* Pause ouvre le duo Pause / Réglages : un écart après le zoom. */
+.hud-pause {
+  margin-left: 6px;
 }
 
 .hud-button[disabled] {
@@ -909,10 +909,6 @@ button:disabled,
  */
 .hud[data-map='true'] .hud-zoom {
   z-index: 10;
-}
-
-.hud-map-button {
-  margin-right: 6px;
 }
 
 .hud-map-button.is-active {
