@@ -85,6 +85,27 @@ export const RECIPES = {
     inputs: { wood: 3 },
     outputs: { coal: 1 },
   },
+  fireBrick: {
+    label: 'Cuisson',
+    building: 'brickworks',
+    duration: 20 * 8,
+    inputs: { stone: 2, wood: 1 },
+    outputs: { brick: 1 },
+  },
+  makeTools: {
+    label: 'Façonnage',
+    building: 'workshop',
+    duration: 20 * 12,
+    inputs: { ironPlate: 1, wood: 2 },
+    outputs: { tools: 1 },
+  },
+  castSteel: {
+    label: 'Coulée',
+    building: 'steelworks',
+    duration: 20 * 15,
+    inputs: { ironPlate: 2, coal: 2 },
+    outputs: { steel: 1 },
+  },
 } as const satisfies Record<string, RecipeProto>;
 
 export type RecipeId = keyof typeof RECIPES;

@@ -28,8 +28,9 @@
  * demander : leur recherche ne coûte que ce qui se récolte.
  *
  * Trois onglets (`theme`) : Bâtiments, Ouvriers (tous les habitants de la
- * ville), Personnage (Adam). Une recherche de plus est une entrée de plus ici
- * et ses textes dans le dictionnaire.
+ * ville), Personnage (Adam) ; puis un onglet par ère atteinte après le
+ * Campement (`era`, `data/eras.ts`), qui porte sa chaîne. Une recherche de
+ * plus est une entrée de plus ici et ses textes dans le dictionnaire.
  *
  * `validatePrototypes()` vérifie les objets, les quantités, les prérequis
  * (connus, sans cycle) et que le coffre du labo contient le plus gros coût.
@@ -141,6 +142,13 @@ export interface ResearchProto {
    * a déjà ouverts — une sauvegarde d'avant — n'en a pas besoin.
    */
   opens: readonly BuildingId[];
+  /**
+   * L'ère qui l'ouvre (index de `ERAS`, `data/eras.ts`). Celles du Campement
+   * vont dans l'onglet de leur `theme` ; celles d'une ère suivante, dans
+   * l'onglet de l'ère. Elle ne se lance qu'une fois la colonie arrivée à
+   * cette ère.
+   */
+  era: number;
 }
 
 export const RESEARCH = {
@@ -156,6 +164,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: [],
     opens: ['well'],
+    era: 0,
   },
   woodcraft: {
     label: 'Bûcheronnage',
@@ -168,6 +177,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: [],
     opens: ['lumberCamp', 'foresterHouse'],
+    era: 0,
   },
   lookout: {
     label: 'Guet',
@@ -180,6 +190,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: [],
     opens: ['watchtower'],
+    era: 0,
   },
   mining: {
     label: 'Extraction',
@@ -192,6 +203,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: [],
     opens: ['quarry', 'drill'],
+    era: 0,
   },
   organizedSites: {
     label: 'Chantiers organisés',
@@ -204,6 +216,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: [],
     opens: ['constructionPost'],
+    era: 0,
   },
   metalworking: {
     label: 'Fonderie',
@@ -216,6 +229,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: ['forge', 'charcoalKiln'],
     opens: [],
+    era: 0,
   },
   masonry: {
     label: 'Maçonnerie',
@@ -228,6 +242,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: [],
     opens: [],
+    era: 0,
   },
   fastDrills: {
     label: 'Foreuses rapides',
@@ -240,6 +255,7 @@ export const RESEARCH = {
     effect: { stat: 'drillTicks', amount: -10 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   fieldMedicine: {
     label: 'Médecine de fortune',
@@ -252,6 +268,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: ['clinic'],
     opens: [],
+    era: 0,
   },
   militia: {
     label: 'Milice',
@@ -264,6 +281,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: ['barracks'],
     opens: [],
+    era: 0,
   },
   fortification: {
     label: 'Fortifications',
@@ -276,6 +294,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: ['archerTower', 'palisade'],
     opens: [],
+    era: 0,
   },
   purification: {
     label: 'Dépollution',
@@ -288,6 +307,7 @@ export const RESEARCH = {
     effect: null,
     unlocks: ['purifier'],
     opens: [],
+    era: 0,
   },
   charcoalFilters: {
     label: 'Filtres doubles',
@@ -300,6 +320,7 @@ export const RESEARCH = {
     effect: { stat: 'purifyTicks', amount: -30 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   fertileFarms: {
     label: 'Fermes fertiles',
@@ -312,6 +333,7 @@ export const RESEARCH = {
     effect: { stat: 'farmYield', amount: 1 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
 
   // ----------------------------------------------------------- Ouvriers
@@ -326,6 +348,7 @@ export const RESEARCH = {
     effect: { stat: 'workerSpeed', amount: 0.15 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   rations: {
     label: 'Rations séchées',
@@ -338,6 +361,7 @@ export const RESEARCH = {
     effect: { stat: 'hungerResist', amount: 0.25 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   canteens: {
     label: 'Gourdes',
@@ -350,6 +374,7 @@ export const RESEARCH = {
     effect: { stat: 'thirstResist', amount: 0.25 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   sturdyPorters: {
     label: 'Porteurs endurants',
@@ -362,6 +387,7 @@ export const RESEARCH = {
     effect: { stat: 'porterCarry', amount: 2 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   goodTools: {
     label: 'Outils de qualité',
@@ -374,6 +400,7 @@ export const RESEARCH = {
     effect: { stat: 'workSpeed', amount: 0.25 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   runners: {
     label: 'Coursiers',
@@ -386,6 +413,7 @@ export const RESEARCH = {
     effect: { stat: 'workerSpeed', amount: 0.15 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
 
   // --------------------------------------------------------- Personnage
@@ -400,6 +428,7 @@ export const RESEARCH = {
     effect: { stat: 'walkSpeed', amount: 0.9 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   bigBag: {
     label: 'Sac renforcé',
@@ -412,6 +441,7 @@ export const RESEARCH = {
     effect: { stat: 'bagCapacity', amount: 15 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   sharpAxes: {
     label: 'Haches affûtées',
@@ -424,6 +454,7 @@ export const RESEARCH = {
     effect: { stat: 'woodYield', amount: 0.5 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   paddedVest: {
     label: 'Gilet rembourré',
@@ -436,6 +467,7 @@ export const RESEARCH = {
     effect: { stat: 'maxHp', amount: 4 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   sharpArrows: {
     label: 'Flèches à croc',
@@ -448,6 +480,7 @@ export const RESEARCH = {
     effect: { stat: 'bowDamage', amount: 0.5 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   quickDraw: {
     label: 'Tir rapide',
@@ -460,6 +493,7 @@ export const RESEARCH = {
     effect: { stat: 'bowCooldown', amount: -4 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   irradiatedArrows: {
     label: 'Flèches irradiées',
@@ -472,6 +506,7 @@ export const RESEARCH = {
     effect: { stat: 'bowDamage', amount: 1 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   // Les spécialités des régions conquises (`data/regions.ts`) : une recherche par biome.
   amberBows: {
@@ -485,6 +520,7 @@ export const RESEARCH = {
     effect: { stat: 'bowDamage', amount: 0.5 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   pearlBag: {
     label: 'Sac cousu de nacre',
@@ -497,6 +533,7 @@ export const RESEARCH = {
     effect: { stat: 'bagCapacity', amount: 10 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   quartzBits: {
     label: 'Mèches de quartz',
@@ -509,6 +546,7 @@ export const RESEARCH = {
     effect: { stat: 'drillTicks', amount: -6 },
     unlocks: [],
     opens: [],
+    era: 0,
   },
   sporeCompost: {
     label: 'Compost de spores',
@@ -521,6 +559,112 @@ export const RESEARCH = {
     effect: { stat: 'farmYield', amount: 1 },
     unlocks: [],
     opens: [],
+    era: 0,
+  },
+  // ---------------------------------------------------------------- Ères
+  brickmaking: {
+    label: 'Cuisson des briques',
+    description: 'Pierre concassée, feu de bois, moules de planches : la brique revient.',
+    icon: { building: 'brickworks' },
+    theme: 'building',
+    cost: { stone: 12, wood: 12 },
+    duration: 20 * 45,
+    requires: [],
+    effect: null,
+    unlocks: ['brickworks'],
+    opens: [],
+    era: 1,
+  },
+  handcarts: {
+    label: 'Charrettes à bras',
+    description: 'Deux roues de récup sous une caisse de briques : les porteurs en prennent plus.',
+    icon: { item: 'brick' },
+    theme: 'workers',
+    cost: { brick: 10, wood: 10 },
+    duration: 20 * 60,
+    requires: ['brickmaking'],
+    effect: { stat: 'porterCarry', amount: 1 },
+    unlocks: [],
+    opens: [],
+    era: 1,
+  },
+  toolmaking: {
+    label: 'Outillage',
+    description: 'Un étau, une meule et des plaques de fer : on façonne ses propres outils.',
+    icon: { building: 'workshop' },
+    theme: 'building',
+    cost: { ironPlate: 4, brick: 10 },
+    duration: 20 * 60,
+    requires: [],
+    effect: null,
+    unlocks: ['workshop'],
+    opens: [],
+    era: 2,
+  },
+  compositeBows: {
+    label: 'Arcs composites',
+    description: 'Du bois, de la corne de croc, des outils précis : l’arc mord plus fort.',
+    icon: { item: 'tools' },
+    theme: 'character',
+    cost: { tools: 4, wolfFang: 3 },
+    duration: 20 * 60,
+    requires: ['toolmaking'],
+    effect: { stat: 'bowDamage', amount: 0.5 },
+    unlocks: [],
+    opens: [],
+    era: 2,
+  },
+  toolDrills: {
+    label: 'Foreuses outillées',
+    description: 'Des mèches changées à la clé, sans arrêter la roue.',
+    icon: { building: 'drill' },
+    theme: 'building',
+    cost: { tools: 6, brick: 6 },
+    duration: 20 * 60,
+    requires: ['toolmaking'],
+    effect: { stat: 'drillTicks', amount: -10 },
+    unlocks: [],
+    opens: [],
+    era: 2,
+  },
+  steelmaking: {
+    label: 'Haut fourneau',
+    description: 'Plus chaud que la forge, plus haut que la mairie : l’acier coule.',
+    icon: { building: 'steelworks' },
+    theme: 'building',
+    cost: { tools: 8, ironPlate: 10, coal: 10 },
+    duration: 20 * 90,
+    requires: [],
+    effect: null,
+    unlocks: ['steelworks'],
+    opens: [],
+    era: 3,
+  },
+  steelArrows: {
+    label: 'Flèches d’acier',
+    description: 'Des pointes d’acier trempé : plus rien ne leur résiste.',
+    icon: { item: 'steel' },
+    theme: 'character',
+    cost: { steel: 4, wood: 10 },
+    duration: 20 * 90,
+    requires: ['steelmaking'],
+    effect: { stat: 'bowDamage', amount: 1 },
+    unlocks: [],
+    opens: [],
+    era: 3,
+  },
+  steelFrame: {
+    label: 'Sac à armature',
+    description: 'Une armature d’acier, des sangles neuves : le sac tient le double sans plier.',
+    icon: { ui: 'bag' },
+    theme: 'character',
+    cost: { steel: 3, tools: 3 },
+    duration: 20 * 90,
+    requires: ['steelmaking'],
+    effect: { stat: 'bagCapacity', amount: 20 },
+    unlocks: [],
+    opens: [],
+    era: 3,
   },
 } as const satisfies Record<string, ResearchProto>;
 

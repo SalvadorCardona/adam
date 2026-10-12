@@ -441,9 +441,19 @@ export class EntityLayer {
 
   /** Fini ou cabossé, selon ce qu'il reste de points de vie. */
   /** Le visage d'un bâtiment fini ; l'émetteur de l'antenne, une fois le Signal lancé, reste allumé. */
-  private faceOf(entity: Exclude<Entity, { kind: 'site' }>): 'built' | 'damaged' | 'lit' {
+  private faceOf(entity: Exclude<Entity, { kind: 'site' }>): BuildingFace {
     if (entity.hp <= buildingLevel(entity.proto, entity.level).hp * DAMAGED_RATIO) return 'damaged';
-    return this.world.victory && 'lit' in SPRITES[spriteOf(entity)].parts ? 'lit' : 'built';
+
+    const parts = SPRITES[spriteOf(entity)].parts;
+
+    if (this.world.victory && 'lit' in parts) return 'lit';
+    // La mairie prend le visage de l'ère atteinte (`data/eras.ts`) : fanions, horloge, cheminée.
+    if (this.world.era > 0) {
+      const era = `era${this.world.era}` as const;
+
+      if (era in parts) return era;
+    }
+    return 'built';
   }
 
   private drawBar(view: EntityView, entity: Entity): void {
@@ -814,6 +824,9 @@ function footSprite(texture: Sprite['texture'], entity: Entity): Sprite {
 function barTop(entity: Entity): number {
   return entity.height * TILE_SIZE - SPRITES[spriteOf(entity)].height - 12;
 }
+
+/** Le morceau qu'un bâtiment fini montre. */
+type BuildingFace = 'built' | 'damaged' | 'lit' | `era${number}`;
 
 /** Le sprite d'un chantier est celui du prototype ; celui d'un bâtiment fini, celui de son niveau. */
 function spriteOf(entity: Entity): SpriteId {

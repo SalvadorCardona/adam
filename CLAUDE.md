@@ -494,6 +494,33 @@ mène (relevé du coût, puis la barre verte « m:ss »), puis trois onglets
 icône (`icon`), son effet ou ce qu'elle débloque, son coût, sa durée, son
 état (verrouillée : le prérequis nommé) et « Lancer ».
 
+**Ères** (`src/data/eras.ts`, `sim/eras.ts`, `ui/eraPanel.ts`) — quatre
+paliers : **Campement** (le départ, `START_BUILDINGS`), **Bourg**, **Ville**,
+**Cité industrielle** ; `World.era` (index, sauvegardé ; absent d'une ancienne
+sauvegarde : 0, le Campement). On passe à la suivante depuis la fenêtre de la
+mairie (« Ères · Campement », pastille corail quand tout est réuni) : un
+panneau liste ses conditions (`eraChecks` : objectifs réussis de la chaîne,
+habitants, bâtiments finis, recherches clés, investissement payé sac puis
+ville) et ce qu'elle apporte ; « Passer à l'ère » pousse `advanceEra`
+(refus `EraRejection`). Chaque ère peut ouvrir au menu des bâtiments
+existants (`opens`, versés dans `World.openBuildings` ; vide pour l'instant,
+le labo ouvre ceux de base dès le Campement), ouvre les **régions** de son
+anneau (`REGION_RINGS[].era` : le Bourg le deuxième, la Ville le troisième),
+un **onglet de recherches** au labo après les trois thèmes (`era` de
+`data/research.ts`, `World.researchOpen` ; la recherche d'une ère plus
+tardive est refusée `locked`), dont celle qui débloque sa
+chaîne — briqueterie (`brickworks` : pierre + bois → brique), atelier
+(`workshop` : plaque + bois → outils), aciérie (`steelworks` : plaques +
+charbon → acier), des forges sur leur recette —, une menace ajoutée aux chefs
+de chaque nuit (`threat`, `withEraThreat` : mutants, gros mutants) et un
+visage de mairie (morceaux `era1`…`era3` de `art/townHall.ts`). Le passage
+(`eraReached`) arrête l'horloge sur un écran plein (nom, devise, récapitulatif,
+fanfare `colony`, pluie de feuilles) jusqu'à « En avant ! ». Ève le signale
+(`eraReady`). L'histoire (objectifs) ouvre la porte d'une ère, l'ère ouvre
+l'économie ; `validatePrototypes()` vérifie qu'une ère ne demande que ce que
+les précédentes rendent accessible. Partie testée de bout en bout dans
+`sim/eras.test.ts`.
+
 **Objectifs** — la partie est une chaîne d'objectifs en données
 (`src/data/objectives.ts`, jugés par `src/sim/objectives.ts`) : mairie,
 3 nuits (Ève arrive), les demandes d'Ève (ses quêtes), foreuse et 20 fer,
@@ -718,9 +745,9 @@ Une région non conquise est voilée (`FOG_TINT.regionAlpha`,
 Son **gardien** — Grand loup, Crabe géant, Colosse des carrières, Roi des
 boues : une bête de `WILDLIFE` à l'habitat `region`, la bête d'origine en plus
 grand (`scale`) — veille sur son repaire (`Region.lair`) et ne se montre
-qu'une fois l'**ère** de l'anneau atteinte (`ERAS` : Fondation dès le départ,
-Colonie après 2 objectifs, Signal après l'acte I ; `World.era()`,
-`regionState` : `conquered` / `open` / `locked`). Plus loin, plus coriace
+qu'une fois l'**ère** de l'anneau atteinte (`ERAS` de `data/eras.ts` :
+Campement dès le départ, Bourg, Ville ; `World.era`, `regionState` :
+`conquered` / `open` / `locked`). Plus loin, plus coriace
 (`hpScale`, `damageScale`). Abattu (`World.conquer`, événement
 `regionConquered`), la région est conquise : Prestige, XP, et sa
 **spécialité** au sol (ambre, nacre, quartz, spore violette), qu'Adam déniche

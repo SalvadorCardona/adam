@@ -28,6 +28,10 @@ export const ITEMS = {
   // Tirée au puits : on la boit, rien d'autre (`data/needs.ts`).
   water: { label: 'Eau', stack: 100 },
   ironPlate: { label: 'Plaque de fer', stack: 50 },
+  // Les chaînes des ères (`data/eras.ts`) : la brique du Bourg, les outils de la Ville, l'acier de la Cité.
+  brick: { label: 'Brique', stack: 100 },
+  tools: { label: 'Outils', stack: 50 },
+  steel: { label: 'Acier', stack: 50 },
   // Le butin propre aux ennemis : on ne le récolte nulle part, il ne sert qu'au labo de recherche.
   mutantGoo: { label: 'Gelée de mutant', stack: 50 },
   wolfFang: { label: 'Croc de loup', stack: 50 },

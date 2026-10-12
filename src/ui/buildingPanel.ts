@@ -89,6 +89,7 @@ import { canDamage, isShielded, isStanding, raidCapacity } from '../sim/enemyBas
 import { KILL_PRESTIGE } from '../data/prestige.ts';
 import { countField, type FieldCount } from '../sim/farmer.ts';
 import { countPlot, type PlotCount } from '../sim/forester.ts';
+import { eraReady } from '../sim/eras.ts';
 import { canPause } from '../sim/staffing.ts';
 import type { Building, EnemyBase, Entity, EntityId, Farmer, Forester, Forge, MobileId, Nursery } from '../sim/types.ts';
 import { TICKS_PER_SECOND, repairCost, siteMissing, timerText, type SiteCoverage, type World } from '../sim/world.ts';
@@ -183,6 +184,8 @@ export class BuildingPanel {
   private readonly upgradeEffect: HTMLElement;
   private readonly upgradeCost: HTMLElement;
   private readonly upgradeButton: HTMLButtonElement;
+  private readonly eraButton: HTMLButtonElement;
+  private onEras: () => void = () => {};
   private lastText = '';
   /** Le compte à rebours de la production en cours (barre et « m:ss »), caché quand rien ne tourne. */
   private readonly production: HTMLElement;
@@ -391,7 +394,14 @@ export class BuildingPanel {
       this.world.push({ type: 'cancelSite', id: this.entityId });
     });
 
+    // La mairie mène la colonie d'une ère à l'autre : ce bouton ouvre le panneau des ères.
+    this.eraButton = document.createElement('button');
+    this.eraButton.type = 'button';
+    this.eraButton.dataset['tone'] = 'upgrade';
+    this.eraButton.addEventListener('click', () => this.onEras());
+
     this.actions.append(
+      this.eraButton,
       this.pauseButton,
       this.repairButton,
       this.transferButton,
@@ -545,6 +555,11 @@ export class BuildingPanel {
       this.lastNeeds = '';
       this.update();
     });
+  }
+
+  /** Ce que fait « Ères » dans la fenêtre de la mairie : ouvrir le panneau des ères (`main.ts`). */
+  public setOnEras(onEras: () => void): void {
+    this.onEras = onEras;
   }
 
   public get open(): boolean {
@@ -756,6 +771,7 @@ export class BuildingPanel {
       this.tabs.setAvailable('inventory', false);
       this.repairButton.hidden = true;
       this.pauseButton.hidden = true;
+      this.eraButton.hidden = true;
       this.crew.hidden = true;
       this.upgrade.hidden = true;
       this.gear.hidden = true;
@@ -788,6 +804,15 @@ export class BuildingPanel {
       const repairLabel = text.repair.button(stock > 0 ? Math.min(cost, stock) : cost, material);
 
       if (this.repairButton.textContent !== repairLabel) this.repairButton.textContent = repairLabel;
+
+      this.eraButton.hidden = entity.kind !== 'townHall';
+      if (entity.kind === 'townHall') {
+        const eraLabel = t().eraPanel.open(t().eras[this.world.era]!.label);
+
+        if (this.eraButton.textContent !== eraLabel) this.eraButton.textContent = eraLabel;
+        // Tout est réuni : le bouton le dit, d'une pastille.
+        this.eraButton.dataset['ready'] = String(eraReady(this.world));
+      }
 
       this.pauseButton.hidden = !pausable;
       this.pauseButton.textContent = entity.paused ? text.resume : text.pause;
@@ -1103,7 +1128,7 @@ export class BuildingPanel {
     for (const part of [this.crew, this.upgrade, this.gear, this.stock]) part.hidden = true;
     this.exchange.show(null);
     this.tabs.setAvailable('inventory', false);
-    for (const button of [this.pauseButton, this.repairButton, this.transferButton, this.cancelButton]) button.hidden = true;
+    for (const button of [this.pauseButton, this.repairButton, this.transferButton, this.cancelButton, this.eraButton]) button.hidden = true;
     delete this.items.dataset['layout'];
     this.setItems([], 'none');
 

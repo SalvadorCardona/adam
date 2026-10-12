@@ -683,7 +683,7 @@ export class Hud {
       const guardian = BIOMES[biome].guardian;
       const name = t().biomes[biome];
 
-      if (state === 'locked') this.notify(t().hud.toast.regionLocked(name, t().eras[era] ?? ''), 'info');
+      if (state === 'locked') this.notify(t().hud.toast.regionLocked(name, t().eras[era]?.label ?? ''), 'info');
       else if (guardian && world.regions[id]?.lair) this.notify(t().hud.toast.regionOpen(name, t().wildlife[guardian]), 'info');
     });
     world.events.on('regionConquered', ({ biome, prestige }) => this.notify(t().hud.toast.regionConquered(t().biomes[biome], prestige), 'good'));
@@ -837,6 +837,7 @@ export class Hud {
 
       this.notify(t().hud.toast.buildingsUnlocked(buildings.length, labels), 'good');
     });
+    world.events.on('eraRejected', () => this.notify(t().eraPanel.rejected, 'bad'));
     world.events.on('researchRejected', ({ reason }) => {
       if (reason === 'busy') this.notify(t().hud.toast.researchBusy, 'bad');
       if (reason === 'taken') this.notify(t().hud.toast.researchTaken, 'bad');
@@ -2078,7 +2079,7 @@ export class Hud {
   }
 
   /** Des feuilles, des pétales : la pluie de confettis, en CSS. Chacune part au bout de sa chute. */
-  private rainLeaves(): void {
+  public rainLeaves(): void {
     for (let i = 0; i < CONFETTI_COUNT; i += 1) {
       const leaf = uiIcon(CONFETTI[i % CONFETTI.length]!, 18 + Math.round(Math.random() * 12));
 

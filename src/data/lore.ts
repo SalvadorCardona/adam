@@ -371,6 +371,36 @@ export const LORE = {
         'la forge ne reste plus à sec, et le bois en trop sert enfin.',
       effect: '3 bois → 1 charbon, 1 ouvrier.',
     },
+    brickworks: {
+      name: 'Briqueterie',
+      sign: 'Briques',
+      site: 'Un four long à maçonner, des moules en bois qui sèchent au soleil. Il lui faudra un briquetier.',
+      description:
+        'Un four long, couché sous un toit de tuiles, et des rangées de briques qui ' +
+        'refroidissent sur des claies. Son briquetier y cuit la pierre concassée au ' +
+        'feu de bois : le bourg se rebâtit en dur.',
+      effect: '2 pierre + 1 bois → 1 brique, 1 ouvrier.',
+    },
+    workshop: {
+      name: 'Atelier',
+      sign: 'Atelier',
+      site: 'Un établi déjà posé, un auvent à tendre. Il lui faudra des plaques de fer pour s’équiper.',
+      description:
+        'Un atelier de briques sous un auvent rayé : un étau, une meule, des ' +
+        'clés accrochées au mur. Son artisan y façonne des outils dans les plaques ' +
+        'de fer, et la ville peut enfin bâtir grand.',
+      effect: '1 plaque de fer + 2 bois → 1 outil, 1 ouvrier.',
+    },
+    steelworks: {
+      name: 'Aciérie',
+      sign: 'Aciérie',
+      site: 'Un haut fourneau à dresser, des poutrelles qui attendent. Il lui faudra des outils et de la brique.',
+      description:
+        'Un haut fourneau de briques cerclé de fer, deux cheminées qui crachent du ' +
+        'violet, une poche de métal qui rougeoie. Son fondeur coule l’acier des plaques ' +
+        'de fer et du charbon : la cité industrielle a son cœur.',
+      effect: '2 plaques de fer + 2 charbon → 1 acier, 1 ouvrier.',
+    },
     clinic: {
       name: 'Clinique',
       sign: 'Clinique',

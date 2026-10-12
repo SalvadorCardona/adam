@@ -3,7 +3,8 @@ import { TILE_SIZE } from '../core/grid.ts';
 import { BUILDINGS } from '../data/buildings.ts';
 import { WILDLIFE } from '../data/enemies.ts';
 import type { ItemId } from '../data/items.ts';
-import { BIOMES, ERAS, HOME_REGION, REGION_RINGS, eraOf } from '../data/regions.ts';
+import { ERAS } from '../data/eras.ts';
+import { BIOMES, HOME_REGION, REGION_RINGS } from '../data/regions.ts';
 import { HOME_REGION_ID, REGION_COUNT, regionAt, regionCenter } from './regions.ts';
 import { deserialize, serialize } from './save.ts';
 import type { Beast, EntityId } from './types.ts';
@@ -84,11 +85,9 @@ describe('régions — géométrie', () => {
     }
   });
 
-  it('les ères suivent les objectifs, et les anneaux lointains en demandent une plus avancée', () => {
-    expect(eraOf(0)).toBe(0);
-    expect(eraOf(ERAS[1].objective)).toBe(1);
-    expect(eraOf(99)).toBe(ERAS.length - 1);
+  it('le premier anneau s’ouvre au Campement, les lointains avec les ères suivantes', () => {
     expect(REGION_RINGS[0].era).toBe(0);
+    for (const ring of REGION_RINGS) expect(ring.era).toBeLessThan(ERAS.length);
     expect(REGION_RINGS[REGION_RINGS.length - 1]!.era).toBeGreaterThan(0);
   });
 });
@@ -115,7 +114,7 @@ describe('régions — conquête', () => {
     expect(world.regionState(far.id)).toBe('locked');
     expect(approach(world, far.id)).toBeUndefined();
 
-    world.objective = ERAS[REGION_RINGS[1].era].objective;
+    world.era = REGION_RINGS[1].era;
     expect(world.regionState(far.id)).toBe('open');
     expect(approach(world, far.id)).toBeDefined();
   });
@@ -125,7 +124,7 @@ describe('régions — conquête', () => {
     const conquered: number[] = [];
     const drops = new Set<ItemId>();
 
-    world.objective = ERAS[2].objective;
+    world.era = 2;
     world.events.on('regionConquered', ({ id }) => conquered.push(id));
 
     const targets = [1, ...world.regions.filter((region) => region.ring === 1).map((region) => region.id).slice(0, 1), REGION_COUNT - 1];
@@ -159,7 +158,7 @@ describe('régions — conquête', () => {
   it('les régions conquises et la vie d’un gardien blessé passent la sauvegarde', () => {
     const world = World.newColony(100);
 
-    world.objective = ERAS[2].objective;
+    world.era = 2;
     defeat(world, 1);
 
     const guardian = approach(world, 2)!;

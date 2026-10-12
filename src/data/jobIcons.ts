@@ -28,6 +28,9 @@ const { ink, coral, orange, mint, cyan, violet, paper, skin } = PALETTE;
 /** Le médaillon commun : un disque jaune de la colonie, son ombre en bas à droite, son reflet en haut à gauche. */
 const MEDAL = shadedCircle(C, C, C - 0.5, 'yellow');
 
+/** Le jour d'un outil percé : la couleur du médaillon. */
+const MEDAL_HOLE = PALETTE.yellow.base;
+
 /** Une icône de métier : le médaillon, puis l'outil. */
 function job(...body: string[]): string {
   return svg(S, S, MEDAL, ...body);
@@ -204,6 +207,31 @@ export const JOB_DRAWINGS = {
     circle(12, 15, 3.2, orange.base),
     circle(11.6, 15.4, 1.6, orange.light),
     shadedPill(5, 18, 14, 3.6, 1.2, 'ink'),
+  ),
+  /** La briqueterie : trois briques corail empilées en quinconce. */
+  brickworks: job(
+    rect(4.5, 13, 7.5, 5, coral.shade, 1.5),
+    rect(4.5, 13, 7.5, 3.8, coral.base, 1.5),
+    rect(12.5, 13, 7.5, 5, coral.shade, 1.5),
+    rect(12.5, 13, 7.5, 3.8, coral.base, 1.5),
+    rect(8.5, 7.5, 7.5, 5, coral.shade, 1.5),
+    rect(8.5, 7.5, 7.5, 3.8, coral.base, 1.5),
+    pill(9.6, 8.2, 3, 1.2, coral.light),
+  ),
+  /** L'atelier : la clé plate et le tournevis croisés. */
+  workshop: job(
+    line(7, 17.5, 16, 8.5, ink.base),
+    circle(17, 7.5, 3.4, ink.base),
+    circle(18, 6.5, 1.5, MEDAL_HOLE),
+    line(7.5, 7.5, 15.5, 15.5, cyan.shade),
+    group('translate(17 17) rotate(45)', rect(-2, -2.5, 4, 6, orange.base, 1.5), pill(-1.2, -1.8, 1, 3, orange.light)),
+  ),
+  /** L'aciérie : la poche de coulée qui verse son acier rougeoyant. */
+  steelworks: job(
+    group('translate(10 11) rotate(-20)', rect(-5.5, -4, 11, 9, ink.shade, 4), rect(-5.5, -4, 11, 7.4, ink.base, 4), pill(-4, -3.2, 4, 1.4, ink.light)),
+    pill(14.5, 11.5, 2.6, 8, orange.base),
+    circle(15.8, 19.4, 2.2, orange.shade),
+    circle(15.4, 19, 1.3, PALETTE.yellow.light),
   ),
   /** La clinique : la croix menthe de sa porte — on y soigne. */
   clinic: job(

@@ -102,6 +102,7 @@ import { OBJECTIVES, objectiveBagBonus, type Reward } from '../data/objectives.t
 import { OFFLINE, OFFLINE_ALERTS, type OfflineAlertId } from '../data/offline.ts';
 import type { QuestId } from '../data/quests.ts';
 import { RECIPES, recipeOf, type RecipeId, type RecipeProto } from '../data/recipes.ts';
+import { ERAS, type EraProto } from '../data/eras.ts';
 import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../data/research.ts';
 import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
 import { ROADS } from '../data/roads.ts';
@@ -119,6 +120,7 @@ import type {
   Command,
   CommandLogEntry,
   DepositRejection,
+  EraRejection,
   GearRejection,
   PlacementRejection,
   RecruitRejection,
@@ -137,7 +139,7 @@ import type { WildlifeId } from '../data/enemies.ts';
 import { baseCenter, baseDoor, breed, canDamage, hitsBase, inBaseZone, isShielded, isStanding, onBase, placeEnemyBases } from './enemyBases.ts';
 import { waveEraOf, projectedRaiders, reinforcements, waveBounty } from './waves.ts';
 import { compassOf, stepMutant, stepQueen, surfacePoint, type Compass, type MutantStep } from './enemies.ts';
-import { BIOMES, REGION_GUARDIAN, REGION_RINGS, eraOf, type BiomeId } from '../data/regions.ts';
+import { BIOMES, REGION_GUARDIAN, REGION_RINGS, type BiomeId } from '../data/regions.ts';
 import { HOME_REGION_ID, REGION_COUNT, placeRegions, regionAt, type Region } from './regions.ts';
 import { createEve, currentQuest, harvestYieldWithTools, isUnlocked, mostDamaged, questProgress, rideHome, walkTo } from './eve.ts';
 import { ADAM_SALT, adultAge, bornTrait, canWork, cleanName, foeAge, nameOf, sexOf, traitOf, yearsToWork } from './inhabitants.ts';
@@ -147,6 +149,7 @@ import { decorMoodAt, type DecorSpot } from './decor.ts';
 import { assignBeds, freshHousing, moodCauses, nightlyMood, moodOf, type Lodging } from './housing.ts';
 import { rollLoot, stepPickup } from './loot.ts';
 import { copyStats, emptyStats, objectiveDone } from './objectives.ts';
+import { eraReady, nextEra, withEraThreat } from './eras.ts';
 import { denSize, densOfChunk, stepBeast, type Den } from './wildlife.ts';
 import { FULL_TILE, blockingTile, facingOf, type TileBox } from './motion.ts';
 import {
@@ -716,6 +719,13 @@ export type WorldEvents = {
   researchStarted: { id: EntityId; research: ResearchId; endTick: number };
   /** La recherche est finie : son effet vaut désormais pour toute la partie. */
   researchCompleted: { id: EntityId; research: ResearchId };
+  /**
+   * La colonie entre dans l'ère `era` (`data/eras.ts`) : `opened`, les
+   * bâtiments qui entrent au menu avec elle ; `fromBag`, ce que le sac a investi.
+   */
+  eraReached: { era: number; opened: BuildingId[]; fromBag: [ItemId, number][] };
+  /** Le passage d'ère a été refusé. */
+  eraRejected: { reason: EraRejection };
   /** Ces bâtiments viennent d'entrer au menu de construction : une recherche, un plan, un objectif. */
   buildingsUnlocked: { buildings: BuildingId[] };
   /** Une commande sur le labo a été refusée. */
@@ -886,11 +896,18 @@ export class World {
    */
   public openBuildings = new Set<BuildingId>(BUILDING_IDS);
 
+  /**
+   * L'ère atteinte, index de `ERAS` (`data/eras.ts`) : 0, le Campement, au
+   * départ et pour une sauvegarde d'avant les ères. Elle ne fait que monter
+   * (`advanceEra`).
+   */
+  public era = 0;
+
   /** Ce que le menu proposait au tick d'avant ; `null` avant le premier. Pas de l'état : il se relit. */
   private menuKnown: Set<BuildingId> | null = null;
 
   /** Ce dont dépendait le menu au dernier compte : tant que rien n'en change, `watchUnlocks` ne recompte pas. */
-  private unlockStamp: { hall: boolean; research: number; quests: number; objective: number; open: number; explored: number } | null = null;
+  private unlockStamp: { hall: boolean; research: number; quests: number; objective: number; open: number; explored: number; era: number } | null = null;
   private exploredStamp = { revision: -1, count: 0 };
 
   /**
@@ -1155,6 +1172,7 @@ export class World {
       researchDone: [...this.researchDone],
       seenBuildings: [...this.seenBuildings],
       openBuildings: [...this.openBuildings],
+      era: this.era,
       rareTrades: { ...this.rareTrades },
       objective: this.objective,
       victory: this.victory,
@@ -1228,6 +1246,7 @@ export class World {
     this.seenBuildings = new Set(state.seenBuildings);
     // Une colonie sauvegardée avant que le labo ne soit un bâtiment de départ le retrouve au menu.
     this.openBuildings = new Set([...(state.openBuildings ?? BUILDING_IDS), ...START_BUILDINGS]);
+    this.era = state.era ?? 0;
     this.rareTrades = { ...state.rareTrades };
     this.objective = state.objective;
     this.victory = state.victory;
@@ -1475,6 +1494,10 @@ export class World {
 
       case 'upgradeBuilding':
         this.upgrade(command.id);
+        break;
+
+      case 'advanceEra':
+        this.advanceEra();
         break;
 
       case 'craftGear':
@@ -1760,6 +1783,52 @@ export class World {
     building.level += 1;
     building.hp = Math.max(1, Math.round((building.hp / before) * upgrade.hp));
     this.events.emit('buildingUpgraded', { id, level: building.level, fromBag });
+  }
+
+  /* ------------------------------------------------------------------ ères */
+
+  /**
+   * « Passer au Bourg » : toutes les conditions de l'ère suivante tiennent
+   * (`sim/eras.ts`), son investissement se paie d'un coup — le sac d'abord,
+   * puis la ville —, et elle ouvre ses bâtiments au menu. Son onglet de
+   * recherches s'ouvre au labo, sa menace rejoint les nuits.
+   */
+  private advanceEra(): void {
+    const next = nextEra(this.era);
+
+    if (next === null) {
+      this.events.emit('eraRejected', { reason: 'lastEra' });
+      return;
+    }
+    if (!eraReady(this)) {
+      this.events.emit('eraRejected', { reason: 'notReady' });
+      return;
+    }
+
+    const proto: EraProto = ERAS[next]!;
+    const town = this.townStock();
+    const fromBag: [ItemId, number][] = [];
+
+    for (const [item, needed] of Object.entries(proto.requires?.invest ?? {}) as [ItemId, number][]) {
+      const bag = Math.min(needed, this.player.inventory.available(item));
+
+      if (bag > 0) {
+        this.player.inventory.remove(item, bag);
+        fromBag.push([item, bag]);
+      }
+      if (needed > bag) town?.remove(item, needed - bag);
+    }
+
+    const opened = proto.opens.filter((id) => !this.openBuildings.has(id));
+
+    for (const id of proto.opens) this.openBuildings.add(id);
+    this.era = next;
+    this.events.emit('eraReached', { era: next, opened, fromBag });
+  }
+
+  /** La recherche est-elle à la portée de l'ère atteinte ? Son onglet s'ouvre avec son ère. */
+  public researchOpen(research: ResearchId): boolean {
+    return RESEARCH[research].era <= this.era;
   }
 
   /* ------------------------------------------------------------ réparation */
@@ -2662,7 +2731,12 @@ export class World {
     const lab = this.labFor(id);
 
     if (!lab) return;
-    if (!Object.hasOwn(RESEARCH, research) || this.researchDone.includes(research) || missingRequirements(research, this.researchDone).length > 0) {
+    if (
+      !Object.hasOwn(RESEARCH, research) ||
+      this.researchDone.includes(research) ||
+      !this.researchOpen(research) ||
+      missingRequirements(research, this.researchDone).length > 0
+    ) {
       this.events.emit('researchRejected', { id, reason: 'locked' });
       return;
     }
@@ -3126,10 +3200,27 @@ export class World {
     const hall = this.warehouse() !== null;
     const stamp = this.unlockStamp;
 
-    if (stamp && stamp.hall === hall && stamp.research === this.researchDone.length && stamp.quests === this.questsDone && stamp.objective === this.objective && stamp.open === this.openBuildings.size && stamp.explored === this.exploredTiles()) {
+    if (
+      stamp &&
+      stamp.hall === hall &&
+      stamp.research === this.researchDone.length &&
+      stamp.quests === this.questsDone &&
+      stamp.objective === this.objective &&
+      stamp.open === this.openBuildings.size &&
+      stamp.explored === this.exploredTiles() &&
+      stamp.era === this.era
+    ) {
       return;
     }
-    this.unlockStamp = { hall, research: this.researchDone.length, quests: this.questsDone, objective: this.objective, open: this.openBuildings.size, explored: this.exploredTiles() };
+    this.unlockStamp = {
+      hall,
+      research: this.researchDone.length,
+      quests: this.questsDone,
+      objective: this.objective,
+      open: this.openBuildings.size,
+      explored: this.exploredTiles(),
+      era: this.era,
+    };
 
     const known = this.menuKnown;
     const menu = MENU_BUILDING_IDS.filter((id) => this.inMenu(id));
@@ -6072,12 +6163,7 @@ export class World {
 
     const ring = REGION_RINGS[this.regions[id]?.ring ?? -1];
 
-    return ring && this.era() >= ring.era ? 'open' : 'locked';
-  }
-
-  /** L'ère de la colonie (indice dans `ERAS`), lue dans les objectifs réussis. */
-  public era(): number {
-    return eraOf(this.objective);
+    return ring && this.era >= ring.era ? 'open' : 'locked';
   }
 
   /** Les régions où tient du bâti ou une route : conquises d'office pour une sauvegarde d'avant les régions. */
@@ -6374,7 +6460,7 @@ export class World {
     if (!lead) return;
 
     const leadTarget = this.waveTarget(lead);
-    const bosses = nightBosses(this.night);
+    const bosses = withEraThreat(nightBosses(this.night), this.era);
     let count = 0;
     let bases = 0;
 
@@ -6463,7 +6549,7 @@ export class World {
     }
 
     const lead = this.leadBase();
-    const extra = Object.values(nightBosses(night)).reduce((sum, n) => sum + n, 0) + (lead ? this.waveReinforcements() : 0);
+    const extra = Object.values(withEraThreat(nightBosses(night), this.era)).reduce((sum, n) => sum + n, 0) + (lead ? this.waveReinforcements() : 0);
 
     if (lead && extra > 0) {
       count += extra;
@@ -6496,7 +6582,7 @@ export class World {
     const night = clock.phase === 'day' || clock.phase === 'dusk' ? clock.cycle : clock.cycle + 1;
     const dayTicks = clock.phase === 'day' ? clock.left - 1 : clock.phase === 'dusk' ? 0 : DAY_CYCLE.day;
     const reinforcements = this.waveReinforcements();
-    const leaders = Object.values(nightBosses(night)).reduce((sum, n) => sum + n, 0) + reinforcements;
+    const leaders = Object.values(withEraThreat(nightBosses(night), this.era)).reduce((sum, n) => sum + n, 0) + reinforcements;
     let count = 0;
     let bases = 0;
 

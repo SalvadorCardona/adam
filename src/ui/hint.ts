@@ -21,6 +21,7 @@ import type { Goal } from '../data/objectives.ts';
 import { RESEARCH_IDS } from '../data/research.ts';
 import { RESOURCES } from '../data/resources.ts';
 import { currentObjective, objectiveWait, type GoalWait } from '../sim/objectives.ts';
+import { eraReady, nextEra } from '../sim/eras.ts';
 import { openingResearch, researchStatus, unlockingResearch } from '../sim/research.ts';
 import type { Building } from '../sim/types.ts';
 import { TICKS_PER_SECOND, type World } from '../sim/world.ts';
@@ -140,6 +141,11 @@ export function tutorialAdvice(world: World, progress: HintProgress, towers: boo
 
   if (mutants === 0 && !quarried && (world.townStock()?.available('stone') ?? 0) === 0) return say(viaLab(world, 'quarry', lines.quarry));
 
+  // L'ère suivante est à portée : rien d'autre ne presse autant, hors des nuits.
+  const next = nextEra(world.era);
+
+  if (mutants === 0 && next !== null && eraReady(world)) return say(lines.eraReady.replace('{era}', t().eras[next]!.label));
+
   // Entre deux nuits, tant qu'elle n'est pas là : elle annonce son arrivée.
   if (mutants === 0 && world.night > 0 && world.night < EVE.arrivalNight && !world.eve()) {
     const left = EVE.arrivalNight - world.night;
@@ -239,7 +245,7 @@ function meanwhile(world: World): Advice | null {
 
   if (
     labs.some((lab) => lab.research === null) &&
-    RESEARCH_IDS.some((id) => researchStatus(id, world.researchDone, null, labs) === 'available')
+    RESEARCH_IDS.some((id) => world.researchOpen(id) && researchStatus(id, world.researchDone, null, labs) === 'available')
   ) {
     return { text: lines.meanwhileResearch, wants: null };
   }
