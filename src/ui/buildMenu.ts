@@ -173,7 +173,7 @@ export class BuildMenu {
     toggleLabel.className = 'build-toggle-label';
     const spaceKey = keyHint();
 
-    this.toggleButton = button('', () => this.toggle());
+    this.toggleButton = button('', (event) => this.toggle(!touched(event)));
     this.toggleButton.className = 'build-toggle';
     this.toggleButton.append(uiIcon('hammer', 28), toggleLabel, spaceKey);
     this.toggleButton.setAttribute('aria-keyshortcuts', 'Space');
@@ -643,13 +643,17 @@ export class BuildMenu {
     return this.opened;
   }
 
-  public toggle(): void {
+  public toggle(focusSearch = true): void {
     if (this.opened) this.close();
-    else this.open();
+    else this.open(focusSearch);
   }
 
-  /** Le tiroir s'ouvre sur un champ de recherche vide, sous le focus : on tape tout de suite. */
-  public open(): void {
+  /**
+   * Le tiroir s'ouvre sur un champ de recherche vide, sous le focus : on tape tout de suite.
+   * Au toucher (`focusSearch` faux), pas de focus : il ferait monter le clavier du téléphone
+   * sur la moitié de l'écran, alors qu'on vient toucher une carte.
+   */
+  public open(focusSearch = true): void {
     this.opened = true;
     this.filter.open();
     this.clearSearch();
@@ -661,7 +665,7 @@ export class BuildMenu {
     this.refresh();
     this.revealChip();
     // Sans défilement : le clavier du téléphone soulève le tiroir (`followKeyboard`), la page ne bouge pas.
-    this.search.focus({ preventScroll: true });
+    if (focusSearch) this.search.focus({ preventScroll: true });
   }
 
   public close(): void {
@@ -991,7 +995,12 @@ function keyHint(): HTMLElement {
   return key;
 }
 
-function button(label: string, onTap: () => void): HTMLButtonElement {
+/** Le geste vient d'un doigt ou d'un stylet (`pointerType` du clic) : ni souris, ni clavier, ni manette. */
+function touched(event: MouseEvent): boolean {
+  return event instanceof PointerEvent && (event.pointerType === 'touch' || event.pointerType === 'pen');
+}
+
+function button(label: string, onTap: (event: MouseEvent) => void): HTMLButtonElement {
   const element = document.createElement('button');
 
   element.type = 'button';
