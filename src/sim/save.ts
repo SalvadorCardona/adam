@@ -126,6 +126,8 @@ export interface WorldState {
   nextWaveTarget?: EntityId;
   /** La nuit dont la vague, sortie, paiera sa prime si on l'abat toute (`WAVE_BOUNTY`). Absent : aucune en jeu. */
   bountyNight?: number;
+  /** Ceux qui ont eu peur depuis l'aube, cf. `World.scared` : leur nuit pèse sur le moral de l'aube. Absent : personne. */
+  scared?: number[];
   kills: number;
   /** Le Prestige de la colonie. Absent des sauvegardes d'avant lui : 0. */
   prestige: number;
@@ -484,6 +486,7 @@ function parseState(raw: unknown): WorldState {
     cycleStartTick: int(state['cycleStartTick']),
     ...(state['nextWaveTarget'] !== undefined && { nextWaveTarget: int(state['nextWaveTarget']) }),
     ...(state['bountyNight'] !== undefined && { bountyNight: int(state['bountyNight']) }),
+    ...(state['scared'] !== undefined && { scared: [...new Set(array(state['scared']).map(int))] }),
     kills: int(state['kills']),
     // Absents d'une sauvegarde d'avant le Prestige : la colonie repart de zéro, ses bâtiments déjà payés.
     prestige: state['prestige'] === undefined ? 0 : int(state['prestige']),

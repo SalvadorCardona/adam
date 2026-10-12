@@ -1160,6 +1160,7 @@ export class World {
       cycleStartTick: this.cycleStartTick,
       ...(this.nextWaveTarget !== null && { nextWaveTarget: this.nextWaveTarget }),
       ...(this.bountyNight !== null && { bountyNight: this.bountyNight }),
+      ...(this.scared.size > 0 && { scared: [...this.scared] }),
       kills: this.kills,
       prestige: this.prestige,
       prestigeSites: [...this.prestigeSites],
@@ -1232,6 +1233,8 @@ export class World {
     this.cycleStartTick = state.cycleStartTick;
     this.nextWaveTarget = state.nextWaveTarget ?? null;
     this.bountyNight = state.bountyNight ?? null;
+    this.scared.clear();
+    for (const id of state.scared ?? []) this.scared.add(id);
     this.kills = state.kills;
     this.prestige = state.prestige;
     this.prestigeSites.clear();
