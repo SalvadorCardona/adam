@@ -905,7 +905,7 @@ Rien ne joue avant un geste du joueur.
   y est dans un try/catch. Un nouvel état de simulation doit entrer dans
   `World.snapshot()` / `restore()` — sinon il se perd au rechargement ; un
   changement incompatible incrémente `SAVE_VERSION`.
-- Le **jardin des souvenirs** (graines laissées par chaque colonie tombée,
+- Le **jardin des souvenirs** (graines laissées par chaque colonie tombée ou refondée après le Signal — « Fonder une nouvelle colonie » de l'écran de victoire verse les graines du bilan, `ColonyScore` : nuits, enfants, bâtiments, bases abattues, habitants, temps, Signal, puis repart sur une carte neuve ;
   bonus plantés, « Partie pure ») n'est pas l'état d'une partie : format
   versionné dans `sim/garden.ts`, clé dédiée `mobile-factory:garden`
   (`storage/localGarden.ts`), jamais effacé par « Recommencer ». Les bonus

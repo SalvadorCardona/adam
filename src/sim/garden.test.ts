@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PERKS, PERK_IDS, seedsFor } from '../data/perks.ts';
+import { PERKS, PERK_IDS, SEED_REWARDS, seedsFor, type ColonyScore } from '../data/perks.ts';
 import {
   EMPTY_GARDEN,
   GARDEN_VERSION,
@@ -11,10 +11,31 @@ import {
   plant,
 } from './garden.ts';
 
+const NONE: ColonyScore = { waves: 0, children: 0, buildings: 1, bases: 0, population: 0, minutes: 0, victory: false };
+
 describe('jardin des souvenirs', () => {
+  it('le barème paie la victoire, les bases abattues, la population et le temps', () => {
+    const base = seedsFor(NONE);
+
+    expect(seedsFor({ ...NONE, victory: true })).toBe(base + SEED_REWARDS.victory);
+    expect(seedsFor({ ...NONE, bases: 2 })).toBe(base + 2 * SEED_REWARDS.perBase);
+    expect(seedsFor({ ...NONE, population: 7 })).toBe(base + 2 * SEED_REWARDS.perPopulationStep);
+    expect(seedsFor({ ...NONE, minutes: 25 })).toBe(base + 2 * SEED_REWARDS.perMinutesStep);
+    expect(seedsFor({ ...NONE, minutes: 100000 })).toBe(base + SEED_REWARDS.maxTimeSeeds);
+  });
+
+  it('une colonie refondée après le Signal repart avec ses bonus, et les graines survivent', () => {
+    const score = { ...NONE, waves: 10, victory: true };
+    let garden = harvestSeeds({ ...EMPTY_GARDEN }, seedsFor(score));
+
+    garden = plant(garden, 'woodStart');
+    expect(garden.planted).toEqual(['woodStart']);
+    expect(activePerks(decodeGarden(encodeGarden(garden)))).toEqual(['woodStart']);
+  });
+
   it('une défaite rapporte toujours des graines, et plus quand la colonie a tenu', () => {
-    const worst = seedsFor({ waves: 0, children: 0, buildings: 1 });
-    const better = seedsFor({ waves: 3, children: 1, buildings: 4 });
+    const worst = seedsFor(NONE);
+    const better = seedsFor({ ...NONE, waves: 3, children: 1, buildings: 4 });
 
     expect(worst).toBeGreaterThan(0);
     expect(better).toBeGreaterThan(worst);

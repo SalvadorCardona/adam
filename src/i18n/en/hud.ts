@@ -255,6 +255,9 @@ export const hud: Messages['hud'] = {
   pause: 'Pause',
   objectiveDone: 'Goal complete!',
   victory: {
+    refound: 'Found a new colony',
+    seeds: (seeds: number): string => `+${seeds} seed${s(seeds)}`,
+    seedsHint: 'To plant in the memory garden: the new colony starts with its perks.',
     endless: 'Keep going forever',
     nights: 'Nights held',
     kills: 'Mutants defeated',

@@ -3678,7 +3678,8 @@ export class World {
 
   /**
    * Le bilan de la colonie, lu par le barème des graines : nuits
-   * repoussées, enfants encore là, bâtiments finis — la mairie comptée même
+   * repoussées, enfants encore là, bases abattues, habitants, temps de jeu,
+   * Signal envoyé, bâtiments finis — la mairie comptée même
    * tombée, puisqu'elle a tenu jusqu'à la défaite.
    */
   public colonyScore(): ColonyScore {
@@ -3689,10 +3690,17 @@ export class World {
     }
     if (this.defeated) buildings += 1;
 
+    const { adults, children, workers } = this.population();
+    const end = this.defeated ? this.defeatTick : this.tickCount;
+
     return {
       waves: Math.max(0, this.night - 1),
-      children: this.population().children,
+      children,
       buildings,
+      bases: this.enemyBases.filter((base) => !isStanding(base)).length,
+      population: adults + children + workers,
+      minutes: Math.floor(end / TICKS_PER_SECOND / 60),
+      victory: this.victory,
     };
   }
 

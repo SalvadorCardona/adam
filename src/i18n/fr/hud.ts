@@ -315,6 +315,9 @@ export const hud = {
   /** Le bandeau d'un objectif réussi sans bandeau à lui. */
   objectiveDone: 'Objectif réussi !',
   victory: {
+    refound: 'Fonder une nouvelle colonie',
+    seeds: (seeds: number): string => `+${seeds} graine${s(seeds)}`,
+    seedsHint: 'À planter au jardin des souvenirs : la nouvelle colonie partira avec ses bonus.',
     endless: 'Continuer sans fin',
     nights: 'Nuits tenues',
     kills: 'Mutants abattus',

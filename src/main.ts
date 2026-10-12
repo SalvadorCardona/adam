@@ -28,6 +28,7 @@ import { OBJECTIVES, type ObjectiveProto } from './data/objectives.ts';
 import { TEST_SCENARIOS, type TestScenarioProto } from './data/testScenario.ts';
 import { PIECES } from './data/wardrobe.ts';
 import { IndicatorTap } from './input/indicatorTap.ts';
+import { mapUrl } from './ui/seed.ts';
 import { seedsFor, type PerkId } from './data/perks.ts';
 import { Inspect } from './input/inspect.ts';
 import { installCursors } from './ui/cursors.ts';
@@ -466,6 +467,15 @@ async function main(): Promise<void> {
   world.events.on('victory', () => {
     celebrating = true;
     window.umami?.track('victoire');
+  });
+  // Refonder : les graines de la colonie au jardin, la partie effacée, puis une carte neuve.
+  let refounding = false;
+
+  hud.setOnRefound(() => {
+    if (refounding) return;
+    refounding = true;
+    garden.bank();
+    autosave.refound();
   });
   hud.setOnContinue(() => {
     celebrating = false;
@@ -909,6 +919,8 @@ interface Autosave {
   now(): void;
   /** Efface la partie et recharge la page sur une carte neuve (ou la seed de l'URL). */
   restart(): void;
+  /** Efface la partie et ouvre une carte neuve, quelle que soit la seed de l'adresse. */
+  refound(): void;
 }
 
 /**
@@ -976,6 +988,12 @@ function wireSave(world: World, saves: LocalSave, started: () => boolean): Autos
       window.umami?.track('partie-recommencee');
       window.location.reload();
     },
+    refound() {
+      enabled = false;
+      saves.clear();
+      window.umami?.track('colonie-refondee');
+      window.location.assign(mapUrl(window.location.href, null));
+    },
   };
 }
 
@@ -983,12 +1001,15 @@ interface GardenWiring {
   current(): Garden;
   plant(perk: PerkId): Garden;
   setPure(pure: boolean): Garden;
+  /** Verse au jardin les graines de la colonie en cours (refondation après le Signal). */
+  bank(): Garden;
 }
 
 /**
  * Le jardin des souvenirs : les graines de la colonie tombée y entrent à la
  * chute de la mairie, une seule fois — la partie perdue est effacée juste
- * après, elle ne retombera pas. Chaque changement est écrit tout de suite,
+ * après, elle ne retombera pas. Une colonie qui a envoyé le Signal verse
+ * les siennes en en fondant une nouvelle (`bank`). Chaque changement est écrit tout de suite,
  * sous sa propre clé : « Recommencer » n'y touche pas.
  */
 function wireGarden(world: World, gardens: LocalGarden): GardenWiring {
@@ -1006,6 +1027,7 @@ function wireGarden(world: World, gardens: LocalGarden): GardenWiring {
     current: () => garden,
     plant: (perk) => keep(plant(garden, perk)),
     setPure: (pure) => keep({ ...garden, pure }),
+    bank: () => keep(harvestSeeds(garden, seedsFor(world.colonyScore()))),
   };
 }
 

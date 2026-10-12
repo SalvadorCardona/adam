@@ -100,6 +100,17 @@ export const SEED_REWARDS = {
   perChild: 3,
   /** Par bâtiment fini, mairie comprise. */
   perBuilding: 1,
+  /** Par base mutante abattue : une région conquise. */
+  perBase: 4,
+  /** Par tranche de `populationStep` habitants. */
+  perPopulationStep: 1,
+  populationStep: 3,
+  /** Par tranche de `minutesStep` minutes de jeu, jusqu'à `maxTimeSeeds`. */
+  perMinutesStep: 1,
+  minutesStep: 10,
+  maxTimeSeeds: 6,
+  /** Fonder une nouvelle colonie après le Signal : l'ère atteinte, une fois. */
+  victory: 10,
 } as const;
 
 /** Le bilan d'une colonie, tel que le barème le lit. */
@@ -107,14 +118,29 @@ export interface ColonyScore {
   waves: number;
   children: number;
   buildings: number;
+  /** Bases mutantes abattues. */
+  bases: number;
+  /** Habitants : ouvriers, enfants, porteurs. */
+  population: number;
+  /** Minutes de jeu écoulées. */
+  minutes: number;
+  /** Le Signal a été envoyé : l'ère finale est atteinte. */
+  victory: boolean;
 }
 
-export function seedsFor({ waves, children, buildings }: ColonyScore): number {
+export function seedsFor(score: ColonyScore): number {
+  const { waves, children, buildings, bases, population, minutes, victory } = score;
+  const time = Math.min(SEED_REWARDS.maxTimeSeeds, Math.floor(minutes / SEED_REWARDS.minutesStep) * SEED_REWARDS.perMinutesStep);
+
   return (
     SEED_REWARDS.base +
     SEED_REWARDS.perWave * waves +
     SEED_REWARDS.perChild * children +
-    SEED_REWARDS.perBuilding * buildings
+    SEED_REWARDS.perBuilding * buildings +
+    SEED_REWARDS.perBase * bases +
+    SEED_REWARDS.perPopulationStep * Math.floor(population / SEED_REWARDS.populationStep) +
+    time +
+    (victory ? SEED_REWARDS.victory : 0)
   );
 }
 

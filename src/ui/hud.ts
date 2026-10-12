@@ -260,10 +260,12 @@ export class Hud {
   private readonly defeatStats: HTMLElement;
   private readonly victory: HTMLElement;
   private readonly victoryStats: HTMLElement;
+  private readonly victorySeeds: HTMLElement;
   private readonly celebration: HTMLElement;
   private readonly confetti: HTMLElement;
   private celebrationTimer = 0;
   private onContinue: () => void = () => {};
+  private onRefound: () => void = () => {};
   private readonly speech: HTMLElement;
   private readonly defeatSeeds: HTMLElement;
   /** L'engrenage : il ouvre le menu des réglages (`settingsPanel.ts`). */
@@ -484,7 +486,8 @@ export class Hud {
     const victoryPanel = element('div', 'panel overlay-panel');
     const victoryTitle = element('h2', 'overlay-title');
     const victoryText = element('p', 'overlay-text');
-    const endless = element('button', 'button-primary');
+    const refound = element('button', 'button-primary');
+    const endless = element('button', 'button-secondary');
 
     this.victoryStats = element('dl', 'overlay-stats');
     endless.type = 'button';
@@ -492,7 +495,10 @@ export class Hud {
       this.victory.hidden = true;
       this.onContinue();
     });
-    victoryPanel.append(uiIcon('goal', 56), victoryTitle, victoryText, this.victoryStats, endless);
+    this.victorySeeds = element('div', 'overlay-seeds');
+    refound.type = 'button';
+    refound.addEventListener('click', () => this.onRefound());
+    victoryPanel.append(uiIcon('goal', 56), victoryTitle, victoryText, this.victoryStats, this.victorySeeds, refound, endless);
     this.victory.append(victoryPanel);
 
     this.celebration = element('div', 'hud-celebration');
@@ -556,6 +562,7 @@ export class Hud {
       fresh.textContent = text.defeat.fresh;
       victoryTitle.textContent = t().lore.signal.title;
       victoryText.textContent = t().lore.signal.text;
+      refound.textContent = text.victory.refound;
       endless.textContent = text.victory.endless;
       this.lastQuest = '';
       this.lastClock = '';
@@ -828,6 +835,11 @@ export class Hud {
   }
 
   /** Ce que fait « Continuer sans fin » : `main.ts` relance l'horloge. */
+  /** « Fonder une nouvelle colonie » : `main.ts` verse les graines au jardin et repart sur une carte neuve. */
+  public setOnRefound(onRefound: () => void): void {
+    this.onRefound = onRefound;
+  }
+
   public setOnContinue(onContinue: () => void): void {
     this.onContinue = onContinue;
   }
@@ -1986,6 +1998,12 @@ export class Hud {
     this.victoryStats.replaceChildren(
       ...rows.flatMap(([name, value]) => [text('', name, 'dt'), text('', value, 'dd')]),
     );
+
+    // Les mêmes graines que `main.ts` verse au jardin à la refondation.
+    const amount = text('overlay-seeds-amount', label.seeds(seedsFor(world.colonyScore())));
+
+    amount.prepend(uiIcon('seed', 28));
+    this.victorySeeds.replaceChildren(amount, text('overlay-seeds-hint', label.seedsHint));
   }
 
   /* ------------------------------------------------------------------ mort */

@@ -135,11 +135,25 @@ describe('graines laissées par une colonie', () => {
   it('une colonie qui n’a rien bâti ne compte rien, sinon le bâti et les nuits comptent', () => {
     const world = new World(7);
 
-    expect(world.colonyScore()).toEqual({ waves: 0, children: 0, buildings: 0 });
+    expect(world.colonyScore()).toEqual({ waves: 0, children: 0, buildings: 0, bases: 0, population: 11, minutes: 0, victory: false });
 
     world.night = 4;
     world.defeated = true;
-    expect(world.colonyScore()).toEqual({ waves: 3, children: 0, buildings: 1 });
-    expect(seedsFor(world.colonyScore())).toBeGreaterThan(seedsFor({ waves: 0, children: 0, buildings: 1 }));
+    expect(world.colonyScore()).toEqual({ waves: 3, children: 0, buildings: 1, bases: 0, population: 11, minutes: 0, victory: false });
+    expect(seedsFor(world.colonyScore())).toBeGreaterThan(seedsFor({ waves: 0, children: 0, buildings: 1, bases: 0, population: 0, minutes: 0, victory: false }));
+  });
+
+  it('le bilan lit les bases abattues, le Signal et le temps de jeu', () => {
+    const world = new World(7);
+    const before = seedsFor(world.colonyScore());
+
+    world.enemyBases[0]!.hp = 0;
+    world.victory = true;
+    world.tickCount = 20 * 60 * 30;
+
+    const score = world.colonyScore();
+
+    expect(score).toMatchObject({ bases: 1, victory: true, minutes: 30 });
+    expect(seedsFor(score)).toBeGreaterThan(before);
   });
 });
