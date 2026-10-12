@@ -98,7 +98,7 @@ const ALARM_MS = 2500;
 const PRESTIGE_FLOAT_MS = 1600;
 
 /** Le vol d'un objet trouvé vers le sac, en ms, et l'écart entre deux objets. */
-const FLY_MS = 900;
+const FIND_FLY_MS = 900;
 const FLY_STAGGER_MS = 110;
 
 /** Durée de vie d'un gain flottant, en ms (cf. `hud-float-up` dans le CSS). */
@@ -1382,7 +1382,7 @@ export class Hud {
           { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px)) scale(0.55)`, opacity: 1, offset: 0.95 },
           { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px)) scale(0.3)`, opacity: 0, offset: 1 },
         ],
-        { duration: FLY_MS, delay, easing: 'cubic-bezier(0.4, 0, 0.6, 1)', fill: 'backwards' },
+        { duration: FIND_FLY_MS, delay, easing: 'cubic-bezier(0.4, 0, 0.6, 1)', fill: 'backwards' },
       );
 
       flight.onfinish = () => {
