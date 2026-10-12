@@ -51,6 +51,7 @@ import { LocalCollection } from './storage/localCollection.ts';
 import { LocalGarden } from './storage/localGarden.ts';
 import { LocalRecord } from './storage/localRecord.ts';
 import { LocalSave, type LoadResult } from './storage/localSave.ts';
+import { TAB_KEY, TabLock } from './storage/localTab.ts';
 import { LocalLocale } from './storage/localLocale.ts';
 import { LocalGamepad, type GamepadPrefs } from './storage/localGamepad.ts';
 import { LocalHaptics } from './storage/localHaptics.ts';
@@ -78,6 +79,7 @@ import { PAD_POINTER_ID } from './ui/padCursor.ts';
 import { PadHelp } from './ui/padHelp.ts';
 import { PadHints } from './ui/padHints.ts';
 import { NotificationPrompt } from './ui/notificationPrompt.ts';
+import { TabLockPanel } from './ui/tabLockPanel.ts';
 import { Notifier, browserBackend } from './ui/notifier.ts';
 import { SettingsPanel } from './ui/settingsPanel.ts';
 import { formatSeed, parseSeed } from './ui/seed.ts';
@@ -222,6 +224,10 @@ async function main(): Promise<void> {
   // Une partie sauvegardée reprend là où elle s'était arrêtée ; sinon, une carte neuve.
   const saves = scenario ? new LocalSave(null) : LocalSave.browser();
   const loaded = saves.load();
+  // Cet onglet prend la main sur la sauvegarde ; un onglet plus ancien cesse d'y écrire (`TabLock`).
+  const tabs = scenario ? new TabLock(null) : TabLock.browser();
+
+  tabs.claim();
   const world = scenario
     ? stageScenario(TEST_SCENARIOS[scenario])
     : loaded.status === 'ok'
@@ -509,7 +515,20 @@ async function main(): Promise<void> {
     if (started && notifier.shouldExplain) notifyPrompt.show();
   });
 
-  const autosave = wireSave(world, saves, () => started);
+  const tabPanel = new TabLockPanel(() => {
+    tabs.claim();
+    window.location.reload();
+  });
+
+  hud.root.append(tabPanel.root);
+  window.addEventListener('storage', (event) => {
+    if (event.key === TAB_KEY && !tabs.held()) tabPanel.show();
+  });
+
+  const autosave = wireSave(world, saves, tabs, () => started, {
+    lost: () => tabPanel.show(),
+    failed: () => hud.notify(t().hud.toast.saveFailed, 'bad'),
+  });
   const garden = wireGarden(world, scenario ? new LocalGarden(null) : LocalGarden.browser());
   const record = wireRecord(world, scenario ? new LocalRecord(null) : LocalRecord.browser());
 
@@ -636,7 +655,13 @@ async function main(): Promise<void> {
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-      if (started && !scenario && hiddenAt > 0) world.push({ type: 'catchUp', awayMs: awayMs(hiddenAt, Date.now()) });
+      // Un autre onglet a joué pendant ce temps : rattraper l'absence sur un état dépassé l'écraserait.
+      if (!tabs.held()) tabPanel.show();
+      else if (started && !scenario && hiddenAt > 0) {
+        world.push({ type: 'catchUp', awayMs: awayMs(hiddenAt, Date.now()) });
+        // La pause garde le rattrapage en attente : d'ici là, la sauvegarde de fermeture ne doit pas dater la partie d'aujourd'hui.
+        autosave.hold();
+      }
       hiddenAt = 0;
       return;
     }
@@ -845,7 +870,7 @@ async function main(): Promise<void> {
   let lastAxisY = 0;
 
   renderer.app.ticker.add((ticker) => {
-    const running = started && !paused && !settings.open && !notifyPrompt.open && !inventory.dressing && !recap.open;
+    const running = started && !paused && !settings.open && !notifyPrompt.open && !tabPanel.open && !inventory.dressing && !recap.open;
 
     // La manette se lit une fois par frame, avant les ticks : l'axe de marche est frais.
     pad.update(ticker.deltaMS, performance.now(), !worldMap.open);
@@ -1122,6 +1147,8 @@ interface Autosave {
   update(deltaMs: number): void;
   /** Écrit la partie sur-le-champ — onglet caché, page quittée. */
   now(): void;
+  /** Suspend l'écriture jusqu'au prochain tick : une commande poussée (`catchUp`) n'a pas encore agi sur l'état. */
+  hold(): void;
   /** Efface la partie et recharge la page sur une carte neuve (ou la seed de l'URL). */
   restart(): void;
   /** Efface la partie et ouvre une carte neuve, quelle que soit la seed de l'adresse. */
@@ -1137,16 +1164,40 @@ interface Autosave {
  * objectif réussi) arrivent en plein tick ; ils ne font que lever un drapeau, et
  * l'écriture attend la fin du tick, quand l'état est cohérent.
  */
-function wireSave(world: World, saves: LocalSave, started: () => boolean): Autosave {
+function wireSave(
+  world: World,
+  saves: LocalSave,
+  tabs: TabLock,
+  started: () => boolean,
+  alerts: {
+    /** Un autre onglet a repris la partie : celui-ci n'écrit plus. */
+    lost(): void;
+    /** L'écriture vient d'échouer (une seule fois, jusqu'à la prochaine réussie). */
+    failed(): void;
+  },
+): Autosave {
   let elapsed = 0;
   let due = false;
   let enabled = true;
+  let failing = false;
+  let heldAt: number | null = null;
 
   const write = (): void => {
     elapsed = 0;
     due = false;
     if (!enabled || !started() || world.defeated) return;
-    saves.save(world);
+    if (!tabs.held()) {
+      alerts.lost();
+      return;
+    }
+    // Le tick n'a pas encore consommé la commande en attente : on garde la sauvegarde d'avant, qui date de l'absence.
+    if (heldAt === world.tickCount) return;
+    heldAt = null;
+
+    const saved = saves.save(world);
+
+    if (!saved && !failing) alerts.failed();
+    failing = !saved;
   };
 
   world.events.on('buildingCompleted', () => {
@@ -1196,6 +1247,9 @@ function wireSave(world: World, saves: LocalSave, started: () => boolean): Autos
       if (due || elapsed >= AUTOSAVE_MS) write();
     },
     now: write,
+    hold() {
+      heldAt = world.tickCount;
+    },
     restart() {
       // Plus rien ne s'écrit : le `pagehide` du rechargement ressusciterait la partie effacée.
       enabled = false;
