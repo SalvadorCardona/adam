@@ -98,6 +98,7 @@ import {
   type PerkId,
 } from '../data/perks.ts';
 import { OBJECTIVES, objectiveBagBonus, type Reward } from '../data/objectives.ts';
+import { OFFLINE, OFFLINE_ALERTS, type OfflineAlertId } from '../data/offline.ts';
 import type { QuestId } from '../data/quests.ts';
 import { RECIPES, recipeOf, type RecipeId, type RecipeProto } from '../data/recipes.ts';
 import { RESEARCH, type ResearchId, type ResearchStat } from '../data/research.ts';
@@ -185,6 +186,7 @@ import {
   unlockingResearch,
 } from './research.ts';
 import { TownFlows } from './flows.ts';
+import { count, countedMs, feedNeed, mealsPerTick, wholeUnits, type OfflineReport } from './offline.ts';
 import { ResourceIndex, type TileLook } from './resources.ts';
 import { FogOfWar, type Sight } from './fog.ts';
 import { Land } from './contamination.ts';
@@ -271,7 +273,7 @@ export const STEP_MS = 1000 / TICKS_PER_SECOND;
 const STEP_SECONDS = 1 / TICKS_PER_SECOND;
 
 /** Les seules commandes qu'on prend d'Adam à terre : celles qui ne sont pas de lui (vue, jardin, brouillard). */
-const DEAD_COMMANDS: ReadonlySet<Command['type']> = new Set(['setMoveAxis', 'seeBuilding', 'seePieces', 'applyPerks', 'grantPieces', 'setFog']);
+const DEAD_COMMANDS: ReadonlySet<Command['type']> = new Set(['setMoveAxis', 'seeBuilding', 'seePieces', 'applyPerks', 'grantPieces', 'setFog', 'catchUp']);
 
 /** Recette utilisée par une foreuse. Une seule pour l'instant, cf. `data/recipes.ts`. */
 const DRILL_RECIPE: RecipeId = 'mineOre';
@@ -751,6 +753,8 @@ export type WorldEvents = {
    * reçoit le plan, `reward` ce que donne une ruine.
    */
   discoveryFound: { id: number; kind: DiscoveryKind; tx: number; ty: number; x: number; y: number; items: [ItemId, number][]; plan: BuildingId | null; reward: RuinReward | null };
+  /** Le temps d'absence est rattrapé (`catchUp`) : le récap « Pendant votre absence » le raconte. */
+  offlineCaughtUp: OfflineReport;
 };
 
 export class World {
@@ -1464,6 +1468,10 @@ export class World {
       case 'setFog':
         this.fog.enabled = command.enabled;
         this.fog.revision += 1;
+        break;
+
+      case 'catchUp':
+        this.catchUp(command.awayMs);
         break;
 
       case 'startResearch':
@@ -3530,6 +3538,8 @@ export class World {
 
     // En pause : l'heure passe sans naissance ni repas, et rien n'est replanifié — « Reprendre » la relance.
     if (nursery.paused) return;
+    // Un réveil d'avant un rattrapage hors ligne, qui a avancé l'heure de naître : il ne sonne plus pour rien.
+    if (this.tickCount < nursery.nextBirthTick) return;
     if (this.nurseryKids(nursery).length >= NURSERY_CARE.capacity) return;
 
     if (!hasInputs(nursery.store, recipe)) {
@@ -3537,6 +3547,15 @@ export class World {
       nursery.hungry = true;
       return;
     }
+    this.bear(nursery);
+    nursery.nextBirthTick = this.tickCount + recipe.duration;
+    this.scheduler.schedule(nursery.id, nursery.nextBirthTick, this.tickCount);
+  }
+
+  /** Une naissance : la nourriture de la recette sort du coffre, l'enfant apparaît à côté de la nurserie. */
+  private bear(nursery: Nursery): void {
+    const recipe: RecipeProto = RECIPES[NURSERY_RECIPE];
+
     for (const [item, amount] of amountsOf(recipe.inputs)) nursery.store.remove(item, amount);
     nursery.hungry = false;
 
@@ -3572,10 +3591,318 @@ export class World {
     this.mobiles.set(kid.id, kid);
     nursery.born += 1;
     this.stats.births += 1;
-    nursery.nextBirthTick = this.tickCount + recipe.duration;
-    this.scheduler.schedule(nursery.id, nursery.nextBirthTick, this.tickCount);
     this.joy = { tick: this.tickCount, kidId: kid.id };
     this.events.emit('childBorn', { nurseryId: nursery.id, kidId: kid.id, name: this.nameFor(kid), x, y });
+  }
+
+  /* ------------------------------------------------------------ hors ligne */
+
+  /**
+   * Le plafond du temps rattrapé hors ligne, en ms. Le seul point où le lire :
+   * une recherche qui le relèvera s'ajoutera ici.
+   */
+  public offlineCapMs(): number {
+    return OFFLINE.maxMs;
+  }
+
+  /**
+   * La commande `catchUp` : la ville rattrape `awayMs` d'absence, borné au
+   * plafond, en agrégé — par pas de `OFFLINE.stepTicks`, pas tick par tick.
+   * À chaque pas, les producteurs rendent leur cadence moyenne, les forges
+   * transforment, les nurseries et les labos avancent leur compte à rebours,
+   * puis chacun mange et boit. Les porteurs (ou les logisticiens) sont
+   * supposés faire leur tournée : avec eux, ce qui sort va en ville et ce
+   * qui entre en vient ; sans eux, chaque coffre se remplit seul.
+   *
+   * L'horloge du jour, elle, ne bouge pas : ni nuit, ni vague, ni mort. Un
+   * habitant sans vivres s'arrête affamé (`OFFLINE.starvedGauge`), et le
+   * récap le dit. Rien sans mairie bâtie, ni sous `OFFLINE.minMs`.
+   */
+  private catchUp(awayMs: number): void {
+    const hall = this.warehouse();
+    const counted = countedMs(awayMs, this.offlineCapMs());
+    const total = Math.floor(counted / STEP_MS);
+
+    if (!hall || this.defeated || total <= 0) return;
+
+    const report: OfflineReport = {
+      awayMs,
+      ticks: total,
+      capped: awayMs > this.offlineCapMs(),
+      gained: {},
+      spent: {},
+      research: [],
+      births: 0,
+      alerts: [],
+    };
+    const alerts = new Set<OfflineAlertId>();
+    const carriers = this.hasCarriers();
+    const carry = new Map<EntityId, number>();
+    const woodLeft = new Map<EntityId, number>();
+    const births = new Map<EntityId, number>();
+    const research = new Map<EntityId, number>();
+    let working = 1;
+
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'nursery') births.set(entity.id, entity.hungry ? 0 : entity.nextBirthTick - this.tickCount);
+      if (entity.kind === 'lab' && entity.endTick > 0) research.set(entity.id, entity.endTick - this.tickCount);
+      if (entity.kind === 'lumberCamp') woodLeft.set(entity.id, this.treesLeft(entity) * LUMBERJACKS.carry);
+    }
+
+    for (let done = 0; done < total; done += OFFLINE.stepTicks) {
+      const span = Math.min(OFFLINE.stepTicks, total - done);
+
+      for (const entity of this.entities.values()) {
+        if (entity.kind === 'site') continue;
+
+        const made = this.offlineOutput(entity, span * (employs(entity.proto) ? working : 1), woodLeft);
+
+        if (made) this.offlineYield(entity, made.item, wholeUnits(carry, entity.id, made.amount), carriers, report, alerts);
+        if (entity.kind === 'forge') this.offlineForge(entity, span * working, carry, carriers, report, alerts);
+      }
+      for (const entity of this.entities.values()) {
+        if (entity.kind === 'nursery') this.offlineBirths(entity, span, births, carriers, report);
+        if (entity.kind === 'lab') this.offlineResearch(entity, span, research, carriers, report);
+      }
+      working = this.offlineMeals(hall.store, span, report, alerts);
+    }
+
+    // Les comptes à rebours repartent d'où le rattrapage les a laissés ; un ancien réveil, en avance, ne sonne plus pour rien.
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'nursery' && !entity.paused) {
+        const left = births.get(entity.id) ?? 0;
+
+        if (left > 0) {
+          entity.hungry = false;
+          entity.nextBirthTick = this.tickCount + left;
+          this.scheduler.schedule(entity.id, entity.nextBirthTick, this.tickCount);
+        } else {
+          entity.nextBirthTick = Math.min(entity.nextBirthTick, this.tickCount);
+          if (entity.hungry) alerts.add('nurseryHungry');
+        }
+      }
+      if (entity.kind === 'lab' && entity.endTick > 0) {
+        entity.endTick = this.tickCount + Math.max(1, research.get(entity.id) ?? entity.endTick - this.tickCount);
+        this.scheduler.schedule(entity.id, entity.endTick, this.tickCount);
+      }
+      if (entity.kind === 'barracks' && entity.training) {
+        entity.training.endTick = Math.max(this.tickCount, entity.training.endTick - total);
+      }
+    }
+
+    this.offlineLowStock(hall.store, alerts);
+    report.alerts = OFFLINE_ALERTS.filter((alert) => alerts.has(alert));
+    // Le stock a sauté d'un coup : les débits de la ville repartent de zéro plutôt que d'afficher ce saut.
+    this.flows.reset();
+    this.events.emit('offlineCaughtUp', report);
+  }
+
+  /** Des porteurs ou des logisticiens pour faire la tournée des coffres : un ouvrier au travail qui n'est pas bâtisseur. */
+  private hasCarriers(): boolean {
+    for (const worker of this.workers()) if (!worker.free && !worker.builder) return true;
+    return false;
+  }
+
+  /**
+   * Ce qu'un producteur sans entrée sort en `ticks` de travail, à sa cadence
+   * moyenne : foreuse, carrière et puits, cabane de bûcheron, ferme. Fractionnaire,
+   * `wholeUnits` en fait des unités. `null` s'il ne produit rien.
+   */
+  private offlineOutput(entity: Building, ticks: number, woodLeft: Map<EntityId, number>): { item: ItemId; amount: number } | null {
+    if (entity.paused || ticks <= 0) return null;
+
+    const staffing = this.staffing(entity);
+    const share = staffing ? staffing.filled / Math.max(1, staffing.max) : 1;
+
+    switch (entity.kind) {
+      case 'drill': {
+        if (!entity.output) return null;
+
+        const amount = Object.values(RECIPES[DRILL_RECIPE].outputs)[0] ?? 1;
+
+        return { item: entity.output, amount: (amount * ticks) / Math.max(1, RECIPES[DRILL_RECIPE].duration + this.bonus('drillTicks')) };
+      }
+
+      case 'quarry': {
+        const recipe = quarryRecipe(entity);
+        const [item, amount] = (Object.entries(recipe.outputs) as [ItemId, number][])[0] ?? ['stone', 1];
+
+        return { item, amount: (amount * ticks * share) / recipe.duration };
+      }
+
+      case 'lumberCamp': {
+        const left = woodLeft.get(entity.id) ?? 0;
+        const amount = Math.min(left, (OFFLINE.lumberjackWoodPerMinute * (staffing?.filled ?? 0) * ticks) / (20 * 60));
+
+        woodLeft.set(entity.id, left - amount);
+        return { item: 'wood', amount };
+      }
+
+      case 'farm': {
+        const tiles = this.farmField(entity).filter((tile) => tile.state !== 'blocked').length;
+
+        return { item: 'food', amount: (tiles * this.cropYield() * OFFLINE.farmEfficiency * share * ticks) / CROPS.ripeTicks };
+      }
+
+      default:
+        return null;
+    }
+  }
+
+  /** Range une production hors ligne : en ville si des porteurs font la tournée, sinon dans le coffre du bâtiment, tant qu'il a la place. */
+  private offlineYield(entity: Building, item: ItemId, amount: number, carriers: boolean, report: OfflineReport, alerts: Set<OfflineAlertId>): void {
+    if (amount <= 0) return;
+
+    const kept = carriers ? (this.townStock()?.add(item, amount) ?? 0) : entity.store.add(item, Math.min(amount, Math.max(0, entity.store.freeSpace())));
+
+    if (kept < amount) alerts.add('storeFull');
+    if (kept <= 0) return;
+    count(report.gained, item, kept);
+    this.tally(item, kept);
+  }
+
+  /**
+   * Les cycles d'une forge (ou d'un four à charbon) en `ticks` de travail :
+   * ses entrées viennent de son coffre, puis de la ville si des porteurs
+   * l'approvisionnent ; il manque de quoi, elle attend la suite.
+   */
+  private offlineForge(forge: Forge, ticks: number, carry: Map<EntityId, number>, carriers: boolean, report: OfflineReport, alerts: Set<OfflineAlertId>): void {
+    if (this.stopped(forge) || ticks <= 0) return;
+
+    const recipe = forgeRecipe(forge);
+    const town = carriers ? this.townStock() : null;
+    const inputs = amountsOf(recipe.inputs);
+    let cycles = wholeUnits(carry, -forge.id, ticks / recipe.duration);
+
+    for (; cycles > 0; cycles -= 1) {
+      const enough = inputs.every(([item, amount]) => forge.store.count(item) + (town?.available(item) ?? 0) >= amount);
+      const room = town !== null || forge.store.freeSpace() + totalOf(recipe.inputs) >= totalOf(recipe.outputs);
+
+      if (!enough || !room) break;
+      for (const [item, amount] of inputs) {
+        const own = forge.store.remove(item, amount);
+
+        if (own < amount) town?.remove(item, amount - own);
+        count(report.spent, item, amount);
+      }
+      for (const [item, amount] of amountsOf(recipe.outputs)) this.offlineYield(forge, item, amount, carriers, report, alerts);
+    }
+    if (cycles > 0) carry.set(-forge.id, 0);
+  }
+
+  /** Le compte à rebours d'une nurserie sur `ticks` : chaque fois qu'il arrive au bout, un enfant naît s'il y a de quoi le nourrir et de la place. */
+  private offlineBirths(nursery: Nursery, ticks: number, births: Map<EntityId, number>, carriers: boolean, report: OfflineReport): void {
+    if (nursery.paused) return;
+
+    const recipe: RecipeProto = RECIPES[NURSERY_RECIPE];
+    const town = carriers ? this.townStock() : null;
+    let left = (births.get(nursery.id) ?? 0) - ticks;
+
+    while (left <= 0) {
+      if (this.nurseryKids(nursery).length >= NURSERY_CARE.capacity) {
+        nursery.hungry = false;
+        left = 0;
+        break;
+      }
+      for (const [item, amount] of amountsOf(recipe.inputs)) {
+        const missing = amount - nursery.store.count(item);
+
+        if (town && missing > 0) nursery.store.add(item, town.remove(item, Math.min(missing, town.available(item))));
+      }
+      if (!hasInputs(nursery.store, recipe)) {
+        nursery.hungry = true;
+        left = 0;
+        break;
+      }
+      for (const [item, amount] of amountsOf(recipe.inputs)) count(report.spent, item, amount);
+      this.bear(nursery);
+      report.births += 1;
+      left += recipe.duration;
+    }
+    births.set(nursery.id, left);
+  }
+
+  /**
+   * Le compte à rebours d'un labo sur `ticks`. Une recherche finie laisse
+   * partir la suivante de la file ; celle qui attend son coût le reçoit de
+   * la ville, si des porteurs l'apportent et que le labo est dans son rayon.
+   */
+  private offlineResearch(lab: Lab, ticks: number, running: Map<EntityId, number>, carriers: boolean, report: OfflineReport): void {
+    let budget = ticks;
+
+    while (lab.research !== null && budget > 0) {
+      if (isCollecting(lab)) {
+        const town = carriers ? this.townStockForLab(lab) : null;
+
+        if (!town) return;
+        for (const [item] of researchCost(lab.research)) this.supplyLab(lab, item, Math.min(labWants(lab, item), town.available(item)), town, 'town');
+        this.startCountdown(lab);
+        if (isCollecting(lab)) return;
+        running.set(lab.id, RESEARCH[lab.research].duration);
+      }
+
+      const left = (running.get(lab.id) ?? 0) - budget;
+
+      if (left > 0) {
+        running.set(lab.id, left);
+        return;
+      }
+      budget = -left;
+
+      const done = lab.research;
+
+      lab.endTick = this.tickCount;
+      this.finishResearch(lab);
+      report.research.push(done);
+      running.set(lab.id, lab.endTick > 0 && lab.research !== null ? RESEARCH[lab.research].duration : 0);
+    }
+  }
+
+  /**
+   * Les repas d'un pas hors ligne, habitant par habitant, au stock de la
+   * ville. Renvoie la part des ouvriers qui travaillent encore : ceux qui
+   * n'ont plus rien n'avancent plus leur bâtiment au pas suivant.
+   */
+  private offlineMeals(town: Store, ticks: number, report: OfflineReport, alerts: Set<OfflineAlertId>): number {
+    let laborers = 0;
+    let stalled = 0;
+
+    for (const mobile of this.inhabitants()) {
+      const toiling = mobile.kind !== 'kid' && !(mobile.kind === 'worker' && mobile.free);
+      let starved = false;
+
+      for (const need of NEED_IDS) {
+        const { item, meal } = NEEDS[need];
+        const fed = feedNeed(need, mobile.needs[need], ticks, toiling, () => {
+          if (town.available(item) < meal) return false;
+          town.remove(item, meal);
+          count(report.spent, item, meal);
+          return true;
+        });
+
+        mobile.needs[need] = fed.level;
+        if (fed.starved) {
+          starved = true;
+          alerts.add(need);
+        }
+      }
+      if (mobile.kind === 'kid') continue;
+      laborers += 1;
+      if (starved) stalled += 1;
+    }
+    return laborers === 0 ? 1 : 1 - stalled / laborers;
+  }
+
+  /** La ville ne tiendra pas `NEED_ALERT.runwayTicks` au rythme des habitants : une alerte par besoin qui n'a pas déjà manqué. */
+  private offlineLowStock(town: Store, alerts: Set<OfflineAlertId>): void {
+    for (const need of NEED_IDS) {
+      if (alerts.has(need)) continue;
+
+      let rate = 0;
+
+      for (const mobile of this.inhabitants()) rate += mealsPerTick(need, mobile.kind !== 'kid' && !(mobile.kind === 'worker' && mobile.free));
+      if (rate > 0 && town.available(NEEDS[need].item) < rate * NEED_ALERT.runwayTicks) alerts.add(need === 'hunger' ? 'lowFood' : 'lowWater');
+    }
   }
 
   /**

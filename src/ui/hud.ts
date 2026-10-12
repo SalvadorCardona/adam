@@ -1152,6 +1152,11 @@ export class Hud {
   }
 
   /** Le panneau de debug est-il ouvert ? Ses raccourcis (brouillard) n'agissent qu'alors. */
+  /** Le bandeau de la ville : là où volent les gains du récap hors ligne. */
+  public get townBanner(): HTMLElement {
+    return this.town;
+  }
+
   public get debugOn(): boolean {
     return this.debug;
   }
