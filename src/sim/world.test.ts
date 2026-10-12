@@ -646,6 +646,32 @@ describe('World', () => {
     expect(rejected).toEqual(['empty', 'bagFull', 'outOfReach', 'missing']);
   });
 
+  it('« Prendre » laisse au coffre ce qu’un porteur a réservé : le disponible ne descend jamais sous zéro', () => {
+    const { world, spot } = worldWithOre();
+
+    clearAround(world, spot);
+    const drill = buildDrill(world, spot);
+
+    if (drill.kind !== 'drill') throw new Error('pas une foreuse');
+
+    for (let i = 0; i < CYCLE * 4; i += 1) world.tick();
+
+    const item = drill.output!;
+    const stock = drill.store.count(item);
+
+    expect(stock).toBeGreaterThan(2);
+    expect(drill.store.reserveOut(item, 2)).toBe(true);
+    expect(world.takeable(drill)).toEqual([[item, stock - 2]]);
+
+    world.push({ type: 'takeFromBuilding', id: drill.id });
+    world.tick();
+
+    expect(world.player.inventory.count(item)).toBe(stock - 2);
+    expect(drill.store.count(item)).toBe(2);
+    expect(drill.store.available(item)).toBe(0);
+    expect(world.takeable(drill)).toEqual([]);
+  });
+
   it('ne retire rien d’un chantier', () => {
     const world = new World(3);
 
