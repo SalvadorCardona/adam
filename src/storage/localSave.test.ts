@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { serialize } from '../sim/save.ts';
 import { World } from '../sim/world.ts';
-import { LocalSave, SAVE_KEY, type SaveStorage } from './localSave.ts';
+import { CORRUPT_SAVE_KEY, LocalSave, SAVE_KEY, type SaveStorage } from './localSave.ts';
 
 /** Un `localStorage` en mémoire, comme celui du navigateur. */
 function memoryStorage(): SaveStorage & { data: Map<string, string> } {
@@ -98,5 +98,18 @@ describe('LocalSave', () => {
       if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
       else delete (globalThis as { localStorage?: Storage }).localStorage;
     }
+  });
+
+  it("garde une copie de la sauvegarde illisible avant qu'une nouvelle partie l'écrase", () => {
+    const storage = memoryStorage();
+    const saves = new LocalSave(storage);
+
+    storage.data.set(SAVE_KEY, '{"abîmée"');
+
+    expect(saves.load()).toEqual({ status: 'corrupt' });
+    expect(storage.data.get(CORRUPT_SAVE_KEY)).toBe('{"abîmée"');
+
+    saves.save(new World(99));
+    expect(storage.data.get(CORRUPT_SAVE_KEY)).toBe('{"abîmée"');
   });
 });

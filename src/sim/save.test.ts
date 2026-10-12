@@ -6,6 +6,7 @@ import { RECIPES } from '../data/recipes.ts';
 import type { Command } from './commands.ts';
 import { BUILD_REACH_TILES } from './player.ts';
 import { nameOf, sexOf } from './inhabitants.ts';
+import { xpForLevel } from './levels.ts';
 import { SAVE_VERSION, decodeSave, deserialize, encodeSave, serialize } from './save.ts';
 import { oreAt } from './terrain.ts';
 import type { EntityId } from './types.ts';
@@ -340,5 +341,27 @@ describe('sauvegarde', () => {
     ]) {
       expect(decodeSave(input)).toEqual({ ok: false, reason: 'corrupt' });
     }
+  });
+});
+
+describe('base mutante entamée par un bonus d\'arc fractionnaire', () => {
+  it('se sauvegarde et se recharge avec ses PV décimaux', () => {
+    const world = new World(100);
+    const base = world.enemyBases[0]!;
+
+    // Niveau 2 : +0,1 de dégâts d'arc ; chef abattu : plus de bouclier.
+    world.player.xp = xpForLevel(2);
+    base.chief = 0;
+
+    const damage = 1 + world.bonus('bowDamage');
+
+    expect(Number.isInteger(damage)).toBe(false);
+    (world as unknown as { hurtBase(target: typeof base, amount: number): void }).hurtBase(base, damage);
+    expect(Number.isInteger(base.hp)).toBe(false);
+
+    const decoded = decodeSave(encodeSave(world, 0));
+
+    if (!decoded.ok) throw new Error(`sauvegarde illisible : ${decoded.reason}`);
+    expect(decoded.world.enemyBases.find((entry) => entry.id === base.id)?.hp).toBe(base.hp);
   });
 });
