@@ -102,6 +102,7 @@ import { needMeter } from './needMeter.ts';
 import { PanelTabs } from './panelTabs.ts';
 import { siteNeedRow } from './siteNeedRow.ts';
 import { BarracksPanel } from './barracksPanel.ts';
+import type { ResearchId } from '../data/research.ts';
 import { ResearchPanel } from './researchPanel.ts';
 import { TransferPanel } from './transferPanel.ts';
 
@@ -558,6 +559,11 @@ export class BuildingPanel {
   }
 
   /** Ce que fait « Ères » dans la fenêtre de la mairie : ouvrir le panneau des ères (`main.ts`). */
+  /** Qui dit quelle recherche le conseil d'Ève demande : le labo la met en tête. */
+  public setAdvisedResearch(advised: () => ResearchId | null): void {
+    this.research.setAdvised(advised);
+  }
+
   public setOnEras(onEras: () => void): void {
     this.onEras = onEras;
   }

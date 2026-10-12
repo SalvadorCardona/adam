@@ -8,6 +8,8 @@ export const researchPanel: Messages['researchPanel'] = {
   takeRest: 'Take the rest',
   noneTitle: 'No research underway',
   noneHint: 'Pick one in the tabs, then bring its cost.',
+  bringCost: 'Bring its cost: no porter will do it. Bump the lab, or transfer from the bag.',
+  advised: 'Advised',
   approach: 'Come closer to drop off — or let the porters do it.',
   transferBoth: 'Transfer from the bag and the town, bump the lab, or let the porters do it.',
   transferBag: 'Transfer from the bag, bump the lab, or let the porters do it.',

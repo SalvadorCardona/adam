@@ -18,7 +18,7 @@ import { EVE } from '../data/eve.ts';
 import { COLONY } from '../data/inhabitants.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
 import type { Goal } from '../data/objectives.ts';
-import { RESEARCH_IDS } from '../data/research.ts';
+import { RESEARCH_IDS, type ResearchId } from '../data/research.ts';
 import { RESOURCES } from '../data/resources.ts';
 import { currentObjective, objectiveWait, type GoalWait } from '../sim/objectives.ts';
 import { eraReady, nextEra } from '../sim/eras.ts';
@@ -26,6 +26,9 @@ import { openingResearch, researchStatus, unlockingResearch } from '../sim/resea
 import type { Building } from '../sim/types.ts';
 import { TICKS_PER_SECOND, type World } from '../sim/world.ts';
 import { t } from '../i18n/locale.ts';
+
+/** À partir de combien d'oisifs Ève s'en mêle. */
+const IDLE_HINT_MIN = 3;
 
 /** Ce que le joueur a déjà fait : un conseil compris ne revient pas. */
 export interface HintProgress {
@@ -40,6 +43,8 @@ export interface HintProgress {
 export interface Advice {
   text: string;
   wants: ItemId | null;
+  /** La recherche que le conseil envoie lancer au labo : sa fenêtre la met en tête. */
+  research?: ResearchId | null;
 }
 
 /** Le sac contient-il au moins un objet qu'on attend quelque part — chantier, recette ou ville ? */
@@ -82,15 +87,20 @@ export function uselessBagHint(world: World): string | null {
  * Le conseil de bâtir `building`, s'il est au menu ; sinon, le chemin du labo
  * qui l'ouvre : le bâtir d'abord, puis y lancer la recherche.
  */
-function viaLab(world: World, building: BuildingId, line: string): string {
+function viaLab(world: World, building: BuildingId, line: string): Advice {
   const research = openingResearch(building) ?? unlockingResearch(building);
 
-  if (world.isUnlocked(building) || research === null) return line;
+  if (world.isUnlocked(building) || research === null) return { text: line, wants: null };
 
   const lines = t().eve.hints;
   const name = t().buildings[building].label;
+  const labs = world.labs().length > 0;
 
-  return (world.labs().length > 0 ? lines.labResearch.replace('{research}', t().research[research].label) : lines.labOpen).replace('{building}', name);
+  return {
+    text: (labs ? lines.labResearch.replace('{research}', t().research[research].label) : lines.labOpen).replace('{building}', name),
+    wants: null,
+    research: labs ? research : null,
+  };
 }
 
 export function tutorialHint(world: World, progress: HintProgress, towers: boolean, mutants: number): string | null {
@@ -126,9 +136,9 @@ export function tutorialAdvice(world: World, progress: HintProgress, towers: boo
   const welled = [...world.entities.values()].some((entity) => entity.proto === 'well');
   const water = world.townStock()?.available('water') ?? 0;
 
-  if (mutants === 0 && !welled && (water < COLONY.startingStock.water / 2 || world.needAlert()?.need === 'thirst')) return say(viaLab(world, 'well', lines.well));
+  if (mutants === 0 && !welled && (water < COLONY.startingStock.water / 2 || world.needAlert()?.need === 'thirst')) return viaLab(world, 'well', lines.well);
 
-  if (world.night === 0 && !towers) return say(viaLab(world, 'watchtower', lines.tower));
+  if (world.night === 0 && !towers) return viaLab(world, 'watchtower', lines.tower);
   if (mutants > 0 && world.night <= 2) return say(lines.bow);
 
   // Entre deux vagues, la mairie entamée d'au moins un bois, et Ève pas encore là pour la réparer : à Adam de le faire.
@@ -136,10 +146,17 @@ export function tutorialAdvice(world: World, progress: HintProgress, towers: boo
     return world.repairStock(hall) > 0 ? say(lines.repair) : say(lines.repairFetch, REPAIR.item);
   }
 
+  // Des ouvriers qui glandent, sans urgence : une maison pour les loger, un bâtiment qui les emploie.
+  if (mutants === 0 && world.census().idle >= IDLE_HINT_MIN) {
+    const { housed, population } = world.housing();
+
+    return say((housed < population ? lines.idleHousing : lines.idle).replace('{n}', String(world.census().idle)));
+  }
+
   // La pierre manque en ville, et rien n'en produit : la carrière, avant que les rochers ne soient vidés.
   const quarried = [...world.entities.values()].some((entity) => entity.proto === 'quarry');
 
-  if (mutants === 0 && !quarried && (world.townStock()?.available('stone') ?? 0) === 0) return say(viaLab(world, 'quarry', lines.quarry));
+  if (mutants === 0 && !quarried && (world.townStock()?.available('stone') ?? 0) === 0) return viaLab(world, 'quarry', lines.quarry);
 
   // L'ère suivante est à portée : rien d'autre ne presse autant, hors des nuits.
   const next = nextEra(world.era);

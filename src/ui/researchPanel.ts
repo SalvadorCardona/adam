@@ -66,6 +66,11 @@ function eraTabIcon(era: number): HTMLElement {
 /** L'ordre d'une liste : ce que mène un labo, ce qui se lance, ce qui est verrouillé, ce qui est fini. Stable : les données gardent leur ordre. */
 const STATUS_ORDER: Record<ResearchStatus, number> = { running: 0, collecting: 0, queued: 1, available: 2, taken: 3, locked: 4, done: 5 };
 
+/** Le rang d'une recherche dans sa liste : la conseillée qui se lance passe devant tout. */
+function order(advised: boolean, status: ResearchStatus): number {
+  return advised && status === 'available' ? -1 : STATUS_ORDER[status];
+}
+
 /** Le pictogramme de chaque onglet. */
 const TAB_ICONS: Record<ResearchTheme, () => HTMLElement> = {
   building: () => uiIcon('hammer', 22),
@@ -100,6 +105,8 @@ export class ResearchPanel {
   private lastCurrent = '';
   private lastQueue = '';
   private lastList = '';
+  /** La recherche que le conseil d'Ève envoie lancer : en tête de sa liste. */
+  private advised: () => ResearchId | null = () => null;
 
   private readonly world: World;
 
@@ -179,6 +186,11 @@ export class ResearchPanel {
     });
   }
 
+  /** Qui dit quelle recherche le conseil demande (`Hud.adviceResearch`). */
+  public setAdvised(advised: () => ResearchId | null): void {
+    this.advised = advised;
+  }
+
   /** À chaque frame, fenêtre du labo ouverte. */
   public update(lab: Lab): void {
     // Un onglet par ère atteinte ; une ère neuve ouvre le sien.
@@ -196,7 +208,9 @@ export class ResearchPanel {
       this.lastQueue = '';
       this.lastList = '';
       // Un autre labo : on ouvre l'onglet de ce qu'il cherche, sinon les bâtiments.
-      this.tabs.select(lab.research === null ? 'building' : tabOf(lab.research));
+      const advised = this.advised();
+
+      this.tabs.select(lab.research !== null ? tabOf(lab.research) : advised !== null ? tabOf(advised) : 'building');
     }
     this.updateCurrent(lab);
     this.updateQueue(lab);
@@ -262,7 +276,7 @@ export class ResearchPanel {
 
     this.current.dataset['state'] = 'collecting';
     this.currentStatus.hidden = false;
-    this.setText(this.currentStatus, !inReach ? text.approach : fromTown ? text.transferBoth : text.transferBag);
+    this.setText(this.currentStatus, !this.hasPorters() ? text.bringCost : !inReach ? text.approach : fromTown ? text.transferBoth : text.transferBag);
     this.timer.hidden = true;
     this.bar.hidden = false;
     this.bar.dataset['kind'] = 'progress';
@@ -275,6 +289,14 @@ export class ResearchPanel {
     const ledger = world.labLedger(lab);
 
     this.setCost(ledger.map(siteNeedRow), `collecting:${lab.research}:${JSON.stringify(ledger)}`);
+  }
+
+  /** Un porteur au travail (ni libre ni bâtisseur) peut-il apporter le coût ? */
+  private hasPorters(): boolean {
+    for (const mobile of this.world.mobiles.values()) {
+      if (mobile.kind === 'worker' && !mobile.free && !mobile.builder) return true;
+    }
+    return false;
   }
 
   /** L'icône, le nom et l'effet de ce que mène le labo ; réécrits quand la recherche ou la langue change. */
@@ -342,8 +364,10 @@ export class ResearchPanel {
     const { world } = this;
     const { researchDone: done } = world;
     const statuses = RESEARCH_IDS.map((id): [ResearchId, ResearchStatus] => [id, researchStatus(id, done, lab, world.labs())]);
+    const advised = this.advised();
     const key = [
       locale(),
+      advised,
       statuses.map(([, status]) => status).join(','),
       lab.endTick > 0,
       queueFull(lab),
@@ -359,15 +383,15 @@ export class ResearchPanel {
       // Ce qui se mène d'abord, puis ce qui attend un prérequis, les recherches finies au bout : le pouce n'a pas à les traverser.
       const rows = statuses
         .filter(([id]) => tabOf(id) === tab && RESEARCH[id].era <= world.era)
-        .sort(([, a], [, b]) => STATUS_ORDER[a] - STATUS_ORDER[b])
-        .map(([id, status]) => this.row(id, status, lab));
+        .sort(([ia, a], [ib, b]) => order(ia === advised, a) - order(ib === advised, b))
+        .map(([id, status]) => this.row(id, status, lab, id === advised));
 
       list.replaceChildren(...rows);
     }
   }
 
   /** Une recherche : icône, nom, effet chiffré, coût et durée, état, et « Lancer » si on peut. */
-  private row(id: ResearchId, status: ResearchStatus, lab: Lab): HTMLElement {
+  private row(id: ResearchId, status: ResearchStatus, lab: Lab, advised: boolean): HTMLElement {
     const { world } = this;
     const text = t().researchPanel;
     const row = element('article', 'research-row');
@@ -376,10 +400,17 @@ export class ResearchPanel {
     const effect = element('p', 'research-effect');
 
     row.dataset['status'] = status;
+    if (advised && status === 'available') row.dataset['advised'] = 'true';
     name.textContent = t().research[id].label;
     effect.append(...this.effect(id));
     head.append(researchIcon(id, 40), name);
 
+    if (advised && status === 'available') {
+      const badge = element('span', 'research-badge');
+
+      badge.append(text.advised);
+      head.append(badge);
+    }
     if (status !== 'available') {
       const badge = element('span', 'research-badge');
 
