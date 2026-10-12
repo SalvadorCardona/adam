@@ -297,7 +297,7 @@ button:disabled,
   pointer-events: none;
 }
 
-/* La barre et la fenêtre de la quête, qui s'ouvre sous elle, calée sur son bord droit. */
+/* La barre et la fenêtre de la quête, qui s'ouvre sous elle, centrée sur son axe. */
 .hud-main {
   grid-area: main;
   position: relative;
@@ -345,6 +345,8 @@ button:disabled,
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
+  left: 0;
+  margin-inline: auto;
   z-index: 4;
   width: min(380px, 100%);
   min-width: 0;
