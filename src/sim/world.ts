@@ -135,7 +135,7 @@ import type {
 import { caravanBagBonus, caravanRoute, createCaravan, drawOffers, isCaravanDay, rideTo, tradeCost } from './caravan.ts';
 import type { WildlifeId } from '../data/enemies.ts';
 import { baseCenter, baseDoor, breed, canDamage, hitsBase, inBaseZone, isShielded, isStanding, onBase, placeEnemyBases } from './enemyBases.ts';
-import { eraOf, projectedRaiders, reinforcements, waveBounty } from './waves.ts';
+import { waveEraOf, projectedRaiders, reinforcements, waveBounty } from './waves.ts';
 import { compassOf, stepMutant, stepQueen, surfacePoint, type Compass, type MutantStep } from './enemies.ts';
 import { BIOMES, REGION_GUARDIAN, REGION_RINGS, eraOf, type BiomeId } from '../data/regions.ts';
 import { HOME_REGION_ID, REGION_COUNT, placeRegions, regionAt, type Region } from './regions.ts';
@@ -6497,9 +6497,9 @@ export class World {
     };
   }
 
-  /** L'ère de la colonie (`eraOf`) : 0 pendant l'acte I, 1 ensuite, 2 après le Signal. */
-  public era(): number {
-    return eraOf(this.objective, this.victory);
+  /** L'ère de la colonie (`waveEraOf`), celle qui renforce les vagues : 0 pendant l'acte I, 1 ensuite, 2 après le Signal. */
+  public waveEra(): number {
+    return waveEraOf(this.objective, this.victory);
   }
 
   /** Les bâtiments finis de la ville, mairie comprise — les palissades ne comptent pas : c'est ce que convoitent les vagues. */
@@ -6514,7 +6514,7 @@ export class World {
 
   /** Les renforts de la prochaine vague, de l'ère et de la taille de la ville (`WAVE_STRENGTH`). */
   public waveReinforcements(): number {
-    return reinforcements(this.era(), this.townSize());
+    return reinforcements(this.waveEra(), this.townSize());
   }
 
   /** La direction, vue de la mairie, d'une base. */

@@ -364,7 +364,7 @@ Notifications, `waveAnnounced`) si la fenêtre n'a pas le focus.
 L'effectif annoncé est exact : la production des bases se déroule d'avance
 (`projectedRaiders`). Pas de vague hors ligne : onglet caché, le jeu est en pause.
 Force (`WAVE_STRENGTH`) : la cadence des bases (le temps), plus des renforts
-de la base de tête — `perEra` par ère (`eraOf` : fin de l'acte I, Signal) et
+de la base de tête — `perEra` par ère (`waveEraOf` : fin de l’acte I, Signal) et
 un par `buildingsPerRaider` bâtiments au-delà de `freeBuildings`, palissades
 exclues (`World.townSize`). Abattue toute avant l'aube, une vague paie sa
 prime en ville (`WAVE_BOUNTY`, `waveRewarded`, `bountyNight` sauvegardé).

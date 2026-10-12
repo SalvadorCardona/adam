@@ -22,7 +22,7 @@ const ACT_ONE = OBJECTIVES.findIndex((objective) => 'banner' in objective);
  * L'ère de la colonie : 0 pendant l'acte I, 1 une fois l'acte I terminé, 2
  * après le Signal. `objective` est le nombre d'objectifs réussis.
  */
-export function eraOf(objective: number, signalSent: boolean): number {
+export function waveEraOf(objective: number, signalSent: boolean): number {
   return (ACT_ONE >= 0 && objective > ACT_ONE ? 1 : 0) + (signalSent ? 1 : 0);
 }
 

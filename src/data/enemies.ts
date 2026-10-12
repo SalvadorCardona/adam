@@ -205,7 +205,7 @@ export const WAVE_WARNING = {
  * S'y ajoutent des **renforts**, qui sortent de la base la plus proche de la
  * mairie avec les chefs :
  * - `perEra` par ère franchie — la fin de l'acte I, puis le Signal
- *   (`eraOf`, `sim/waves.ts`) ;
+ *   (`waveEraOf`, `sim/waves.ts`) ;
  * - un tous les `buildingsPerRaider` bâtiments finis au-delà de
  *   `freeBuildings` (palissades non comprises) : la ville qui grandit attire
  *   la convoitise.
