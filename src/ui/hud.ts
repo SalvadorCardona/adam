@@ -34,7 +34,7 @@
  * - les boutons pause et réglages (l'engrenage) à droite de la quête, et dessous les deux
  *   stocks, en version compacte : la **ville** (le coffre de la mairie) et
  *   le **sac** d'Adam avec son remplissage — un tap sur le sac ouvre le
- *   panneau inventaire (`inventoryPanel.ts`). Sur un téléphone, les deux
+ *   fenêtre du sac (`bagPanel.ts`). Sur un téléphone, les deux
  *   cartes n'en font plus qu'une, repliée en pastille : la jauge du sac, ce
  *   que compte la ville, et la ressource que réclame le conseil — le
  *   détail est dans le panneau ;
@@ -380,7 +380,7 @@ export class Hud {
     clip.append(this.hint);
     fold.append(clip);
 
-    // Les boutons du joueur, en haut à droite : le sac, avec l'habillage d'Adam et « Bâtir » (`main.ts`).
+    // Les boutons du joueur, en bas à droite : le sac (inventaire et habillement) et « Bâtir » (`main.ts`).
     this.actions = element('div', 'hud-actions');
     this.bag = element('button', 'hud-bag');
     this.bag.type = 'button';

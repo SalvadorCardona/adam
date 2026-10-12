@@ -46,9 +46,10 @@ export type Command =
   | { type: 'supplyBuilding'; id: EntityId }
   /**
    * Vide le sac dans le stock de la ville — le coffre de la mairie. Adam doit
-   * être à portée de la mairie. Sans `item`, tout le sac ; avec, cet objet seulement.
+   * être à portée de la mairie. Sans `item`, tout le sac ; avec, cet objet
+   * seulement — `amount` unités au plus s'il est donné.
    */
-  | { type: 'depositToTown'; item?: ItemId }
+  | { type: 'depositToTown'; item?: ItemId; amount?: number }
   /**
    * Fait passer un objet entre le sac et le coffre d'un bâtiment — la mairie,
    * une foreuse, une forge… (`sim/transfer.ts`) : `take` du coffre au sac,
@@ -61,9 +62,9 @@ export type Command =
   | { type: 'transferItems'; id: EntityId; direction: TransferDirection; quantity: TransferQuantity; item?: ItemId }
   /**
    * Jette à ses pieds, en tas ramassable, ce qu'Adam porte. Sans `item`, tout
-   * le sac ; avec, cet objet seulement.
+   * le sac ; avec, cet objet seulement — `amount` unités au plus s'il est donné.
    */
-  | { type: 'dropItem'; item?: ItemId }
+  | { type: 'dropItem'; item?: ItemId; amount?: number }
   /**
    * Le joueur a vu le bâtiment nouvellement débloqué : sa carte du menu de
    * construction perd son badge « Nouveau ». Choisir la carte l'envoie ;

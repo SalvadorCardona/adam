@@ -80,6 +80,24 @@ describe('ville et sac', () => {
     expect(world.townStock()!.count('coal')).toBe(0);
   });
 
+  it('une quantité ne dépose ou ne jette que ces unités-là', () => {
+    const world = withTown();
+    const { inventory } = world.player;
+
+    inventory.add('wood', 12);
+    world.push({ type: 'depositToTown', item: 'wood', amount: 10 });
+    world.tick();
+
+    expect(inventory.count('wood')).toBe(2);
+    expect(world.townStock()!.count('wood')).toBe(10);
+
+    world.push({ type: 'dropItem', item: 'wood', amount: 1 });
+    world.tick();
+
+    expect(inventory.count('wood')).toBe(1);
+    expect(pickups(world)).toEqual([expect.objectContaining({ item: 'wood', amount: 1 })]);
+  });
+
   it('loin de la mairie, ou le sac vide : refusé, rien ne bouge', () => {
     const world = withTown();
     const refused = rejections(world);

@@ -201,7 +201,7 @@ button:disabled,
 
   /*
    * La taille unique des boutons du HUD, à un seul endroit : les six contrôles
-   * du haut (disques) et les trois boutons du joueur du bas (carrés arrondis),
+   * du haut (disques) et les deux boutons du joueur du bas (carrés arrondis),
    * leurs pictogrammes, l'écart qui les sépare. 48 px, une cible tactile sûre
    * au pouce ; sous 400 px de large la rangée du haut ne tiendrait pas, elle
    * descend à 44 px, le minimum tactile.
@@ -1756,16 +1756,31 @@ button:disabled,
 
 /* ------------------------------------------------------------ panneau du sac */
 
-.inventory-panel h2 {
+/*
+ * L'inventaire, onglet de la fenêtre du sac : la jauge en tête, puis la
+ * grille et la ville qui défilent en hauteur, puis l'objet choisi et les
+ * boutons du bas, toujours visibles — comme le pied de l'habillement.
+ */
+.inventory-tab {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
+  min-height: 0;
+}
+
+.inventory-tab[hidden] {
+  display: none;
+}
+
+.inventory-gauge .transfer-gauge {
+  height: 14px;
+  margin-top: 4px;
 }
 
 .inventory-capacity {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1773,66 +1788,197 @@ button:disabled,
   color: var(--danger);
 }
 
-.inventory-list {
+/* Où est Adam : en menthe près de la mairie, en lavande ailleurs — le dépôt s'éteint, le message dit pourquoi. */
+.inventory-where {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 40vh;
-  overflow-y: auto;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--paper-shade);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
-.inventory-row {
+.inventory-where[data-near='true'] {
+  background: var(--mint-light);
+  color: var(--ink);
+}
+
+.inventory-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 2px 2px 8px;
+}
+
+/* Le sac en cases : cinq par rangée, carrées, l'icône au centre, la quantité en pastille au coin. */
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 5), minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inventory-slot {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 18px;
-}
-
-.inventory-name {
-  flex: 1;
+  justify-content: center;
+  aspect-ratio: 1;
   min-width: 0;
-  font-weight: 500;
+  max-height: 96px;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  box-shadow: 0 4px 0 var(--paper-shade), inset 0 0 0 2px var(--paper-shade);
+  cursor: var(--cursor-hand);
 }
 
-.inventory-count {
+.inventory-slot .icon {
+  width: 58%;
+  height: auto;
+  max-width: 48px;
+  pointer-events: none;
+}
+
+.inventory-slot:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--paper-shade), inset 0 0 0 2px var(--paper-shade);
+}
+
+.inventory-slot[aria-selected='true'] {
+  background: var(--yellow-light);
+  box-shadow: 0 4px 0 var(--yellow-shade), inset 0 0 0 3px var(--yellow);
+}
+
+/* Une case libre : un creux lavande, sans face avant. */
+.inventory-slot-empty {
+  background: var(--paper-shade);
+  box-shadow: inset 0 3px 0 rgb(90 63 214 / 0.12);
+  cursor: default;
+}
+
+.inventory-slot-count {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--violet);
+  color: var(--paper);
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 0 var(--violet-shade);
 }
 
 .inventory-empty {
+  margin: 8px 0 0;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 15px;
+  text-align: center;
 }
 
-/* Le bouton d'une ligne : une petite capsule, menthe pour déposer, corail pour jeter. */
+.inventory-empty[hidden] {
+  display: none;
+}
+
+/* L'objet choisi : son icône et son nom, sa quantité, le sélecteur 1 / 10 / Tout, ce qu'on en fait. */
+.inventory-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 18px;
+  background: var(--paper-shade);
+}
+
+.inventory-detail[data-empty='true'] {
+  display: flex;
+  justify-content: center;
+}
+
+.inventory-pick {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.inventory-detail-head {
+  flex: 1 1 100px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inventory-detail-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.inventory-detail-count {
+  flex: none;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--violet);
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-quantity {
+  background: var(--paper);
+}
+
+.transfer-quantity.inventory-quantity button {
+  min-width: 44px;
+  min-height: 40px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.inventory-detail-actions {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 8px;
+}
+
+/* Le bouton de l'objet choisi : une capsule, menthe pour déposer, corail pour jeter ; éteint loin de la mairie. */
 .inventory-action {
-  min-width: 88px;
-  min-height: 44px;
+  flex: 1;
+  min-height: 46px;
   padding: 0 14px;
   border: none;
   border-radius: 999px;
   font: inherit;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--paper);
   background: var(--coral);
   box-shadow: 0 4px 0 var(--coral-shade);
+  cursor: var(--cursor-hand);
 }
 
-.inventory-action[data-tone='deposit'],
-.inventory-panel .building-panel-actions button[data-tone='deposit'] {
+.inventory-action[data-tone='deposit'] {
   background: var(--mint);
-  color: var(--paper);
   box-shadow: 0 4px 0 var(--mint-shade);
-}
-
-.inventory-panel .building-panel-actions button[data-tone='drop'] {
-  background: var(--coral);
-  color: var(--paper);
-  box-shadow: 0 4px 0 var(--coral-shade);
 }
 
 .inventory-action:active {
@@ -1842,6 +1988,54 @@ button:disabled,
 
 .inventory-action[data-tone='deposit']:active {
   box-shadow: 0 1px 0 var(--mint-shade);
+}
+
+.inventory-action[disabled],
+.inventory-actions button[disabled] {
+  background: var(--paper-shade);
+  color: var(--violet-light);
+  box-shadow: 0 4px 0 var(--violet-light);
+  transform: none;
+  cursor: var(--cursor-forbidden);
+}
+
+/* Le bas de l'onglet : « Déposer en ville » (éteint loin de la mairie) et « Tout jeter », côte à côte. */
+.inventory-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.inventory-actions button {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0 12px;
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.inventory-actions button[hidden] {
+  display: none;
+}
+
+.inventory-actions button[data-tone='deposit']:not([disabled]) {
+  background: var(--mint);
+  color: var(--paper);
+  box-shadow: 0 5px 0 var(--mint-shade);
+}
+
+.inventory-actions button[data-tone='deposit']::before {
+  background: var(--mint-light);
+}
+
+.inventory-actions button[disabled]::before {
+  display: none;
+}
+
+.inventory-actions button[data-tone='drop']:not([disabled]) {
+  background: var(--coral);
+  color: var(--paper);
+  box-shadow: 0 5px 0 var(--coral-shade);
 }
 
 .inventory-town {
@@ -2918,8 +3112,8 @@ button:disabled,
 
 
 /*
- * Les trois boutons du joueur, tout en bas à droite, en rangée : l'habillage
- * d'Adam, son sac, « Bâtir ». Tous carrés, de la taille unique des boutons du
+ * Les deux boutons du joueur, tout en bas à droite, en rangée : le sac
+ * d'Adam (inventaire et habillement), « Bâtir ». Tous carrés, de la taille unique des boutons du
  * HUD (`--btn`), mêmes rayons, même face avant. Le libellé de « Bâtir » et la
  * touche des raccourcis ne se lisent plus qu'au lecteur d'écran et à
  * l'infobulle. Le tiroir de construction et la barre de pose occupent le bas :
@@ -5653,43 +5847,6 @@ button:disabled,
 
 /* ------------------------------------------------------- garde-robe d'Adam */
 
-/*
- * Le bouton de la garde-robe, premier du groupe en haut à droite : le visage
- * d'Adam tel qu'il est habillé, sur une carte blanche de la taille de ses
- * voisins — le sac est le sien. Une pastille corail dit qu'une pièce vient
- * d'être trouvée.
- */
-.hud .hud-wardrobe {
-  position: relative;
-  overflow: visible;
-}
-
-.hud-wardrobe-face {
-  width: var(--btn-icon);
-  height: var(--btn-icon);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.hud-wardrobe[data-new='true']::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--coral);
-  box-shadow: inset -2px -2px 0 var(--coral-shade);
-  animation: wardrobe-ping 1.4s ease-in-out infinite;
-}
-
-@keyframes wardrobe-ping {
-  50% {
-    transform: scale(1.25);
-  }
-}
-
 /* Le bouton d'un toast : « Essayer ». La bulle ne prend pas les doigts, lui si. */
 .hud-toast-action {
   flex: none;
@@ -5734,12 +5891,10 @@ button:disabled,
   text-align: left;
 }
 
-.wardrobe-head .overlay-title {
-  flex: 1;
-  font-size: 24px;
-}
-
 .wardrobe-count {
+  position: absolute;
+  top: 0;
+  right: 0;
   font-size: 14px;
   font-weight: 600;
   color: var(--muted);
@@ -5747,6 +5902,7 @@ button:disabled,
 }
 
 .wardrobe-stage {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5821,7 +5977,8 @@ button:disabled,
 
 @media (prefers-reduced-motion: reduce) {
   .wardrobe-figure img,
-  .hud-wardrobe[data-new='true']::after {
+  .hud .hud-bag[data-new='true']::after,
+  .bag-tab[data-new='true']::after {
     animation: none;
   }
 }
@@ -6044,14 +6201,134 @@ span.wardrobe-thumb {
   padding: 0 12px;
 }
 
+/*
+ * La fenêtre du sac : la garde-robe d'hier, avec deux onglets en tête —
+ * « Inventaire » et « Habillement » —, deux capsules côte à côte, la choisie
+ * en violet plein. Le corps de l'onglet prend toute la hauteur qui reste.
+ */
+.bag-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.wardrobe-tab-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 0;
+}
+
+.wardrobe-tab-body[hidden] {
+  display: none;
+}
+
+.bag-tabs {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--paper-shade);
+}
+
+.bag-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--violet-shade);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: var(--cursor-hand);
+}
+
+.bag-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bag-tab .icon,
+.bag-tab-face {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
+.bag-tab-face {
+  border-radius: 50%;
+}
+
+.bag-tab[aria-selected='true'] {
+  background: var(--violet);
+  color: var(--paper);
+  box-shadow: 0 3px 0 var(--violet-shade);
+}
+
+/* La pastille d'une pièce trouvée : sur le sac du HUD et sur l'onglet « Habillement ». */
+.hud .hud-bag[data-new='true']::after,
+.bag-tab[data-new='true']::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: inset -2px -2px 0 var(--coral-shade);
+  animation: bag-ping 1.4s ease-in-out infinite;
+}
+
+.bag-tab[data-new='true']::after {
+  top: 2px;
+  right: 6px;
+  width: 11px;
+  height: 11px;
+}
+
+/* Un petit téléphone : les onglets se serrent pour garder leur nom entier. */
+@media (max-width: 400px) {
+  .bag-tab {
+    gap: 4px;
+    padding: 0 4px;
+    font-size: 14px;
+  }
+
+  .bag-tab .icon,
+  .bag-tab-face {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@keyframes bag-ping {
+  50% {
+    transform: scale(1.25);
+  }
+}
+
 /* Couché (un téléphone tourné) : l'aperçu à gauche, les onglets et les pièces à droite. */
 @media (orientation: landscape) and (max-height: 600px) {
   .wardrobe-panel {
-    grid-template-columns: 180px minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
     width: min(860px, 100%);
     height: 100%;
     padding: 12px 14px 14px;
+  }
+
+  .wardrobe-tab-body {
+    grid-template-columns: 180px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
   .wardrobe-head,
@@ -6061,5 +6338,33 @@ span.wardrobe-thumb {
 
   .wardrobe-stage {
     justify-content: center;
+  }
+
+  .wardrobe-count {
+    position: static;
+  }
+
+  /* L'inventaire couché : la grille et la ville à gauche, la jauge, l'objet choisi et les boutons à droite. */
+  .inventory-tab:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 14px;
+  }
+
+  .inventory-scroll {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+
+  .inventory-gauge,
+  .inventory-where,
+  .inventory-detail,
+  .inventory-actions {
+    grid-column: 2;
+  }
+
+  .inventory-detail {
+    align-self: end;
   }
 }

@@ -4,7 +4,6 @@ import type { Messages } from '../messages.ts';
 
 export const wardrobe: Messages['wardrobe'] = {
   title: 'Adam’s wardrobe',
-  open: 'Customise Adam',
   slots: {
     hair: 'Hair',
     eyes: 'Eyes',

@@ -57,7 +57,7 @@ import { TILE_SIZE } from './core/grid.ts';
 import { detectLocale, onLocale, setLocale, t } from './i18n/locale.ts';
 import { BuildingPanel } from './ui/buildingPanel.ts';
 import { CaravanPanel } from './ui/caravanPanel.ts';
-import { InventoryPanel } from './ui/inventoryPanel.ts';
+import { BagPanel } from './ui/bagPanel.ts';
 import { ResourcePanel } from './ui/resourcePanel.ts';
 import { escapeAction } from './ui/escape.ts';
 import { JoystickView } from './ui/joystick.ts';
@@ -67,7 +67,6 @@ import { Hud } from './ui/hud.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
 import { haptics } from './ui/haptics.ts';
 import { SettingsPanel } from './ui/settingsPanel.ts';
-import { WardrobePanel } from './ui/wardrobePanel.ts';
 import { formatSeed, parseSeed } from './ui/seed.ts';
 import { testBanner, testScenarioOf } from './ui/testRoute.ts';
 import { ZoomControls } from './ui/zoomControls.ts';
@@ -235,23 +234,30 @@ async function main(): Promise<void> {
   }
   const hud = new Hud(world, debug);
   const buildMenu = new BuildMenu(world, placement, MENU_BUILDING_IDS, () => audio.play('open'));
-  // La fenêtre d'un bâtiment, le sac, les ressources et le troc occupent la même place : l'un ferme les autres.
+  // La fenêtre d'un bâtiment, le sac, les ressources et le troc : l'un ferme les autres.
   const panel = new BuildingPanel(world, () => {
     inventory.close();
     resources.close();
     trade.close();
     audio.play('open');
   });
-  const inventory = new InventoryPanel(
-    world,
-    () => {
+  /*
+   * Le sac : une fenêtre à deux onglets, l'inventaire et l'habillement
+   * d'Adam. Sur l'habillement, l'horloge s'arrête comme pour les réglages ;
+   * « Valider » pousse `dressAdam`.
+   */
+  const inventory = new BagPanel(world, hud.bag, {
+    onToggle: (open) => {
+      accumulator = 0;
+      if (!open) return;
+      buildMenu.close();
       panel.close();
       resources.close();
       trade.close();
       audio.play('open');
     },
-    (alert) => renderer.pointTo(alert.target, alert.item),
-  );
+    onAlert: (alert) => renderer.pointTo(alert.target, alert.item),
+  });
   const resources = new ResourcePanel(
     world,
     () => {
@@ -336,26 +342,12 @@ async function main(): Promise<void> {
     recenter: () => (worldMap.open ? worldMap.recenter() : renderer.resetZoom()),
   });
 
-  // L'éditeur de personnage : ouvert, il arrête l'horloge comme les réglages ; « Valider » pousse `dressAdam`.
-  const wardrobe = new WardrobePanel(world, {
-    onToggle: (open) => {
-      accumulator = 0;
-      if (!open) return;
-      buildMenu.close();
-      panel.close();
-      inventory.close();
-      resources.close();
-      trade.close();
-      audio.play('open');
-    },
-  });
-
-  // Une pièce trouvée : un toast, et son bouton « Essayer » ouvre l'éditeur sur son onglet.
+  // Une pièce trouvée : un toast, et son bouton « Essayer » ouvre l'habillement sur son emplacement.
   world.events.on('pieceFound', ({ piece }) => {
     hud.notify(t().wardrobe.found(t().pieces[piece]), 'good', {
       label: t().wardrobe.tryOn,
       run: () => {
-        if (started && !paused && !settings.open && !world.defeated) wardrobe.show(PIECES[piece].slot);
+        if (started && !paused && !settings.open && !world.defeated) inventory.show('wardrobe', PIECES[piece].slot);
       },
     });
   });
@@ -365,9 +357,9 @@ async function main(): Promise<void> {
   // La rangée du haut à droite : Pause, Réglages, la carte du monde, puis le zoom.
   zoom.root.prepend(hud.pauseButton, hud.settingsButton, worldMap.button);
   hud.mountControls(zoom.root);
-  // Les trois boutons du joueur, en bas à droite : la garde-robe d'Adam, le sac, « Bâtir ».
-  hud.actions.append(wardrobe.button, hud.bag, buildMenu.buildButton);
-  hud.root.append(worldMap.root, stick.root, buildMenu.root, panel.root, inventory.root, resources.root, trade.root);
+  // Les deux boutons du joueur, en bas à droite : le sac (inventaire et habillement), « Bâtir ».
+  hud.actions.append(hud.bag, buildMenu.buildButton);
+  hud.root.append(worldMap.root, stick.root, buildMenu.root, panel.root, resources.root, trade.root);
   stick.avoid(buildMenu.bottomParts, hud.root);
   hud.bag.addEventListener('click', () => inventory.toggle());
   hud.resourcesButton.addEventListener('click', () => resources.toggle());
@@ -493,7 +485,7 @@ async function main(): Promise<void> {
   } else {
     hud.root.append(title.root);
   }
-  hud.root.append(wardrobe.root);
+  hud.root.append(inventory.root);
   // Par-dessus tout, écran titre compris : la langue se choisit avant même de jouer.
   hud.root.append(settings.root);
   mount.append(hud.root);
@@ -509,7 +501,7 @@ async function main(): Promise<void> {
       // Ctrl, Alt ou Cmd : un raccourci du navigateur ou du système, pas du menu.
       if (isTyping(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
 
-      const canOpen = started && !paused && !settings.open && !wardrobe.open && !world.defeated && !worldMap.open;
+      const canOpen = started && !paused && !settings.open && !inventory.open && !world.defeated && !worldMap.open;
 
       if (buildMenu.handleKey(event.code, event.repeat, canOpen)) {
         event.preventDefault();
@@ -541,32 +533,29 @@ async function main(): Promise<void> {
 
       const action = escapeAction({
         settingsOpen: settings.open,
-        wardrobeOpen: wardrobe.open,
+        bagOpen: inventory.open,
         paused,
         mapOpen: worldMap.open,
         menuOpen: buildMenu.isOpen,
         panelOpen: panel.open || trade.open,
-        inventoryOpen: inventory.open || resources.open,
+        resourcesOpen: resources.open,
       });
 
       if (action === 'closeSettings') settings.close();
-      else if (action === 'closeWardrobe') wardrobe.close();
+      else if (action === 'closeBag') inventory.close();
       else if (action === 'closeMap') worldMap.close();
       else if (action === 'closeMenu') buildMenu.close();
       else if (action === 'closePanel') {
         panel.close();
         trade.close();
       }
-      else if (action === 'closeInventory') {
-        inventory.close();
-        resources.close();
-      }
+      else if (action === 'closeResources') resources.close();
       else setPaused(action === 'pause');
     }
-    if (shortcut === 'inventory' && started && !paused && !settings.open && !wardrobe.open && !worldMap.open) inventory.toggle();
+    if (shortcut === 'inventory' && started && !paused && !settings.open && !worldMap.open) inventory.toggle();
     if (shortcut === 'map') {
       if (worldMap.open) worldMap.close();
-      else if (started && !paused && !settings.open && !wardrobe.open && !world.defeated) worldMap.show();
+      else if (started && !paused && !settings.open && !inventory.open && !world.defeated) worldMap.show();
     }
     if (shortcut === 'debug' && import.meta.env.DEV) hud.toggleDebug();
     // Débogage : F lève ou rabat le brouillard de guerre — en dev, panneau de debug ouvert.
@@ -649,12 +638,12 @@ async function main(): Promise<void> {
   let frame = 0;
 
   // Une partie de test peut s'ouvrir sur l'éditeur de personnage, pour les captures.
-  if (scenario && (TEST_SCENARIOS[scenario] as TestScenarioProto).wardrobe?.open) wardrobe.show();
+  if (scenario && (TEST_SCENARIOS[scenario] as TestScenarioProto).wardrobe?.open) inventory.show('wardrobe');
   let lastAxisX = 0;
   let lastAxisY = 0;
 
   renderer.app.ticker.add((ticker) => {
-    const running = started && !paused && !settings.open && !wardrobe.open;
+    const running = started && !paused && !settings.open && !inventory.dressing;
 
     if (running && !celebrating) accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS);
 
@@ -729,7 +718,7 @@ async function main(): Promise<void> {
     const height = renderer.app.screen.height;
     let top = height - HUD_BOTTOM_INSET;
 
-    for (const node of [...buildMenu.bottomParts, panel.root, inventory.root, resources.root, trade.root]) {
+    for (const node of [...buildMenu.bottomParts, panel.root, resources.root, trade.root]) {
       const rect = node.getBoundingClientRect();
 
       if (rect.height > 0) top = Math.min(top, rect.top);
