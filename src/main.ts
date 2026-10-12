@@ -260,8 +260,14 @@ async function main(): Promise<void> {
     world.push({ type: 'setFog', enabled: false });
   }
   const hud = new Hud(world, debug);
-  const buildMenu = new BuildMenu(world, placement, MENU_BUILDING_IDS, () => audio.play('open'));
-  // La fenêtre d'un bâtiment, le sac, les ressources et le troc : l'un ferme les autres.
+  const buildMenu = new BuildMenu(world, placement, MENU_BUILDING_IDS, () => {
+    panel.close();
+    inventory.close();
+    resources.close();
+    trade.close();
+    audio.play('open');
+  });
+  // La fenêtre d'un bâtiment, le sac, les ressources, le troc et le tiroir : l'un ferme les autres.
   const panel = new BuildingPanel(world, () => {
     inventory.close();
     resources.close();
