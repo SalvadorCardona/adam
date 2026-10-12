@@ -50,6 +50,13 @@ sa fenêtre propose « Renforcer » (niveaux d'amélioration, `upgrades` de
 Le **four à charbon** (`charcoalKiln`, débloqué avec la forge, un ouvrier)
 est une forge sur sa propre recette (`burnCharcoal` : 3 bois → 1 charbon) :
 une forge trouve la sienne par son id (`recipeOf`, une seule par bâtiment).
+Le **grill** (`grill`, débloqué au labo, recherche « Grillades », un ouvrier) en
+est une aussi (`grillMeat` : 1 viande → 1 viande grillée) : les porteurs le
+ravitaillent depuis la mairie et rapportent les grillées, sans cas spécial. La
+mairie convertit toujours la viande crue en nourriture (`HUNTING.foodPerMeat`),
+la grillée à `HUNTING.foodPerGrilled`, plus généreux ; `butcherMeat` laisse au
+grill en marche son stock visé (`demand`) de viande crue. Visuel dans
+`docs/grill/`.
 Les porteurs ravitaillent les forges depuis la ville et rapportent leurs
 sorties (plaques, charbon) à la mairie ; leurs entrées restent au four.
 

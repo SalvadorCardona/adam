@@ -24,6 +24,7 @@ export const content: Content = {
     ironOre: 'Iron ore',
     food: 'Food',
     meat: 'Meat',
+    grilledMeat: 'Grilled meat',
     water: 'Water',
     ironPlate: 'Iron plate',
     brick: 'Brick',
@@ -290,6 +291,15 @@ export const content: Content = {
       effect: '3 wood → 1 coal, 1 worker.',
       upgrades: [],
     },
+    grill: {
+      label: 'Grill',
+      sign: 'Grill',
+      siteDescription: 'A half-drum to set on its scrap legs, a grate to bend. It will need a cook.',
+      description:
+        'A drum cut in two, a scrap grate and embers that never die. Its cook roasts the meat from the hunts: cooked, it feeds far better than raw, and the smoke announces dinner to the whole camp.',
+      effect: '1 meat → 1 grilled meat, 1 worker.',
+      upgrades: [],
+    },
     brickworks: {
       label: 'Brickworks',
       sign: 'Bricks',
@@ -389,6 +399,7 @@ export const content: Content = {
     raiseChild: 'Birth',
     smeltPlate: 'Smelting',
     burnCharcoal: 'Charring',
+    grillMeat: 'Grilling',
     fireBrick: 'Firing',
     makeTools: 'Toolmaking',
     castSteel: 'Casting',
@@ -759,6 +770,10 @@ export const content: Content = {
     sporeFilters: {
       label: 'Spore filters',
       description: 'Spores from the polluted lands, packed into the filters: the station cleans faster.',
+    },
+    grilling: {
+      label: 'Grilling',
+      description: 'A half-drum, a grate, some embers: cooked meat feeds better than raw.',
     },
     brickmaking: {
       label: 'Brick firing',

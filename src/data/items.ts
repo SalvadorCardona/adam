@@ -25,6 +25,8 @@ export const ITEMS = {
   food: { label: 'Nourriture', stack: 100 },
   // Le butin des bêtes sauvages : à la mairie, elle devient de la nourriture (`HUNTING`, `data/needs.ts`).
   meat: { label: 'Viande', stack: 100 },
+  // La viande cuite au grill (`grill`) : à la mairie, elle nourrit mieux que la crue (`HUNTING.foodPerGrilled`).
+  grilledMeat: { label: 'Viande grillée', stack: 100 },
   // Tirée au puits : on la boit, rien d'autre (`data/needs.ts`).
   water: { label: 'Eau', stack: 100 },
   ironPlate: { label: 'Plaque de fer', stack: 50 },

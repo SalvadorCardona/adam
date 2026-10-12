@@ -42,6 +42,7 @@ import { FORESTER } from '../art/forester.ts';
 import { FORESTER_HOUSE } from '../art/foresterHouse.ts';
 import { BRICKWORKS } from '../art/brickworks.ts';
 import { CHARCOAL_KILN } from '../art/charcoalKiln.ts';
+import { GRILL } from '../art/grill.ts';
 import { STEELWORKS } from '../art/steelworks.ts';
 import { WORKSHOP } from '../art/workshop.ts';
 import { FORGE } from '../art/forge.ts';
@@ -209,6 +210,7 @@ export const SPRITES = {
   palisade: PALISADE,
   forge: FORGE,
   charcoalKiln: CHARCOAL_KILN,
+  grill: GRILL,
   brickworks: BRICKWORKS,
   workshop: WORKSHOP,
   steelworks: STEELWORKS,

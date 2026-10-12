@@ -76,6 +76,19 @@ export const ITEM_ICONS: Record<ItemId, string> = {
     shadedPill(3, 3, 14, 13, 6, 'coral'),
     pill(6, 5.5, 5, 2.4, coral.light),
   ),
+  /** Le pilon de viande, doré par la braise et zébré de grill : la viande cuite. */
+  grilledMeat: svg(
+    S,
+    S,
+    pill(15, 13, 6, 5, paper.shade),
+    pill(15, 12.5, 5, 3.6, paper.base),
+    circle(19.5, 17, 2.2, paper.shade),
+    circle(19.2, 16.5, 1.7, paper.base),
+    shadedPill(3, 3, 14, 13, 6, 'orange'),
+    pill(6, 5.5, 5, 2.4, orange.light),
+    line(7, 12, 12, 7, ink.base),
+    line(10, 14, 15, 9, ink.base),
+  ),
   /**
    * Une goutte d'eau cyan, pointe en haut — la teinte de l'eau, mais pas la
    * forme du minerai de fer, un bloc trapu clouté : on ne les confond pas.

@@ -5,7 +5,7 @@ import { COLONY } from '../data/inhabitants.ts';
 import { unlockingResearch } from './research.ts';
 import { ENEMIES } from '../data/enemies.ts';
 import { ITEM_IDS, type ItemId } from '../data/items.ts';
-import { NEEDS } from '../data/needs.ts';
+import { HUNTING, NEEDS } from '../data/needs.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
 import { RECIPES } from '../data/recipes.ts';
 import { JOB_PRIORITY, WANDER } from '../data/workers.ts';
@@ -31,6 +31,8 @@ interface Layout {
   forges?: Stock[];
   /** Fours à charbon finis, coffre déjà garni, posés près de la mairie, après les forges. */
   kilns?: Stock[];
+  /** Grills finis, coffre déjà garni, posés près de la mairie, après les fours. */
+  grills?: Stock[];
   /** Nurseries finies, affamées : l'heure de la naissance est passée. */
   nurseries?: Stock[];
 }
@@ -107,6 +109,18 @@ function colony(layout: Layout): World {
       level: 1,
       paused: false,
       staff: BUILDINGS.charcoalKiln.workers,
+      blocked: true,
+    });
+  }
+  for (const store of layout.grills ?? []) {
+    entities.push({
+      ...placeNear('grill'),
+      kind: 'forge',
+      store,
+      hp: BUILDINGS.grill.hp,
+      level: 1,
+      paused: false,
+      staff: BUILDINGS.grill.workers,
       blocked: true,
     });
   }
@@ -651,6 +665,73 @@ describe('forge et nurserie ravitaillées par la ville', () => {
     expect(hallOf(world).store.count('ironOre')).toBe(28 - (ironShare - 2));
     expect(hallOf(world).store.count('coal')).toBe(0);
     expect(forge.blocked).toBe(false);
+  });
+});
+
+describe('grill', () => {
+  function grillsOf(world: World): Forge[] {
+    return [...world.entities.values()].filter((entity): entity is Forge => entity.proto === 'grill');
+  }
+
+  it('la recette : 1 viande → 1 viande grillée en 5 s, un ouvrier, débloqué au labo', () => {
+    expect(RECIPES.grillMeat).toMatchObject({ building: 'grill', duration: 20 * 5, inputs: { meat: 1 }, outputs: { grilledMeat: 1 } });
+    expect(BUILDINGS.grill).toMatchObject({ kind: 'forge', workers: 1 });
+    expect(unlockingResearch('grill')).toBe('grilling');
+  });
+
+  it('la viande grillée rapporte plus de nourriture que la crue', () => {
+    expect(HUNTING.foodPerGrilled).toBeGreaterThan(HUNTING.foodPerMeat);
+  });
+
+  it('6 viandes en ville : le grill en garde 4 à cuire, les porteurs rapportent les grillées, le reste est converti cru', () => {
+    const world = colony({ hall: { meat: 6 }, houses: 1, grills: [{}] });
+    const [grill] = grillsOf(world);
+    const food = hallOf(world).store.count('food');
+    let grilled = 0;
+
+    if (!grill) throw new Error('pas de grill');
+    world.events.on('forgeProduced', () => (grilled += 1));
+
+    run(world, 120 * TICKS_PER_SECOND, () => expectCoveredPromises(world));
+
+    // Le stock visé du grill (`demand`) passe par la grille ; le surplus est converti cru, comme sans grill.
+    const kept = BUILDINGS.grill.demand.meat;
+
+    expect(grilled).toBe(kept);
+    expect(census(world).meat).toBe(0);
+    expect(census(world).grilledMeat).toBe(0);
+    expect(hallOf(world).store.count('food')).toBe(food + kept * HUNTING.foodPerGrilled + (6 - kept) * HUNTING.foodPerMeat);
+  });
+
+  it('sans grill, la viande crue devient de la nourriture comme avant', () => {
+    const world = colony({ hall: { meat: 6 }, houses: 1 });
+    const food = hallOf(world).store.count('food');
+
+    run(world, 3 * TICKS_PER_SECOND);
+
+    expect(hallOf(world).store.count('meat')).toBe(0);
+    expect(hallOf(world).store.count('food')).toBe(food + 6 * HUNTING.foodPerMeat);
+  });
+
+  it('un grill en pause ne retient pas la viande : elle est convertie', () => {
+    const world = colony({ hall: { meat: 6 }, houses: 1, grills: [{}] });
+    const [grill] = grillsOf(world);
+
+    if (!grill) throw new Error('pas de grill');
+    grill.paused = true;
+    run(world, 3 * TICKS_PER_SECOND);
+
+    expect(hallOf(world).store.count('meat')).toBe(0);
+  });
+
+  it('la viande grillée déposée en ville est convertie au ratio des grillades', () => {
+    const world = colony({ hall: { grilledMeat: 4 }, houses: 1 });
+    const food = hallOf(world).store.count('food');
+
+    run(world, 3 * TICKS_PER_SECOND);
+
+    expect(hallOf(world).store.count('grilledMeat')).toBe(0);
+    expect(hallOf(world).store.count('food')).toBe(food + 4 * HUNTING.foodPerGrilled);
   });
 });
 

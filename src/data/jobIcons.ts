@@ -23,7 +23,7 @@ import { ICON_SIZE } from './icons.ts';
 
 const S = ICON_SIZE;
 const C = S / 2;
-const { ink, coral, orange, mint, cyan, violet, paper, skin } = PALETTE;
+const { ink, coral, orange, yellow, mint, cyan, violet, paper, skin } = PALETTE;
 
 /** Le médaillon commun : un disque jaune de la colonie, son ombre en bas à droite, son reflet en haut à gauche. */
 const MEDAL = shadedCircle(C, C, C - 0.5, 'yellow');
@@ -207,6 +207,15 @@ export const JOB_DRAWINGS = {
     circle(12, 15, 3.2, orange.base),
     circle(11.6, 15.4, 1.6, orange.light),
     shadedPill(5, 18, 14, 3.6, 1.2, 'ink'),
+  ),
+  /** Le grill : une grille indigo, deux brochettes de viande et la flamme dessous. */
+  grill: job(
+    pill(4, 9, 16, 3, ink.base),
+    shadedPill(6, 5, 5, 5, 2, 'coral'),
+    shadedPill(13, 5, 5, 5, 2, 'coral'),
+    polygon([12, 13, 15.5, 19.5, 8.5, 19.5], orange.shade),
+    circle(12, 19, 3.4, orange.base),
+    circle(12, 19.4, 1.7, yellow.base),
   ),
   /** La briqueterie : trois briques corail empilées en quinconce. */
   brickworks: job(
