@@ -6,6 +6,8 @@ export const researchPanel = {
   takeRest: 'Prendre le reste',
   noneTitle: 'Aucune recherche en cours',
   noneHint: 'Choisissez-en une dans les onglets, puis apportez son coût.',
+  bringCost: 'Apportez son coût : aucun porteur ne s’en charge. Heurtez le labo, ou transférez le sac.',
+  advised: 'Conseillée',
   approach: 'Rapprochez-vous pour déposer — ou laissez faire les porteurs.',
   transferBoth: 'Transférez le sac et la ville, heurtez le labo, ou laissez faire les porteurs.',
   transferBag: 'Transférez le sac, heurtez le labo, ou laissez faire les porteurs.',

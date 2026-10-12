@@ -74,6 +74,23 @@ describe('tutorialHint', () => {
     expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.labResearch.replace('{research}', 'Guet').replace('{building}', tower));
   });
 
+  it('dix ouvriers qui glandent, la tour posée : Ève les envoie travailler, et loger si les lits manquent', () => {
+    const world = World.newColony(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    for (let i = 0; i < 400; i += 1) world.tick();
+
+    const { idle } = world.census();
+
+    expect(idle).toBeGreaterThanOrEqual(3);
+    // Les urgences d'abord (tour, puits) : on les écarte pour ne lire que le conseil des oisifs.
+    const text = tutorialAdvice(world, FRESH, true, 0)?.text ?? '';
+
+    expect(text).toBe(EVE_LINES.hints.idleHousing.replace('{n}', String(idle)));
+  });
+
   it('ne parle jamais d’un bouton « Construire »', () => {
     const world = new World(1);
     const hints: (string | null)[] = [tutorialHint(world, FRESH, false, 0)];

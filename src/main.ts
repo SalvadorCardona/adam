@@ -280,6 +280,7 @@ async function main(): Promise<void> {
     trade.close();
     audio.play('open');
   });
+  panel.setAdvisedResearch(() => hud.adviceResearch());
   /*
    * Le sac : une fenêtre à deux onglets, l'inventaire et l'habillement
    * d'Adam. Sur l'habillement, l'horloge s'arrête comme pour les réglages ;

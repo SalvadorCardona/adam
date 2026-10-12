@@ -561,6 +561,8 @@ export const content: Content = {
       foundry: 'At the lab, start the Foundry: the forge and the charcoal kiln will show up in “Build”.',
       forge: 'The forge is unlocked! Iron and coal in, iron plates out.',
       kiln: 'Forge hungry for coal? A charcoal kiln bakes your spare wood: three logs, one coal.',
+      idle: 'Your {n} guys are slacking, Adam: place a logistics post, or any building that hires.',
+      idleHousing: 'Your {n} guys are slacking and sleeping outside: place a house for them, then a logistics post.',
       eraReady: 'We’ve got everything to become a {era}! Open the town hall, “Eras” tab, and make the move.',
       waitBirth: 'The baby arrives in {time}.',
       waitDawn: 'Next dawn in {time}.',

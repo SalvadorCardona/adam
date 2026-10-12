@@ -4915,6 +4915,11 @@ button:disabled,
   color: var(--ink);
 }
 
+.research-row[data-advised='true'] .research-badge {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
 .research-row[data-status='locked'] .research-badge {
   color: var(--danger);
 }

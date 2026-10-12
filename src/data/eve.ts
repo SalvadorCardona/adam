@@ -75,6 +75,9 @@ export const EVE_LINES = {
     forge: 'La forge est débloquée ! Fer et charbon dedans, plaques de fer dehors.',
     /** La forge bâtie, plus de charbon en ville et pas de four à charbon : le bois en trop s'y change en charbon. */
     kiln: 'Ta forge a faim de charbon ? Un four à charbon cuit ton bois en trop : trois bûches, un charbon.',
+    /** Des ouvriers libres qui glandent, sans urgence. `{n}` : leur nombre. `idleHousing` : et il manque des lits. */
+    idle: 'Tes {n} gars glandent, Adam : pose un poste de logistique, ou un bâtiment qui emploie du monde.',
+    idleHousing: 'Tes {n} gars glandent et dorment dehors : pose une maison pour les loger, puis un poste de logistique.',
     /** Tout est réuni pour l'ère suivante (`data/eras.ts`) : `{era}` est son nom. */
     eraReady: 'On a tout pour devenir un {era} ! Ouvre la mairie, onglet « Ères », et lance le passage.',
     /**

@@ -63,7 +63,7 @@ import { SIGNAL_WAVES } from '../data/artDirection.ts';
 import { OBJECTIVES, type Goal } from '../data/objectives.ts';
 import { seedsFor } from '../data/perks.ts';
 import { QUESTS, type QuestReward } from '../data/quests.ts';
-import { RESEARCH } from '../data/research.ts';
+import { RESEARCH, type ResearchId } from '../data/research.ts';
 import { WEATHER, WEATHER_CALENDAR } from '../data/weather.ts';
 import { dayDialSvg, type UiIcon } from '../art/ui.ts';
 import type { AtlasStats } from '../render/spriteLibrary.ts';
@@ -299,6 +299,7 @@ export class Hud {
   /** Tick où le conseil a été montré (ou déplié) : il se replie `HINT_FOLD_TICKS` plus tard. */
   private hintSince = 0;
   private wanted: ItemId | null = null;
+  private advisedResearch: ResearchId | null = null;
 
   /** Les répliques d'Ève en attente, et l'heure où la réplique affichée s'en va. */
   private readonly speechQueue: string[] = [];
@@ -1199,6 +1200,11 @@ export class Hud {
   }
 
   /** La ressource que le conseil envoie chercher, ou `null` : le renderer y pointe un repère. */
+  /** La recherche que le conseil envoie lancer au labo, ou `null`. */
+  public adviceResearch(): ResearchId | null {
+    return this.advisedResearch;
+  }
+
   public wantedItem(): ItemId | null {
     return this.wanted;
   }
@@ -1825,6 +1831,7 @@ export class Hud {
     const hint = advice?.text ?? '';
 
     this.wanted = advice?.wants ?? null;
+    this.advisedResearch = advice?.research ?? null;
 
     // La langue vient de changer : le même conseil, dans l'autre langue, sans le relancer ni le déplier.
     if (hint !== this.lastHint && this.hintLocale !== locale()) {
