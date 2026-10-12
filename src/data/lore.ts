@@ -371,6 +371,16 @@ export const LORE = {
         'la forge ne reste plus à sec, et le bois en trop sert enfin.',
       effect: '3 bois → 1 charbon, 1 ouvrier.',
     },
+    grill: {
+      name: 'Grill',
+      sign: 'Grill',
+      site: 'Un demi-bidon à poser sur ses pieds de ferraille, une grille à tordre. Il lui faudra un grilleur.',
+      description:
+        'Un bidon coupé en deux, une grille de récup et des braises qui ne s’éteignent jamais. ' +
+        'Son grilleur y fait rôtir la viande des chasses : cuite, elle nourrit bien mieux ' +
+        'que crue, et la fumée annonce le dîner à tout le campement.',
+      effect: '1 viande → 1 viande grillée, 1 ouvrier.',
+    },
     brickworks: {
       name: 'Briqueterie',
       sign: 'Briques',

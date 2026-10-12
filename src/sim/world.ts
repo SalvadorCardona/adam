@@ -4236,20 +4236,44 @@ export class World {
     };
   }
 
-  /** Toute la viande libre de la ville devient de la nourriture (`HUNTING`). */
+  /**
+   * La viande libre de la ville devient de la nourriture (`HUNTING`), la
+   * grillée plus généreusement que la crue. Un grill en marche garde sa part
+   * de viande crue : ce que ses porteurs vont lui apporter n'est pas converti
+   * sous leur nez.
+   */
   private butcherMeat(): void {
     const town = this.townStock();
 
     if (!town) return;
 
-    const meat = town.available(HUNTING.meat);
+    const grilled = town.available(HUNTING.grilledMeat);
 
-    if (meat <= 0) return;
+    if (grilled > 0) this.convertMeat(HUNTING.grilledMeat, grilled, HUNTING.foodPerGrilled);
 
-    const food = town.add(HUNTING.food, meat * HUNTING.foodPerMeat);
-    const used = Math.ceil(food / HUNTING.foodPerMeat);
+    let kept = 0;
 
-    town.remove(HUNTING.meat, used);
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'forge' && !entity.paused && HUNTING.meat in forgeRecipe(entity).inputs) {
+        kept += consumerWants(entity, HUNTING.meat);
+      }
+    }
+
+    const meat = town.available(HUNTING.meat) - kept;
+
+    if (meat > 0) this.convertMeat(HUNTING.meat, meat, HUNTING.foodPerMeat);
+  }
+
+  /** Retirer `amount` de `item` de la ville et y verser la nourriture qu'il rend, au plus ce qui y tient. */
+  private convertMeat(item: ItemId, amount: number, perUnit: number): void {
+    const town = this.townStock();
+
+    if (!town) return;
+
+    const food = town.add(HUNTING.food, amount * perUnit);
+    const used = Math.ceil(food / perUnit);
+
+    town.remove(item, used);
     if (food > 0) this.tally(HUNTING.food, food);
   }
 

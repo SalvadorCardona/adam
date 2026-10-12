@@ -50,6 +50,7 @@ export const BUILD_PRESTIGE = {
   palisade: 0,
   forge: 3,
   charcoalKiln: 2,
+  grill: 2,
   brickworks: 3,
   workshop: 4,
   steelworks: 5,

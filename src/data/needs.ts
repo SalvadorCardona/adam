@@ -79,16 +79,20 @@ export type NeedId = keyof typeof NEEDS;
  * qui rapporte la sienne à son coffre). Les bêtes
  * sauvages (`WILDLIFE`) lâchent de la viande ; déposée à la mairie, elle y
  * devient de la nourriture, `foodPerMeat` pour une, à la cadence de
- * `convertTicks`. Les bêtes reviennent avec leur tanière (`respawnTicks`) :
+ * `convertTicks` ; cuite au grill (`grill`), la viande grillée en rend
+ * `foodPerGrilled`, davantage. Les bêtes reviennent avec leur tanière (`respawnTicks`) :
  * la viande ne s'épuise pas pour de bon.
  */
 export const HUNTING = {
   meat: 'meat',
   food: 'food',
   foodPerMeat: 2,
+  grilledMeat: 'grilledMeat',
+  /** La viande grillée rend plus que la crue : la cuisson paie son détour. */
+  foodPerGrilled: 3,
   /** Ticks entre deux conversions : une seconde. */
   convertTicks: 20,
-} as const satisfies { meat: ItemId; food: ItemId; foodPerMeat: number; convertTicks: number };
+} as const satisfies { meat: ItemId; grilledMeat: ItemId; food: ItemId; foodPerMeat: number; foodPerGrilled: number; convertTicks: number };
 
 export const NEED_IDS = Object.keys(NEEDS) as NeedId[];
 

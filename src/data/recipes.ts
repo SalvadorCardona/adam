@@ -85,6 +85,13 @@ export const RECIPES = {
     inputs: { wood: 3 },
     outputs: { coal: 1 },
   },
+  grillMeat: {
+    label: 'Grillade',
+    building: 'grill',
+    duration: 20 * 5,
+    inputs: { meat: 1 },
+    outputs: { grilledMeat: 1 },
+  },
   fireBrick: {
     label: 'Cuisson',
     building: 'brickworks',
