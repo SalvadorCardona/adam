@@ -100,6 +100,12 @@ export interface SavedDen {
   readyTick: number;
 }
 
+/** Le prénom d'un habitant, rangé sous son id. */
+export interface SavedName {
+  id: number;
+  name: string;
+}
+
 /** Tout l'état de la simulation, en données JSON. */
 /** Les régions telles qu'elles sont rangées : les conquises, et les gardiens blessés. */
 export interface SavedRegions {
@@ -211,6 +217,8 @@ export interface WorldState {
   chests?: number[];
   /** Les ruines fouillées et les secrets trouvés, par id (`sim/discoveries.ts`). Absent d'avant eux : aucun. */
   spots?: number[];
+  /** Le prénom que chaque habitant porte, par id (`World.nameFor`). Absent d'avant eux : on les retrouve par `nameOf`. */
+  names?: SavedName[];
   scheduler: SchedulerSnapshot;
 }
 
@@ -525,6 +533,7 @@ function parseState(raw: unknown): WorldState {
     dens: unique(array(state['dens']).map(parseDen)),
     chests: [...new Set(array(state['chests'] ?? []).map(int))],
     spots: [...new Set(array(state['spots'] ?? []).map(int))],
+    ...(state['names'] !== undefined && { names: unique(array(state['names']).map(parseName)) }),
     scheduler: parseScheduler(state['scheduler']),
   };
 }
@@ -1214,6 +1223,12 @@ function parseDen(raw: unknown): SavedDen {
   const den = record(raw);
 
   return { id: int(den['id']), members: int(den['members']), readyTick: int(den['readyTick']) };
+}
+
+function parseName(raw: unknown): SavedName {
+  const entry = record(raw);
+
+  return { id: int(entry['id']), name: string(entry['name']).slice(0, NAME_MAX) };
 }
 
 /** Un transport en cours : ses réservations se rejouent au chargement, il doit donc être exact. */

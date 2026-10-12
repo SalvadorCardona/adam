@@ -226,7 +226,7 @@ le soir (crépuscule, nuit) ou pendant une vague.
 **Âge** (`data/inhabitants.ts`, `sim/inhabitants.ts`) — chacun a un `age`,
 sauvegardé, qui prend un an à chaque aube (`ageInhabitants`) ; un adulte
 arrivé tout fait a un âge haché de la seed et de son id, son prénom aussi
-(`nameOf`, jamais stocké). L'enfant sort de la nurserie à 10 ans et n'est
+(`nameOf`, tiré des `CORE_NAMES` premiers de `NAMES`). Aucun vivant ne porte le prénom d'un autre : `pickName` prend celui de `nameOf` s'il est libre, sinon un libre de son sexe ; rangé sous `names` (`World.givenNames`, `settleNames`), une sauvegarde d'avant garde les tirages d'origine. L'enfant sort de la nurserie à 10 ans et n'est
 affecté à rien ; à 14, il rejoint les ouvriers de la colonie (`colonists`
 + 1, un ouvrier libre sous le même id, toast « Lina a 14 ans… ») — le porteur `grown` ne survit que dans les
 anciennes sauvegardes.
