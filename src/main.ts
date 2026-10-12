@@ -21,6 +21,7 @@ import { VOICES } from './audio/synth.ts';
 import { assertPrototypes } from './data/validate.ts';
 import { GROUND, PARTICLES, type ParticleStyle } from './data/artDirection.ts';
 import { MENU_BUILDING_IDS } from './data/buildings.ts';
+import { NOTIFICATION_KINDS, type NotificationKind } from './data/notifications.ts';
 import { CHIEF, type WildlifeId } from './data/enemies.ts';
 import { STORY_SEXES } from './data/inhabitants.ts';
 import type { ItemId } from './data/items.ts';
@@ -51,6 +52,7 @@ import { LocalRecord } from './storage/localRecord.ts';
 import { LocalSave, type LoadResult } from './storage/localSave.ts';
 import { LocalLocale } from './storage/localLocale.ts';
 import { LocalHaptics } from './storage/localHaptics.ts';
+import { LocalNotifications } from './storage/localNotifications.ts';
 import { LocalSigns } from './storage/localSigns.ts';
 import { LocalZoom } from './storage/localZoom.ts';
 import { TILE_SIZE } from './core/grid.ts';
@@ -66,6 +68,8 @@ import { rewardText } from './ui/collectionPanel.ts';
 import { Hud } from './ui/hud.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
 import { haptics } from './ui/haptics.ts';
+import { NotificationPrompt } from './ui/notificationPrompt.ts';
+import { Notifier, browserBackend } from './ui/notifier.ts';
 import { SettingsPanel } from './ui/settingsPanel.ts';
 import { formatSeed, parseSeed } from './ui/seed.ts';
 import { testBanner, testScenarioOf } from './ui/testRoute.ts';
@@ -406,6 +410,15 @@ async function main(): Promise<void> {
     toggleMusic: () => settings.setMusic(audio.toggleMusic()),
     toggleSigns: () => showSigns(!signsOn),
     toggleHaptics: () => showHaptics(!haptics.enabled),
+    toggleNotification: (kind) => {
+      notifier.setEnabled(kind, !notifier.enabled(kind));
+      showNotifications();
+    },
+    cycleNotificationLimit: () => {
+      notifier.cycleLimit();
+      showNotifications();
+    },
+    askNotifications: () => notifyPrompt.show(),
     setSfxVolume: (volume) => audio.setSfxVolume(volume),
     setMusicVolume: (volume) => audio.setMusicVolume(volume),
     onToggle: (open) => {
@@ -429,6 +442,36 @@ async function main(): Promise<void> {
   settings.setHaptics(haptics.enabled);
   if (!haptics.supported) settings.hideHaptics();
   wireHaptics(world);
+
+  // Les notifications : demandées après la première recherche lancée, jamais au premier lancement.
+  const notifier = new Notifier(
+    scenario ? new LocalNotifications(null) : LocalNotifications.browser(),
+    browserBackend(`${import.meta.env.BASE_URL}sw.js`),
+    () => document.hidden || !document.hasFocus(),
+  );
+  const showNotifications = (): void =>
+    settings.setNotifications(
+      notifier.supported
+        ? { permission: notifier.permission, kinds: Object.fromEntries(NOTIFICATION_KINDS.map((kind) => [kind, notifier.enabled(kind)])) as Record<NotificationKind, boolean>, limit: notifier.limit }
+        : null,
+    );
+  const notifyPrompt = new NotificationPrompt({
+    onAccept: () => void notifier.ask().then(showNotifications),
+    onLater: () => {
+      notifier.markExplained();
+      showNotifications();
+    },
+    onToggle: (open) => {
+      accumulator = 0;
+      if (open) audio.play('open');
+    },
+  });
+
+  hud.root.append(notifyPrompt.root);
+  showNotifications();
+  wireNotifications(world, notifier, () => {
+    if (started && notifier.shouldExplain) notifyPrompt.show();
+  });
 
   const autosave = wireSave(world, saves, () => started);
   const garden = wireGarden(world, scenario ? new LocalGarden(null) : LocalGarden.browser());
@@ -540,8 +583,10 @@ async function main(): Promise<void> {
       // Le champ qui avait le clavier le rend : les touches suivantes reviennent au jeu.
       if (typing && event.target instanceof HTMLElement) event.target.blur();
 
+      if (notifyPrompt.open) notifyPrompt.dismiss();
+
       const action = escapeAction({
-        settingsOpen: settings.open,
+        settingsOpen: settings.open || notifyPrompt.open,
         bagOpen: inventory.open,
         paused,
         mapOpen: worldMap.open,
@@ -652,7 +697,7 @@ async function main(): Promise<void> {
   let lastAxisY = 0;
 
   renderer.app.ticker.add((ticker) => {
-    const running = started && !paused && !settings.open && !inventory.dressing;
+    const running = started && !paused && !settings.open && !notifyPrompt.open && !inventory.dressing;
 
     if (running && !celebrating) accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS);
 
@@ -1083,6 +1128,46 @@ function wireRecord(world: World, records: LocalRecord): number {
 }
 
 /** Le téléphone vibre aux moments clés : un bâtiment fini, une recherche, un objectif, une naissance. */
+/**
+ * Les événements qui valent une notification — la politique (type permis,
+ * plafond du jour, fenêtre en retrait) est celle du `Notifier`. Les vivres se
+ * surveillent à part : `needAlert` n'est pas un événement, on regarde chaque
+ * seconde et on ne prévient qu'au passage de « tout va bien » à « ça manque ».
+ */
+function wireNotifications(world: World, notifier: Notifier, onResearchStarted: () => void): void {
+  world.events.on('researchStarted', onResearchStarted);
+  world.events.on('researchCompleted', ({ research }) =>
+    notifier.notify('research', { title: t().notifications.research.title, body: t().notifications.research.body(t().research[research].label) }),
+  );
+  world.events.on('childBorn', ({ name }) =>
+    notifier.notify('child', { title: t().notifications.child.title, body: t().notifications.child.body(name) }),
+  );
+
+  // Une vague s'annonce en trois temps (3, 2, 1 s) : une seule notification par vague.
+  let announced = '';
+
+  world.events.on('waveCountdown', ({ night, wave, count }) => {
+    const key = `${night}:${wave}`;
+
+    if (key === announced) return;
+    announced = key;
+    notifier.notify('attack', { title: t().notifications.attack.title, body: t().notifications.attack.body(night, count) });
+  });
+
+  let short = false;
+
+  window.setInterval(() => {
+    const alert = world.needAlert();
+
+    if (alert && !short) {
+      const text = t().notifications.supplies;
+
+      notifier.notify('supplies', { title: alert.item === 'water' ? text.waterTitle : text.foodTitle, body: text.body(alert.minutes) });
+    }
+    short = alert !== null;
+  }, 1000);
+}
+
 function wireHaptics(world: World): void {
   world.events.on('resourceHarvested', () => haptics.pulse('tick'));
   world.events.on('buildingCompleted', () => haptics.pulse('done'));

@@ -4907,6 +4907,17 @@ button:disabled,
   z-index: 12;
 }
 
+.settings-panel {
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.settings-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .settings-head {
   display: flex;
   align-items: center;
@@ -6414,4 +6425,13 @@ span.wardrobe-thumb {
   .inventory-detail {
     align-self: end;
   }
+}
+
+/* L'écran d'explication des notifications : une liste de ce qui préviendra, en puces. */
+.notify-points {
+  margin: 0;
+  padding: 0 0 0 22px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink);
 }

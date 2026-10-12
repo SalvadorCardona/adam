@@ -13,7 +13,9 @@
  */
 
 import { LOCALES, messagesOf, onLocale, t, type Locale } from '../i18n/locale.ts';
+import { NOTIFICATION_KINDS, type NotificationKind } from '../data/notifications.ts';
 import { uiIcon } from './icons.ts';
+import type { NotifyPermission } from './notifier.ts';
 
 export interface SettingsActions {
   setLocale(locale: Locale): void;
@@ -21,11 +23,22 @@ export interface SettingsActions {
   toggleMusic(): void;
   toggleSigns(): void;
   toggleHaptics(): void;
+  toggleNotification(kind: NotificationKind): void;
+  cycleNotificationLimit(): void;
+  /** « Autoriser les notifications » : l'écran d'explication, puis la demande du navigateur. */
+  askNotifications(): void;
   /** Un curseur de volume a bougé : de 0 à 1, à chaque cran pendant qu'on le glisse. */
   setSfxVolume(volume: number): void;
   setMusicVolume(volume: number): void;
   /** Ouvert ou fermé : l'horloge s'arrête, le son de fenêtre joue. */
   onToggle(open: boolean): void;
+}
+
+/** Ce que la section Notifications montre : `main.ts` la lui redonne à chaque changement. */
+export interface NotificationState {
+  permission: NotifyPermission;
+  kinds: Record<NotificationKind, boolean>;
+  limit: number;
 }
 
 export class SettingsPanel {
@@ -38,6 +51,12 @@ export class SettingsPanel {
   private readonly musicButton: HTMLButtonElement;
   private readonly signsButton: HTMLButtonElement;
   private readonly hapticsButton: HTMLButtonElement;
+  private readonly notifyLabel: HTMLHeadingElement;
+  private readonly notifyKinds = new Map<NotificationKind, HTMLButtonElement>();
+  private readonly notifyLimit: HTMLButtonElement;
+  private readonly notifyAllow: HTMLButtonElement;
+  private readonly notifyDenied: HTMLParagraphElement;
+  private notifications: NotificationState | null = null;
   private readonly sfxVolume: VolumeSlider;
   private readonly musicVolume: VolumeSlider;
   private readonly actions: SettingsActions;
@@ -116,6 +135,30 @@ export class SettingsPanel {
     this.hapticsButton.className = 'button-secondary settings-toggle';
     this.hapticsButton.addEventListener('click', () => actions.toggleHaptics());
 
+    this.notifyLabel = document.createElement('h3');
+    this.notifyLabel.className = 'settings-label';
+    this.notifyAllow = document.createElement('button');
+    this.notifyAllow.type = 'button';
+    this.notifyAllow.className = 'button-secondary settings-toggle';
+    this.notifyAllow.addEventListener('click', () => actions.askNotifications());
+    this.notifyDenied = document.createElement('p');
+    this.notifyDenied.className = 'settings-note';
+    this.notifyLimit = document.createElement('button');
+    this.notifyLimit.type = 'button';
+    this.notifyLimit.className = 'button-secondary settings-toggle';
+    this.notifyLimit.addEventListener('click', () => actions.cycleNotificationLimit());
+
+    const notifyKinds: HTMLButtonElement[] = [];
+
+    for (const kind of NOTIFICATION_KINDS) {
+      const button = document.createElement('button');
+
+      button.type = 'button';
+      button.className = 'button-secondary settings-toggle';
+      button.addEventListener('click', () => actions.toggleNotification(kind));
+      this.notifyKinds.set(kind, button);
+      notifyKinds.push(button);
+    }
 
     this.sfxVolume = new VolumeSlider((volume) => actions.setSfxVolume(volume));
     this.musicVolume = new VolumeSlider((volume) => actions.setMusicVolume(volume));
@@ -130,6 +173,11 @@ export class SettingsPanel {
       this.musicVolume.root,
       this.signsButton,
       this.hapticsButton,
+      this.notifyLabel,
+      this.notifyAllow,
+      this.notifyDenied,
+      ...notifyKinds,
+      this.notifyLimit,
     );
     this.root.append(this.panel);
 
@@ -144,6 +192,7 @@ export class SettingsPanel {
       this.setMusic(this.music);
       this.setSigns(this.signs);
       this.setHaptics(this.haptics);
+      this.renderNotifications();
       this.sfxVolume.setName(text.sfxVolume);
       this.musicVolume.setName(text.musicVolume);
     });
@@ -197,6 +246,32 @@ export class SettingsPanel {
   public setHaptics(on: boolean): void {
     this.haptics = on;
     toggleLabel(this.hapticsButton, on, uiIcon(on ? 'vibrateOn' : 'vibrateOff', 22), t().settings.haptics);
+  }
+
+  /** La section Notifications ; cachée tant que le navigateur n'en sait pas. */
+  public setNotifications(state: NotificationState | null): void {
+    this.notifications = state;
+    this.renderNotifications();
+  }
+
+  private renderNotifications(): void {
+    const state = this.notifications;
+    const text = t().notifications;
+    const supported = state !== null && state.permission !== 'unsupported';
+    const granted = state?.permission === 'granted';
+
+    this.notifyLabel.hidden = !supported;
+    this.notifyLabel.textContent = text.heading;
+    this.notifyAllow.hidden = state?.permission !== 'default';
+    this.notifyAllow.replaceChildren(uiIcon('hint', 22), text.allow);
+    this.notifyDenied.hidden = state?.permission !== 'denied';
+    this.notifyDenied.textContent = text.denied;
+    for (const [kind, button] of this.notifyKinds) {
+      button.hidden = !granted;
+      if (state) toggleLabel(button, state.kinds[kind], uiIcon('hint', 22), text.kinds[kind]);
+    }
+    this.notifyLimit.hidden = !granted;
+    if (state) this.notifyLimit.replaceChildren(uiIcon('hint', 22), text.perDay(state.limit));
   }
 
   /** Un navigateur sans `navigator.vibrate` n'a que faire de l'interrupteur. */
