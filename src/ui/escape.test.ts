@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { escapeAction, type EscapeState } from './escape.ts';
 
-const NOTHING: EscapeState = { settingsOpen: false, wardrobeOpen: false, paused: false, mapOpen: false, menuOpen: false, panelOpen: false, inventoryOpen: false };
+const NOTHING: EscapeState = { settingsOpen: false, bagOpen: false, paused: false, mapOpen: false, menuOpen: false, panelOpen: false, resourcesOpen: false };
 
 describe('escapeAction', () => {
   it('rien d’ouvert : pause', () => {
@@ -18,9 +18,9 @@ describe('escapeAction', () => {
     expect(escapeAction({ ...NOTHING, settingsOpen: true, paused: true, panelOpen: true })).toBe('closeSettings');
   });
 
-  it('l’éditeur de personnage s’annule, après les réglages', () => {
-    expect(escapeAction({ ...NOTHING, wardrobeOpen: true, panelOpen: true })).toBe('closeWardrobe');
-    expect(escapeAction({ ...NOTHING, wardrobeOpen: true, settingsOpen: true })).toBe('closeSettings');
+  it('la fenêtre du sac se ferme, après les réglages', () => {
+    expect(escapeAction({ ...NOTHING, bagOpen: true, panelOpen: true })).toBe('closeBag');
+    expect(escapeAction({ ...NOTHING, bagOpen: true, settingsOpen: true })).toBe('closeSettings');
   });
 
   it('la carte du monde se ferme avant le reste, sans pause', () => {
@@ -36,7 +36,7 @@ describe('escapeAction', () => {
     expect(escapeAction({ ...NOTHING, panelOpen: true })).toBe('closePanel');
   });
 
-  it('le sac se ferme, sans pause', () => {
-    expect(escapeAction({ ...NOTHING, inventoryOpen: true })).toBe('closeInventory');
+  it('le panneau des ressources se ferme, sans pause', () => {
+    expect(escapeAction({ ...NOTHING, resourcesOpen: true })).toBe('closeResources');
   });
 });

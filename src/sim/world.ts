@@ -1338,7 +1338,7 @@ export class World {
         break;
 
       case 'depositToTown':
-        this.depositToTown(command.item);
+        this.depositToTown(command.item, command.amount);
         break;
 
       case 'transferItems':
@@ -1346,7 +1346,7 @@ export class World {
         break;
 
       case 'dropItem':
-        this.dropFromBag(command.item);
+        this.dropFromBag(command.item, command.amount);
         break;
 
       case 'upgradeBuilding':
@@ -1850,7 +1850,7 @@ export class World {
   }
 
   /** Le bouton « Déposer en ville » : le sac, ou un seul objet, passe dans le coffre de la mairie. */
-  private depositToTown(only?: ItemId): void {
+  private depositToTown(only?: ItemId, amount?: number): void {
     const town = this.townStock();
 
     if (!town) {
@@ -1863,7 +1863,7 @@ export class World {
     }
 
     const { inventory } = this.player;
-    const entries = inventory.entries().filter(([item]) => only === undefined || item === only);
+    const entries = bagPart(inventory.entries(), only, amount);
 
     if (entries.length === 0) {
       this.events.emit('depositRejected', { reason: 'empty' });
@@ -1890,9 +1890,9 @@ export class World {
    * s'en est éloigné. Rien n'est détruit : le tas s'efface seulement s'il
    * est oublié, comme le butin.
    */
-  private dropFromBag(only?: ItemId): void {
+  private dropFromBag(only?: ItemId, amount?: number): void {
     const { inventory } = this.player;
-    const dropped = inventory.entries().filter(([item]) => only === undefined || item === only);
+    const dropped = bagPart(inventory.entries(), only, amount);
 
     // Les tas s'alignent juste devant ses pieds : sous lui, son sprite les cacherait.
     for (const [index, [item, count]] of dropped.entries()) {
@@ -8471,4 +8471,15 @@ function footprintCenter(entity: { tx: number; ty: number; width: number; height
 /** La clé d'un emplacement payé en Prestige : le bâtiment et le coin de son emprise. */
 function prestigeKey(entity: { proto: BuildingId; tx: number; ty: number }): string {
   return `${entity.proto}@${entity.tx},${entity.ty}`;
+}
+
+/**
+ * Ce que « Déposer » ou « Jeter » prend au sac : tout, un seul objet, ou
+ * `amount` unités au plus de cet objet. Une quantité nulle ne prend rien.
+ */
+function bagPart(entries: [ItemId, number][], only?: ItemId, amount?: number): [ItemId, number][] {
+  return entries
+    .filter(([item]) => only === undefined || item === only)
+    .map(([item, count]): [ItemId, number] => [item, amount === undefined ? count : Math.min(count, Math.max(0, Math.floor(amount)))])
+    .filter(([, count]) => count > 0);
 }

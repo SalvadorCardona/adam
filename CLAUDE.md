@@ -66,12 +66,20 @@ le reste. Les chantiers
 puisent dans les deux, la ville seulement dans son rayon (`logisticRadius`,
 `sim/warehouse.ts`, le cercle jaune du mode construction). Le HUD
 les montre à part : le sac, un bouton carré violet (`.hud-bag`) du groupe `.hud-actions`, tout en bas
-à droite, avec l'habillage d'Adam et « Bâtir » — trois
-boutons de `--btn` (48 px, la taille unique des neuf boutons du HUD) (pictogramme blanc `bagButton`, « 10/60 »
-dans une capsule qui se remplit, l'objet que réclame le conseil, touche I) ; la
-ville, un bandeau d'une ligne en haut à gauche, une maison sans libellé, qui
-défile de côté. Le sac (tap, ou touche I) ouvre
-`ui/inventoryPanel.ts`, sans pause, comme la fenêtre d'un bâtiment. Sa
+à droite, avec « Bâtir » — deux
+boutons de `--btn` (48 px, la taille unique des huit boutons du HUD) (pictogramme blanc `bagButton`, « 10/60 »
+dans une capsule qui se remplit, l'objet que réclame le conseil, touche I, pastille corail d'une pièce
+trouvée) ; la ville, un bandeau d'une ligne en haut à gauche, une maison sans libellé, qui
+défile de côté. Le sac (tap, ou touche I) ouvre une seule fenêtre, au format de
+l'ancienne garde-robe (`ui/bagPanel.ts`), à deux onglets : **Inventaire**, par
+défaut et sans pause (`ui/inventoryTab.ts`), et **Habillement**, l'éditeur
+d'Adam (`ui/wardrobeTab.ts`), qui arrête l'horloge (`BagPanel.dressing`).
+L'inventaire est une grille de cases (cinq par rangée, deux rangées au
+moins, cases vides en creux) : l'icône en grand, la quantité en pastille ;
+la jauge et les places libres au-dessus. Une case touchée montre dessous son
+nom, sa quantité, 1 / 10 / Tout et « Déposer » (`depositToTown`, `amount`) —
+éteint loin de la mairie, où « Jeter » (`dropItem`, `amount`) le relaie ;
+en bas, « Déposer en ville » (éteint loin d'elle) ou « Tout jeter ». Sa
 section Ville est un tableau de bord (`sim/flows.ts`, `World.flows`) : débit
 net par objet sur deux minutes (anneau d'échantillons, pas sauvegardé) et
 deux alertes au plus — pénurie d'une recette, surplus que rien n'utilise —
@@ -489,7 +497,7 @@ barre d'XP ouvrent le bandeau de la ville (`.hud-level`), « +N XP » flotte
 sur l'ennemi.
 
 **Garde-robe d'Adam** (`src/data/wardrobe.ts`, `src/sim/wardrobe.ts`,
-`ui/wardrobePanel.ts`) — Adam se dessine en **calques** (`art/adamLook.ts`) :
+`ui/wardrobeTab.ts`) — Adam se dessine en **calques** (`art/adamLook.ts`) :
 peau, sac, écharpe fixes, puis une **pièce** par emplacement (`LOOK_SLOTS` :
 cheveux, yeux, barbe, haut, pantalon, chaussures, lunettes, chapeau ;
 `PIECES`, rareté, `starter`) et trois nuanciers de la palette (`LOOK_COLORS` :
@@ -498,8 +506,8 @@ yeux, cheveux et barbe, haut). Un calque range ses formes à des profondeurs
 pied, qui alterne à la marche. Le rendu recompose les morceaux `adam.down/up/
 side/foot` dans une petite page à part quand Adam se change
 (`SpriteLibrary.dress`, `Puppet.refresh`) : aucun sprite de plus. L'éditeur
-s'ouvre au visage d'Adam posé au-dessus du sac (pastille : pièce trouvée) ou
-au « Essayer » du toast « Nouvel objet : … » ; il arrête l'horloge, tient un
+est l'onglet Habillement de la fenêtre du sac (pastille sur le sac et l'onglet :
+pièce trouvée), qu'ouvre aussi le « Essayer » du toast « Nouvel objet : … » ; il arrête l'horloge, tient un
 brouillon et pousse `dressAdam` à « Valider » (refus `LookRejection`). Une
 pièce se **trouve** (`WARDROBE_LOOT`) : coffre de la carte, objectif réussi,
 base abattue et son chef — plus de pièces, et plus rares, plus la base est

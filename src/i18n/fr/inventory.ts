@@ -2,6 +2,11 @@
 
 export const inventory = {
   title: 'Sac',
+  /** Les onglets de la fenêtre du sac. */
+  tabs: {
+    inventory: 'Inventaire',
+    wardrobe: 'Habillement',
+  },
   town: 'Ville',
   /** « 12/20 — 8 places libres ». */
   capacity: (total: number, capacity: number, free: number): string =>
@@ -10,6 +15,10 @@ export const inventory = {
   whereFar: 'Loin de la mairie : ce que vous jetez reste au sol, et se ramasse en repassant dessus.',
   whereNoTown: 'Pas encore de ville : ce que vous jetez reste au sol, et se ramasse en repassant dessus.',
   empty: 'Le sac est vide.',
+  /** Sous la grille, tant qu'aucune case n'est choisie. */
+  pick: 'Touchez une case pour choisir un objet.',
+  /** L'`aria-label` d'une case : « Bois : 6 ». */
+  slot: (item: string, amount: number): string => `${item} : ${amount}`,
   townEmpty: 'Rien en stock pour l’instant.',
   deposit: 'Déposer',
   drop: 'Jeter',

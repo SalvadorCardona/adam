@@ -2,8 +2,6 @@
 
 export const wardrobe = {
   title: 'Garde-robe d’Adam',
-  /** Le bouton du bord droit qui ouvre l'éditeur. */
-  open: 'Personnaliser Adam',
   /** Les onglets, un par emplacement (`LOOK_SLOTS`). */
   slots: {
     hair: 'Cheveux',

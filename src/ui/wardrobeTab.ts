@@ -1,10 +1,10 @@
 /**
- * L'éditeur de personnage : la garde-robe d'Adam.
+ * L'éditeur de personnage : la garde-robe d'Adam, l'onglet « Habillement »
+ * de la fenêtre du sac (`bagPanel.ts`).
  *
- * Il s'ouvre au bouton posé sur le sac — le visage d'Adam tel qu'il est
- * habillé, une pastille quand une pièce vient d'être trouvée — ou au
- * « Essayer » du toast d'une trouvaille. Plein écran, il arrête l'horloge
- * comme les réglages (`main.ts` lit `open`).
+ * Il s'ouvre au sac, sur son onglet, ou au « Essayer » du toast d'une
+ * trouvaille. Tant qu'il est l'onglet ouvert, il arrête l'horloge comme les
+ * réglages (`main.ts` lit `BagPanel.dressing`).
  *
  * Au milieu, Adam en pied qui marche sur place (un corps, deux pieds : les
  * mêmes calques qu'en jeu, `art/adamLook.ts`), qu'on fait tourner. Dessous,
@@ -21,7 +21,7 @@
  * voile le jettent.
  */
 
-import { ADAM_STRIDE, adamFace, adamLookParts, pieceThumbnail } from '../art/adamLook.ts';
+import { ADAM_STRIDE, adamLookParts, pieceThumbnail } from '../art/adamLook.ts';
 import type { Tone } from '../data/artDirection.ts';
 import { LOOK_COLORS, LOOK_SLOTS, PIECES, PIECE_IDS, copyLook, piecesOf, sameLook, type ColorSlot, type Look, type LookSlot, type PieceId } from '../data/wardrobe.ts';
 import { onLocale, t } from '../i18n/locale.ts';
@@ -42,20 +42,19 @@ const PREVIEW_SCALE = 4;
 const THUMB_SIZE = 64;
 
 export interface WardrobeActions {
-  /** Ouvert ou fermé : l'horloge s'arrête, le son de fenêtre joue. */
-  onToggle(open: boolean): void;
+  /** « Annuler » ou « Valider » : la fenêtre du sac se ferme. */
+  done(): void;
+  /** Une pièce trouvée attend d'être regardée, ou ne l'attend plus : la pastille du sac et de l'onglet. */
+  badge(fresh: boolean): void;
 }
 
-export class WardrobePanel {
+export class WardrobeTab {
+  /** Le contenu de l'onglet : l'aperçu, les emplacements et leurs pièces, Annuler et Valider. */
   public readonly root: HTMLElement;
-  /** Le bouton posé au-dessus du sac : le visage d'Adam. */
-  public readonly button: HTMLButtonElement;
+  private readonly count: HTMLElement;
 
   private readonly world: World;
   private readonly actions: WardrobeActions;
-  private readonly title: HTMLElement;
-  private readonly count: HTMLElement;
-  private readonly closeButton: HTMLButtonElement;
   private readonly figure: HTMLElement;
   private readonly body: HTMLImageElement;
   private readonly feet: [HTMLImageElement, HTMLImageElement];
@@ -67,8 +66,8 @@ export class WardrobePanel {
   private readonly hint: HTMLElement;
   private readonly cancelButton: HTMLButtonElement;
   private readonly validateButton: HTMLButtonElement;
-  private readonly face: HTMLImageElement;
 
+  private active = false;
   private draft: Look;
   private slot: LookSlot = LOOK_SLOTS[0];
   private turn: Turn = 'down';
@@ -85,45 +84,12 @@ export class WardrobePanel {
     this.actions = actions;
     this.draft = copyLook(world.player.look);
 
-    this.button = document.createElement('button');
-    this.button.type = 'button';
-    this.button.className = 'hud-button hud-wardrobe';
-    this.button.setAttribute('aria-haspopup', 'dialog');
-    this.face = document.createElement('img');
-    this.face.className = 'hud-wardrobe-face';
-    this.face.alt = '';
-    this.face.setAttribute('aria-hidden', 'true');
-    this.button.append(this.face);
-    this.button.addEventListener('click', () => this.toggle());
-
     this.root = document.createElement('div');
-    this.root.className = 'overlay wardrobe-screen';
-    this.root.hidden = true;
-    this.root.addEventListener('click', (event) => {
-      if (event.target === this.root) this.close();
-    });
-
-    const panel = document.createElement('div');
-
-    panel.className = 'panel overlay-panel wardrobe-panel';
-    panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-modal', 'true');
-
-    const head = document.createElement('div');
-
-    head.className = 'settings-head wardrobe-head';
-    this.title = document.createElement('h2');
-    this.title.className = 'overlay-title';
-    this.title.id = 'wardrobe-title';
-    panel.setAttribute('aria-labelledby', this.title.id);
+    this.root.className = 'wardrobe-tab-body';
+    this.root.id = 'bag-tab-wardrobe';
+    this.root.setAttribute('role', 'tabpanel');
     this.count = document.createElement('span');
     this.count.className = 'wardrobe-count';
-    this.closeButton = document.createElement('button');
-    this.closeButton.type = 'button';
-    this.closeButton.className = 'building-panel-close';
-    this.closeButton.append(uiIcon('close'));
-    this.closeButton.addEventListener('click', () => this.close());
-    head.append(this.title, this.count, this.closeButton);
 
     // L'aperçu : deux pieds et un corps superposés, que le CSS fait marcher sur place.
     const stage = document.createElement('div');
@@ -141,7 +107,7 @@ export class WardrobePanel {
       this.turn = TURNS[(TURNS.indexOf(this.turn) + 1) % TURNS.length]!;
       this.renderFigure();
     });
-    stage.append(this.figure, this.turnButton);
+    stage.append(this.count, this.figure, this.turnButton);
 
     const controls = document.createElement('div');
 
@@ -184,71 +150,69 @@ export class WardrobePanel {
     this.cancelButton = document.createElement('button');
     this.cancelButton.type = 'button';
     this.cancelButton.className = 'button-secondary';
-    this.cancelButton.addEventListener('click', () => this.close());
+    this.cancelButton.addEventListener('click', () => this.actions.done());
     this.validateButton = document.createElement('button');
     this.validateButton.type = 'button';
     this.validateButton.className = 'button-primary';
     this.validateButton.addEventListener('click', () => this.validate());
     footer.append(this.cancelButton, this.validateButton);
 
-    panel.append(head, stage, controls, footer);
-    this.root.append(panel);
+    this.root.append(stage, controls, footer);
 
     world.events.on('pieceFound', () => {
       this.renderBadge();
-      if (this.open) this.render();
+      if (this.active) this.render();
     });
-    world.events.on('lookChanged', () => this.renderFace());
 
     onLocale(() => {
       const text = t().wardrobe;
 
-      this.title.textContent = text.title;
       this.turnButton.textContent = text.turn;
       this.cancelButton.textContent = text.cancel;
       this.validateButton.textContent = text.validate;
-      this.closeButton.setAttribute('aria-label', t().common.close);
-      this.button.setAttribute('aria-label', text.open);
-      this.button.dataset['tip'] = text.open;
       for (const [slot, tab] of this.tabs) tab.textContent = text.slots[slot];
       this.render();
     });
-    this.renderFace();
     this.renderBadge();
   }
 
-  public get open(): boolean {
-    return !this.root.hidden;
-  }
-
-  /** Ouvre l'éditeur, sur l'onglet `slot` s'il est donné : le brouillon repart de ce qu'Adam porte. */
-  public show(slot?: LookSlot): void {
-    if (slot) this.slot = slot;
+  /** La fenêtre s'ouvre : le brouillon repart de ce qu'Adam porte, de face. */
+  public reset(): void {
     this.draft = copyLook(this.world.player.look);
     this.turn = 'down';
-    this.root.hidden = false;
+  }
+
+  /** L'onglet devient celui qu'on voit, sur l'emplacement `slot` s'il est donné. */
+  public enter(slot?: LookSlot): void {
+    if (slot) this.slot = slot;
+    this.active = true;
     this.render();
-    this.actions.onToggle(true);
+  }
+
+  /** L'onglet quitte l'écran : la fenêtre change d'onglet, ou se ferme. */
+  public leave(): void {
+    this.active = false;
+  }
+
+  /** La fenêtre se ferme : ce qu'on vient de voir n'est plus nouveau ; les emplacements qu'on n'a pas ouverts gardent le leur. */
+  public closed(): void {
+    this.active = false;
+    this.shown.clear();
+    this.renderBadge();
+  }
+
+  public focus(): void {
     this.validateButton.focus({ preventScroll: true });
   }
 
-  public close(): void {
-    if (!this.open) return;
-    this.root.hidden = true;
-    // Ce qu'on vient de voir n'est plus nouveau ; les onglets qu'on n'a pas ouverts gardent le leur.
-    this.shown.clear();
-    this.renderBadge();
-    this.actions.onToggle(false);
-  }
-
-  public toggle(): void {
-    if (this.open) this.close();
-    else this.show();
+  /** Une pièce trouvée attend-elle d'être regardée ? */
+  public get fresh(): boolean {
+    return this.world.player.unseenPieces.some((piece) => this.unseen(piece));
   }
 
   private validate(): void {
     if (!sameLook(this.draft, this.world.player.look)) this.world.push({ type: 'dressAdam', look: copyLook(this.draft) });
-    this.close();
+    this.actions.done();
   }
 
   private layer(className: string): HTMLImageElement {
@@ -261,7 +225,7 @@ export class WardrobePanel {
   }
 
   private render(): void {
-    if (!this.open) return;
+    if (!this.active) return;
 
     const owned = PIECE_IDS.filter((piece) => owns(this.world.player.wardrobe, piece)).length;
 
@@ -302,6 +266,7 @@ export class WardrobePanel {
       tab.dataset['new'] = String(piecesOf(slot).some((piece) => this.unseen(piece)));
     }
 
+    this.renderBadge();
     this.grid.replaceChildren(...piecesOf(this.slot).map((piece) => this.card(piece)));
     this.hint.textContent = '';
 
@@ -406,15 +371,9 @@ export class WardrobePanel {
     return this.world.player.unseenPieces.includes(piece) && !this.sent.has(piece);
   }
 
-  /** La pastille du bouton : une pièce trouvée attend d'être regardée. */
+  /** La pastille du sac et de l'onglet : une pièce trouvée attend d'être regardée. */
   private renderBadge(): void {
-    if (this.world.player.unseenPieces.some((piece) => this.unseen(piece))) this.button.dataset['new'] = 'true';
-    else delete this.button.dataset['new'];
-  }
-
-  /** Le visage d'Adam sur son bouton, tel qu'il est habillé. */
-  private renderFace(): void {
-    this.face.src = dataUrl(adamFace(this.world.player.look, 46));
+    this.actions.badge(this.fresh);
   }
 }
 
