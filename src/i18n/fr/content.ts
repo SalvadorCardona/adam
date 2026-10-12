@@ -6,6 +6,7 @@
  */
 
 import { BUILDING_CATEGORIES, BUILDINGS, type BuildingId, type BuildingProto } from '../../data/buildings.ts';
+import { ACHIEVEMENTS, TROPHIES } from '../../data/achievements.ts';
 import { RARE_OFFERS } from '../../data/caravan.ts';
 import { ENEMY_BASE } from '../../data/enemyBases.ts';
 import { ENEMIES, WILDLIFE } from '../../data/enemies.ts';
@@ -97,6 +98,8 @@ export const content = {
   researchStats: mapTable(RESEARCH_STATS, ({ label, unit }): { label: string; unit: string } => ({ label, unit })),
   researchThemes: mapTable(RESEARCH_THEMES, (label): string => label),
   research: mapTable(RESEARCH, ({ label, description }): { label: string; description: string } => ({ label, description })),
+  achievements: mapTable(ACHIEVEMENTS, ({ label, description }): { label: string; description: string } => ({ label, description })),
+  trophies: mapTable(TROPHIES, ({ label, description }): { label: string; description: string } => ({ label, description })),
   perks: mapTable(PERKS, ({ label, description }): { label: string; description: string } => ({ label, description })),
   weather: mapTable(WEATHER, ({ label, advice }): { label: string; advice: string } => ({ label, advice })),
   rareOffers: mapTable(RARE_OFFERS, (offer): string => offer.label),

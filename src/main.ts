@@ -14,6 +14,7 @@ import '@fontsource/fredoka/latin-500.css';
 import '@fontsource/fredoka/latin-600.css';
 import '@fontsource/fredoka/latin-700.css';
 import './style.css';
+import { rewardOf } from './data/achievements.ts';
 import { AudioEngine } from './audio/engine.ts';
 import { prefetchMusic } from './audio/music.ts';
 import { VOICES } from './audio/synth.ts';
@@ -37,10 +38,13 @@ import { Placement } from './input/placement.ts';
 import { PointerRouter } from './input/pointer.ts';
 import { Pinch, bindWheelZoom } from './input/zoom.ts';
 import { GameRenderer } from './render/renderer.ts';
+import { AchievementTracker } from './sim/achievements.ts';
+import { earnedSkins, type Collection } from './sim/collection.ts';
 import { activePerks, harvestSeeds, plant, type Garden } from './sim/garden.ts';
 import { stageScenario } from './sim/testScenario.ts';
 import type { Entity } from './sim/types.ts';
-import { STEP_MS, World } from './sim/world.ts';
+import { STEP_MS, TICKS_PER_SECOND, World } from './sim/world.ts';
+import { LocalCollection } from './storage/localCollection.ts';
 import { LocalGarden } from './storage/localGarden.ts';
 import { LocalRecord } from './storage/localRecord.ts';
 import { LocalSave, type LoadResult } from './storage/localSave.ts';
@@ -56,6 +60,7 @@ import { ResourcePanel } from './ui/resourcePanel.ts';
 import { escapeAction } from './ui/escape.ts';
 import { JoystickView } from './ui/joystick.ts';
 import { BuildMenu } from './ui/buildMenu.ts';
+import { rewardText } from './ui/collectionPanel.ts';
 import { Hud } from './ui/hud.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
 import { SettingsPanel } from './ui/settingsPanel.ts';
@@ -411,16 +416,21 @@ async function main(): Promise<void> {
   const garden = wireGarden(world, scenario ? new LocalGarden(null) : LocalGarden.browser());
   const record = wireRecord(world, scenario ? new LocalRecord(null) : LocalRecord.browser());
 
-  const pause = new PauseScreen(world.seed, () => setPaused(false), () => autosave.restart());
+  const achievements = wireAchievements(world, scenario ? new LocalCollection(null) : LocalCollection.browser(), hud, audio);
+  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart());
   const title = new TitleScreen({
     resume: loaded.status === 'ok',
     notice: LOAD_NOTICES[loaded.status] ?? linkNotice(world),
     garden: garden.current(),
     gardenActions: garden,
     record,
+    collection: () => achievements.collection,
     onPlay: () => {
       // Une nouvelle colonie part avec les bonus du jardin ; une colonie reprise garde les siens.
       if (loaded.status !== 'ok') world.push({ type: 'applyPerks', perks: activePerks(garden.current()) });
+      // Les compteurs de colonie repartent de zéro ; les skins gagnés l'attendent dans sa garde-robe.
+      if (loaded.status !== 'ok') achievements.newRun();
+      world.push({ type: 'grantPieces', pieces: earnedSkins(achievements.collection), silent: true });
       started = true;
       hud.root.dataset['started'] = 'true';
       window.umami?.track(loaded.status === 'ok' ? 'partie-reprise' : 'partie-demarree');
@@ -628,6 +638,8 @@ async function main(): Promise<void> {
       accumulator -= STEP_MS;
     }
     if (running) autosave.update(ticker.deltaMS);
+    // Une fois par seconde de jeu : les succès dont la condition vient d'être remplie.
+    if (running && world.tickCount % TICKS_PER_SECOND === 0 && world.tickCount !== achievements.checkedAt) achievements.update();
 
     const roadTool = placement.roadTool();
 
@@ -967,6 +979,45 @@ function wireGarden(world: World, gardens: LocalGarden): GardenWiring {
     current: () => garden,
     plant: (perk) => keep(plant(garden, perk)),
     setPure: (pure) => keep({ ...garden, pure }),
+  };
+}
+
+interface AchievementWiring {
+  readonly collection: Collection;
+  /** Le tick du dernier contrôle, pour n'en faire qu'un par seconde. */
+  readonly checkedAt: number;
+  update(): void;
+  newRun(): void;
+}
+
+/**
+ * Les succès : la collection vit à part de la partie (`storage/localCollection.ts`),
+ * s'écrit à chaque changement, et chaque succès obtenu offre son toast et, le
+ * cas échéant, sa pièce de garde-robe.
+ */
+function wireAchievements(world: World, collections: LocalCollection, hud: Hud, audio: AudioEngine): AchievementWiring {
+  let checkedAt = -1;
+  const tracker = new AchievementTracker(world, collections.load(), {
+    onChange: () => void collections.save(tracker.collection),
+    onUnlock: (id) => {
+      const reward = rewardOf(id);
+
+      hud.notifyAchievement(t().collection.unlocked, t().achievements[id].label, rewardText(id));
+      audio.play('objective');
+      if (reward && 'skin' in reward) world.push({ type: 'grantPieces', pieces: [reward.skin] });
+    },
+  });
+
+  return {
+    collection: tracker.collection,
+    get checkedAt() {
+      return checkedAt;
+    },
+    update: () => {
+      checkedAt = world.tickCount;
+      tracker.update();
+    },
+    newRun: () => tracker.newRun(),
   };
 }
 

@@ -467,6 +467,24 @@ nuit à tenir : `goalWait`/`objectiveWait`) affiche son temps restant, ou en
 corail ce qui la retient ; Ève enchaîne alors sur de quoi s'occuper
 (réparer, une tour, l'objet le plus bas en ville, une recherche).
 
+**Succès et collection** (`src/data/achievements.ts`, `src/sim/achievements.ts`,
+`src/sim/collection.ts`, `ui/collectionPanel.ts`) — une trentaine de succès en
+données, chacun une condition « statistique ≥ but » (`STATS` : jauges lues sur
+le monde, compteurs de colonie tenus au fil des événements dans
+`Collection.run`, remis à zéro à chaque nouvelle colonie ou chute de la mairie).
+Quatre difficultés : premiers pas, progression, défis (nuits d'affilée sans
+perte ou sans mort de faim…), secrets (cachés à la collection tant qu'ils ne
+sont pas obtenus). `AchievementTracker` contrôle une fois par seconde de jeu ;
+un succès obtenu lance un toast animé (`Hud.notifyAchievement`). Récompenses
+cosmétiques : un **skin** (pièce de la garde-robe, offerte par la commande
+`grantPieces` à l'obtention et, en silence, au départ de chaque colonie) ou un
+**trophée** (décoration, variante de bâtiment : exposé à la collection, pas
+encore dessiné sur la carte). Les **bâtiments rares** (`RARE_BUILDINGS`) se
+trouvent en les bâtissant une fois. La collection n'est pas l'état d'une
+partie : clé `mobile-factory:collection` (`storage/localCollection.ts`), jamais
+effacée par « Recommencer ». L'écran Collection s'ouvre depuis l'écran titre et
+la pause.
+
 **Prestige** (`src/data/prestige.ts`, icône `PRESTIGE_ICON`) — un compteur
 de la colonie (`World.prestige`, sauvegardé ; absent d'une vieille
 sauvegarde : 0), ni porté ni stocké. Chaque bâtiment achevé rapporte

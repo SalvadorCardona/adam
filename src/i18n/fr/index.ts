@@ -4,6 +4,7 @@
  * `data/` à plat (`items`, `buildings`, `eve`…).
  */
 
+import { collection } from './collection.ts';
 import { common, settings } from './common.ts';
 import { content } from './content.ts';
 import { hud } from './hud.ts';
@@ -28,5 +29,6 @@ export const FR = {
   researchPanel,
   resourcePanel,
   wardrobe,
+  collection,
   ...content,
 };

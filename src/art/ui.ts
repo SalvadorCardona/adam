@@ -454,6 +454,16 @@ export const UI_ICONS = {
   play: svg(S, S, polygon([8.5, 5.5, 19.5, 12.5, 8.5, 19.5], orange.shade), polygon([7.5, 4.5, 18.5, 11.5, 7.5, 18.5], paper.base)),
   /** « Recommencer », sur un bouton blanc : la flèche corail qui repart. */
   restart: svg(S, S, restartArrow(12.6, 13.6, coral.shade), restartArrow(12, 13, coral.base), pill(5, 11.5, 2, 3.4, coral.light)),
+  /** Un trophée : la coupe jaune des succès, sur son pied. */
+  trophy: svg(
+    S,
+    S,
+    rect(9.5, 15, 5, 4, yellow.shade, 1.5),
+    pill(6.5, 18.5, 11, 3.5, yellow.shade),
+    pill(1.5, 5, 5.5, 7, yellow.shade),
+    pill(17, 5, 5.5, 7, yellow.shade),
+    shadedPill(5.5, 2.5, 13, 14, 2.5, 'yellow'),
+  ),
   /** Une graine qui germe : la monnaie du jardin des souvenirs. */
   seed: svg(
     S,

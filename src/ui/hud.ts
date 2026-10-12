@@ -1166,6 +1166,32 @@ export class Hud {
   }
 
   /**
+   * Un succès obtenu : une bulle jaune plus large que les autres, le trophée
+   * qui rebondit et un reflet qui la traverse. Elle reste un peu plus longtemps.
+   */
+  public notifyAchievement(title: string, label: string, reward: string | null): void {
+    const toast = element('div', 'hud-toast hud-toast-achievement');
+    const text = element('div', 'hud-toast-text');
+    const kicker = element('span', 'hud-toast-kicker');
+    const name = element('strong', 'hud-toast-name');
+
+    toast.dataset['tone'] = 'trophy';
+    kicker.textContent = title;
+    name.textContent = label;
+    text.append(kicker, name);
+    if (reward) text.append(Object.assign(element('span', 'hud-toast-reward'), { textContent: reward }));
+    toast.append(uiIcon('trophy', 34), text);
+    this.toasts.append(toast);
+
+    while (this.toasts.childElementCount > MAX_TOASTS) this.toasts.firstElementChild?.remove();
+
+    window.setTimeout(() => {
+      toast.dataset['leaving'] = 'true';
+      window.setTimeout(() => toast.remove(), 240);
+    }, TOAST_MS * 1.5);
+  }
+
+  /**
    * Le bandeau d'une vague, une seule fois par vague ; `boss` : un gros
    * mutant ou la Reine (`queen`) mène la charge. Il dit ce qu'elle vise : la
    * mairie, ou l'usine.

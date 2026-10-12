@@ -73,7 +73,7 @@ import { ENEMY_BASE, FIREBALL, GUARD_RANGE, RAIDS, enemyBaseLevel } from '../dat
 import { EVE } from '../data/eve.ts';
 import { FOG_VISION } from '../data/fog.ts';
 import { GEAR_WORKSHOP, MAX_GEAR, gearOf } from '../data/gear.ts';
-import { WARDROBE_SPARE, copyLook, sameLook, wardrobeDrop, type Look, type LootSource, type PieceId } from '../data/wardrobe.ts';
+import { PIECES, WARDROBE_SPARE, copyLook, isStarter, sameLook, wardrobeDrop, type Look, type LootSource, type PieceId } from '../data/wardrobe.ts';
 import { drawPieces, lookRejection, type LookRejection } from './wardrobe.ts';
 import { CHESTS } from '../data/chests.ts';
 import { PURIFIER } from '../data/contamination.ts';
@@ -264,7 +264,7 @@ export const STEP_MS = 1000 / TICKS_PER_SECOND;
 const STEP_SECONDS = 1 / TICKS_PER_SECOND;
 
 /** Les seules commandes qu'on prend d'Adam à terre : celles qui ne sont pas de lui (vue, jardin, brouillard). */
-const DEAD_COMMANDS: ReadonlySet<Command['type']> = new Set(['setMoveAxis', 'seeBuilding', 'seePieces', 'applyPerks', 'setFog']);
+const DEAD_COMMANDS: ReadonlySet<Command['type']> = new Set(['setMoveAxis', 'seeBuilding', 'seePieces', 'applyPerks', 'grantPieces', 'setFog']);
 
 /** Recette utilisée par une foreuse. Une seule pour l'instant, cf. `data/recipes.ts`. */
 const DRILL_RECIPE: RecipeId = 'mineOre';
@@ -721,7 +721,7 @@ export type WorldEvents = {
   /** L'apparence demandée a été refusée. */
   lookRejected: { reason: LookRejection };
   /** Une pièce de garde-robe trouvée : un objectif, une base, son chef, la Reine, une bête. Elle entre à l'éditeur. */
-  pieceFound: { piece: PieceId; source: LootSource };
+  pieceFound: { piece: PieceId; source: LootSource | 'achievement' };
   /** Une source donnait des pièces, mais Adam a déjà toute la garde-robe : du Prestige à la place (`WARDROBE_SPARE`). */
   piecesSpared: { source: LootSource; prestige: number };
   /** Adam ouvre un coffre de la carte, au centre (x, y) de sa case. */
@@ -1374,6 +1374,10 @@ export class World {
         this.applyPerks(command.perks);
         break;
 
+      case 'grantPieces':
+        this.grantPieces(command.pieces, command.silent === true);
+        break;
+
       case 'setFog':
         this.fog.enabled = command.enabled;
         this.fog.revision += 1;
@@ -1422,6 +1426,17 @@ export class World {
       case 'removeRoad':
         this.removeRoad(command.tiles);
         break;
+    }
+  }
+
+  /** Des pièces offertes par des succès : jamais un doublon, jamais une pièce du départ. */
+  private grantPieces(pieces: readonly PieceId[], silent: boolean): void {
+    for (const piece of new Set(pieces)) {
+      if (!Object.hasOwn(PIECES, piece) || isStarter(piece) || this.player.wardrobe.includes(piece)) continue;
+      this.player.wardrobe.push(piece);
+      if (silent) continue;
+      this.player.unseenPieces.push(piece);
+      this.events.emit('pieceFound', { piece, source: 'achievement' });
     }
   }
 

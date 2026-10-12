@@ -23,7 +23,9 @@
  */
 
 import { onLocale, t } from '../i18n/locale.ts';
+import { progressOf, type Collection } from '../sim/collection.ts';
 import type { Garden } from '../sim/garden.ts';
+import { CollectionPanel } from './collectionPanel.ts';
 import { GardenPanel, type GardenActions } from './garden.ts';
 import { buildingIcon, itemIcon, uiIcon } from './icons.ts';
 import { seedLine } from './seed.ts';
@@ -41,6 +43,8 @@ export interface TitleOptions {
   /** Le record « nuits tenues après le Signal » ; 0 tant qu'aucune antenne n'a parlé. */
   record: number;
   gardenActions: GardenActions;
+  /** La collection de succès : l'écran titre l'ouvre. */
+  collection: () => Collection;
   /** L'engrenage du coin : le menu des réglages, la langue d'abord. */
   onSettings: () => void;
 }
@@ -49,7 +53,7 @@ export class TitleScreen {
   public readonly root: HTMLElement;
   private readonly unsubscribe: () => void;
 
-  public constructor({ resume, notice, onPlay, onRestart, garden, gardenActions, record, onSettings }: TitleOptions) {
+  public constructor({ resume, notice, onPlay, onRestart, garden, gardenActions, record, collection, onSettings }: TitleOptions) {
     this.root = document.createElement('div');
     this.root.className = 'overlay title-screen';
 
@@ -175,6 +179,32 @@ export class TitleScreen {
     panel.append(gardenButton);
     this.root.append(gardenPanel.root);
 
+    const collectionButton = document.createElement('button');
+    const collectionPanel = new CollectionPanel(collection, () => {
+      collectionPanel.root.hidden = true;
+      panel.hidden = false;
+      collectionButton.focus();
+    });
+    const collectionLabel = (): void => {
+      const { done, total } = progressOf(collection());
+
+      collectionButton.replaceChildren(uiIcon('trophy', 22), t().collection.button(done, total));
+      collectionButton.setAttribute('aria-label', t().collection.buttonLabel);
+    };
+
+    collectionPanel.root.hidden = true;
+    collectionButton.type = 'button';
+    collectionButton.className = 'button-secondary title-garden';
+    labels.push(collectionLabel);
+    collectionButton.addEventListener('click', () => {
+      collectionPanel.render();
+      panel.hidden = true;
+      collectionPanel.root.hidden = false;
+      collectionPanel.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus();
+    });
+    panel.append(collectionButton);
+    this.root.append(collectionPanel.root);
+
     if (record > 0) {
       const best = document.createElement('p');
       const icon = buildingIcon('antenna', 22);
@@ -213,8 +243,9 @@ export class PauseScreen {
 
   private readonly panel: HTMLElement;
   private readonly confirm: HTMLElement;
+  private readonly collection: CollectionPanel;
 
-  public constructor(seed: number, onResume: () => void, onRestart: () => void) {
+  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void) {
     this.root = document.createElement('div');
     this.root.className = 'overlay pause-screen';
     this.root.hidden = true;
@@ -242,8 +273,27 @@ export class PauseScreen {
     restart.className = 'button-secondary';
     restart.addEventListener('click', () => this.asking(true));
 
+    const showCollection = document.createElement('button');
+
+    showCollection.type = 'button';
+    showCollection.className = 'button-secondary';
+    showCollection.addEventListener('click', () => {
+      this.collection.render();
+      this.asking(false);
+      this.panel.hidden = true;
+      this.collection.root.hidden = false;
+      this.collection.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus();
+    });
+    this.collection = new CollectionPanel(collection, () => {
+      this.collection.root.hidden = true;
+      this.panel.hidden = false;
+      showCollection.focus();
+    });
+
     onLocale(() => {
       const { pause } = t().screens;
+
+      showCollection.replaceChildren(uiIcon('trophy', 22), t().collection.title);
 
       title.textContent = pause.title;
       text.textContent = pause.text;
@@ -252,15 +302,19 @@ export class PauseScreen {
     });
 
     this.confirm = confirmRestart(onRestart, () => this.asking(false));
-    this.panel.append(title, text, resume, restart, seedLine(seed));
-    this.root.append(this.panel, this.confirm);
+    this.panel.append(title, text, resume, showCollection, restart, seedLine(seed));
+    this.root.append(this.panel, this.confirm, this.collection.root);
+    this.collection.root.hidden = true;
     this.asking(false);
   }
 
   public set visible(visible: boolean) {
     this.root.hidden = !visible;
     // Rouvrir la pause, c'est retrouver la pause, pas une question laissée en plan.
-    if (visible) this.asking(false);
+    if (visible) {
+      this.collection.root.hidden = true;
+      this.asking(false);
+    }
   }
 
   private asking(asking: boolean): void {

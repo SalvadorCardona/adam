@@ -183,6 +183,12 @@ export type Command =
    */
   | { type: 'applyPerks'; perks: readonly PerkId[] }
   /**
+   * Des pièces de garde-robe gagnées en succès (`data/achievements.ts`) :
+   * celles qu'Adam n'a pas déjà rejoignent sa garde-robe. `silent` : au départ
+   * d'une colonie, sans toast ni pastille « Nouveau ».
+   */
+  | { type: 'grantPieces'; pieces: readonly PieceId[]; silent?: boolean }
+  /**
    * Réglage de débogage : faux, le brouillard de guerre se lève — toute la
    * carte se voit et se bâtit. Les cases explorées continuent de se compter.
    */

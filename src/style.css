@@ -2223,6 +2223,201 @@ button:disabled,
   box-shadow: inset -2px -2px 0 var(--coral-shade);
 }
 
+/* Un succès obtenu : la bulle jaune, le trophée qui rebondit, un reflet qui passe. */
+.hud-toast-achievement {
+  position: relative;
+  overflow: hidden;
+  padding: 8px 20px 8px 12px;
+  border-radius: 24px;
+  background: var(--yellow);
+  box-shadow: 0 4px 0 var(--yellow-shade);
+  text-align: left;
+  animation: achievement-in 480ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+.hud-toast-achievement::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 40%;
+  border-radius: 0;
+  background: var(--paper);
+  box-shadow: none;
+  opacity: 0.55;
+  transform: skewX(-20deg);
+  animation: achievement-shine 900ms 350ms ease-out both;
+}
+
+.hud-toast-achievement .icon {
+  flex: none;
+  animation: achievement-bounce 700ms 250ms ease-out both;
+}
+
+.hud-toast-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.hud-toast-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hud-toast-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.hud-toast-reward {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+@keyframes achievement-in {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.8);
+  }
+}
+
+@keyframes achievement-shine {
+  to {
+    left: 130%;
+  }
+}
+
+@keyframes achievement-bounce {
+  0%,
+  100% {
+    transform: scale(1) rotate(0);
+  }
+  35% {
+    transform: scale(1.35) rotate(-14deg);
+  }
+  65% {
+    transform: scale(0.95) rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-toast-achievement,
+  .hud-toast-achievement::before,
+  .hud-toast-achievement .icon {
+    animation: none;
+  }
+}
+
+/* L'écran Collection : une liste de cartes, qui défile sur un petit écran. */
+.collection-panel {
+  width: min(420px, 100%);
+  max-height: calc(100dvh - 48px - var(--safe-top) - var(--safe-bottom));
+  overflow-y: auto;
+  gap: 10px;
+}
+
+.collection-summary {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 8px;
+  padding: 6px 18px;
+  border-radius: 999px;
+  background: var(--yellow);
+  box-shadow: 0 4px 0 var(--yellow-shade);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.collection-heading {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--violet-shade);
+}
+
+.collection-intro {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--violet-shade);
+}
+
+.collection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.collection-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 18px;
+  background: var(--paper-shade);
+}
+
+.collection-row .icon {
+  flex: none;
+  object-fit: contain;
+}
+
+.collection-row[data-done='false'] .icon {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+.collection-row[data-done='false'] {
+  color: var(--muted);
+}
+
+.collection-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--violet-shade);
+}
+
+.collection-text strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.collection-row[data-done='false'] .collection-text strong {
+  color: var(--muted);
+}
+
+.collection-reward {
+  font-weight: 600;
+  color: var(--good);
+}
+
+.collection-empty {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .hud-toast[data-leaving='true'] {
   animation: toast-out 240ms ease-in forwards;
 }

@@ -501,6 +501,158 @@ export const content: Content = {
       description: 'A fertilizer of mutant goo, diluted. Very diluted.',
     },
   },
+  achievements: {
+    firstRoof: {
+      label: 'First roof',
+      description: 'Build the town hall.',
+    },
+    firstNight: {
+      label: 'One night down',
+      description: 'Survive a night.',
+    },
+    firstShot: {
+      label: 'First shot',
+      description: 'Take down an enemy.',
+    },
+    firstChest: {
+      label: 'Lucky find',
+      description: 'Open a chest on the map.',
+    },
+    firstChild: {
+      label: 'One more face',
+      description: 'See a child born at the nursery.',
+    },
+    firstTrade: {
+      label: 'Good deal',
+      description: 'Barter with the caravan.',
+    },
+    firstLab: {
+      label: 'Eureka',
+      description: 'Finish a research at the lab.',
+    },
+    twentyWorkers: {
+      label: 'A real crew',
+      description: 'Have 20 workers in the colony.',
+    },
+    builder10: {
+      label: 'Little hamlet',
+      description: 'Have 10 buildings standing.',
+    },
+    builder25: {
+      label: 'Small town',
+      description: 'Have 25 buildings standing.',
+    },
+    level5: {
+      label: 'Adam toughens up',
+      description: 'Reach level 5.',
+    },
+    level10: {
+      label: 'Veteran',
+      description: 'Reach level 10.',
+    },
+    nights5: {
+      label: 'Five nights',
+      description: 'Survive 5 nights.',
+    },
+    nights20: {
+      label: 'Twenty nights',
+      description: 'Survive 20 nights.',
+    },
+    quests5: {
+      label: 'Eve’s errands',
+      description: 'Complete 5 of Eve’s quests.',
+    },
+    signal: {
+      label: 'The Signal',
+      description: 'Send the Signal from the antenna.',
+    },
+    base1: {
+      label: 'First camp razed',
+      description: 'Destroy a mutant base.',
+    },
+    base3: {
+      label: 'Conqueror',
+      description: 'Destroy 3 mutant bases.',
+    },
+    army5: {
+      label: 'Full army',
+      description: 'Lead 5 companions at once.',
+    },
+    cleanTen: {
+      label: 'Unbroken ramparts',
+      description: 'Hold 10 nights in a row without losing a building.',
+    },
+    fedTen: {
+      label: 'Full bellies',
+      description: 'Hold 10 nights in a row with nobody dying of hunger or thirst.',
+    },
+    queenSlain: {
+      label: 'The Queen has fallen',
+      description: 'Slay the Puddle Queen.',
+    },
+    chiefs3: {
+      label: 'Chief hunter',
+      description: 'Defeat 3 base chiefs.',
+    },
+    rares: {
+      label: 'Collector',
+      description: 'Find all 6 rare buildings.',
+    },
+    wardrobe20: {
+      label: 'Full closet',
+      description: 'Own 20 wardrobe pieces.',
+    },
+    hallFell: {
+      label: 'That smelled like smoke',
+      description: 'See the town hall fall. It happens to the best.',
+    },
+    tripleNap: {
+      label: 'Forced nap',
+      description: 'Get knocked out 3 times in one colony.',
+    },
+    dryDiet: {
+      label: 'Dry diet',
+      description: 'Lose a worker to hunger or thirst.',
+    },
+    treasure10: {
+      label: 'Chest looter',
+      description: 'Open 10 chests in one colony.',
+    },
+    mutantFriend: {
+      label: 'It’s curable',
+      description: 'Cure a mutant at the clinic.',
+    },
+    haggler: {
+      label: 'Rug merchant',
+      description: 'Make 5 trades in one colony.',
+    },
+  },
+  trophies: {
+    flagGarland: {
+      label: 'Bunting garland',
+      description: 'Patched cloth pennants for party days.',
+    },
+    gnomeStatue: {
+      label: 'Garden gnome',
+      description: 'It survived the end of the world. It is proud.',
+    },
+    mintBanner: {
+      label: 'Mint banner',
+      description: 'Life is taking over, and you can see it from afar.',
+    },
+    goldenHall: {
+      label: 'Golden town hall',
+      description: 'A town hall repainted sunshine yellow.',
+    },
+    vinedTower: {
+      label: 'Flowery tower',
+      description: 'A watchtower overrun with vines and flowers.',
+    },
+    paintedDrill: {
+      label: 'Painted drill',
+      description: 'A drill in the colony’s colours.',
+    },
+  },
   perks: {
     woodStart: {
       label: 'Starter bundle',
