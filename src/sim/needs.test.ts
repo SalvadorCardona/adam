@@ -436,6 +436,26 @@ describe('soif', () => {
     expect(deprivedNeed(fullNeeds())).toBeNull();
   });
 
+  it('sans nourriture, l’affamé le plus bas va boire : personne ne meurt de soif avec de l’eau en ville', () => {
+    const world = colony({ water: 140 });
+    const deaths: string[] = [];
+    let drank = 0;
+
+    world.events.on('needMet', ({ need }) => {
+      if (need === 'thirst') drank += 1;
+    });
+    world.events.on('workerStarved', ({ need }) => {
+      deaths.push(need);
+    });
+    for (const worker of workers(world)) {
+      worker.needs.hunger = 0.01;
+      worker.needs.thirst = 0.2;
+    }
+    run(world, 20 * 60);
+    expect(drank).toBeGreaterThan(0);
+    expect(deaths).not.toContain('thirst');
+  });
+
   it('un enfant assoiffé ne grandit pas à l’aube', () => {
     const world = colony({});
     let stunted: string | null = null;

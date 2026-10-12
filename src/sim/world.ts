@@ -7142,15 +7142,20 @@ export class World {
 
   /** Sous un seuil : sa part du stock de la ville réservée, il part pour la mairie. */
   private seekMeal(mobile: Inhabitant): void {
-    const need = urgentNeed(mobile.needs);
     const hall = this.warehouse();
 
-    if (need === null || !hall) return;
+    if (!hall) return;
+
+    // Le plus bas d'abord ; si la ville n'a pas de quoi le combler, l'autre besoin passe devant la mort.
+    const wanted = NEED_IDS.filter((id) => mobile.needs[id] < NEEDS[id].seekBelow).sort((a, b) => mobile.needs[a] - mobile.needs[b]);
+    const need = wanted.find((id) => hall.store.available(NEEDS[id].item) >= NEEDS[id].meal);
+
+    if (need === undefined) return;
 
     const { item, meal } = NEEDS[need];
     const door = doorOf(hall);
 
-    if (hall.store.available(item) < meal || !clearLine(this.seed, mobile.x, mobile.y, door.x, door.y)) return;
+    if (!clearLine(this.seed, mobile.x, mobile.y, door.x, door.y)) return;
 
     hall.store.reserveOut(item, meal);
     mobile.meal = need;
