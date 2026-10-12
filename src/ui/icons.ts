@@ -13,6 +13,7 @@
  * (`data/categoryIcons.ts`) et les pictogrammes de l'interface (`art/ui.ts`).
  */
 
+import { DPAD_GLYPH, FACE_GLYPHS, STICK_GLYPH, type FaceButton } from '../art/padGlyphs.ts';
 import { ROAD_THUMB } from '../art/road.ts';
 import { UI_ICONS, type UiIcon } from '../art/ui.ts';
 import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
@@ -24,6 +25,7 @@ import { PERKS, type PerkId } from '../data/perks.ts';
 import { embed, svg } from '../data/artDirection.ts';
 import { SPRITES, type SpriteId } from '../data/sprites.ts';
 import { t } from '../i18n/locale.ts';
+import type { PadKind } from '../input/gamepad.ts';
 
 const cache = new Map<string, string>();
 
@@ -138,6 +140,16 @@ export function roadIcon(size = 40): HTMLImageElement {
 /** Un pictogramme d'interface (pause, son, marteau…), décoratif : le bouton porte déjà son libellé. */
 export function uiIcon(name: UiIcon, size = 24): HTMLImageElement {
   const element = image(url(`ui:${name}`, UI_ICONS[name]), 'icon icon-ui', size, size);
+
+  element.alt = '';
+  element.setAttribute('aria-hidden', 'true');
+  return element;
+}
+
+/** Un bouton de la manette (`art/padGlyphs.ts`), décoratif : son action est écrite à côté. */
+export function padGlyph(kind: PadKind, button: FaceButton | 'dpad' | 'stick', size = 24): HTMLImageElement {
+  const source = button === 'dpad' ? DPAD_GLYPH : button === 'stick' ? STICK_GLYPH : FACE_GLYPHS[kind][button];
+  const element = image(url(`pad:${kind}:${button}`, source), 'icon icon-ui pad-glyph', size, size);
 
   element.alt = '';
   element.setAttribute('aria-hidden', 'true');

@@ -6978,3 +6978,136 @@ span.wardrobe-thumb {
   background: var(--coral);
   content: '';
 }
+
+/* ---------------------------------------------------------------- manette */
+
+/*
+ * Le curseur virtuel de la manette (`ui/padCursor.ts`) : la flèche de la
+ * souris en plus grand, au-dessus de tout, transparente aux clics — le
+ * `elementFromPoint` qui cherche ce qu'il vise passe à travers lui. Une ombre
+ * indigo pleine le détache de l'herbe comme de la nuit.
+ */
+.pad-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  pointer-events: none;
+  will-change: transform;
+  filter: drop-shadow(2px 3px 0 var(--ink-shade));
+}
+
+.pad-cursor[hidden] {
+  display: none;
+}
+
+.pad-cursor img {
+  display: block;
+}
+
+/*
+ * L'élément sous le focus de la croix : un anneau blanc puis cyan, qui
+ * respire — pas un contour du dessin, une marque de la manette, bien visible
+ * à 1280 × 800. Il passe devant la face avant du bouton, d'où `!important`.
+ */
+.pad-focus {
+  outline: none !important;
+  box-shadow:
+    0 0 0 3px var(--paper),
+    0 0 0 7px var(--cyan) !important;
+  animation: pad-focus 1.2s ease-in-out infinite;
+}
+
+@keyframes pad-focus {
+  50% {
+    box-shadow:
+      0 0 0 3px var(--paper),
+      0 0 0 9px var(--cyan-shade);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pad-focus {
+    animation: none;
+  }
+}
+
+/* En mode manette, le joystick tactile et les touches du clavier s'effacent ; les boutons de la manette paraissent. */
+[data-input='pad'] .joystick,
+[data-input='pad'] .key-hint,
+[data-input='pad'] .build-drawer-keys {
+  display: none !important;
+}
+
+.pad-hint {
+  display: none;
+}
+
+[data-input='pad'] .pad-hint {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  display: block;
+  line-height: 0;
+  pointer-events: none;
+}
+
+.hud-actions > button {
+  position: relative;
+}
+
+/* L'aide « Contrôles manette » : par-dessus les réglages, un bouton (ou deux) et son action par ligne. */
+.pad-help-screen {
+  z-index: 14;
+}
+
+.pad-help {
+  width: min(400px, 100%);
+}
+
+.pad-help-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 14px;
+  align-items: center;
+  margin: 0;
+  text-align: left;
+}
+
+.pad-help-list dt {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.pad-help-list dd {
+  margin: 0;
+  font-size: 17px;
+  color: var(--ink);
+}
+
+/* Un bouton à nom (L1, RT, Options) : une capsule indigo, son nom en blanc. */
+.pad-key {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  min-width: 34px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  justify-content: center;
+  background: var(--ink);
+  box-shadow: 0 3px 0 var(--ink-shade);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pad-key .pad-glyph {
+  margin-left: -6px;
+}
+
+.pad-help-kind {
+  font-size: 16px;
+}
