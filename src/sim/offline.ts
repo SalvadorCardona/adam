@@ -62,8 +62,9 @@ export interface FedNeed {
  * Une jauge sur `ticks` de temps agrégé : elle baisse à sa cadence (travail
  * ou repos) ; chaque fois qu'elle passe sous `seekBelow`, l'habitant prend
  * un repas si `take()` le lui donne — en jeu, la jauge remonte à 1 au seuil,
- * donc chaque repas rend `1 - seekBelow`. Sans de quoi, elle s'arrête à
- * `OFFLINE.starvedGauge` : affamé, jamais mort hors ligne.
+ * donc chaque repas rend `1 - seekBelow`. Sans de quoi sous le seuil, il est affamé
+ * et sa jauge reprend au retour à `OFFLINE.returnGauge` :
+ * jamais mort hors ligne, ni condamné à l'être au retour.
  */
 export function feedNeed(need: NeedId, level: number, ticks: number, working: boolean, take: () => boolean): FedNeed {
   const { seekBelow, restTicks, workTicks } = NEEDS[need];
@@ -75,9 +76,9 @@ export function feedNeed(need: NeedId, level: number, ticks: number, working: bo
     meals += 1;
   }
 
-  const starved = next <= OFFLINE.starvedGauge;
+  const starved = next < seekBelow;
 
-  return { level: Math.min(1, Math.max(OFFLINE.starvedGauge, next)), meals, starved };
+  return { level: starved ? OFFLINE.returnGauge : Math.min(1, next), meals, starved };
 }
 
 /** Repas pris par tick, en moyenne, par un habitant pour ce besoin : de quoi dire combien de temps tiendra le stock. */
