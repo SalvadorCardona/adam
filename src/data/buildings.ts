@@ -703,9 +703,10 @@ export const MENU_BUILDING_IDS = BUILDING_IDS.filter((id) => BUILDINGS[id].menu)
 /**
  * Les bâtiments au menu dès le début de la partie. Les autres attendent leur
  * déblocage (plan d'Ève, recherche, objectif) ou, faute d'y être rattachés,
- * restent masqués. Seul endroit où la liste est définie.
+ * restent masqués. Le labo en est : c'est lui qui découvre la suite (forge,
+ * four, clinique, caserne). Seul endroit où la liste est définie.
  */
-export const START_BUILDINGS = ['home', 'nursery', 'logisticsPost'] as const satisfies readonly BuildingId[];
+export const START_BUILDINGS = ['home', 'nursery', 'logisticsPost', 'lab'] as const satisfies readonly BuildingId[];
 
 /** Les lits du bâtiment fini : sa part de l'Habitation de la ville. */
 export function bedsOf(id: BuildingId): number {

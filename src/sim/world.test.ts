@@ -1555,7 +1555,8 @@ describe('bâtiments de départ', () => {
     const world = World.newColony(100);
 
     for (const id of START_BUILDINGS) expect(free(world, id)).toBe(true);
-    for (const id of ['drill', 'farm', 'well', 'quarry', 'lumberCamp', 'watchtower', 'lab'] as const) expect(free(world, id)).toBe(false);
+    expect(START_BUILDINGS).toContain('lab');
+    for (const id of ['drill', 'farm', 'well', 'quarry', 'lumberCamp', 'watchtower', 'forge', 'charcoalKiln', 'clinic'] as const) expect(free(world, id)).toBe(false);
   });
 
   it('une sauvegarde d’avant les ouvre tous, et une colonie neuve se recharge à l’identique', () => {
@@ -1565,5 +1566,14 @@ describe('bâtiments de départ', () => {
     expect(deserialize(JSON.parse(JSON.stringify(state))).openBuildings).toEqual(new Set(START_BUILDINGS));
     expect(openBuildings).toEqual([...START_BUILDINGS]);
     expect(deserialize(JSON.parse(JSON.stringify(legacy))).isUnlocked('drill')).toBe(true);
+  });
+
+  it('une colonie sauvegardée avant que le labo ne soit de départ le retrouve, sans rien ouvrir d’autre', () => {
+    const state = serialize(World.newColony(100));
+    const restored = deserialize(JSON.parse(JSON.stringify({ ...state, openBuildings: ['home', 'nursery', 'logisticsPost'] })));
+
+    expect(restored.isUnlocked('lab')).toBe(true);
+    expect(restored.isUnlocked('drill')).toBe(false);
+    expect(restored.isUnlocked('forge')).toBe(false);
   });
 });

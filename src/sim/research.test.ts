@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TILE_SIZE } from '../core/grid.ts';
-import { BUILDINGS, MENU_BUILDING_IDS, type BuildingId } from '../data/buildings.ts';
+import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, type BuildingId } from '../data/buildings.ts';
 import { ENEMIES, WILDLIFE } from '../data/enemies.ts';
 import type { ItemId } from '../data/items.ts';
 import { COLONY } from '../data/inhabitants.ts';
@@ -71,8 +71,8 @@ function drySeed(): number {
 }
 
 /** Un monde dont la mairie est bâtie, et un labo fini à côté d'Adam. */
-function withLab(seed = drySeed()): { world: World; lab: Lab } {
-  const world = new World(seed);
+function withLab(seed = drySeed(), colony = (at: number) => new World(at)): { world: World; lab: Lab } {
+  const world = colony(seed);
 
   fill(world, BUILDINGS.townHall.cost);
   world.push({ type: 'transferToSite', id: world.townHallId });
@@ -759,6 +759,36 @@ describe('recherche — bâtiments débloqués', () => {
     for (const id of ['forge', 'charcoalKiln', 'clinic', 'builderHouse', 'antenna'] as const) expect(start).not.toContain(id);
     expect(start.filter((id) => world.isNewInMenu(id))).toEqual([]);
     expect(events).toEqual([]);
+  });
+
+  // Non-régression : une colonie neuve (`World.newColony`, celle du jeu) ne s'ouvrait pas sur le labo.
+  it('une colonie neuve ne propose que les bâtiments de départ, labo compris', () => {
+    const world = World.newColony(drySeed());
+    const events = unlocked(world);
+
+    fill(world, BUILDINGS.townHall.cost);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    expect([...menu(world)].sort()).toEqual([...START_BUILDINGS].sort());
+    expect(menu(world)).toContain('lab');
+    expect(MENU_BUILDING_IDS.filter((id) => world.isNewInMenu(id))).toEqual([]);
+    expect(events).toEqual([]);
+  });
+
+  it('dans une colonie neuve, finir la Fonderie fait entrer la forge et le four au menu, avec badge et annonce', () => {
+    const { world } = withLab(drySeed(), (seed) => World.newColony(seed));
+    const events = unlocked(world);
+
+    expect(world.inMenu('forge')).toBe(false);
+    expect(world.inMenu('charcoalKiln')).toBe(false);
+
+    finish(world, 'metalworking');
+
+    expect(events).toEqual([['forge', 'charcoalKiln']]);
+    expect(world.isNewInMenu('forge')).toBe(true);
+    expect(world.isNewInMenu('charcoalKiln')).toBe(true);
+    expect(world.inMenu('clinic')).toBe(false);
   });
 
   it('chaque bâtiment débloqué au labo l’est par une seule recherche, qui le dit', () => {
