@@ -262,12 +262,20 @@ describe('hors ligne — la ville rattrape', () => {
     world.tick();
     expect(lab.endTick).toBeGreaterThan(0);
 
+    const cost = Object.entries(RESEARCH.bigBag.cost) as [ItemId, number][];
+    const before = Object.fromEntries(cost.map(([item]) => [item, world.townStock()!.count(item)]));
+
     const report = catchUp(world, RESEARCH.walkingBoots.duration * STEP_MS + 10 * MINUTE);
 
     expect(report!.research).toContain('walkingBoots');
     expect(world.researchDone).toContain('walkingBoots');
     // La suivante a reçu son coût de la ville ; elle a fini aussi, ou elle tourne.
     expect(world.researchDone.includes('bigBag') || lab.research === 'bigBag').toBe(true);
+    // Le coût payé par la ville figure au « Consommé » : l'écart de stock est gains − consommé.
+    for (const [item, amount] of cost) {
+      expect(report!.spent[item] ?? 0).toBeGreaterThanOrEqual(amount);
+      expect(world.townStock()!.count(item)).toBe(before[item]! + (report!.gained[item] ?? 0) - (report!.spent[item] ?? 0));
+    }
   });
 
   it('une sauvegarde relue rattrape son absence comme la partie d’origine', () => {

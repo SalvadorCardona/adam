@@ -3994,7 +3994,9 @@ export class World {
         const town = carriers ? this.townStockForLab(lab) : null;
 
         if (!town) return;
-        for (const [item] of researchCost(lab.research)) this.supplyLab(lab, item, Math.min(labWants(lab, item), town.available(item)), town, 'town');
+        for (const [item] of researchCost(lab.research)) {
+          count(report.spent, item, this.supplyLab(lab, item, Math.min(labWants(lab, item), town.available(item)), town, 'town'));
+        }
         this.startCountdown(lab);
         if (isCollecting(lab)) return;
         running.set(lab.id, RESEARCH[lab.research].duration);
