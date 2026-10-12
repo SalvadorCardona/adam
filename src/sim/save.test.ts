@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TILE_SIZE, worldToTile } from '../core/grid.ts';
 import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
+import { DAY_CYCLE } from '../data/dayNight.ts';
 import type { ItemId } from '../data/items.ts';
 import { RECIPES } from '../data/recipes.ts';
 import type { Command } from './commands.ts';
@@ -212,6 +213,35 @@ describe('sauvegarde', () => {
     // L'horloge du HUD reprend à la même heure, au même jour.
     expect(copy.dayDial()).toEqual(original.dayDial());
     expect(copy.dayDial()).not.toBeNull();
+  });
+
+  it('la peur de la nuit survit au rechargement : le moral de l’aube est le même', () => {
+    const world = new World(4242);
+
+    completeSite(world, world.townHallId);
+
+    const laborers = [...world.mobiles.values()].filter((mobile) => mobile.kind === 'worker');
+
+    expect(laborers.length).toBeGreaterThan(0);
+    // Ceux qui ont eu peur pendant la nuit (rempli par `stepFear`).
+    const scared = (world as unknown as { scared: Set<number> }).scared;
+
+    for (const worker of laborers) scared.add(worker.id);
+
+    const reloaded = deserialize(JSON.parse(JSON.stringify(serialize(world))));
+    const happiness = (target: World): number[] =>
+      [...target.mobiles.values()].filter((mobile) => mobile.kind === 'worker').map((mobile) => (mobile as { happiness: number }).happiness);
+
+    for (const target of [world, reloaded]) {
+      const clock = target.clock()!;
+
+      // Jusqu'à l'aube suivante, sans traverser la nuit : le prochain tick la lève.
+      target.cycleStartTick -= DAY_CYCLE.day + DAY_CYCLE.dusk + DAY_CYCLE.night - clock.offset - 1;
+      target.tick();
+      expect(target.clock()).toMatchObject({ phase: 'dawn' });
+    }
+    expect(happiness(reloaded)).toEqual(happiness(world));
+    expect(happiness(world)).not.toEqual(happiness(new World(4242)));
   });
 
   it('le monde rechargé joue exactement la même suite de ticks', () => {
