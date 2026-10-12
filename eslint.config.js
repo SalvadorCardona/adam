@@ -62,6 +62,27 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
 
+  // Le back-end tourne dans Node.
+  {
+    files: ['server/**'],
+    languageOptions: { globals: globals.node },
+  },
+
+  /*
+   * Le contrat partagé entre le jeu et le serveur : ni DOM, ni Node, ni
+   * code de l'un ou de l'autre — les deux l'importent.
+   */
+  {
+    files: ['shared/**'],
+    languageOptions: { globals: {} },
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: ['node:*', 'pixi.js', '**/src/**', '**/server/**'] },
+      ],
+    },
+  },
+
   {
     files: ['*.config.ts', '*.config.js'],
     languageOptions: { globals: globals.node },

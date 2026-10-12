@@ -1,0 +1,12 @@
+# Le contexte de `server/Dockerfile` est la racine du dépôt : seuls les
+# manifestes, `shared/` et `server/` y servent.
+**/node_modules
+**/.env
+server/data
+dist
+docs
+public
+src
+.git
+.github
+.claude

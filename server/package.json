@@ -1,0 +1,26 @@
+{
+  "name": "@mobile-factory/server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Back-end de Mobile Factory : API HTTP, WebSocket et base SQLite.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --watch-path=src --watch-path=migrations --watch-path=../shared src/main.ts",
+    "start": "node src/main.ts",
+    "migrate": "node src/migrate.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "build": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.4",
+    "hono": "^4.13.13",
+    "ws": "^8.22.0"
+  }
+}

@@ -10,12 +10,18 @@
     "url": "https://cardona.digital"
   },
   "license": "MIT",
+  "workspaces": [
+    "server"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "dev:online": "vite --mode online",
+    "dev:server": "npm run dev -w server",
+    "dev:all": "concurrently --kill-others --names server,client --prefix-colors magenta,cyan \"npm:dev:server\" \"npm:dev:online\"",
+    "build": "tsc --noEmit && vite build && npm run build -w server",
     "preview": "vite preview",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && npm run typecheck -w server",
     "test": "vitest run",
     "test:watch": "vitest",
     "art:sheet": "node src/tools/artSheet.ts",
@@ -25,6 +31,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.4.1",
+    "concurrently": "^10.0.6",
     "eslint": "^10.9.1",
     "globals": "^17.12.0",
     "typescript": "~6.0.2",
