@@ -68,7 +68,6 @@ import { WEATHER, WEATHER_CALENDAR } from '../data/weather.ts';
 import { dayDialSvg, type UiIcon } from '../art/ui.ts';
 import type { AtlasStats } from '../render/spriteLibrary.ts';
 import type { WaterStats } from '../render/waterLayer.ts';
-import type { RoadRejection } from '../sim/commands.ts';
 import type { Compass } from '../sim/enemies.ts';
 import type { Trend } from '../sim/flows.ts';
 import type { Entity, Mobile, MobileId } from '../sim/types.ts';
@@ -597,13 +596,6 @@ export class Hud {
     world.events.on('placementRejected', ({ reason, ore }) =>
       this.notify(reason === 'footing' ? footingText(ore) : t().hud.rejection[reason], 'bad'),
     );
-    world.events.on('roadPaved', ({ fromBag }) => {
-      if (fromBag > 0) this.float('stone', -fromBag);
-    });
-    world.events.on('roadRemoved', ({ toBag }) => {
-      if (toBag > 0) this.float('stone', toBag);
-    });
-    world.events.on('roadRejected', ({ reason, paved }) => this.notify(roadLabel(reason, paved), 'bad'));
     world.events.on('resourceHarvested', ({ item, amount }) => {
       if (item === 'wood') this.harvestedWood = true;
       if (item === 'stone') this.harvestedStone = true;
@@ -2382,14 +2374,6 @@ function rewardLabel(reward: QuestReward): string {
   return reward.type === 'plan'
     ? t().hud.toast.planReceived(t().buildings[reward.building].label)
     : t().hud.toast.toolReceived(t().tools[reward.tool]);
-}
-
-/** Ce que dit la bulle quand un tracé de route n'a pas été pavé en entier ; `paved` tuiles l'ont été. */
-function roadLabel(reason: RoadRejection, paved: number): string {
-  const text = t().hud.road;
-
-  if (reason !== 'noStone') return text[reason];
-  return paved > 0 ? text.noStone(paved) : text.noStoneAtAll;
 }
 
 /** Le nom d'un niveau : le bâtiment au niveau 1, son amélioration au-delà. */

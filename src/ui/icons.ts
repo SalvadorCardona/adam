@@ -14,7 +14,6 @@
  */
 
 import { DPAD_GLYPH, FACE_GLYPHS, STICK_GLYPH, type FaceButton } from '../art/padGlyphs.ts';
-import { ROAD_THUMB } from '../art/road.ts';
 import { UI_ICONS, type UiIcon } from '../art/ui.ts';
 import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
 import { CATEGORY_ICONS, type CategoryFilter } from '../data/categoryIcons.ts';
@@ -126,14 +125,6 @@ export function categoryIcon(filter: CategoryFilter, size = 20): HTMLImageElemen
 
   element.alt = '';
   element.setAttribute('aria-hidden', 'true');
-  return element;
-}
-
-/** La vignette de la route au menu de construction : quelques dalles qui tournent. */
-export function roadIcon(size = 40): HTMLImageElement {
-  const element = image(url('road', ROAD_THUMB), 'icon icon-building', size, size);
-
-  element.alt = t().screens.road;
   return element;
 }
 

@@ -7,8 +7,7 @@
  * le dit, et quand c'est un arbre ou un rocher on dit aussi le remède : Adam
  * n'a qu'à le heurter. Une foreuse hors de son assise : on dit sa règle —
  * moitié filon, moitié herbe (`footingText`) —, et le posable dit ce
- * qu'elle extraira (`placementOutput`). Un tracé de route dit
- * pourquoi une partie ne sera pas pavée (`roadReason`).
+ * qu'elle extraira (`placementOutput`)..
  *
  * Fonction pure, sans DOM : `buildMenu.ts` l'affiche, les tests la lisent.
  */
@@ -17,9 +16,9 @@ import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
 import type { ItemId } from '../data/items.ts';
 import type { ResourceId } from '../data/resources.ts';
 import { t } from '../i18n/locale.ts';
-import type { PlacementRejection, RoadRejection } from '../sim/commands.ts';
+import type { PlacementRejection } from '../sim/commands.ts';
 import { footingHalf } from '../sim/footing.ts';
-import type { PlacementBlock, RoadStep, World } from '../sim/world.ts';
+import type { PlacementBlock, World } from '../sim/world.ts';
 
 export interface PlacementReason {
   /** Le motif : « Un arbre gêne ». */
@@ -28,7 +27,7 @@ export interface PlacementReason {
   remedy: string | null;
 }
 
-type SimpleRejection = Exclude<PlacementRejection, 'resource' | 'footing' | 'road' | 'nearHall' | 'shore' | 'enemyZone' | 'polluted' | 'radioactive'>;
+type SimpleRejection = Exclude<PlacementRejection, 'resource' | 'footing' | 'nearHall' | 'shore' | 'enemyZone' | 'polluted' | 'radioactive'>;
 
 /** Une entrée du dictionnaire (remède '' = aucun) en motif affichable. */
 function reason(entry: { text: string; remedy: string }): PlacementReason {
@@ -49,8 +48,6 @@ export function placementReason(block: PlacementBlock, world: World): PlacementR
   if (block.reason === 'nearHall') return reason(placement.nearHall);
   // Le puits puise dans la rivière : il faut le coller à l'eau.
   if (block.reason === 'shore') return reason(placement.shore);
-  // Une route ne se recouvre pas : le marteau la retire, et rend sa pierre.
-  if (block.reason === 'road') return reason(placement.road);
   // La terre polluée attend une station de dépollution ; la radioactive, rien pour l'instant.
   if (block.reason === 'polluted' || block.reason === 'radioactive') return reason(placement[block.reason]);
   // Une base mutante tient la zone : il faut l'abattre, avec un arc de son niveau.
@@ -97,20 +94,4 @@ export function placementOutput(building: BuildingId, tx: number, ty: number, wo
   const item = world.oreUnder(building, tx, ty);
 
   return item ? t().panel.placement.extracts(t().items[item]) : null;
-}
-
-/**
- * Pourquoi une partie du tracé ne sera pas pavée — le manque de pierre
- * d'abord, c'est lui qui arrête le tracé —, ou `null` s'il passe en entier.
- */
-export function roadReason(plan: readonly RoadStep[]): PlacementReason | null {
-  const states = plan.map((step) => step.state);
-
-  const roads = t().panel.placement.roads;
-
-  if (states.includes('noStone')) return reason(roads.noStone);
-
-  const refused = states.find((state): state is Exclude<RoadRejection, 'noStone'> => state !== 'pave' && state !== 'paved');
-
-  return refused ? reason(roads[refused]) : null;
 }

@@ -223,7 +223,7 @@ describe('maison du forestier', () => {
     expect(planted).toBe(0);
   }, 30_000);
 
-  it('ne plante ni sur l’eau, ni sur une route, ni sous le bâti', () => {
+  it('ne plante ni sur l’eau, ni sous le bâti', () => {
     const world = colony();
     const house = houseOf(world);
 
@@ -232,7 +232,6 @@ describe('maison du forestier', () => {
     for (const tile of world.forestPlot(house)) {
       if (!world.resources.isPlanted(tile.tx, tile.ty)) continue;
       expect(terrainAt(world.seed, tile.tx, tile.ty)).toBe('grass');
-      expect(world.roads.has(tile.tx, tile.ty)).toBe(false);
       expect(world.chunks.occupantAt(tile.tx, tile.ty)).toBeUndefined();
     }
     // L'emprise de la maison n'est pas dans son carré.

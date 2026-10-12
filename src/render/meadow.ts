@@ -2,8 +2,10 @@
  * La prairie : ce que le bake du sol pose sur l'herbe, au lieu d'un damier.
  *
  * Rien ici n'est de l'état. Les taches et les semis se tirent de la seed —
- * à graine égale, même prairie. Fonctions pures, sans Pixi :
- * `chunkLayer.ts` les bake, les tests les lisent.
+ * à graine égale, même prairie — et les chemins de terre battue se lisent
+ * dans la ville (`trailsOf`) : ce sont les allées que les habitants ont
+ * tracées entre la mairie et chaque bâtiment fini. Fonctions pures, sans
+ * Pixi : `chunkLayer.ts` les bake, les tests les lisent.
  *
  * - **Taches** (`patchesIn`) : une par cellule de `PATCH_CELL` tuiles, ou
  *   aucune, plus claire ou plus dense, d'une des silhouettes de
@@ -14,12 +16,17 @@
  * - **Semis** (`sprinkleAt`) : un brin ou une fleurette sur une tuile d'herbe
  *   sur huit environ, à une place tirée dans la tuile, pas au milieu : l'œil
  *   ne retrouve pas la grille.
+ * - **Chemins** (`trailsOf`, `trailPoints`) : une courbe douce de la porte
+ *   de la mairie à celle du bâtiment, bombée d'un côté tiré de sa place ;
+ *   elle passe sur l'herbe, le sable et la roche, pas sur l'eau.
  */
 
 import { TILE_SIZE } from '../core/grid.ts';
 import { hash3 } from '../core/rng.ts';
 import { PATCH_SHAPE_COUNT, PATCH_SIZE, PATCH_TONES, type MeadowSprinkle, type PatchTone } from '../art/terrain.ts';
+import { doorOf } from '../sim/jobs.ts';
 import { terrainAt } from '../sim/terrain.ts';
+import type { Entity } from '../sim/types.ts';
 
 /** Côté d'une cellule de taches, en tuiles : une tache au plus par cellule. */
 export const PATCH_CELL = 7;
@@ -146,4 +153,84 @@ export function sprinkleAt(seed: number, tx: number, ty: number): Sprinkle | nul
     roll < SPRIG_CHANCE ? (((h >>> 7) & 1) === 0 ? 'sprig.0' : 'sprig.1') : ((h >>> 7) & 1) === 0 ? 'speck.0' : 'speck.1';
 
   return { name, dx: 1 + ((h >>> 8) % 17), dy: 2 + ((h >>> 14) % 18) };
+}
+
+/* ---------------------------------------------------------------- chemins */
+
+/** Au-delà de cette distance de la mairie, en tuiles, un bâtiment n'a pas de chemin : on y va rarement. */
+export const TRAIL_MAX_TILES = 40;
+
+/** Une allée de terre battue : une courbe du second degré, en pixels monde. */
+export interface Trail {
+  /** Ce qui la décide : la mairie et le bâtiment, à leur place. Deux chemins de même clé sont le même. */
+  key: string;
+  from: { x: number; y: number };
+  control: { x: number; y: number };
+  to: { x: number; y: number };
+}
+
+/**
+ * Les chemins de la ville : de la porte de la mairie bâtie à celle de chaque
+ * bâtiment fini à moins de `TRAIL_MAX_TILES`. Pas de mairie, pas de chemin.
+ */
+export function trailsOf(seed: number, hall: Entity | undefined, entities: Iterable<Entity>): Trail[] {
+  if (!hall || hall.kind !== 'townHall') return [];
+
+  const from = doorOf(hall);
+  const trails: Trail[] = [];
+
+  for (const entity of entities) {
+    if (entity.kind === 'site' || entity.id === hall.id) continue;
+
+    const to = doorOf(entity);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy);
+
+    if (length < TILE_SIZE * 2 || length > TRAIL_MAX_TILES * TILE_SIZE) continue;
+
+    // Bombée d'un côté ou de l'autre, d'un quart de sa longueur au plus : une allée, pas une règle.
+    const bend = ((hash3(seed ^ 0x1f83d9ab, entity.tx, entity.ty) % 1000) / 1000 - 0.5) * 0.45;
+
+    trails.push({
+      key: `${hall.tx},${hall.ty}>${entity.tx},${entity.ty},${entity.width},${entity.height}`,
+      from,
+      control: { x: from.x + dx / 2 - dy * bend, y: from.y + dy / 2 + dx * bend },
+      to,
+    });
+  }
+  return trails;
+}
+
+/** Les points de la courbe, tous les `step` pixels environ, bouts compris. */
+export function trailPoints(trail: Trail, step: number): { x: number; y: number }[] {
+  const { from, control, to } = trail;
+  // La corde et les deux bras encadrent la longueur : leur moyenne suffit à espacer les points.
+  const length = (Math.hypot(to.x - from.x, to.y - from.y) + Math.hypot(control.x - from.x, control.y - from.y) + Math.hypot(to.x - control.x, to.y - control.y)) / 2;
+  const count = Math.max(1, Math.ceil(length / step));
+  const points: { x: number; y: number }[] = [];
+
+  for (let i = 0; i <= count; i += 1) {
+    const t = i / count;
+    const u = 1 - t;
+
+    points.push({
+      x: u * u * from.x + 2 * u * t * control.x + t * t * to.x,
+      y: u * u * from.y + 2 * u * t * control.y + t * t * to.y,
+    });
+  }
+  return points;
+}
+
+/** Le rectangle (pixels monde) que couvre un chemin, sa largeur comprise. */
+export function trailBounds(trail: Trail, margin: number): { left: number; top: number; right: number; bottom: number } {
+  const xs = [trail.from.x, trail.control.x, trail.to.x];
+  const ys = [trail.from.y, trail.control.y, trail.to.y];
+
+  return {
+    left: Math.min(...xs) - margin,
+    top: Math.min(...ys) - margin,
+    right: Math.max(...xs) + margin,
+    bottom: Math.max(...ys) + margin,
+  };
 }

@@ -15,7 +15,6 @@ const lower = (name: string): string => String(name).toLowerCase();
 export const hud: Messages['hud'] = {
   rejection: {
     occupied: 'Spot already taken',
-    road: 'A road runs here — remove it first',
     terrain: 'Can’t build on this ground',
     polluted: 'Polluted land — a cleanup station will make it clean',
     radioactive: 'Radioactive land — nothing cleans it, not yet',
@@ -29,18 +28,6 @@ export const hud: Messages['hud'] = {
     enemyZone: 'A mutant base holds this zone — take it down first',
     unexplored: 'Unexplored area — go there first',
     region: 'Unconquered region — defeat its guardian first',
-  },
-  road: {
-    noStone: (paved: number): string => `Out of stone: road stopped after ${paved} tile${s(paved)}`,
-    noStoneAtAll: 'No stone to pave with — none in the bag, none in town nearby',
-    terrain: 'No roads on water',
-    occupied: 'A road can’t run under a building',
-    resource: 'Skipped trees and rocks: clear them to pave',
-    enemyZone: 'No roads inside a mutant base’s zone',
-    unexplored: 'No roads into the unknown: explore first',
-    region: 'No roads in an unconquered region: defeat its guardian',
-    polluted: 'No roads on polluted land — a purifier will clean it',
-    radioactive: 'No roads on radioactive land',
   },
   gear: {
     outOfReach: 'Too far from the forge — get closer',

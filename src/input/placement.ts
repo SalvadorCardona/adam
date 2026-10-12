@@ -28,22 +28,12 @@
  * `onRefuse`, et rien n'est posé), un clic droit annule. Le tactile ne passe
  * par aucune de ces branches.
  *
- * **La route** n'est pas un bâtiment : c'est un tracé. Armée (`selectRoad`),
- * le doigt glisse de tuile en tuile et laisse derrière lui un fantôme de
- * dalles (`trail`), sans diagonale ; revenir en arrière efface la dernière
- * tuile. Le tracé s'arrête à `ROADS.maxTiles`. Au doigt, « Poser » pave
- * ensuite le tracé, comme pour un bâtiment ; à la souris, on maintient le
- * clic et on glisse, et le relâcher pave. Le même tracé, outil `remove`, est
- * le marteau : il retire les dalles qu'il couvre.
- *
  * Rien n'est modifié dans le monde ici : la validation pousse une commande
- * `placeBuilding`, `paveRoad` ou `removeRoad` que le tick consomme.
+ * `placeBuilding` que le tick consomme.
  */
 
-import { TILE_SIZE, floorDiv, type TileCoord } from '../core/grid.ts';
+import { TILE_SIZE } from '../core/grid.ts';
 import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
-import { ROADS } from '../data/roads.ts';
-import { stepsBetween } from '../sim/roads.ts';
 import type { PlacementBlock, World } from '../sim/world.ts';
 import { TAP_SLOP, type PointerConsumer, type PointerSample } from './pointer.ts';
 
@@ -58,15 +48,6 @@ export interface GhostState {
 
 export type PlacementMode = 'idle' | 'armed' | 'placing';
 
-/** L'outil route : paver, ou retirer au marteau. */
-export type RoadTool = 'pave' | 'remove';
-
-/** Le tracé de route en cours : l'outil, et les tuiles dans l'ordre du doigt. */
-export interface RoadTrail {
-  tool: RoadTool;
-  tiles: readonly TileCoord[];
-}
-
 /**
  * Décalage vertical du fantôme au-dessus du doigt, en pixels CSS.
  * Sans lui le pouce cache exactement ce qu'on essaie de viser.
@@ -79,10 +60,6 @@ export class Placement implements PointerConsumer {
 
   /** Bâtiment choisi dans le menu ; conservé après une pose seulement par « Poser encore ». */
   private armed: BuildingId | null = null;
-  /** L'outil route armé, à la place d'un bâtiment ; `null` sinon. */
-  private road: RoadTool | null = null;
-  /** Les tuiles du tracé de route, dans l'ordre du doigt. */
-  private trail: TileCoord[] = [];
   private pointerId: number | null = null;
   private startX = 0;
   private startY = 0;
@@ -110,11 +87,6 @@ export class Placement implements PointerConsumer {
   /** Le curseur survole la carte sans bouton enfoncé : le fantôme le suit. */
   public hover(sample: PointerSample): void {
     if (this.mode === 'idle' || this.pointerId !== null || !sample.mouse) return;
-    if (this.road) {
-      // À la souris, la dalle sous le curseur dit où partira le tracé.
-      this.startTrail(sample);
-      return;
-    }
     this.moveGhost(sample);
   }
 
@@ -125,30 +97,9 @@ export class Placement implements PointerConsumer {
       return;
     }
     this.armed = building;
-    this.road = null;
-    this.trail = [];
     this.mode = 'armed';
     this.ghost = null;
     this.onChange();
-  }
-
-  /** Le menu a choisi la route — paver, ou retirer au marteau. Un tracé en cours change d'outil sans s'effacer. */
-  public selectRoad(tool: RoadTool): void {
-    this.armed = null;
-    this.ghost = null;
-    this.road = tool;
-    if (this.trail.length === 0) this.mode = 'armed';
-    this.onChange();
-  }
-
-  /** L'outil route armé, ou `null`. */
-  public roadTool(): RoadTool | null {
-    return this.road;
-  }
-
-  /** Le tracé de route en cours, ou `null` hors du mode route ou avant le premier doigt. */
-  public roadTrail(): RoadTrail | null {
-    return this.road && this.trail.length > 0 ? { tool: this.road, tiles: this.trail } : null;
   }
 
   /** Bâtiment actuellement armé, ou `null`. Le menu s'en sert pour s'allumer. */
@@ -159,8 +110,6 @@ export class Placement implements PointerConsumer {
   public cancel(): void {
     this.mode = 'idle';
     this.armed = null;
-    this.road = null;
-    this.trail = [];
     this.ghost = null;
     this.pointerId = null;
     this.onChange();
@@ -171,10 +120,6 @@ export class Placement implements PointerConsumer {
    * `again` : « Poser encore », on reste armé sur le même bâtiment.
    */
   public confirm(again = false): void {
-    if (this.road) {
-      this.confirmRoad(again);
-      return;
-    }
     if (this.mode !== 'placing' || !this.ghost) return;
 
     this.world.push({
@@ -193,34 +138,9 @@ export class Placement implements PointerConsumer {
     this.onChange();
   }
 
-  /** Pave, ou retire, le tracé ; `again` garde l'outil armé pour un tracé suivant. */
-  private confirmRoad(again: boolean): void {
-    const tool = this.road;
-
-    if (!tool || this.trail.length === 0) return;
-
-    this.world.push({ type: tool === 'pave' ? 'paveRoad' : 'removeRoad', tiles: [...this.trail] });
-
-    if (!again) {
-      this.cancel();
-      return;
-    }
-    this.trail = [];
-    this.mode = 'armed';
-    this.onChange();
-  }
-
   /** Le fantôme est-il posable là où il est ? Sert à griser le bouton. */
   public isConfirmable(): boolean {
-    if (this.road) return this.roadConfirmable();
     return this.mode === 'placing' && this.ghost !== null && this.block() === null;
-  }
-
-  /** Un tracé vaut d'être confirmé s'il pave au moins une tuile — ou, au marteau, s'il couvre une dalle. */
-  private roadConfirmable(): boolean {
-    if (this.trail.length === 0) return false;
-    if (this.road === 'remove') return this.trail.some(({ tx, ty }) => this.world.roads.has(tx, ty));
-    return this.world.roadPlan(this.trail).some((step) => step.state === 'pave');
   }
 
   /** Pourquoi le fantôme n'est pas posable, et quelles cases bloquent ; `null` s'il l'est ou s'il n'y a pas de fantôme. */
@@ -244,18 +164,11 @@ export class Placement implements PointerConsumer {
     this.startX = sample.x;
     this.startY = sample.y;
     this.dragging = false;
-    // Un nouveau doigt part d'un nouveau tracé, là où il se pose.
-    if (this.road) this.startTrail(sample);
     return true;
   }
 
   public onMove(sample: PointerSample): void {
     if (sample.id !== this.pointerId) return;
-
-    if (this.road) {
-      this.extendTrail(sample);
-      return;
-    }
 
     if (!this.dragging) {
       if (Math.hypot(sample.x - this.startX, sample.y - this.startY) <= TAP_SLOP) return;
@@ -267,13 +180,6 @@ export class Placement implements PointerConsumer {
   public onUp(sample: PointerSample): void {
     if (sample.id !== this.pointerId) return;
     this.pointerId = null;
-    if (this.road) {
-      // À la souris, relâcher le clic pave ; au doigt, « Poser » le fera.
-      if (!sample.mouse) return;
-      if (this.isConfirmable()) this.confirmRoad(true);
-      else this.onRefuse();
-      return;
-    }
     if (this.dragging) return;
     // Un tap pose le fantôme là où le doigt s'est levé.
     this.moveGhost(sample);
@@ -281,52 +187,6 @@ export class Placement implements PointerConsumer {
     if (!sample.mouse) return;
     if (this.isConfirmable()) this.confirm();
     else this.onRefuse();
-  }
-
-  /** La tuile visée : au-dessus du doigt, sous le curseur. */
-  private tileAt(sample: PointerSample): TileCoord {
-    const world = this.screenToWorld(sample.x, sample.y - (sample.mouse === true ? 0 : FINGER_OFFSET_Y));
-
-    return { tx: floorDiv(world.x, TILE_SIZE), ty: floorDiv(world.y, TILE_SIZE) };
-  }
-
-  private startTrail(sample: PointerSample): void {
-    const tile = this.tileAt(sample);
-    const [only] = this.trail;
-
-    if (this.trail.length === 1 && only?.tx === tile.tx && only.ty === tile.ty) return;
-    this.trail = [tile];
-    this.mode = 'placing';
-    this.onChange();
-  }
-
-  /**
-   * Le doigt a glissé : le tracé le rejoint tuile à tuile, sans diagonale.
-   * Revenir sur l'avant-dernière tuile efface la dernière ; repasser sur une
-   * tuile déjà tracée ne la compte pas deux fois.
-   */
-  private extendTrail(sample: PointerSample): void {
-    const tile = this.tileAt(sample);
-    const last = this.trail.at(-1);
-
-    if (!last || (last.tx === tile.tx && last.ty === tile.ty)) return;
-
-    let changed = false;
-
-    for (const step of stepsBetween(last, tile)) {
-      const back = this.trail.at(-2);
-
-      if (back && back.tx === step.tx && back.ty === step.ty) {
-        this.trail.pop();
-        changed = true;
-        continue;
-      }
-      if (this.trail.length >= ROADS.maxTiles) break;
-      if (this.trail.some(({ tx, ty }) => tx === step.tx && ty === step.ty)) continue;
-      this.trail.push(step);
-      changed = true;
-    }
-    if (changed) this.onChange();
   }
 
   private moveGhost(sample: PointerSample): void {

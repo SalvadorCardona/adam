@@ -58,11 +58,6 @@
  * clavier qui monte soulève le tiroir (`visualViewport`) : la liste reste
  * au-dessus de lui ; le champ écrit en 16 px, sous quoi iOS zoomerait.
  *
- * La dernière carte n'est pas un bâtiment : la **route**, une pierre par
- * tuile. Choisie, elle arme le tracé (`Placement.selectRoad`) ; la barre dit
- * combien de tuiles et de pierres, « Poser » pave, et « Retirer » change
- * l'outil pour le marteau, qui retire les dalles et rend leur pierre.
- *
  * Sous le champ de recherche, une rangée de puces filtre les cartes par famille
  * (`category` de `data/buildings.ts`) : « Tous », puis chaque famille qui a
  * au moins une carte au menu, avec leur nombre (`buildFilter.ts`). Une seule
@@ -84,7 +79,6 @@ import { gridStep, type GridMove } from '../core/gridNav.ts';
 import { BUILDING_CATEGORIES, BUILDINGS, type BuildingId, type BuildingProto } from '../data/buildings.ts';
 import type { CategoryFilter } from '../data/categoryIcons.ts';
 import type { ItemId } from '../data/items.ts';
-import { ROADS } from '../data/roads.ts';
 import type { Placement } from '../input/placement.ts';
 import { footingHalf } from '../sim/footing.ts';
 import type { World } from '../sim/world.ts';
@@ -92,8 +86,8 @@ import { onLocale, t } from '../i18n/locale.ts';
 import { BuildFilter, type FilterCard } from './buildFilter.ts';
 import { buildOrder } from './buildOrder.ts';
 import { buildingTerms, searchKey } from './buildSearch.ts';
-import { buildingIcon, categoryIcon, itemAmount, itemIcon, jobIcon, roadIcon, uiIcon } from './icons.ts';
-import { footingText, placementOutput, placementReason, roadReason } from './placementReason.ts';
+import { buildingIcon, categoryIcon, itemAmount, itemIcon, jobIcon, uiIcon } from './icons.ts';
+import { footingText, placementOutput, placementReason } from './placementReason.ts';
 
 /** Position physique → mouvement dans la grille : flèches, et ZQSD/WASD comme pour marcher. */
 const MOVES: Readonly<Record<string, GridMove>> = {
@@ -109,11 +103,6 @@ const MOVES: Readonly<Record<string, GridMove>> = {
 
 /** Un doigt posé plus longtemps que ça sur une carte lit son effet au lieu de la choisir. */
 const LONG_PRESS_MS = 450;
-
-/** La carte de la route : ce qu'elle fait, en une ligne, dans la langue du moment. */
-function roadEffect(): string {
-  return t().menu.roadEffect(t().common.number(ROADS.speed));
-}
 
 export class BuildMenu {
   public readonly root: HTMLElement;
@@ -142,10 +131,7 @@ export class BuildMenu {
   /** Pourquoi le fantôme ne se pose pas, en une ligne, dans une bulle sous lui. */
   private readonly ghostBubble: HTMLElement;
   private project: (x: number, y: number) => { x: number; y: number } = (x, y) => ({ x, y });
-  /** Paver ou retirer : l'outil de la route, en mode route seulement. */
-  private readonly toolButton: HTMLButtonElement;
   private readonly cards = new Map<BuildingId, HTMLButtonElement>();
-  private readonly roadCard: HTMLButtonElement;
   private readonly badges = new Map<BuildingId, HTMLElement>();
   private readonly costs: { item: ItemId; amount: number; element: HTMLElement }[] = [];
   /** Les libellés fixes des cartes, réécrits à chaque changement de langue. */
@@ -260,9 +246,6 @@ export class BuildMenu {
       this.list.append(card);
     }
 
-    this.roadCard = this.road();
-    this.list.append(this.roadCard);
-
     this.searchEmpty = document.createElement('div');
     this.searchEmpty.className = 'build-search-empty';
     this.searchEmpty.setAttribute('role', 'status');
@@ -295,15 +278,10 @@ export class BuildMenu {
     this.confirmButton.dataset['confirm'] = 'true';
     this.repeatButton = button('', () => this.placement.confirm(true));
     this.cancelButton = button('', () => this.placement.cancel());
-    this.toolButton = button('', () => {
-      this.placement.selectRoad(this.placement.roadTool() === 'remove' ? 'pave' : 'remove');
-    });
-    this.toolButton.hidden = true;
     this.armedBar.append(
       this.armedLabel,
       this.reason,
       this.cancelButton,
-      this.toolButton,
       this.repeatButton,
       this.confirmButton,
     );
@@ -337,7 +315,6 @@ export class BuildMenu {
       for (const relabel of this.relabels) relabel();
       // Les noms ont changé de langue : la recherche se relit dans la nouvelle.
       for (const [id, card] of this.cards) this.terms.set(card, buildingTerms(id, text));
-      this.terms.set(this.roadCard, [text.menu.road]);
       this.searchChanged();
       // Les icônes des coûts portent le nom de l'objet (`itemIcon`), posé à leur création.
       for (const { item, element } of this.costs) {
@@ -464,57 +441,6 @@ export class BuildMenu {
     return card;
   }
 
-  /**
-   * La carte de la route : comme celle d'un bâtiment, mais son coût est par
-   * tuile, et elle arme le tracé au lieu d'un fantôme.
-   */
-  private road(): HTMLButtonElement {
-    const show = (): void => setText(this.effectLine, t().menu.cardEffect(t().menu.road, roadEffect()));
-    const card = button('', () => {
-      if (this.swallowClick) {
-        this.swallowClick = false;
-        return;
-      }
-      if (!this.unlocked()) return;
-      this.close();
-      this.placement.selectRoad('pave');
-    });
-
-    card.className = 'build-card';
-    this.longPress(card, show);
-    card.addEventListener('focus', show);
-    const icon = roadIcon();
-
-    card.append(icon);
-
-    const body = document.createElement('div');
-    const name = document.createElement('div');
-    const effect = document.createElement('div');
-    const cost = document.createElement('div');
-    const meta = document.createElement('div');
-    const footer = document.createElement('div');
-    const price = itemAmount(ROADS.item, 1);
-
-    body.className = 'build-card-body';
-    name.className = 'build-card-name';
-    effect.className = 'build-card-effect';
-    cost.className = 'build-card-cost';
-    cost.append(price);
-    this.costs.push({ item: ROADS.item, amount: 1, element: price });
-    meta.className = 'build-card-meta';
-    footer.className = 'build-card-footer';
-    footer.append(cost, meta);
-    body.append(name, effect, footer);
-    card.append(body);
-    this.relabels.push(() => {
-      icon.alt = t().screens.road;
-      name.textContent = t().menu.road;
-      effect.textContent = roadEffect();
-      meta.textContent = t().menu.roadMeta;
-    });
-    return card;
-  }
-
   /** Appui long : l'effet s'écrit au pied du tiroir, la carte n'est pas choisie. */
   private longPress(card: HTMLButtonElement, show: () => void): void {
     let timer: number | undefined;
@@ -562,8 +488,6 @@ export class BuildMenu {
 
       if (card) this.list.append(card);
     }
-    // La route ferme la liste : ce n'est pas un bâtiment, elle ne se range pas avec eux.
-    this.list.append(this.roadCard);
     this.list.scrollTop = 0;
   }
 
@@ -589,7 +513,6 @@ export class BuildMenu {
     for (const [id, card] of this.cards) {
       cards.set(card, { category: BUILDINGS[id].category, terms: this.terms.get(card) ?? [], shown: this.shown(id) });
     }
-    cards.set(this.roadCard, { category: ROADS.category, terms: this.terms.get(this.roadCard) ?? [], shown: this.unlocked() });
     return cards;
   }
 
@@ -613,7 +536,7 @@ export class BuildMenu {
       if (chip.getAttribute('aria-label') !== label) chip.setAttribute('aria-label', label);
     }
 
-    for (const card of [...this.cards.values(), this.roadCard]) {
+    for (const card of this.cards.values()) {
       const shown = view.visible.has(card);
 
       if (card.hidden === shown) card.hidden = !shown;
@@ -840,9 +763,6 @@ export class BuildMenu {
       fresh ||= isNew;
     }
 
-    const roadTool = this.placement.roadTool();
-
-    this.roadCard.dataset['active'] = String(roadTool !== null);
     this.refreshFilter();
     this.toggleButton.dataset['new'] = String(fresh);
 
@@ -872,12 +792,6 @@ export class BuildMenu {
       const label = placing ? t().menu.placing(name) : t().menu.tapToPlace(name);
 
       if (this.armedLabel.textContent !== label) this.armedLabel.textContent = label;
-    }
-    this.toolButton.hidden = roadTool === null;
-    if (roadTool) {
-      this.ghostBubble.hidden = true;
-      this.refreshRoad(roadTool, placing);
-      return;
     }
     setText(this.confirmButton, t().menu.place);
 
@@ -935,46 +849,6 @@ export class BuildMenu {
     setText(this.ghostBubble, text);
     this.ghostBubble.hidden = false;
     this.ghostBubble.style.transform = `translate(${Math.round(point.x)}px, ${Math.round(point.y)}px) translate(-50%, 10px)`;
-  }
-
-  /** La barre du tracé : combien de tuiles, combien de pierres, et ce qui ne sera pas pavé. */
-  private refreshRoad(tool: 'pave' | 'remove', placing: boolean): void {
-    const trail = this.placement.roadTrail();
-    const tiles = trail?.tiles ?? [];
-    const confirmable = this.placement.isConfirmable();
-    const { menu } = t();
-    let label: string;
-    let reason: { text: string; remedy: string | null } | null = null;
-
-    if (tool === 'remove') {
-      const slabs = tiles.filter(({ tx, ty }) => this.world.roads.has(tx, ty)).length;
-
-      label = placing ? menu.removeCount(slabs) : menu.removeHint;
-    } else {
-      const plan = this.world.roadPlan(tiles);
-      const paid = plan.filter((step) => step.state === 'pave').length;
-
-      label = placing ? menu.roadCount(paid) : menu.roadHint;
-      reason = roadReason(plan);
-    }
-
-    setText(this.armedLabel, label);
-    setText(this.toolButton, tool === 'pave' ? menu.remove : menu.pave);
-    setText(this.confirmButton, tool === 'pave' ? menu.place : menu.remove);
-
-    this.reason.hidden = !placing || !reason;
-    this.reason.dataset['ok'] = 'false';
-    if (reason) {
-      this.reasonText.hidden = false;
-      setText(this.reasonText, reason.text);
-      setText(this.reasonRemedy, reason.remedy ?? '');
-      this.reasonRemedy.hidden = !reason.remedy;
-    }
-
-    this.confirmButton.hidden = !placing;
-    this.confirmButton.disabled = !confirmable;
-    this.repeatButton.hidden = !placing;
-    this.repeatButton.disabled = !confirmable;
   }
 
   public destroy(): void {

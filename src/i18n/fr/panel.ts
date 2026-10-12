@@ -467,7 +467,6 @@ export const panel = {
     veins: { ironOre: 'fer', coal: 'charbon', stone: 'pierre' } satisfies Record<DrillDeposit, string>,
     polluted: { text: 'Terre polluée', remedy: 'Une station de dépollution à côté la rendra saine' },
     radioactive: { text: 'Terre radioactive', remedy: 'Inconstructible, et rien ne la nettoie pour l’instant' },
-    road: { text: 'Une route passe ici', remedy: 'Retirez-la d’abord : Bâtir › Route › Retirer' },
     shore: { text: 'Le puits se pose au bord d’une rivière', remedy: 'Collez-le à l’eau : il y puise' },
     nearHall: { text: 'Trop près de la mairie', remedy: 'Éloignez-vous, hors du cercle autour d’elle' },
     treesAndRocks: { text: 'Des arbres et des rochers gênent', remedy: 'Adam peut les récolter' },
@@ -480,17 +479,5 @@ export const panel = {
     region: 'Région à conquérir — vainquez son gardien d’abord',
     /** Ce qu'une foreuse posée là extraira. */
     extracts: (item: string): string => `Extraira : ${item}`,
-    /** Pourquoi une partie d'un tracé de route ne sera pas pavée. */
-    roads: {
-      noStone: { text: 'Plus de pierre pour la suite', remedy: 'Cassez des rochers, ou tracez dans le rayon de la mairie' },
-      terrain: { text: 'Pas sur l’eau', remedy: '' },
-      occupied: { text: 'Un bâtiment est sur le tracé', remedy: '' },
-      resource: { text: 'Un arbre ou un rocher gêne', remedy: 'Adam peut le récolter' },
-      enemyZone: { text: 'Une base mutante tient la zone', remedy: 'Abattez-la avec un arc de son niveau' },
-      unexplored: { text: 'Le tracé entre dans l’inconnu', remedy: 'Explorez d’abord la zone' },
-      region: { text: 'Le tracé entre dans une région à conquérir', remedy: 'Vainquez d’abord son gardien' },
-      polluted: { text: 'Terre polluée sur le tracé', remedy: 'Une station de dépollution la rendra saine' },
-      radioactive: { text: 'Terre radioactive sur le tracé', remedy: 'Inconstructible, et rien ne la nettoie pour l’instant' },
-    },
   },
 };

@@ -311,13 +311,6 @@ describe('brouillard de guerre', () => {
     expect(fresh.canPlace('watchtower', spot.tx, spot.ty)).toBeNull();
   });
 
-  it('pas de route dans l’inconnu', () => {
-    const world = new World(7);
-    const adam = adamTile(world);
-
-    expect(world.roadBlock(adam.tx + 40, adam.ty)).toBe('unexplored');
-  });
-
   it('se lève au réglage de débogage', () => {
     const world = new World(7);
     const adam = adamTile(world);

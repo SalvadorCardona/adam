@@ -297,6 +297,17 @@ describe('sauvegarde', () => {
     }
   });
 
+  it('une sauvegarde d’avant la suppression des routes du joueur se charge : les dalles disparaissent', () => {
+    const raw = JSON.parse(JSON.stringify(state)) as { roads?: Record<string, number[]> };
+
+    raw.roads = { '0,0': [0, 1, 33], '-1,2': [5] };
+
+    const copy = deserialize(raw);
+
+    expect(serialize(copy)).not.toHaveProperty('roads');
+    expect(copy.entities.size).toBe(original.entities.size);
+  });
+
   it('refuse un sexe inconnu', () => {
     const raw = JSON.parse(JSON.stringify(state)) as { mobiles: { kind: string; sex?: string }[] };
 

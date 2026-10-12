@@ -106,7 +106,6 @@ const TAINT_COLORS: Record<ContaminationKind, Color> = {
   radioactive: PALETTE.orange.shade,
 };
 
-const ROAD_COLOR: Color = PALETTE.paper.shade;
 const VEIL_COLOR: Color = PALETTE.ink.base;
 /** Une région à conquérir : ses hachures jaunes, une diagonale sur `HATCH`, et leur part. */
 const OPEN_COLOR: Color = PALETTE.yellow.base;
@@ -385,7 +384,7 @@ export class WorldMap {
     const context = block.canvas.getContext('2d')!;
     const size = BLOCK * BLOCK_PX;
     const image = context.createImageData(size, size);
-    const { seed, resources, roads, land } = this.world;
+    const { seed, resources, land } = this.world;
     const [or, og, ob] = this.colorOf(OPEN_COLOR);
     const [lr, lg, lb] = this.colorOf(VEIL_COLOR);
     const [br, bgr, bb] = this.colorOf(BORDER_COLOR);
@@ -398,7 +397,7 @@ export class WorldMap {
 
         if (sight === 'unexplored') continue;
 
-        let [r, g, b] = this.colorOf(tileColor(seed, tx, ty, roads.has(tx, ty), resources.at(tx, ty)?.id ?? null, land.at(tx, ty)));
+        let [r, g, b] = this.colorOf(tileColor(seed, tx, ty, resources.at(tx, ty)?.id ?? null, land.at(tx, ty)));
         const region = this.world.regionAt(tx, ty);
         const state = this.world.regionState(region);
 
@@ -703,8 +702,7 @@ class DragTap implements PointerConsumer {
 }
 
 /** La couleur d'une tuile : la route, sinon l'arbre ou le rocher, sinon le filon, sinon le sol. */
-function tileColor(seed: number, tx: number, ty: number, road: boolean, resource: ResourceId | null, tainted: ContaminationKind | null): Color {
-  if (road) return ROAD_COLOR;
+function tileColor(seed: number, tx: number, ty: number, resource: ResourceId | null, tainted: ContaminationKind | null): Color {
   if (tainted) return TAINT_COLORS[tainted];
   if (resource) return RESOURCE_COLORS[resource];
 

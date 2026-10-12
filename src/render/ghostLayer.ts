@@ -38,11 +38,6 @@
  * tombe sur un emplacement refusé (`refuse()`). Deux minuteurs de vue, figés
  * sous `prefers-reduced-motion` ; le fantôme posé au doigt ne bouge pas.
  *
- * La route armée montre son tracé (`updateRoad`) : une case par tuile,
- * menthe si elle sera pavée, blanche si elle l'est déjà, corail si elle est
- * refusée (eau, bâti, arbre, pierre qui manque) — d'après `World.roadPlan`,
- * le juge du tick. Au marteau, les dalles qu'il retirera passent au corail.
- *
  * Le `Graphics` n'est redessiné que lorsque la case ou la validité change :
  * retesseller un rectangle à 120 Hz pour rien serait le genre de gaspillage
  * qu'on paye en batterie.
@@ -56,7 +51,7 @@ import { BUILD_REACH_TILES } from '../sim/player.ts';
 import { oreAt } from '../sim/terrain.ts';
 import type { Footing } from '../sim/footing.ts';
 import type { PlacementBlock, World } from '../sim/world.ts';
-import type { GhostState, RoadTool, RoadTrail } from '../input/placement.ts';
+import type { GhostState } from '../input/placement.ts';
 import { ITEM_TONES, iconKey } from './indicatorLayer.ts';
 import type { SpriteLibrary } from './spriteLibrary.ts';
 
@@ -117,9 +112,6 @@ export class GhostLayer {
   private readonly oreIcons = new Container();
   private readonly oreIconPool: Sprite[] = [];
   private lastOreKey = '';
-  /** Le tracé de route : une case par tuile. */
-  private readonly trail = new Graphics();
-  private lastTrailKey = '';
   private readonly preview = new Sprite();
   /** Le fantôme lui-même — sprite, cases, liseré — : c'est lui qui secoue la tête. */
   private readonly ghost = new Container();
@@ -154,7 +146,6 @@ export class GhostLayer {
       this.keepOut,
       this.reach,
       this.ghost,
-      this.trail,
     );
     this.container.visible = false;
   }
@@ -170,10 +161,6 @@ export class GhostLayer {
     block: PlacementBlock | null,
     deltaMs: number,
   ): void {
-    this.trail.visible = false;
-    this.ghost.visible = true;
-    this.reach.visible = true;
-
     if (!armed) {
       this.container.visible = false;
       this.lastKey = '';
@@ -292,55 +279,6 @@ export class GhostLayer {
         )
         .fill({ color: hex(tone.base), alpha: 0.45 })
         .stroke({ width: STROKE.width, color: VALID, alignment: 1 });
-    }
-  }
-
-  /**
-   * Le mode route : la grille, le rayon de la mairie — la ville paie les
-   * tuiles qu'il couvre —, et le tracé. Appelé à la place d'`update` tant
-   * que la route est armée.
-   */
-  public updateRoad(tool: RoadTool, trail: RoadTrail | null, deltaMs: number): void {
-    this.container.visible = true;
-    this.ghost.visible = false;
-    this.reach.visible = false;
-    this.trail.visible = true;
-    this.lastKey = '';
-    this.lastOreKey = '';
-    const last = trail?.tiles.at(-1);
-
-    this.updateGrid(last ? { x: last.tx + 0.5, y: last.ty + 0.5 } : null);
-    this.updateOres(false);
-    this.updateWarehouseReach();
-    this.animate(false, deltaMs);
-    this.trail.x = this.ghost.x;
-
-    const tiles = trail?.tiles ?? [];
-    const states =
-      tool === 'pave'
-        ? this.world.roadPlan(tiles).map((step) => step.state)
-        : tiles.map(({ tx, ty }) => (this.world.roads.has(tx, ty) ? 'remove' : 'none'));
-    const key = `${tool}:${tiles.map(({ tx, ty }, i) => `${tx},${ty},${states[i] ?? ''}`).join(';')}`;
-
-    if (key === this.lastTrailKey) return;
-    this.lastTrailKey = key;
-    this.trail.clear();
-
-    for (const [i, { tx, ty }] of tiles.entries()) {
-      const state = states[i];
-      const color = state === 'pave' ? VALID : state === 'paved' || state === 'none' ? WHITE : INVALID;
-      const fill = state === 'paved' || state === 'none' ? 0.15 : 0.5;
-
-      this.trail
-        .roundRect(
-          tx * TILE_SIZE + CELL_INSET,
-          ty * TILE_SIZE + CELL_INSET,
-          TILE_SIZE - CELL_INSET * 2,
-          TILE_SIZE - CELL_INSET * 2,
-          RADIUS.block,
-        )
-        .fill({ color, alpha: fill })
-        .stroke({ width: STROKE.width, color, alpha: 0.9, alignment: 1 });
     }
   }
 

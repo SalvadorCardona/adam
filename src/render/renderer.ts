@@ -19,16 +19,16 @@
  */
 
 import { Application, Container } from 'pixi.js';
-import type { TileCoord } from '../core/grid.ts';
 import { GROUND, SIGNAL_WAVES, hex } from '../data/artDirection.ts';
 import type { BuildingId } from '../data/buildings.ts';
 import type { ItemId } from '../data/items.ts';
-import type { GhostState, RoadTool, RoadTrail } from '../input/placement.ts';
+import type { GhostState } from '../input/placement.ts';
 import type { EntityId } from '../sim/types.ts';
 import type { Selection } from '../ui/creatureView.ts';
 import { STEP_MS, type World } from '../sim/world.ts';
 import { Camera, ZOOM, stepZoom } from './camera.ts';
 import { ChunkLayer } from './chunkLayer.ts';
+import { trailsOf } from './meadow.ts';
 import { EnemyBaseLayer } from './enemyBaseLayer.ts';
 import { ChestLayer } from './chestLayer.ts';
 import { SpotLayer } from './spotLayer.ts';
@@ -51,12 +51,18 @@ import { WeatherLayer } from './weatherLayer.ts';
 /** Le recul de la caméra quand l'antenne s'allume : de quoi voir le pylône entier et ses premières ondes. */
 const SIGNAL_ZOOM = 0.75;
 
+/** Tous les combien de frames les chemins de terre battue se relisent dans la ville. */
+const TRAIL_CHECK_FRAMES = 30;
+
 export class GameRenderer {
   public readonly camera = new Camera();
 
   private readonly worldContainer = new Container();
   private readonly hudContainer = new Container();
   private readonly chunkLayer: ChunkLayer;
+  /** Les chemins de terre battue se relisent toutes les `TRAIL_CHECK_FRAMES` frames : la ville change rarement. */
+  private trailClock = 0;
+  private trailKey: string | null = null;
   private readonly waterLayer: WaterLayer;
   private readonly shadows = new Container();
   private readonly entityLayer: EntityLayer;
@@ -88,16 +94,11 @@ export class GameRenderer {
     this.world = world;
     this.library = library;
     this.tiles = new TerrainTiles(library);
-    this.chunkLayer = new ChunkLayer(app.renderer, library, this.tiles, world.seed, world.roads, world.land);
-    // Une route posée ou retirée rebake le sol sous elle : c'est le seul changement que le sol connaisse.
-    const repave = ({ tiles }: { tiles: readonly TileCoord[] }): void => {
-      for (const { tx, ty } of tiles) this.chunkLayer.invalidate(tx, ty);
-    };
-
-    world.events.on('roadPaved', repave);
-    world.events.on('roadRemoved', repave);
+    this.chunkLayer = new ChunkLayer(app.renderer, library, this.tiles, world.seed, world.land);
     // Une terre dépolluée redevient du sol ordinaire : le bloc se rebake.
-    world.events.on('landCleaned', repave);
+    world.events.on('landCleaned', ({ tiles }) => {
+      for (const { tx, ty } of tiles) this.chunkLayer.invalidate(tx, ty);
+    });
     this.waterLayer = new WaterLayer(world.seed);
     this.signboards = new Signboards(app.renderer, library);
     this.entityLayer = new EntityLayer(world, library, this.tiles, this.shadows, this.signboards);
@@ -295,16 +296,8 @@ export class GameRenderer {
     this.camera.shake(amount);
   }
 
-  /**
-   * `armed` : le bâtiment armé au menu de construction, ou `null` hors du mode construction.
-   * `road` : l'outil route armé à sa place, et son tracé.
-   */
-  public draw(
-    alpha: number,
-    armed: BuildingId | null,
-    ghost: GhostState | null,
-    road: { tool: RoadTool; trail: RoadTrail | null } | null = null,
-  ): void {
+  /** `armed` : le bâtiment armé au menu de construction, ou `null` hors du mode construction. */
+  public draw(alpha: number, armed: BuildingId | null, ghost: GhostState | null): void {
     const building = armed !== null;
     const { player } = this.world;
 
@@ -329,6 +322,7 @@ export class GameRenderer {
     );
     this.worldContainer.scale.set(this.camera.zoom);
 
+    this.updateTrails();
     this.chunkLayer.update(this.camera);
     this.waterLayer.update(this.camera, this.app.ticker.deltaMS);
     // Un seul appel au juge par frame : le fantôme colore les cases, l'arbre qui gêne clignote.
@@ -342,13 +336,32 @@ export class GameRenderer {
     this.particles.update(this.app.ticker.deltaMS);
     this.nightLayer.update(alpha);
     this.fogLayer.update(this.camera);
-    if (road) this.ghostLayer.updateRoad(road.tool, road.trail, this.app.ticker.deltaMS);
-    else this.ghostLayer.update(armed, ghost, block, this.app.ticker.deltaMS);
+    this.ghostLayer.update(armed, ghost, block, this.app.ticker.deltaMS);
     this.workReach.update(building ? ghost : null, this.selected?.kind === 'building' ? this.selected.id : null);
     this.selection.update(this.selected, alpha, this.app.ticker.deltaMS);
     this.weather.update(this.camera, this.app.ticker.deltaMS, alpha);
     this.signal.update(this.camera, this.app.ticker.deltaMS);
     this.indicators.update(this.camera, this.app.ticker.deltaMS, alpha);
+  }
+
+  /**
+   * Les chemins entre la mairie et ses bâtiments : relus de temps en temps,
+   * passés au sol seulement s'ils ont changé — un bâtiment achevé, tombé ou
+   * annulé. Le sol rebake alors les blocs qu'ils traversent.
+   */
+  private updateTrails(): void {
+    if (this.trailClock > 0) {
+      this.trailClock -= 1;
+      return;
+    }
+    this.trailClock = TRAIL_CHECK_FRAMES;
+
+    const trails = trailsOf(this.world.seed, this.world.entities.get(this.world.townHallId), this.world.entities.values());
+    const key = trails.map((trail) => trail.key).join(';');
+
+    if (key === this.trailKey) return;
+    this.trailKey = key;
+    this.chunkLayer.setTrails(trails);
   }
 
   /** Nombre de blocs de sol bakés — le HUD de debug l'affiche. */
