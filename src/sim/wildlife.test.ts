@@ -6,6 +6,7 @@ import { DEATH } from '../data/death.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { nearestFoe } from './combat.ts';
 import { PLAYER_MAX_HP } from './player.ts';
+import type { WorldState } from './save.ts';
 import { habitatAt } from './terrain.ts';
 import type { Beast, Mutant } from './types.ts';
 import { densOfChunk, stepBeast } from './wildlife.ts';
@@ -380,7 +381,7 @@ describe('Adam blessé', () => {
     for (let i = 0; i < 100; i += 1) world.tick();
 
     const left = world.respawnTicks;
-    const copy = World.restore(JSON.parse(JSON.stringify(world.snapshot())));
+    const copy = World.restore(JSON.parse(JSON.stringify(world.snapshot())) as WorldState);
     expect(left).toBeGreaterThan(0);
     expect(copy.respawnTicks).toBe(left);
     expect(copy.dead).toBe(true);
