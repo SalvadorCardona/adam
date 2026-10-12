@@ -893,10 +893,12 @@ Les règles, en résumé :
   barre et chaque bloc des deux groupes la prennent, sans marge ni `top` ni
   hauteur à eux ; chaque bloc est sa propre carte blanche, aux rayons de la
   barre (`--hud-r`), sans cadre qui englobe un groupe. Tout tient sur une ligne
-  dès 1366 px (la barre 420 px au plus, le groupe de gauche `--hud-side`,
+  dès 1600 px (la barre 420 px au plus, le groupe de gauche `--hud-side`,
   520 px, la droite à sa taille) ; en
-  dessous, la barre reste seule en haut et les deux groupes font une seconde
-  rangée juste dessous, de même hauteur. `src/ui/hudTop.test.ts` verrouille ces
+  dessous, la barre (avec les contrôles dès 600 px) reste en haut, le groupe de
+  gauche prend toute la largeur de la rangée dessous — la ville y lit ses
+  stocks — et la météo, quand elle tombe, une dernière rangée (`.hud-right`
+  sans météo n'occupe rien). `src/ui/hudTop.test.ts` verrouille ces
   règles dans `style.css` : un bloc du haut qui prend sa propre hauteur, une
   marge ou une transformation casse le test.
   La **barre** (`.hud-topbar`, 920 px au plus, 420 sur la rangée unique) ne

@@ -128,4 +128,41 @@ describe('le haut de l’écran', () => {
     for (const rule of expanded) expect(rule.declarations.has('transform')).toBe(false);
   });
 
+  /** Les zones nommées d'un `grid-template-areas` : une chaîne par rangée, mots séparés. */
+  function areas(media: string): string[][] {
+    const rule = rules.find((r) => r.media === media && r.selectors.includes('.hud-top') && r.declarations.has('grid-template-areas'));
+
+    return (rule?.declarations.get('grid-template-areas') ?? '').split("' '").map((row) => row.replace(/'/g, '').trim().split(' '));
+  }
+
+  it('ne met la météo ni dans la rangée de la ville ni dans sa colonne, sous 1600 px', () => {
+    for (const media of ['', '@media (min-width: 600px)']) {
+      const grid = areas(media);
+
+      expect(grid.length, media).toBeGreaterThan(1);
+      for (const row of grid) {
+        if (row.includes('left')) expect(row, `${media} : ${row.join(' ')}`).not.toContain('right');
+      }
+    }
+  });
+
+  it('ne passe à la rangée unique qu’à 1600 px, où le groupe de gauche tient tout entier', () => {
+    expect(areas('@media (min-width: 1600px)')).toEqual([['left', 'main', 'right', 'controls']]);
+    expect(rules.some((rule) => rule.media === '@media (min-width: 1366px)' && rule.selectors.includes('.hud-top'))).toBe(false);
+  });
+
+  it('retire le groupe de droite de la grille tant qu’aucune météo ne tombe', () => {
+    const empty = rules.find((rule) => rule.selectors.some((selector) => selector.startsWith('.hud-right:not(:has(.hud-weather')));
+
+    expect(empty?.declarations.get('display')).toBe('none');
+  });
+
+  it('laisse la ville se réduire et défiler dans son groupe', () => {
+    const town = rules.find((rule) => rule.selectors.includes('.hud .hud-top .hud-town'));
+
+    expect(town?.declarations.get('flex')).toBe('0 1 auto');
+    expect(town?.declarations.get('min-width')).toBe('0');
+    expect(town?.declarations.get('overflow')).toBe('hidden');
+  });
+
 });

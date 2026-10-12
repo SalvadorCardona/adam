@@ -261,12 +261,12 @@ button:disabled,
  * ses cases (`--cell-h`). Aucun cadre n'englobe un groupe : chaque bloc est sa
  * propre carte blanche, de même hauteur et de mêmes rayons que la barre.
  *
- * Tout ne tient sur une ligne qu'à partir de 1366 px : la barre veut 420 px au
+ * Tout ne tient sur une ligne qu'à partir de 1600 px : la barre veut 420 px au
  * plus (l'objectif et son intitulé), le groupe de gauche `--hud-side`, 520 px
  * (la population, l'horloge, le Prestige et quelques objets de la ville), la
- * météo le reste. En dessous, la
- * barre reste seule en haut, et les deux groupes font une seconde rangée juste
- * dessous, alignée elle aussi.
+ * météo le reste. En dessous, la barre (et les contrôles dès 600 px) reste en
+ * haut, le groupe de gauche prend toute la largeur de la rangée dessous — la
+ * ville y lit ses stocks — et la météo, quand elle tombe, une dernière rangée.
  */
 .hud-top {
   --hud-margin: 8px;
@@ -287,11 +287,12 @@ button:disabled,
   left: calc(var(--safe-left) + var(--hud-margin));
   right: calc(var(--safe-right) + var(--hud-margin));
   display: grid;
-  grid-template-columns: minmax(0, 1fr) fit-content(50%);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    'main main'
-    'left right'
-    'controls controls';
+    'main'
+    'left'
+    'controls'
+    'right';
   align-items: start;
   gap: var(--hud-gap);
   pointer-events: none;
@@ -319,9 +320,15 @@ button:disabled,
   grid-area: left;
 }
 
+/* Sans météo, le groupe de droite ne tient aucune rangée : l'espace de la grille ne bouge pas. */
+.hud-right:not(:has(.hud-weather:not([hidden]))) {
+  display: none;
+}
+
 /* De droite à gauche : la météo au bord. */
 .hud-right {
   grid-area: right;
+  justify-self: end;
   flex-direction: row-reverse;
   flex-wrap: wrap;
 }
@@ -1805,7 +1812,8 @@ button:disabled,
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       'main controls'
-      'left right';
+      'left left'
+      'right right';
   }
 
   .hud-main {
@@ -1830,12 +1838,12 @@ button:disabled,
 }
 
 /*
- * Un bureau : tout le haut sur une seule rangée. Le groupe de gauche (la ville,
+ * Un grand bureau : tout le haut sur une seule rangée. Le groupe de gauche (la ville,
  * la population, l'horloge) prend ce qui reste ; la barre, 420 px au plus, puis
  * la météo à droite, à sa taille. La ville défile de côté dans ce qui lui
  * reste.
  */
-@media (min-width: 1366px) {
+@media (min-width: 1600px) {
   .hud-top {
     grid-template-columns: minmax(var(--hud-side), 1fr) minmax(0, 420px) auto auto;
     grid-template-areas: 'left main right controls';
