@@ -102,7 +102,7 @@ montre qu'en mode construction, en pointillés autour du fantôme.
 | herbe | `#93e8ae` | `#8ae0a6` | `#62c894` | `#b3f2c6` |
 | sable | `#ffd98a` | `#ffd382` | `#f2b766` | `#ffe9b8` |
 | eau | `#45d6ff` | `#3ccaf8` | `#2fb8ea` | `#b8f1ff` |
-| roche | `#b8c3ff` | `#afbaf9` | `#8a97e6` | `#d3daff` |
+| roche | `#f3bfc8` | `#ecb3be` | `#c97d9f` | `#fedde0` |
 
 L'eau n'est pas une tuile : le sol baké pose sous elle la terre de sa rive,
 et **un seul shader** la peint par-dessus, au pixel près
