@@ -19,6 +19,7 @@ export const settings: Messages['settings'] = {
   music: 'Music',
   signs: 'Building signs',
   haptics: 'Vibration',
+  perf: 'Performance counter',
   sfxVolume: 'Sound effects volume',
   musicVolume: 'Music volume',
   toggle: (name, on) => `${name}: ${on ? 'on' : 'off'}`,

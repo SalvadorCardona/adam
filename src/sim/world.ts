@@ -988,6 +988,8 @@ export class World {
   public objectiveBase: WorldStats = emptyStats();
 
   private readonly scheduler = new Scheduler();
+  /** Réveils du scheduler au dernier tick — une mesure pour le compteur de performances, pas de l'état. */
+  private woken = 0;
   private readonly queue: Command[] = [];
   private readonly log: CommandLogEntry[] = [];
   private rng: StatefulRng;
@@ -1487,7 +1489,10 @@ export class World {
     this.watchOverColony();
     if (!this.dead) this.shootPlayerBow();
 
-    for (const id of this.scheduler.due(this.tickCount)) {
+    const due = this.scheduler.due(this.tickCount);
+
+    this.woken = due.length;
+    for (const id of due) {
       const entity = this.entities.get(id);
 
       if (entity) this.wake(entity);
@@ -9864,6 +9869,11 @@ export class World {
   /** Nombre de réveils en attente — affiché dans le HUD de debug. */
   public pendingWakes(): number {
     return this.scheduler.size();
+  }
+
+  /** Réveils traités au dernier tick — lus par le compteur de performances. */
+  public wakesLastTick(): number {
+    return this.woken;
   }
 
   /** La première tuile praticable collée à l'emprise, en commençant par le bas, ou `null`. */

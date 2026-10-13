@@ -1,7 +1,7 @@
 /**
  * Le menu des réglages, derrière le bouton engrenage du HUD : la langue, les
  * sons, la musique et un volume pour chacun des deux, les pancartes des
- * bâtiments, la manette (son aide, sa vibration, sa zone morte). Rien qui touche à la partie — ce sont des préférences de
+ * bâtiments, le compteur de performances, la manette (son aide, sa vibration, sa zone morte). Rien qui touche à la partie — ce sont des préférences de
  * l'appareil, gardées hors de la sauvegarde.
  *
  * Ouvert, il arrête l'horloge (`main.ts` lit `open`) ; il se ferme par sa
@@ -23,6 +23,8 @@ export interface SettingsActions {
   toggleSound(): void;
   toggleMusic(): void;
   toggleSigns(): void;
+  /** Le compteur de FPS et de ticks, au bas du HUD. */
+  togglePerf(): void;
   toggleHaptics(): void;
   toggleNotification(kind: NotificationKind): void;
   cycleNotificationLimit(): void;
@@ -58,6 +60,7 @@ export class SettingsPanel {
   private readonly musicButton: HTMLButtonElement;
   private readonly signsButton: HTMLButtonElement;
   private readonly hapticsButton: HTMLButtonElement;
+  private readonly perfButton: HTMLButtonElement;
   private readonly padLabel: HTMLHeadingElement;
   private readonly padHelpButton: HTMLButtonElement;
   private readonly padRumbleButton: HTMLButtonElement;
@@ -76,6 +79,7 @@ export class SettingsPanel {
   private music = true;
   private signs = true;
   private haptics = true;
+  private perf = false;
 
   public constructor(actions: SettingsActions) {
     this.actions = actions;
@@ -148,6 +152,11 @@ export class SettingsPanel {
     this.hapticsButton.className = 'button-secondary settings-toggle';
     this.hapticsButton.addEventListener('click', () => actions.toggleHaptics());
 
+    this.perfButton = document.createElement('button');
+    this.perfButton.type = 'button';
+    this.perfButton.className = 'button-secondary settings-toggle';
+    this.perfButton.addEventListener('click', () => actions.togglePerf());
+
     // La manette : son aide, sa vibration, la zone morte de ses sticks.
     this.padLabel = document.createElement('h3');
     this.padLabel.className = 'settings-label';
@@ -202,6 +211,7 @@ export class SettingsPanel {
       this.musicVolume.root,
       this.signsButton,
       this.hapticsButton,
+      this.perfButton,
       this.padLabel,
       this.padHelpButton,
       this.padRumbleButton,
@@ -225,6 +235,7 @@ export class SettingsPanel {
       this.setMusic(this.music);
       this.setSigns(this.signs);
       this.setHaptics(this.haptics);
+      this.setPerf(this.perf);
       this.padLabel.textContent = t().gamepad.heading;
       this.padHelpButton.replaceChildren(uiIcon('hint', 22), t().gamepad.helpTitle);
       this.setPadRumble(this.padRumble);
@@ -288,6 +299,11 @@ export class SettingsPanel {
   public setHaptics(on: boolean): void {
     this.haptics = on;
     toggleLabel(this.hapticsButton, on, uiIcon(on ? 'vibrateOn' : 'vibrateOff', 22), t().settings.haptics);
+  }
+
+  public setPerf(on: boolean): void {
+    this.perf = on;
+    toggleLabel(this.perfButton, on, uiIcon('hint', 22), t().settings.perf);
   }
 
   /** La vibration de la manette et la zone morte de ses sticks (en part de leur course). */

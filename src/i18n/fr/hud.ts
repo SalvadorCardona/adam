@@ -22,6 +22,9 @@ const s = (n: number): string => (n > 1 ? 's' : '');
 const lower = (name: string): string => String(name).toLowerCase();
 
 export const hud = {
+  /** Le compteur de performances : images par seconde, durée d'un tick, réveils du scheduler par tick. */
+  perf: (fps: number, tickMs: number, wakes: number): string =>
+    `${fps.toFixed(0)} FPS · ${tickMs.toFixed(2).replace('.', ',')} ms/tick · ${wakes.toFixed(1).replace('.', ',')} réveils/tick`,
   /** Pourquoi un bâtiment armé ne se pose pas (`PlacementRejection`). */
   rejection: {
     occupied: 'Emplacement déjà occupé',

@@ -56,6 +56,7 @@ import { LocalLocale } from './storage/localLocale.ts';
 import { LocalGamepad, type GamepadPrefs } from './storage/localGamepad.ts';
 import { LocalHaptics } from './storage/localHaptics.ts';
 import { LocalNotifications } from './storage/localNotifications.ts';
+import { LocalPerf } from './storage/localPerf.ts';
 import { LocalSigns } from './storage/localSigns.ts';
 import { LocalZoom } from './storage/localZoom.ts';
 import { TILE_SIZE } from './core/grid.ts';
@@ -78,6 +79,7 @@ import { haptics } from './ui/haptics.ts';
 import { PAD_POINTER_ID } from './ui/padCursor.ts';
 import { PadHelp } from './ui/padHelp.ts';
 import { PadHints } from './ui/padHints.ts';
+import { PerfSampler } from './ui/perfMeter.ts';
 import { NotificationPrompt } from './ui/notificationPrompt.ts';
 import { TabLockPanel } from './ui/tabLockPanel.ts';
 import { Notifier, browserBackend } from './ui/notifier.ts';
@@ -532,6 +534,18 @@ async function main(): Promise<void> {
     settings.setSigns(on);
   };
 
+  // Le compteur de performances : même principe, caché tant qu'on ne l'a pas demandé.
+  const perfPrefs = scenario ? new LocalPerf(null) : LocalPerf.browser();
+  const perfSampler = new PerfSampler();
+  let perfOn = perfPrefs.load();
+  const showPerf = (on: boolean): void => {
+    perfOn = on;
+    perfPrefs.save(on);
+    perfSampler.reset();
+    hud.setPerf(on);
+    settings.setPerf(on);
+  };
+
   // L'aide « Contrôles manette », ouverte depuis les réglages, par-dessus eux.
   const padHelp = new PadHelp();
 
@@ -544,6 +558,7 @@ async function main(): Promise<void> {
     toggleSound: () => settings.setSound(!audio.toggleMuted()),
     toggleMusic: () => settings.setMusic(audio.toggleMusic()),
     toggleSigns: () => showSigns(!signsOn),
+    togglePerf: () => showPerf(!perfOn),
     toggleHaptics: () => showHaptics(!haptics.enabled),
     toggleNotification: (kind) => {
       notifier.setEnabled(kind, !notifier.enabled(kind));
@@ -567,6 +582,8 @@ async function main(): Promise<void> {
 
   renderer.setSigns(signsOn);
   settings.setSigns(signsOn);
+  hud.setPerf(perfOn);
+  settings.setPerf(perfOn);
 
 
   // Les vibrations : même principe, et l'interrupteur disparaît là où le navigateur ne sait pas vibrer.
@@ -1017,7 +1034,10 @@ async function main(): Promise<void> {
 
     while (!guest && accumulator >= STEP_MS && !celebrating) {
       pushAxisIfChanged();
+      const tickStart = perfOn ? performance.now() : 0;
+
       world.tick();
+      if (perfOn) perfSampler.tick(performance.now() - tickStart, world.wakesLastTick());
       hosting?.afterTick();
       accumulator -= STEP_MS;
     }
@@ -1031,6 +1051,11 @@ async function main(): Promise<void> {
     worldMap.update(ticker.deltaMS);
 
     renderer.draw(accumulator / STEP_MS, placement.armedBuilding(), placement.ghost);
+    if (perfOn) {
+      const reading = perfSampler.frame(ticker.deltaMS);
+
+      if (reading) hud.showPerf(reading);
+    }
     hud.update(ticker.FPS, renderer.bakedChunks, renderer.atlasStats, renderer.waterStats, renderer.weatherParticles);
 
     // Lire la mise en page force un reflow : une fois tous les dix cadres suffit.
