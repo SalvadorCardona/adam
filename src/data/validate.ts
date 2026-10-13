@@ -246,6 +246,9 @@ export function validatePrototypes(): string[] {
   for (const [id, recipe] of Object.entries(RECIPES) as [string, RecipeProto][]) {
     if (!(recipe.building in BUILDINGS)) {
       errors.push(`RECIPES.${id} : bâtiment inconnu « ${recipe.building} »`);
+    } else if (!BUILDINGS[recipe.building].menu) {
+      // Un bâtiment qu'on ne peut pas bâtir ne fera jamais tourner sa recette.
+      errors.push(`RECIPES.${id} : « ${recipe.building} » n'est pas constructible`);
     } else if (buildingsWithRecipe.has(recipe.building) && BUILDINGS[recipe.building].kind === 'forge') {
       // Une forge trouve sa recette par son id (`recipeOf`) : une seconde ne tournerait jamais.
       errors.push(`RECIPES.${id} : « ${recipe.building} » a déjà une recette`);
@@ -267,13 +270,13 @@ export function validatePrototypes(): string[] {
     }
 
     // La nurserie seule produit autre chose qu'un objet : un enfant.
-    if (Object.keys(recipe.outputs).length === 0 && BUILDINGS[recipe.building].kind !== 'nursery') {
+    if (Object.keys(recipe.outputs).length === 0 && BUILDINGS[recipe.building]?.kind !== 'nursery') {
       errors.push(`RECIPES.${id} : aucune sortie`);
     }
 
     const needs = sum(recipe.inputs);
 
-    if (needs > BUILDINGS[recipe.building].storage) {
+    if (needs > (BUILDINGS[recipe.building]?.storage ?? Infinity)) {
       errors.push(`RECIPES.${id} : le coffre de « ${recipe.building} » ne peut pas contenir ses entrées`);
     }
   }
