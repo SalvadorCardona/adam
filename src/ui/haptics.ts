@@ -15,6 +15,10 @@ export const HAPTIC_PATTERNS = {
   done: [30, 40, 30],
   /** Une recherche, un objectif, un niveau : le plus long des petits motifs. */
   win: [40, 50, 40, 50, 90],
+  /** Un bâtiment posé : la confirmation d'un placement, à sentir sans regarder. */
+  place: [20],
+  /** Une vague annoncée, la nuit qui tombe : plus marqué qu'une pose, plus bref que l'alarme. */
+  wave: [90, 60, 90, 60, 160],
   /** La mairie frappée hors de l'écran. */
   alarm: [140, 80, 140],
 } as const satisfies Record<string, readonly number[]>;
@@ -22,7 +26,7 @@ export const HAPTIC_PATTERNS = {
 export type HapticName = keyof typeof HAPTIC_PATTERNS;
 
 /** Le délai minimal entre deux vibrations d'un même motif, en ms : un téléphone qui vibre sans arrêt se pose sur la table. */
-const MIN_GAP_MS: Record<HapticName, number> = { tick: 400, done: 150, win: 150, alarm: 4000 };
+const MIN_GAP_MS: Record<HapticName, number> = { tick: 400, done: 150, win: 150, place: 150, wave: 4000, alarm: 4000 };
 
 export class Haptics {
   private on = true;

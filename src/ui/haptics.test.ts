@@ -17,6 +17,18 @@ describe('Haptics', () => {
     expect(vibrate).toHaveBeenCalledWith([30, 40, 30]);
   });
 
+  it('distingue la pose, courte, de l\'annonce d\'une vague, plus marquée', () => {
+    const vibrate = vi.fn();
+
+    vi.stubGlobal('navigator', { vibrate });
+    const haptics = new Haptics();
+
+    haptics.pulse('place', 1000);
+    haptics.pulse('wave', 1000);
+    expect(vibrate).toHaveBeenNthCalledWith(1, [20]);
+    expect(vibrate).toHaveBeenNthCalledWith(2, [90, 60, 90, 60, 160]);
+  });
+
   it('se tait une fois coupé, et arrête la vibration en cours', () => {
     const vibrate = vi.fn();
 
