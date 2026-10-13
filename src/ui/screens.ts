@@ -47,13 +47,15 @@ export interface TitleOptions {
   collection: () => Collection;
   /** L'engrenage du coin : le menu des réglages, la langue d'abord. */
   onSettings: () => void;
+  /** Le bouton « Compte » (`AccountPanel.button`) : facultatif, on joue sans. */
+  accountButton: HTMLButtonElement;
 }
 
 export class TitleScreen {
   public readonly root: HTMLElement;
   private readonly unsubscribe: () => void;
 
-  public constructor({ resume, notice, onPlay, onRestart, garden, gardenActions, record, collection, onSettings }: TitleOptions) {
+  public constructor({ resume, notice, onPlay, onRestart, garden, gardenActions, record, collection, onSettings, accountButton }: TitleOptions) {
     this.root = document.createElement('div');
     this.root.className = 'overlay title-screen';
 
@@ -204,6 +206,8 @@ export class TitleScreen {
     });
     panel.append(collectionButton);
     this.root.append(collectionPanel.root);
+
+    panel.append(accountButton);
 
     if (record > 0) {
       const best = document.createElement('p');

@@ -87,7 +87,10 @@ import { testBanner, testScenarioOf } from './ui/testRoute.ts';
 import { ZoomControls } from './ui/zoomControls.ts';
 import { SeenArea } from './ui/mapSight.ts';
 import { WorldMap } from './ui/worldMap.ts';
+import { AccountClient } from './net/account.ts';
 import { Connection } from './net/connection.ts';
+import { LocalAccount } from './storage/localAccount.ts';
+import { AccountPanel } from './ui/accountPanel.ts';
 
 /**
  * Clamp anti-spirale de la mort.
@@ -249,6 +252,14 @@ async function main(): Promise<void> {
   const connection = Connection.browser();
 
   connection.start();
+
+  // Le compte, facultatif : la session gardée sur l'appareil se revérifie au passage en ligne.
+  const accounts = new AccountClient(connection.baseUrl, scenario ? new LocalAccount(null) : LocalAccount.browser());
+  const accountPanel = new AccountPanel(accounts, connection);
+
+  connection.subscribe((state) => {
+    if (state === 'online') void accounts.refresh();
+  });
 
   const renderer = await GameRenderer.create(world, mount);
   const audio = new AudioEngine();
@@ -565,6 +576,7 @@ async function main(): Promise<void> {
     },
     onRestart: () => autosave.restart(),
     onSettings: () => settings.show(),
+    accountButton: accountPanel.button('button-secondary title-garden'),
   });
 
   function setPaused(value: boolean): void {
@@ -636,7 +648,8 @@ async function main(): Promise<void> {
   hud.root.append(inventory.root);
   hud.root.append(eras.root, eras.screen);
   // Par-dessus tout, écran titre compris : la langue se choisit avant même de jouer.
-  hud.root.append(settings.root, padHelp.root);
+  settings.addAccountButton(accountPanel.button('button-secondary settings-toggle'));
+  hud.root.append(settings.root, accountPanel.root, padHelp.root);
   mount.append(hud.root);
 
   /*
@@ -695,6 +708,11 @@ async function main(): Promise<void> {
       field?.blur();
 
       if (notifyPrompt.open) notifyPrompt.dismiss();
+      // La fenêtre du compte est par-dessus les réglages (ou l'écran titre) : elle se ferme la première.
+      if (accountPanel.open) {
+        accountPanel.close();
+        return;
+      }
       // L'aide de la manette est par-dessus les réglages : elle se ferme la première.
       if (padHelp.open) {
         padHelp.close();

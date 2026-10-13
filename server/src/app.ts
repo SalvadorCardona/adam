@@ -5,10 +5,12 @@
  */
 
 import type { DatabaseSync } from 'node:sqlite';
-import { Hono } from 'hono';
+import { getConnInfo } from '@hono/node-server/conninfo';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { API_PATHS, API_SERVICE, API_VERSION, type HealthResponse } from '../../shared/api.ts';
 import { originAllowed, type ServerConfig } from './config.ts';
+import { accountRoutes } from './accounts.ts';
 import { schemaVersion } from './db.ts';
 
 export interface AppDeps {
@@ -16,9 +18,25 @@ export interface AppDeps {
   readonly db: DatabaseSync;
   /** L'horloge, en millisecondes : `performance.now` en vrai, une valeur figée en test. */
   readonly now?: () => number;
+  /** L'horloge murale, en millisecondes depuis 1970 (sessions, limites de tentatives). */
+  readonly clock?: () => number;
+  /** L'IP du client, pour les limites de tentatives. */
+  readonly clientIp?: (c: Context) => string;
 }
 
-export function createApp({ config, db, now = () => performance.now() }: AppDeps): Hono {
+/** L'IP vue par Node ; derrière un proxy (Dokploy), la première de `X-Forwarded-For`. */
+function peerIp(c: Context): string {
+  const forwarded = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim();
+
+  if (forwarded) return forwarded;
+  try {
+    return getConnInfo(c).remote.address ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+export function createApp({ config, db, now = () => performance.now(), clock = Date.now, clientIp = peerIp }: AppDeps): Hono {
   const startedAt = now();
   const app = new Hono();
 
@@ -26,6 +44,7 @@ export function createApp({ config, db, now = () => performance.now() }: AppDeps
     '*',
     cors({
       origin: (origin) => (originAllowed(config, origin) ? origin : null),
+      allowHeaders: ['Authorization', 'Content-Type'],
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       maxAge: 600,
     }),
@@ -53,6 +72,8 @@ export function createApp({ config, db, now = () => performance.now() }: AppDeps
 
     return c.json(body);
   });
+
+  app.route('/', accountRoutes({ db, clock, clientIp }));
 
   app.notFound((c) => c.json({ ok: false, error: 'notFound' }, 404));
   app.onError((error, c) => {

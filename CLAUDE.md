@@ -1240,6 +1240,23 @@ le serveur coupé, le navigateur inscrit lui-même l'échec de la sonde dans la
 console (aucun script ne peut l'en empêcher) : le backoff en limite le
 nombre, le jeu n'en voit rien.
 
+**Comptes** (facultatifs ; `shared/api.ts` : routes `/auth/register|login|logout|me`,
+bornes `ACCOUNT_LIMITS`, validation partagée client/serveur ; `server/src/accounts.ts`,
+`passwords.ts`, `rateLimit.ts`, migration `0002_accounts.sql`) — pseudo, e-mail
+(unique, minuscules), mot de passe haché en **Argon2id** (`node:crypto`, jamais
+journalisé). Session : **jeton opaque en `Authorization: Bearer`**, pas de cookie
+— le jeu (Pages) et le serveur sont sur deux origines, et un cookie tiers est
+refusé par Safari et les navigateurs mobiles ; le serveur n'en garde que
+l'empreinte SHA-256, 90 jours. Limites de tentatives en mémoire (5 échecs par
+adresse, 20 par IP, 15 min ; 10 inscriptions par IP et heure), IP lue dans
+`X-Forwarded-For` derrière le proxy. Client : `net/account.ts` (`AccountClient`,
+jamais d'exception, hors ligne = `offline`), session gardée sous
+`mobile-factory:account` (`storage/localAccount.ts`, jamais dans la partie),
+fenêtre `ui/accountPanel.ts` (boutons « Compte » de l'écran titre et des
+Réglages, Échap la ferme la première), textes `i18n/*/account.ts`. Sans
+serveur ou sans `VITE_API_URL`, le bouton dit « hors ligne » et rien d'autre
+ne change. Captures dans `docs/comptes/`.
+
 **Scripts** : `npm run dev:all` lance serveur (`dev:server`, `node --watch`)
 et client branché dessus (`dev:online` = `vite --mode online`, qui lit
 `.env.online` → `http://localhost:8790`) ; `npm run dev` reste le jeu seul,
