@@ -1190,9 +1190,23 @@ export class Hud {
 
   /** Bas des rangées du haut — ou de la quête, ouverte dessous —, en pixels écran : les repères de bord du renderer restent dessous. */
   public topInset(): number {
-    const bar = this.top.getBoundingClientRect().bottom;
+    const bar = this.topBottom();
 
     return this.quest.dataset['folded'] === 'false' ? Math.max(bar, this.quest.getBoundingClientRect().bottom) : bar;
+  }
+
+  /**
+   * Bas de `.hud-top`. Sous 600 px les contrôles forment une colonne sur le bord
+   * droit, qui allonge la grille : ce sont des obstacles (`obstacles()`), pas du
+   * haut — sinon la zone des repères de bord se réduit à une bande au centre.
+   */
+  private topBottom(): number {
+    const top = this.top.getBoundingClientRect().bottom;
+    const controls = this.controls.getBoundingClientRect();
+
+    if (controls.height <= controls.width) return top;
+
+    return Math.max(...[this.bar, this.left, this.right].map((node) => node.getBoundingClientRect().bottom));
   }
 
   /** Range la rangée des contrôles dans le haut de l'écran, en haut à droite. */
