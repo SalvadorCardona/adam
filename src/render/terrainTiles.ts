@@ -115,7 +115,10 @@ export class TerrainTiles {
    */
   public ground(ground: DryGround, roll: number): Texture {
     if (ground === 'grass') return this.library.texture('terrain.grass.0');
-    return this.library.texture(`terrain.${ground}.${variantOf(roll)}`);
+    // La roche a une quatrième variante, la fissure et sa touffe, sur une tuile de vingt.
+    const variant = ground === 'rock' && roll % 20 === 19 ? 3 : variantOf(roll);
+
+    return this.library.texture(`terrain.${ground}.${variant}`);
   }
 
   /** Transition dessinée sur une tuile de `owner`, du côté où la voisine est d'un autre sol. */

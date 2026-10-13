@@ -12,7 +12,7 @@
  * - l'**eau** n'est pas une tuile : le bake pose sous elle la terre de la
  *   rive, et un shader la peint par-dessus, au pixel près — rive arrondie,
  *   profondeur en dégradé, écume, crêtes (`render/waterShader.ts`) ;
- * - la **roche** est un plateau : dessus pâle, face avant sombre en bas,
+ * - la **roche** est un plateau rosé (jamais lavande : l'indigo est celui du brouillard), fissuré et parfois touffu : dessus pâle, face avant sombre en bas,
  *   liseré clair en haut.
  * Là où un sol s'avance dans un autre, son coin s'arrondit (`corner`) : les
  * plateaux ont les angles doux des autres formes du jeu.
@@ -71,6 +71,8 @@ export const GROUND_TILES: Record<Ground, readonly string[]> = {
     // Pas d'aplat d'un autre ton : des carrés de teinte voisine feraient un damier.
     tile(flat('rock'), pill(16, 18, 10, 3, GROUND.rock.alt), circle(9, 10, 2, GROUND.rock.alt)),
     tile(flat('rock'), rect(6, 8, 14, 10, GROUND.rock.alt, 4), pill(8, 9.5, 6, 2, GROUND.rock.light)),
+    // Une fissure et une touffe : la roche est un sol où la vie reprend, pas un voile.
+    tile(flat('rock'), pill(6, 14, 14, 2, GROUND.rock.shade), pill(16, 15, 2, 8, GROUND.rock.shade), pill(21, 22, 2, 5, PALETTE.mint.base), pill(24, 23, 2, 4, PALETTE.mint.shade), pill(18, 23, 2, 3, PALETTE.mint.shade)),
   ],
 };
 

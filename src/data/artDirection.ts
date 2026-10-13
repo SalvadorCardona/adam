@@ -81,7 +81,7 @@ export const GROUND = {
   },
   sand: { base: '#ffd98a', alt: '#ffd382', shade: '#f2b766', light: '#ffe9b8' },
   water: { base: '#45d6ff', alt: '#3ccaf8', shallow: '#74ecec', deep: '#3a94f2', shade: '#2fb8ea', light: '#b8f1ff' },
-  rock: { base: '#b8c3ff', alt: '#afbaf9', shade: '#8a97e6', light: '#d3daff' },
+  rock: { base: '#f3bfc8', alt: '#ecb3be', shade: '#c97d9f', light: '#fedde0' },
 } as const;
 
 export type Tone = keyof typeof PALETTE;
