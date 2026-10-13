@@ -34,7 +34,7 @@ export const screens = {
   },
   confirmRestart: {
     title: 'Recommencer ?',
-    text: 'Ta colonie sera perdue : la mairie, le sac, les enfants, tout.',
+    text: 'Votre colonie sera perdue : la mairie, le sac, les enfants, tout.',
     confirm: 'Recommencer',
   },
   garden: {
