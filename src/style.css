@@ -7432,9 +7432,25 @@ button[data-offline='true'] {
   color: var(--muted);
 }
 
-/* Hors ligne ou en cours d'envoi : « Se connecter » s'estompe, sans rien bloquer d'autre. */
-.account-form .button-primary:disabled {
-  opacity: 0.45;
+/*
+ * Un bouton plein désactivé se lit au premier coup d'œil : ton de papier à
+ * l'ombre, texte atténué, ni face avant ni reflet, et il ne s'enfonce pas.
+ * Après les variantes de ton (`data-tone`, `data-ready`) pour les battre à
+ * spécificité égale.
+ */
+.button-primary:disabled,
+.button-secondary:disabled,
+.building-panel-actions button:disabled {
+  background: var(--paper-shade);
+  color: var(--muted);
+  box-shadow: none;
+  opacity: 0.7;
+  transform: none;
+}
+
+.button-primary:disabled::before,
+.building-panel-actions button:disabled::before {
+  display: none;
 }
 
 /* ------------------------------------------------------------------ inviter un ami */
