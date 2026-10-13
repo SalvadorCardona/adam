@@ -84,6 +84,11 @@ const INK = hex(PALETTE.ink.base);
 const BAR_HEIGHT = 8;
 /** Le « m:ss » sous la barre d'un producteur, en pixels monde. */
 const TIMER_FONT = 11;
+/** Le pseudo de l'ami : sa police, la capsule blanche qui le porte, sa hauteur au-dessus de la tête. */
+const TAG_FONT = 10;
+const TAG_HEIGHT = 14;
+const TAG_PAD = 5;
+const TAG_RISE = 4;
 /** La rangée des objets d'un chantier commence autant de pixels sous la barre. */
 const NEEDS_DIP = 2;
 
@@ -186,6 +191,11 @@ export class EntityLayer {
 
   private readonly views = new Map<EntityId, EntityView>();
   private readonly adam: Puppet;
+  /** L'ami, quand on joue à deux : le gabarit d'Adam habillé autrement, son pseudo au-dessus de la tête. */
+  private readonly partner: Puppet;
+  private readonly partnerTag = new Container();
+  private readonly partnerName: Text;
+  private partnerNameShown = '';
   /** Sa barre de vie, au-dessus de la tête, dès qu'une bête l'a entamé. */
   private readonly adamHp = new Graphics();
   private adamHpShown = -1;
@@ -218,6 +228,19 @@ export class EntityLayer {
     this.adam.root.addChild(this.adamHp);
     this.container.addChild(this.adam.root);
 
+    this.partner = new Puppet(library, 'partner', tiles.shadow('grass'), { shadowWidth: 22, stride: 4 });
+    this.partnerName = new Text({
+      text: '',
+      style: { fontFamily: 'Fredoka', fontWeight: '600', fontSize: TAG_FONT, fill: INK },
+      resolution: Math.min(3, window.devicePixelRatio || 1) * ZOOM.max,
+    });
+    this.partnerName.anchor.set(0.5, 0.5);
+    this.partnerTag.addChild(new Graphics(), this.partnerName);
+    this.partnerTag.position.set(0, -SPRITES.partner.height * SPRITES.partner.anchorY - TAG_RISE);
+    this.partner.root.addChild(this.partnerTag);
+    this.partner.root.visible = false;
+    this.container.addChild(this.partner.root);
+
     world.events.on('buildingPlaced', ({ id }) => this.add(id));
     world.events.on('buildingCompleted', ({ id }) => {
       this.replace(id);
@@ -242,7 +265,7 @@ export class EntityLayer {
     });
     world.events.on('playerHurt', () => this.adam.hit());
     // Adam s'habille comme il l'a choisi : à l'ouverture d'une partie, et à chaque « Valider » de l'éditeur.
-    if (!sameLook(world.player.look, DEFAULT_LOOK)) this.dressAdam(world.player.look);
+    if (!sameLook(world.adam.look, DEFAULT_LOOK)) this.dressAdam(world.adam.look);
     world.events.on('lookChanged', ({ look }) => this.dressAdam(look));
     // Adam a les mains vides : l'outil découle de ce qu'il fait — la hache pour un arbre, la
     // pioche pour un rocher (fer, charbon, pierre), le marteau pour bâtir, renforcer ou réparer.
@@ -251,7 +274,7 @@ export class EntityLayer {
     world.events.on('playerRepaired', () => this.wieldTool('hammer', true));
     world.events.on('buildingUpgraded', () => this.wieldTool('hammer', true));
     world.events.on('arrowShot', ({ x, y }) => {
-      const { player } = world;
+      const player = world.adam;
 
       if (Math.abs(x - player.x) < SHOOTER_EPSILON && Math.abs(y - (player.y - BOW_RISE)) < SHOOTER_EPSILON) {
         this.adam.shoot();
@@ -577,17 +600,52 @@ export class EntityLayer {
     view.sign.scale.set(Math.min(1, (entity.width * TILE_SIZE - SIGN_MARGIN * 2) / view.sign.texture.width));
   }
 
-  /** Un outil d'Adam, le temps d'un geste — sauf s'il vise : l'arc passe avant, sans clignoter. */
+  /**
+   * Un outil d'Adam, le temps d'un geste — sauf s'il vise : l'arc passe avant,
+   * sans clignoter. Le geste de l'ami (l'événement tombe pendant qu'il agit) est le sien.
+   */
   private wieldTool(tool: Exclude<HeldTool, 'bow'>, swing = false): void {
-    if (this.world.player.target === null) this.adam.wield(tool, swing);
+    if (this.world.partnerActing) this.partner.wield(tool, swing);
+    else if (this.world.adam.target === null) this.adam.wield(tool, swing);
+  }
+
+  /** L'ami, interpolé comme Adam, et son pseudo dans une capsule blanche. */
+  private updatePartner(alpha: number, ticker: Ticker): void {
+    const partner = this.world.partner;
+
+    this.partner.root.visible = partner !== null;
+    if (!partner) return;
+
+    const { player, name } = partner;
+    const x = player.prevX + (player.x - player.prevX) * alpha;
+    const y = player.prevY + (player.y - player.prevY) * alpha;
+
+    this.partner.root.position.set(x, y);
+    this.partner.root.zIndex = y + PLAYER_FOOT;
+    this.partner.update(ticker.deltaMS, player.facing, player.moving ? 'walk' : player.harvesting ? 'act' : 'idle');
+
+    if (name === this.partnerNameShown) return;
+    this.partnerNameShown = name;
+    this.partnerName.text = name;
+
+    const width = this.partnerName.width + TAG_PAD * 2;
+    const pill = this.partnerTag.children[0] as Graphics;
+
+    pill
+      .clear()
+      .roundRect(-width / 2, -TAG_HEIGHT / 2 + 1, width, TAG_HEIGHT, TAG_HEIGHT / 2)
+      .fill(hex(PALETTE.paper.shade))
+      .roundRect(-width / 2, -TAG_HEIGHT / 2, width, TAG_HEIGHT, TAG_HEIGHT / 2)
+      .fill(hex(PALETTE.paper.base));
   }
 
   /** `alpha` est la fraction du pas de simulation déjà écoulée, dans [0, 1[. */
   public update(alpha: number, ticker: Ticker, zoom: number): void {
-    const { player } = this.world;
+    const player = this.world.adam;
     const x = player.prevX + (player.x - player.prevX) * alpha;
     const y = player.prevY + (player.y - player.prevY) * alpha;
 
+    this.updatePartner(alpha, ticker);
     this.adam.root.position.set(x, y);
     this.adam.root.zIndex = y + PLAYER_FOOT;
     // Un ennemi à portée : Adam le vise, l'arc en main, tant qu'il le garde en joue.
@@ -797,6 +855,7 @@ export class EntityLayer {
     this.destroyed = true;
     this.mobiles.destroy();
     this.adam.destroy();
+    this.partner.destroy();
     this.container.destroy({ children: true });
   }
 }

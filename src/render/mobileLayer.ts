@@ -799,7 +799,7 @@ export class MobileLayer {
 
   /** Pose le marqueur sur la cible de l'arc d'Adam, et le fait respirer. */
   private mark(alpha: number, deltaMs: number): void {
-    const id = this.world.player.target;
+    const id = this.world.adam.target;
     const target = id === null ? undefined : this.world.mobiles.get(id);
     const visible =
       target !== undefined && (target.kind === 'mutant' || target.kind === 'beast') && this.world.sees(target.x, target.y);

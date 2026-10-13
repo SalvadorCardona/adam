@@ -528,6 +528,7 @@ export class Puppet {
 export type PuppetId = Extract<
   SpriteId,
   | 'adam'
+  | 'partner'
   | 'eve'
   | 'mutant'
   | 'queen'

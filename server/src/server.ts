@@ -10,6 +10,9 @@ import { serve } from '@hono/node-server';
 import { createApp } from './app.ts';
 import type { ServerConfig } from './config.ts';
 import { migrate, openDatabase, readMigrations, type Migration } from './db.ts';
+import { tokenReader } from './accounts.ts';
+import { partyDirectory } from './parties.ts';
+import { PartyRooms } from './rooms.ts';
 import { attachSocket } from './socket.ts';
 
 export interface RunningServer {
@@ -31,13 +34,15 @@ export async function startServer(config: ServerConfig): Promise<RunningServer> 
     throw error;
   }
 
-  const app = createApp({ config, db });
+  // Les salles du jeu à deux : le WebSocket les remplit, la fermeture d'une session (`DELETE`) les vide.
+  const rooms = new PartyRooms(partyDirectory(db), tokenReader(db, Date.now));
+  const app = createApp({ config, db, onPartyClosed: (code) => rooms.end(code) });
   const server = await new Promise<Server>((resolve, reject) => {
     const http = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, () => resolve(http as Server));
 
     http.once('error', reject);
   });
-  const hub = attachSocket(server, config);
+  const hub = attachSocket(server, config, rooms);
 
   return {
     port: (server.address() as AddressInfo).port,

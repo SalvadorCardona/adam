@@ -45,6 +45,7 @@ import { freshNeeds, fullNeeds } from './needs.ts';
 import { canPause, clampStaff, isWorkPriority, type StaffPost } from './staffing.ts';
 import { readLook, readUnseen, readWardrobe } from './wardrobe.ts';
 import { REGION_COUNT } from './regions.ts';
+import { partnerName, type Partner } from './partner.ts';
 import type { Store, StoreSnapshot } from './store.ts';
 import type {
   BeastState,
@@ -94,6 +95,9 @@ export interface SavedStaffPost extends StaffPost {
 }
 
 export type SavedPlayer = Omit<Player, 'inventory'> & { inventory: StoreSnapshot };
+
+/** L'ami, quand on joue à deux (`sim/partner.ts`) : son personnage et son pas. */
+export type SavedPartner = Omit<Partner, 'player'> & { player: SavedPlayer };
 
 /** Une tanière qui a servi : combien de bêtes dehors, et quand elle se repeuple. */
 export interface SavedDen {
@@ -190,6 +194,8 @@ export interface WorldState {
   /** Les compteurs au début de l'objectif en cours. */
   objectiveBase: WorldStats;
   player: SavedPlayer;
+  /** L'ami, s'il jouait à deux. Absent en solo, et d'une sauvegarde d'avant le jeu à deux. */
+  partner?: SavedPartner;
   /** Tuiles entamées : `"tx,ty"` → unités déjà prises. */
   resources: Record<string, number>;
   /**
@@ -519,6 +525,7 @@ function parseState(raw: unknown): WorldState {
     ...(state['enemyBases'] !== undefined && { enemyBases: unique(array(state['enemyBases']).map(parseEnemyBase)) }),
     ...(state['regions'] !== undefined && { regions: parseRegions(state['regions']) }),
     player: parsePlayer(state['player']),
+    ...(state['partner'] !== undefined && { partner: parsePartner(state['partner']) }),
     resources: parseResources(state['resources']),
     // Absents d'une sauvegarde d'avant le forestier : rien n'était planté.
     planted: parsePlanted(state['planted'] ?? {}),
@@ -599,6 +606,19 @@ function parsePlayer(raw: unknown): SavedPlayer {
     // Absentes d'avant le marquage « Nouveau » : tout a déjà été vu.
     unseenPieces: readUnseen(player['unseenPieces'], wardrobe),
     inventory: stock(player['inventory']),
+  };
+}
+
+function parsePartner(raw: unknown): SavedPartner {
+  const partner = record(raw);
+
+  return {
+    name: partnerName(string(partner['name'])),
+    player: parsePlayer(partner['player']),
+    moveX: Math.max(-1, Math.min(1, finite(partner['moveX']))),
+    moveY: Math.max(-1, Math.min(1, finite(partner['moveY']))),
+    contactKey: string(partner['contactKey']),
+    contactTicks: int(partner['contactTicks']),
   };
 }
 

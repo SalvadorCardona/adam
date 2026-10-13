@@ -196,7 +196,8 @@ import { count, countedMs, feedNeed, mealsPerTick, wholeUnits, type OfflineRepor
 import { ResourceIndex, type TileLook } from './resources.ts';
 import { FogOfWar, type Sight } from './fog.ts';
 import { Land } from './contamination.ts';
-import type { SavedEntity, WorldState } from './save.ts';
+import type { SavedEntity, SavedPartner, SavedPlayer, WorldState } from './save.ts';
+import { PARTNER_LOOK, partnerName, type Partner } from './partner.ts';
 import { Scheduler } from './scheduler.ts';
 import { Store } from './store.ts';
 import { ProblemWatch, type ProblemFacts } from './problems.ts';
@@ -280,7 +281,22 @@ export const STEP_MS = 1000 / TICKS_PER_SECOND;
 const STEP_SECONDS = 1 / TICKS_PER_SECOND;
 
 /** Les seules commandes qu'on prend d'Adam à terre : celles qui ne sont pas de lui (vue, jardin, brouillard). */
-const DEAD_COMMANDS: ReadonlySet<Command['type']> = new Set(['setMoveAxis', 'seeBuilding', 'seePieces', 'applyPerks', 'grantPieces', 'setFog', 'catchUp']);
+const DEAD_COMMANDS: ReadonlySet<Command['type']> = new Set([
+  'setMoveAxis',
+  'seeBuilding',
+  'seePieces',
+  'applyPerks',
+  'grantPieces',
+  'setFog',
+  'catchUp',
+  'partnerJoin',
+  'partnerLeave',
+  'asPartner',
+]);
+
+/** Les sources de vision des deux joueurs : hors des ids des bâtiments (pairs) et des mobiles (impairs). */
+const ADAM_SIGHT = -1;
+const PARTNER_SIGHT = -2;
 
 /** Recette utilisée par une foreuse. Une seule pour l'instant, cf. `data/recipes.ts`. */
 const DRILL_RECIPE: RecipeId = 'mineOre';
@@ -795,6 +811,10 @@ export type WorldEvents = {
   discoveryFound: { id: number; kind: DiscoveryKind; tx: number; ty: number; x: number; y: number; items: [ItemId, number][]; plan: BuildingId | null; reward: RuinReward | null };
   /** Le temps d'absence est rattrapé (`catchUp`) : le récap « Pendant votre absence » le raconte. */
   offlineCaughtUp: OfflineReport;
+  /** Jouer à deux : l'ami est entré dans la partie (`partnerJoin`). */
+  partnerJoined: { name: string };
+  /** L'ami est parti : son personnage a disparu (`partnerLeave`). */
+  partnerLeft: { name: string };
 };
 
 export class World {
@@ -815,7 +835,24 @@ export class World {
   public readonly entities = new Map<EntityId, Entity>();
   public readonly mobiles = new Map<MobileId, Mobile>();
   public readonly events = new Emitter<WorldEvents>();
-  public readonly player: Player;
+  /** Adam, toujours : le personnage de l'hôte, celui que la sauvegarde garde. */
+  public readonly adam: Player;
+  /** L'ami, quand on joue à deux (`sim/partner.ts`) ; `null` en solo. */
+  public partner: Partner | null = null;
+  /** Qui agit pendant le tick : Adam, ou l'ami le temps de son pas et de ses commandes (`asPartner`). */
+  private acting: Player | null = null;
+  /** Le personnage que suit cet écran : Adam chez l'hôte, l'ami chez lui (`viewAsPartner`). Jamais de l'état. */
+  private viewer: 'adam' | 'partner' = 'adam';
+
+  /**
+   * Le joueur : pendant le tick, celui qui agit ; ailleurs — rendu, HUD,
+   * fenêtres —, celui de cet écran. Son sac, sa portée, sa caméra.
+   */
+  public get player(): Player {
+    if (this.acting) return this.acting;
+
+    return this.viewer === 'partner' && this.partner ? this.partner.player : this.adam;
+  }
 
   /** Ce qui entre et sort de la ville, sur les deux dernières minutes : vue, pas état — jamais sauvegardé. */
   public readonly flows = new TownFlows();
@@ -1097,7 +1134,7 @@ export class World {
 
     this.spawnX = (sx + 0.5) * TILE_SIZE;
     this.spawnY = (sy + 1.5) * TILE_SIZE;
-    this.player = createPlayer(this.spawnX, this.spawnY, adultAge(this.seed, ADAM_SALT));
+    this.adam = createPlayer(this.spawnX, this.spawnY, adultAge(this.seed, ADAM_SALT));
     this.townHallId = this.openSite(STARTING_BUILDING, sx - 1, sy - proto.height);
     this.target = { x: (sx + 0.5) * TILE_SIZE, y: (sy - proto.height / 2) * TILE_SIZE };
 
@@ -1125,6 +1162,22 @@ export class World {
    * Rien n'est appliqué ici : la commande attend le prochain tick.
    */
   public push(command: Command): void {
+    if (this.relay) {
+      this.relay(command);
+      return;
+    }
+    this.queue.push(command);
+  }
+
+  /**
+   * Chez l'ami, qui ne fait pas autorité, ses commandes ne s'appliquent pas
+   * ici : elles partent à l'hôte (`net/lockstep.ts`), qui les applique et les
+   * renvoie avec le tick où elles sont passées. `null` : on fait autorité.
+   */
+  public relay: ((command: Command) => void) | null = null;
+
+  /** Une commande venue de l'hôte, rejouée au tick où il l'a appliquée : elle passe, même chez l'ami. */
+  public replay(command: Command): void {
     this.queue.push(command);
   }
 
@@ -1144,7 +1197,7 @@ export class World {
     // Les venus depuis la dernière seconde ont leur prénom avant d'être rangés.
     this.settleNames(false);
 
-    const { inventory, look, wardrobe, unseenPieces, ...player } = this.player;
+    const partner = this.partner;
 
     return {
       seed: this.seed,
@@ -1186,7 +1239,8 @@ export class World {
       regions: { conquered: [...this.conquered].sort((a, b) => a - b), guardians: [...this.guardianHp].map(([id, hp]) => ({ id, hp })) },
       stats: copyStats(this.stats),
       objectiveBase: copyStats(this.objectiveBase),
-      player: { ...player, look: copyLook(look), wardrobe: [...wardrobe], unseenPieces: [...unseenPieces], inventory: inventory.toJSON() },
+      player: savePlayer(this.adam),
+      ...(partner && { partner: { ...partner, player: savePlayer(partner.player) } }),
       resources: this.resources.toJSON(),
       planted: this.resources.plantedJSON(),
       crops: this.resources.cropsJSON(),
@@ -1268,12 +1322,13 @@ export class World {
       objectiveBagBonus(state.objective) +
       caravanBagBonus(this.rareTrades);
 
-    Object.assign(this.player, player, {
+    Object.assign(this.adam, player, {
       look: copyLook(player.look),
       wardrobe: [...player.wardrobe],
       unseenPieces: [...player.unseenPieces],
       inventory: Store.fromJSON(capacity, inventory),
     });
+    this.partner = state.partner ? restorePartner(state.partner) : null;
     this.resources.restore(state.resources, state.planted, state.tick, state.crops);
     this.land.restore(state.cleaned ?? {});
 
@@ -1330,7 +1385,7 @@ export class World {
     } else {
       this.conquered = this.builtRegions();
     }
-    this.hereRegion = this.regionAt(floorDiv(this.player.x, TILE_SIZE), floorDiv(this.player.y, TILE_SIZE));
+    this.hereRegion = this.regionAt(floorDiv(this.adam.x, TILE_SIZE), floorDiv(this.adam.y, TILE_SIZE));
 
     this.scheduler.restore(state.scheduler);
     this.restoreJobs();
@@ -1367,7 +1422,7 @@ export class World {
 
         this.fog.reveal(center.tx, center.ty, FOG_VISION.legacy + Math.max(entity.width, entity.height) / 2);
       }
-      this.fog.reveal(floorDiv(this.player.x, TILE_SIZE), floorDiv(this.player.y, TILE_SIZE), FOG_VISION.legacy);
+      this.fog.reveal(floorDiv(this.adam.x, TILE_SIZE), floorDiv(this.adam.y, TILE_SIZE), FOG_VISION.legacy);
     }
     this.watchSight();
   }
@@ -1385,19 +1440,27 @@ export class World {
   /* ------------------------------------------------------------------ tick */
 
   public tick(): void {
+    // Pendant le tick, le joueur est Adam — sur l'écran de l'ami aussi : la simulation ne dépend pas de qui regarde.
+    this.acting = this.adam;
+    try {
+      this.step();
+    } finally {
+      this.acting = null;
+    }
+  }
+
+  private step(): void {
     this.tickCount += 1;
     this.drainCommands();
     this.updateWeather();
 
-    const slowed = this.spell && !this.sheltered(this.player.x, this.player.y);
-    const speed = slowed && this.spell ? WEATHER[this.spell.id].playerSpeed : 1;
     const contact = stepPlayer(
       this.player,
       this.dead ? 0 : this.moveX,
       this.dead ? 0 : this.moveY,
       this.playerObstacleAt,
       STEP_SECONDS,
-      (PLAYER_SPEED_TILES + this.bonus('walkSpeed')) * speed,
+      this.walkSpeed(),
     );
 
     if (!this.dead) {
@@ -1408,6 +1471,7 @@ export class World {
       this.openChests();
       this.searchSpots();
     }
+    if (this.partner) this.stepPartner(this.partner);
     this.growForest();
     this.stepClock();
     this.corrode();
@@ -1445,8 +1509,8 @@ export class World {
   }
 
   private apply(command: Command): void {
-    // À terre, Adam ne fait rien : ni pas, ni chantier, ni échange. Seul ce qui n'est pas de lui passe.
-    if (this.dead && !DEAD_COMMANDS.has(command.type)) return;
+    // À terre, Adam ne fait rien : ni pas, ni chantier, ni échange. Seul ce qui n'est pas de lui passe — l'ami, lui, joue.
+    if (this.dead && this.acting === this.adam && !DEAD_COMMANDS.has(command.type)) return;
 
     switch (command.type) {
       case 'setMoveAxis':
@@ -1582,7 +1646,188 @@ export class World {
       case 'trade':
         this.trade(command.caravan, command.offer);
         break;
+
+      case 'partnerJoin':
+        this.partnerJoin(command.name);
+        break;
+
+      case 'partnerLeave':
+        this.partnerLeave();
+        break;
+
+      case 'asPartner': {
+        const { partner } = this;
+
+        // Une enveloppe dans l'enveloppe ne passe pas : l'ami n'agit qu'une fois, et en son nom.
+        if (partner && command.command.type !== 'asPartner') this.asPartner(partner, () => this.apply(command.command));
+        break;
+      }
     }
+  }
+
+  /* --------------------------------------------------------------- à deux */
+
+  /** La vitesse du joueur qui agit, à pleine amplitude : la base, la recherche, la pluie acide hors de l'abri. */
+  private walkSpeed(): number {
+    const slowed = this.spell && !this.sheltered(this.player.x, this.player.y);
+    const speed = slowed && this.spell ? WEATHER[this.spell.id].playerSpeed : 1;
+
+    return (PLAYER_SPEED_TILES + this.bonus('walkSpeed')) * speed;
+  }
+
+  /**
+   * Fait agir l'ami : le temps de `act`, le joueur est lui — sa position, son
+   * sac, son axe, sa tuile heurtée —, puis Adam reprend sa place.
+   */
+  private asPartner(partner: Partner, act: () => void): void {
+    const saved = { acting: this.acting, moveX: this.moveX, moveY: this.moveY, contactKey: this.contactKey, contactTicks: this.contactTicks };
+
+    this.acting = partner.player;
+    this.moveX = partner.moveX;
+    this.moveY = partner.moveY;
+    this.contactKey = partner.contactKey;
+    this.contactTicks = partner.contactTicks;
+    try {
+      act();
+    } finally {
+      partner.moveX = this.moveX;
+      partner.moveY = this.moveY;
+      partner.contactKey = this.contactKey;
+      partner.contactTicks = this.contactTicks;
+      this.acting = saved.acting;
+      this.moveX = saved.moveX;
+      this.moveY = saved.moveY;
+      this.contactKey = saved.contactKey;
+      this.contactTicks = saved.contactTicks;
+    }
+  }
+
+  /** Le pas de l'ami, comme celui d'Adam : il marche, heurte, récolte, ouvre les coffres et fouille les ruines. */
+  private stepPartner(partner: Partner): void {
+    this.asPartner(partner, () => {
+      const contact = stepPlayer(this.player, this.moveX, this.moveY, this.playerObstacleAt, STEP_SECONDS, this.walkSpeed());
+
+      this.handleContact(contact);
+      this.harvestNearby();
+      this.openChests();
+      this.searchSpots();
+    });
+  }
+
+  /** L'ami entre : à côté d'Adam, sur une case où l'on marche, sac vide. Déjà là, il change seulement de nom. */
+  private partnerJoin(raw: string): void {
+    const name = partnerName(raw);
+
+    if (this.partner) {
+      this.partner.name = name;
+      return;
+    }
+
+    const { x, y } = this.adam;
+    const tx = floorDiv(x, TILE_SIZE);
+    const ty = floorDiv(y, TILE_SIZE);
+    const beside = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => !this.isSolid(tx + dx!, ty + dy!)) ?? [0, 0];
+    const player = createPlayer(x + beside[0]! * TILE_SIZE, y + beside[1]! * TILE_SIZE, this.adam.age);
+
+    player.look = copyLook(PARTNER_LOOK);
+    player.wardrobe = Object.values(PARTNER_LOOK.pieces).filter((piece) => !isStarter(piece));
+    this.partner = { name, player, moveX: 0, moveY: 0, contactKey: '', contactTicks: 0 };
+    this.events.emit('partnerJoined', { name });
+  }
+
+  /** L'ami s'en va : rien de son sac ne se perd, il reste en tas là où il se tenait. */
+  private partnerLeave(): void {
+    const { partner } = this;
+
+    if (!partner) return;
+    this.asPartner(partner, () => this.dropFromBag());
+    this.partner = null;
+    this.events.emit('partnerLeft', { name: partner.name });
+  }
+
+  /**
+   * Cet écran est celui de l'ami : le joueur, hors du tick, est son
+   * personnage — la caméra le suit, le HUD montre son sac, la portée se
+   * mesure de lui. La simulation n'en sait rien.
+   */
+  public viewAsPartner(): void {
+    this.viewer = 'partner';
+  }
+
+  /** L'ami agit-il en ce moment (son pas, ses commandes) ? Les événements émis alors sont les siens. */
+  public get partnerActing(): boolean {
+    return this.acting !== null && this.acting !== this.adam;
+  }
+
+  /** Le joueur qui agit en ce moment n'est pas celui de cet écran : ce qu'il gagne ou se voit refuser ne s'affiche pas ici. */
+  public get otherActing(): boolean {
+    if (!this.acting) return false;
+
+    return this.acting !== (this.viewer === 'partner' && this.partner ? this.partner.player : this.adam);
+  }
+
+  /**
+   * S'abonne à un événement du joueur de cet écran : ses gains, ses refus,
+   * son sac. Ceux de l'autre joueur, quand on joue à deux, passent sans bruit.
+   */
+  public mine<K extends keyof WorldEvents>(event: K, listener: (payload: WorldEvents[K]) => void): () => void {
+    return this.events.on(event, (payload) => {
+      if (!this.otherActing) listener(payload);
+    });
+  }
+
+  /** Cet écran suit-il l'ami plutôt qu'Adam ? */
+  public get viewingPartner(): boolean {
+    return this.viewer === 'partner' && this.partner !== null;
+  }
+
+  /**
+   * Une empreinte de l'état, comparée d'un écran à l'autre quand on joue à
+   * deux (`net/lockstep.ts`) : le tick, le PRNG, les compteurs d'ids, les
+   * deux joueurs, chaque mobile et chaque coffre. Deux mondes qui ont rejoué
+   * les mêmes commandes ont la même ; une différence dit qu'ils ont divergé.
+   */
+  public checksum(): number {
+    let hash = 0x811c9dc5;
+    const mix = (value: number): void => {
+      hash = Math.imul(hash ^ (value | 0), 0x01000193) >>> 0;
+    };
+    const mixText = (text: string): void => {
+      for (let i = 0; i < text.length; i += 1) mix(text.charCodeAt(i));
+    };
+    const mixPoint = (x: number, y: number): void => {
+      mix(Math.round(x * 64));
+      mix(Math.round(y * 64));
+    };
+    const mixStore = (store: Store): void => {
+      for (const [item, count] of store.entries()) {
+        mixText(item);
+        mix(count);
+      }
+    };
+
+    mix(this.tickCount);
+    mix(this.rng.state());
+    mix(this.nextId);
+    mix(this.nextMobileId);
+    mixPoint(this.adam.x, this.adam.y);
+    mix(this.adam.hp);
+    mixStore(this.adam.inventory);
+    if (this.partner) {
+      mixPoint(this.partner.player.x, this.partner.player.y);
+      mixStore(this.partner.player.inventory);
+    }
+    for (const mobile of this.mobiles.values()) {
+      mix(mobile.id);
+      mixText(mobile.kind);
+      mixPoint(mobile.x, mobile.y);
+    }
+    for (const entity of this.entities.values()) {
+      mix(entity.id);
+      mixText(entity.kind);
+      if (entity.kind !== 'site') mixStore(entity.store);
+    }
+    return hash;
   }
 
   /** Des pièces offertes par des succès : jamais un doublon, jamais une pièce du départ. */
@@ -9647,7 +9892,12 @@ export class World {
     const fog = this.fog;
 
     fog.begin();
-    fog.source(-1, floorDiv(this.player.x, TILE_SIZE), floorDiv(this.player.y, TILE_SIZE), FOG_VISION.player);
+    fog.source(ADAM_SIGHT, floorDiv(this.adam.x, TILE_SIZE), floorDiv(this.adam.y, TILE_SIZE), FOG_VISION.player);
+    if (this.partner) {
+      const { x, y } = this.partner.player;
+
+      fog.source(PARTNER_SIGHT, floorDiv(x, TILE_SIZE), floorDiv(y, TILE_SIZE), FOG_VISION.player);
+    }
     for (const entity of this.entities.values()) {
       const { tx, ty } = centerTile(entity);
       const reach = FOG_VISION.buildings[entity.proto] ?? FOG_VISION.building;
@@ -9943,4 +10193,27 @@ function bagPart(entries: [ItemId, number][], only?: ItemId, amount?: number): [
     .filter(([item]) => only === undefined || item === only)
     .map(([item, count]): [ItemId, number] => [item, amount === undefined ? count : Math.min(count, Math.max(0, Math.floor(amount)))])
     .filter(([, count]) => count > 0);
+}
+
+/** Un joueur tel que la sauvegarde le range : son sac en données. */
+function savePlayer(player: Player): SavedPlayer {
+  const { inventory, look, wardrobe, unseenPieces, ...rest } = player;
+
+  return { ...rest, look: copyLook(look), wardrobe: [...wardrobe], unseenPieces: [...unseenPieces], inventory: inventory.toJSON() };
+}
+
+/** L'ami d'une sauvegarde — ou d'une image envoyée par l'hôte. */
+function restorePartner(saved: SavedPartner): Partner {
+  const { inventory, ...player } = saved.player;
+
+  return {
+    ...saved,
+    player: {
+      ...player,
+      look: copyLook(player.look),
+      wardrobe: [...player.wardrobe],
+      unseenPieces: [...player.unseenPieces],
+      inventory: Store.fromJSON(INVENTORY_CAPACITY, inventory),
+    },
+  };
 }

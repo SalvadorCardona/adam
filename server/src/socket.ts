@@ -1,18 +1,24 @@
 /**
- * Le WebSocket, sur le même port que l'API (`/ws`). Il servira à jouer à
- * deux ; pour l'instant il salue, répond au ping et écarte les connexions
- * mortes. `ws` plutôt qu'une surcouche : la bibliothèque de référence de
- * Node, sans magie, branchée sur l'`upgrade` du serveur HTTP.
+ * Le WebSocket, sur le même port que l'API (`/ws`). Il salue, répond au
+ * ping, écarte les connexions mortes, et fait jouer à deux : l'hôte et l'ami
+ * s'y annoncent, puis il relaie leurs messages (`rooms.ts`). `ws` plutôt
+ * qu'une surcouche : la bibliothèque de référence de Node, sans magie,
+ * branchée sur l'`upgrade` du serveur HTTP. Les messages sont compressés
+ * (`permessage-deflate`) au-delà d'un kilo-octet : l'image d'une partie
+ * envoyée à l'ami qui arrive y gagne quatre fois sa taille.
  */
 
 import type { IncomingMessage, Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
-import { API_PATHS, API_VERSION, parseClientMessage, type ServerMessage } from '../../shared/api.ts';
+import { API_PATHS, API_VERSION, PLAY_LIMITS, parseClientMessage, type ServerMessage } from '../../shared/api.ts';
 import { originAllowed, type ServerConfig } from './config.ts';
+import type { PartyRooms } from './rooms.ts';
 
 /** Un message plus gros est refusé : rien dans le protocole n'en a besoin. */
-const MAX_PAYLOAD = 64 * 1024;
+const MAX_PAYLOAD = PLAY_LIMITS.maxMessageBytes;
+/** Les petits messages (les pas de la partie, quelques dizaines d'octets) partent tels quels. */
+const DEFLATE_THRESHOLD = 1024;
 /** Une connexion qui ne répond pas à deux pings de suite est fermée. */
 const HEARTBEAT_MS = 30_000;
 
@@ -21,8 +27,8 @@ export interface SocketHub {
   close(): void;
 }
 
-export function attachSocket(server: Server, config: ServerConfig): SocketHub {
-  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD });
+export function attachSocket(server: Server, config: ServerConfig, rooms: PartyRooms): SocketHub {
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD, perMessageDeflate: { threshold: DEFLATE_THRESHOLD } });
   const alive = new WeakSet<WebSocket>();
 
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
@@ -48,7 +54,10 @@ export function attachSocket(server: Server, config: ServerConfig): SocketHub {
         return;
       }
       if (message.type === 'ping') send(ws, { type: 'pong', t: message.t });
+      else if (message.type === 'host' || message.type === 'join') rooms.enter(ws, message.type === 'host' ? 'host' : 'guest', message.code, message.token);
+      else rooms.relay(ws, message.data, message.to);
     });
+    ws.on('close', () => rooms.leave(ws));
     send(ws, { type: 'hello', api: API_VERSION });
   });
 

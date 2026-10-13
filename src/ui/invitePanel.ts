@@ -5,6 +5,10 @@
  * `POLL_MS`) et ferme la session à la demande. Ouverte depuis la pause ;
  * fermée par sa croix, un tap sur le voile ou Échap (`main.ts`).
  *
+ * L'invitation ouverte, l'hôte s'annonce au serveur (`onSession`, `net/play.ts`) :
+ * l'ami qui entre dans la salle entre aussi dans la partie. Fermer la
+ * fenêtre ne l'arrête pas ; fermer la session, si.
+ *
  * Elle ne touche pas à la partie, et rien n'y est obligatoire : sans compte
  * ou sans serveur elle le dit, et le jeu se joue comme avant. Boutons et
  * champ sont de vrais éléments focalisables — doigt, clavier et manette
@@ -34,6 +38,7 @@ export class InvitePanel {
   private readonly connection: Connection;
   private readonly openAccount: () => void;
   private readonly now: () => number;
+  private readonly onSession: (code: string | null) => void;
   private readonly closeButton: HTMLButtonElement;
   private readonly title: HTMLHeadingElement;
   private readonly status: HTMLParagraphElement;
@@ -61,8 +66,17 @@ export class InvitePanel {
   private timer: ReturnType<typeof setInterval> | null = null;
   private busy = false;
 
-  public constructor(party: PartyClient, accounts: AccountClient, connection: Connection, openAccount: () => void, now: () => number = Date.now) {
+  /** `onSession` : l'invitation ouverte (son code), ou fermée (`null`) — on héberge, on cesse d'héberger. */
+  public constructor(
+    party: PartyClient,
+    accounts: AccountClient,
+    connection: Connection,
+    openAccount: () => void,
+    onSession: (code: string | null) => void = () => {},
+    now: () => number = Date.now,
+  ) {
     this.party = party;
+    this.onSession = onSession;
     this.accounts = accounts;
     this.connection = connection;
     this.openAccount = openAccount;
@@ -143,6 +157,7 @@ export class InvitePanel {
         this.info = null;
         this.state = 'idle';
         this.stopPolling();
+        this.onSession(null);
       }
       if (!this.open) return;
       if (user && (this.state === 'idle' || this.state === 'failed')) void this.create();
@@ -216,6 +231,7 @@ export class InvitePanel {
       this.note = null;
       this.link.value = inviteUrl(window.location.href, result.party.code);
       this.qr.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrSvg(this.link.value))}`;
+      this.onSession(result.party.code);
       if (this.open) this.startPolling();
     } else {
       this.state = 'failed';
@@ -246,7 +262,9 @@ export class InvitePanel {
     this.render();
   }
 
+  /** Une invitation expirée ne fait plus entrer personne, mais la partie en cours continue ; fermée, elle s'arrête. */
   private ended(reason: 'expired' | 'closed'): void {
+    if (reason === 'closed') this.onSession(null);
     this.state = 'ended';
     this.failure = reason;
     this.info = null;

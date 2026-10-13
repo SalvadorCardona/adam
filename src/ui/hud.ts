@@ -593,50 +593,50 @@ export class Hud {
 
     document.addEventListener('pointerdown', this.foldCrewOnTouch, { capture: true });
 
-    world.events.on('placementRejected', ({ reason, ore }) =>
+    world.mine('placementRejected', ({ reason, ore }) =>
       this.notify(reason === 'footing' ? footingText(ore) : t().hud.rejection[reason], 'bad'),
     );
-    world.events.on('resourceHarvested', ({ item, amount }) => {
+    world.mine('resourceHarvested', ({ item, amount }) => {
       if (item === 'wood') this.harvestedWood = true;
       if (item === 'stone') this.harvestedStone = true;
       this.float(item, amount);
       this.flyToBag(item);
     });
-    world.events.on('siteDelivered', ({ item, amount, source }) => {
+    world.mine('siteDelivered', ({ item, amount, source }) => {
       this.delivered = true;
       // Ce que la ville donne ne sort pas du sac : rien ne tombe de la tête d'Adam.
       if (source === 'bag') this.float(item, -amount);
     });
-    world.events.on('townDeposited', ({ item, amount }) => this.float(item, -amount));
-    world.events.on('itemDropped', ({ item, amount }) => this.float(item, -amount));
-    world.events.on('depositRejected', ({ reason }) => {
+    world.mine('townDeposited', ({ item, amount }) => this.float(item, -amount));
+    world.mine('itemDropped', ({ item, amount }) => this.float(item, -amount));
+    world.mine('depositRejected', ({ reason }) => {
       if (reason === 'outOfReach') this.notify(t().hud.toast.depositFar, 'bad');
       if (reason === 'noTown') this.notify(t().hud.toast.depositNoTown, 'bad');
     });
-    world.events.on('siteRejected', ({ reason }) => {
+    world.mine('siteRejected', ({ reason }) => {
       if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
       if (reason === 'nothingToGive') this.notify(t().hud.toast.siteNothing, 'bad');
     });
-    world.events.on('storeTaken', ({ item, amount }) => this.float(item, amount));
-    world.events.on('buildingSupplied', ({ item, amount, source }) => {
+    world.mine('storeTaken', ({ item, amount }) => this.float(item, amount));
+    world.mine('buildingSupplied', ({ item, amount, source }) => {
       if (source === 'bag') this.float(item, -amount);
     });
-    world.events.on('supplyRejected', ({ reason }) => {
+    world.mine('supplyRejected', ({ reason }) => {
       if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
       if (reason === 'nothingToGive') this.notify(t().hud.toast.supplyNothing, 'bad');
     });
     world.events.on('nurseryHungry', () => this.notify(t().hud.toast.nurseryHungry, 'bad'));
-    world.events.on('takeRejected', ({ reason }) => {
+    world.mine('takeRejected', ({ reason }) => {
       if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
       if (reason === 'empty') this.notify(t().hud.toast.chestEmpty, 'bad');
       if (reason === 'bagFull') this.notify(t().hud.toast.bagFullTake, 'bad');
     });
-    world.events.on('transferRejected', ({ reason }) => {
+    world.mine('transferRejected', ({ reason }) => {
       if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
       if (reason === 'bagFull') this.notify(t().hud.toast.bagFullTake, 'bad');
     });
-    world.events.on('inventoryFull', () => this.notify(this.bagFullMessage(), 'bad'));
-    world.events.on('harvestRefused', ({ item, wanted, plenty }) => {
+    world.mine('inventoryFull', () => this.notify(this.bagFullMessage(), 'bad'));
+    world.mine('harvestRefused', ({ item, wanted, plenty }) => {
       this.refused(item);
       this.notify(harvestRefusedText(item, wanted, plenty), 'info');
     });
@@ -657,7 +657,7 @@ export class Hud {
     // Un coffre ouvert : « Coffre ouvert ! » monte au-dessus de lui.
     world.events.on('chestOpened', ({ tx, ty }) => this.celebrate({ tx, ty, width: 1, height: 1 }, t().wardrobe.chestOpened));
     // Une ruine fouillée, un secret trouvé : le mot monte du lieu, et le butin vole vers le sac.
-    world.events.on('discoveryFound', ({ kind, tx, ty, x, y, items, plan }) => {
+    world.mine('discoveryFound', ({ kind, tx, ty, x, y, items, plan }) => {
       if (kind !== 'chest') this.celebrate({ tx, ty, width: 1, height: 1 }, t().hud.discovery[kind]);
       if (plan) this.notify(t().hud.discovery.plan(t().buildings[plan].label), 'good');
       this.flyFindsToBag(items, x, y);
@@ -689,7 +689,7 @@ export class Hud {
       else if (guardian && world.regions[id]?.lair) this.notify(t().hud.toast.regionOpen(name, t().wildlife[guardian]), 'info');
     });
     world.events.on('regionConquered', ({ biome, prestige }) => this.notify(t().hud.toast.regionConquered(t().biomes[biome], prestige), 'good'));
-    world.events.on('specialtyFound', ({ item, amount }) => this.float(item, amount));
+    world.mine('specialtyFound', ({ item, amount }) => this.float(item, amount));
     // Le « +N Prestige » monte déjà de la base (`prestigeGained`) : il ne reste que le bandeau.
     world.events.on('enemyBaseDestroyed', ({ prestige }) => this.notify(t().hud.toast.baseDestroyed(prestige), 'good'));
     world.events.on('gearCrafted', ({ level, fromBag }) => {
@@ -702,23 +702,23 @@ export class Hud {
     });
     world.events.on('companionJoined', ({ role }) => this.notify(t().hud.toast.companionJoined(t().companionClasses[role].label), 'good'));
     world.events.on('companionDied', ({ role }) => this.notify(t().hud.toast.companionDied(t().companionClasses[role].label), 'bad'));
-    world.events.on('recruitRejected', ({ reason }) => {
+    world.mine('recruitRejected', ({ reason }) => {
       if (reason !== 'missing') this.notify(t().hud.recruit[reason], 'bad');
     });
-    world.events.on('gearRejected', ({ reason }) => {
+    world.mine('gearRejected', ({ reason }) => {
       if (reason !== 'missing') this.notify(t().hud.gear[reason], 'bad');
     });
-    world.events.on('upgradeRejected', ({ reason }) => {
+    world.mine('upgradeRejected', ({ reason }) => {
       if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
       if (reason === 'missingItems') this.notify(t().hud.toast.upgradeMissing, 'bad');
       if (reason === 'locked') this.notify(t().hud.toast.upgradeLocked, 'bad');
     });
-    world.events.on('playerRepaired', ({ item, amount, fromBag }) => {
+    world.mine('playerRepaired', ({ item, amount, fromBag }) => {
       this.repaired = true;
       if (fromBag > 0) this.float(item, -fromBag);
       if (amount > fromBag) this.notify(t().hud.toast.repairedFromTown(amount - fromBag, t().items[item]), 'good');
     });
-    world.events.on('repairRejected', ({ reason }) => {
+    world.mine('repairRejected', ({ reason }) => {
       if (reason !== 'missing') this.notify(t().hud.repair[reason], 'bad');
     });
     world.events.on('waveCountdown', ({ seconds, night, wave, count, bases, boss, queen, from, targetProto, x, y }) => {
@@ -760,7 +760,7 @@ export class Hud {
       for (const [item, amount] of reward) this.float(item, amount);
       this.notify(t().hud.wave.bounty(night, reward.map(([item, amount]) => t().hud.toast.storedItem(amount, t().items[item])).join(', ')), 'good');
     });
-    world.events.on('lootPicked', ({ item, amount }) => {
+    world.mine('lootPicked', ({ item, amount }) => {
       this.float(item, amount);
       this.flyToBag(item);
     });
@@ -801,13 +801,13 @@ export class Hud {
       this.say([t().eve.caravan]);
     });
     world.events.on('caravanLeaving', () => this.notify(t().hud.toast.caravanLeaving, 'info'));
-    world.events.on('traded', ({ fromBag, stored }) => {
+    world.mine('traded', ({ fromBag, stored }) => {
       for (const [item, amount] of fromBag) this.float(item, -amount);
       for (const [item, amount] of Object.entries(stored) as [ItemId, number][]) {
         if (amount > 0) this.notify(t().hud.toast.storedAtHall(t().hud.toast.storedItem(amount, t().items[item])), 'info');
       }
     });
-    world.events.on('tradeRejected', ({ reason }) => {
+    world.mine('tradeRejected', ({ reason }) => {
       if (reason === 'outOfReach') this.notify(t().hud.toast.tradeFar, 'bad');
       if (reason === 'missingItems') this.notify(t().hud.toast.tradeMissing, 'bad');
       if (reason === 'done') this.notify(t().hud.toast.tradeDone, 'bad');

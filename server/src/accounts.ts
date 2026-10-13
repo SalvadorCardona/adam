@@ -84,21 +84,31 @@ async function readJson(c: Context): Promise<Record<string, unknown> | null> {
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
+/** Le compte derrière un jeton de session, ou `null` (inconnu, expiré). Le WebSocket le lit d'ici. */
+export function tokenReader(db: DatabaseSync, clock: () => number): (token: string) => AccountUser | null {
+  const findBySession = db.prepare(
+    'SELECT a.id, a.nickname, a.email, a.password_hash FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ? AND s.expires_at > ?',
+  );
+
+  return (token) => {
+    const row = findBySession.get(fingerprint(token), clock()) as AccountRow | undefined;
+
+    return row ? publicUser(row) : null;
+  };
+}
+
 /**
  * Qui parle ? Le compte derrière le jeton `Authorization: Bearer`, ou `null`
  * (pas de jeton, jeton inconnu ou expiré). Les routes qui demandent un
  * joueur connecté — parties hébergées — le lisent d'ici.
  */
 export function sessionReader(db: DatabaseSync, clock: () => number): (c: Context) => AccountUser | null {
-  const findBySession = db.prepare(
-    'SELECT a.id, a.nickname, a.email, a.password_hash FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ? AND s.expires_at > ?',
-  );
+  const userOf = tokenReader(db, clock);
 
   return (c) => {
     const token = bearer(c);
-    const row = token ? (findBySession.get(fingerprint(token), clock()) as AccountRow | undefined) : undefined;
 
-    return row ? publicUser(row) : null;
+    return token ? userOf(token) : null;
   };
 }
 

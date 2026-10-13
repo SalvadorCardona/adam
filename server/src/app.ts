@@ -23,6 +23,8 @@ export interface AppDeps {
   readonly clock?: () => number;
   /** L'IP du client, pour les limites de tentatives. */
   readonly clientIp?: (c: Context) => string;
+  /** Une session de partie se ferme : ceux qui y jouent par le WebSocket l'apprennent. */
+  readonly onPartyClosed?: (code: string) => void;
 }
 
 /** L'IP vue par Node ; derrière un proxy (Dokploy), la première de `X-Forwarded-For`. */
@@ -37,7 +39,7 @@ function peerIp(c: Context): string {
   }
 }
 
-export function createApp({ config, db, now = () => performance.now(), clock = Date.now, clientIp = peerIp }: AppDeps): Hono {
+export function createApp({ config, db, now = () => performance.now(), clock = Date.now, clientIp = peerIp, onPartyClosed }: AppDeps): Hono {
   const startedAt = now();
   const app = new Hono();
 
@@ -75,7 +77,7 @@ export function createApp({ config, db, now = () => performance.now(), clock = D
   });
 
   app.route('/', accountRoutes({ db, clock, clientIp }));
-  app.route('/', partyRoutes({ db, clock, clientIp, userOf: sessionReader(db, clock), ttlMs: config.inviteTtlMs }));
+  app.route('/', partyRoutes({ db, clock, clientIp, userOf: sessionReader(db, clock), ttlMs: config.inviteTtlMs, ...(onPartyClosed && { onClosed: onPartyClosed }) }));
 
   app.notFound((c) => c.json({ ok: false, error: 'notFound' }, 404));
   app.onError((error, c) => {

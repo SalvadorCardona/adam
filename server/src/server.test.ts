@@ -57,6 +57,59 @@ describe('le serveur démarré', () => {
     ws.close();
   });
 
+  it('fait jouer l’hôte et l’ami par le WebSocket, jusqu’à la fermeture de la session', async () => {
+    const server = await start();
+    const base = `http://127.0.0.1:${server.port}`;
+    const post = async (path: string, body: unknown, token?: string, method = 'POST'): Promise<Record<string, unknown>> => {
+      const response = await fetch(`${base}${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+        body: JSON.stringify(body),
+      });
+
+      return (await response.json()) as Record<string, unknown>;
+    };
+    const register = async (nickname: string): Promise<string> =>
+      (await post('/auth/register', { nickname, email: `${nickname}@example.com`, password: 'correct horse battery' }))['token'] as string;
+    const hostToken = await register('Salva');
+    const guestToken = await register('Lina');
+    const code = ((await post('/parties', {}, hostToken))['party'] as { code: string }).code;
+
+    await post(`/parties/${code}/join`, {}, guestToken);
+
+    const host = new WebSocket(`ws://127.0.0.1:${server.port}/ws`);
+    const hostSaw = messages(host, 4);
+
+    await new Promise((resolve) => host.on('open', resolve));
+    host.send(JSON.stringify({ type: 'host', code, token: hostToken }));
+
+    const guest = new WebSocket(`ws://127.0.0.1:${server.port}/ws`);
+    const guestSaw = messages(guest, 4);
+
+    await new Promise((resolve) => guest.on('open', resolve));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    guest.send(JSON.stringify({ type: 'join', code, token: guestToken }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    host.send(JSON.stringify({ type: 'relay', data: { t: 'f', a: 1, b: 2 } }));
+    guest.send(JSON.stringify({ type: 'relay', data: { t: 'c', c: { type: 'setMoveAxis', x: 0, y: 1 } } }));
+
+    const fromHost = await hostSaw;
+
+    // L'ami est arrivé chez l'hôte, et sa commande aussi, avec son id.
+    expect(fromHost.slice(1).map((message) => message.type)).toEqual(['hosting', 'guestIn', 'relay']);
+    expect(fromHost[3]).toMatchObject({ type: 'relay', data: { t: 'c' } });
+
+    await post(`/parties/${code}`, {}, hostToken, 'DELETE');
+
+    expect((await guestSaw).slice(1)).toEqual([
+      { type: 'joined', code, host: 'Salva', hostOnline: true },
+      { type: 'relay', data: { t: 'f', a: 1, b: 2 } },
+      { type: 'ended' },
+    ]);
+    host.close();
+    guest.close();
+  });
+
   it('refuse un WebSocket venu d’une origine inconnue', async () => {
     const server = await start();
     const ws = new WebSocket(`ws://127.0.0.1:${server.port}/ws`, { headers: { Origin: 'https://evil.example' } });

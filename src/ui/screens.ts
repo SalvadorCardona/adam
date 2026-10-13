@@ -249,7 +249,8 @@ export class PauseScreen {
   private readonly confirm: HTMLElement;
   private readonly collection: CollectionPanel;
 
-  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: () => void) {
+  /** `onInvite` : `null` chez l'ami en jeu — on n'invite pas dans la partie d'un autre. */
+  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: (() => void) | null) {
     this.root = document.createElement('div');
     this.root.className = 'overlay pause-screen';
     this.root.hidden = true;
@@ -281,7 +282,8 @@ export class PauseScreen {
 
     invite.type = 'button';
     invite.className = 'button-secondary';
-    invite.addEventListener('click', onInvite);
+    invite.hidden = onInvite === null;
+    if (onInvite) invite.addEventListener('click', onInvite);
 
     const showCollection = document.createElement('button');
 

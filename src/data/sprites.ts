@@ -17,6 +17,7 @@
  */
 
 import { ADAM } from '../art/adam.ts';
+import { PARTNER } from '../art/partner.ts';
 import { ALERT } from '../art/alert.ts';
 import { ANTENNA, ANTENNA_2, ANTENNA_3 } from '../art/antenna.ts';
 import { ARROW } from '../art/arrow.ts';
@@ -113,6 +114,8 @@ export interface SpriteProto {
 
 export const SPRITES = {
   adam: ADAM,
+  /** L'ami, quand on joue à deux : le gabarit d'Adam, habillé autrement. */
+  partner: PARTNER,
   eve: EVE_SPRITE,
   cargoBike: CARGO_BIKE,
   /** La caravane de troc : la charrette, son marchand, et la roue qui tourne. */

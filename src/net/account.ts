@@ -58,6 +58,11 @@ export class AccountClient {
     return this.session?.user ?? null;
   }
 
+  /** Le jeton de la session, pour s'annoncer au WebSocket quand on joue à deux ; `null` sans compte. */
+  public get token(): string | null {
+    return this.session?.token ?? null;
+  }
+
   public subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
 
