@@ -244,7 +244,7 @@ export const hud: Messages['hud'] = {
       (population > housed ? `: ${population - housed} sleep${population - housed === 1 ? 's' : ''} outside, build a House` : ''),
     happinessName: 'Town happiness',
     happiness: (total: number, average: number, unhappy: number): string =>
-      `Town happiness: ${total} (average ${average} per inhabitant, ${unhappy} unhappy)`,
+      `Town happiness: ${average}/100 on average (total ${total}, ${unhappy} unhappy)`,
   },
   army: {
     label: (n: number, max: number, hp: number, maxHp: number, training: number): string =>
