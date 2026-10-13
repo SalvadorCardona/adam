@@ -35,8 +35,12 @@ jobs:
 
       # `npm run build` = `tsc --noEmit && vite build` : le typecheck est déjà
       # dans le build, rien à dupliquer ici. Lint et tests restent à la CI.
+      # `VITE_API_URL` (variable du dépôt, pas un secret : l'adresse est publique)
+      # fixe le back-end que le jeu publié contacte. Absente, le jeu reste hors ligne.
       - name: Build
         run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
 
       - uses: actions/configure-pages@v5
 

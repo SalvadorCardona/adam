@@ -12,6 +12,7 @@
     "dev": "node --watch-path=src --watch-path=migrations --watch-path=../shared src/main.ts",
     "start": "node src/main.ts",
     "migrate": "node src/migrate.ts",
+    "backup": "node src/backup.ts",
     "typecheck": "tsc --noEmit -p .",
     "build": "tsc --noEmit -p ."
   },
