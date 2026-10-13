@@ -57,7 +57,7 @@ import { TILE_SIZE } from '../core/grid.ts';
 import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
 import { COMPANIONS, COMPANION_CLASSES } from '../data/companions.ts';
 import type { ItemId } from '../data/items.ts';
-import { NEED_IDS, type NeedId } from '../data/needs.ts';
+import { NEEDS, NEED_IDS, type NeedId } from '../data/needs.ts';
 import { BIOMES } from '../data/regions.ts';
 import { SIGNAL_WAVES } from '../data/artDirection.ts';
 import { OBJECTIVES, type Goal } from '../data/objectives.ts';
@@ -1975,11 +1975,13 @@ export class Hud {
    * la carte le dit au lieu de montrer un stock vide. À côté de chaque objet,
    * sa tendance sur la dernière minute de jeu (`TownFlows.trend`) : une
    * flèche menthe s'il monte, corail s'il baisse, rien s'il stagne. Au bout
-   * du bandeau, le bouton du panneau des ressources.
+   * du bandeau, le bouton du panneau des ressources. Un objet d'un besoin
+   * (nourriture, eau) y reste à 0, en corail, une fois la mairie bâtie ; les
+   * autres disparaissent à zéro.
    */
   private updateTown(): void {
     const stock = this.world.townStock();
-    const entries = stock?.entries() ?? [];
+    const entries = stock ? withVitals(stock.entries()) : [];
     const { flows } = this.world;
     const key = stock ? entries.map(([item, amount]) => `${item}:${amount}:${flows.trend(item)}`).join(',') : 'none';
 
@@ -2275,12 +2277,20 @@ function chip(icon: 'people' | 'mutant', value: number, label: string): HTMLElem
 }
 
 /** `node`, avec son libellé (`setTip`). */
+/** Le stock de la ville, plus à 0 les objets des besoins (`NEEDS`) qu'il n'a plus. */
+function withVitals(entries: [ItemId, number][]): [ItemId, number][] {
+  const missing = NEED_IDS.map((need) => NEEDS[need].item).filter((item) => !entries.some(([owned]) => owned === item));
+
+  return [...entries, ...missing.map((item): [ItemId, number] => [item, 0])];
+}
+
 /** Un objet du bandeau de la ville : son icône, sa quantité, et sa flèche s'il monte ou baisse. */
 function townEntry(item: ItemId, amount: number, trend: Trend): HTMLElement {
   const label = t().hud.stock;
   const name = t().items[item];
   const entry = itemAmount(item, amount);
 
+  if (amount === 0) entry.dataset['empty'] = 'true';
   if (trend === 'flat') return tipped(entry, label.inTown(name, amount));
 
   const arrow = uiIcon(trend === 'up' ? 'trendUp' : 'trendDown', 12);
