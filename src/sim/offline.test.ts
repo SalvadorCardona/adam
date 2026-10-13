@@ -144,7 +144,8 @@ describe('hors ligne — la ville rattrape', () => {
   });
 
   it('sans porteur ni logisticien, chaque producteur remplit son coffre, et pas plus', () => {
-    const world = stageScenario(TEST_SCENARIOS.base);
+    const { base } = TEST_SCENARIOS;
+    const world = stageScenario({ ...base, buildings: base.buildings.filter(({ building }) => building !== 'logisticsPost') });
     const report = catchUp(world, HOUR);
 
     expect(report!.alerts).toContain('storeFull');

@@ -31,6 +31,8 @@ export interface ScenarioBuilding {
    * bâtiment est livré en entier — et fini, s'il n'attend pas de bâtisseurs.
    */
   delivered?: Partial<Record<ItemId, number>>;
+  /** Ouvriers réglés d'emblée (`setWorkers`), quand la colonie de départ ne suffit pas à tout pourvoir. */
+  workers?: number;
 }
 
 export interface TestScenarioProto {
@@ -93,13 +95,22 @@ export interface TestScenarioProto {
  */
 export const SHORE_SPOT = { dx: 20, dy: 16 } as const;
 
+/**
+ * Un autre bord d'eau, à l'ouest de la mairie de la graine 100, celui-là en
+ * ligne droite sans eau entre sa porte et la mairie : les porteurs et les
+ * logisticiens ne traversent pas l'eau, ils ne pourraient jamais vider un
+ * puits posé en `SHORE_SPOT`.
+ */
+export const WELL_SPOT = { dx: -25, dy: -11 } as const;
+
 /** Le rayon exploré d'office autour de la mairie d'une partie de test. */
 export const SCENARIO_REVEAL = 30;
 
 export const TEST_SCENARIOS = {
   /**
    * Une petite base au matin du premier jour : la mairie et son stock, une
-   * cabane de bûcheron, une ferme et un puits qui tournent, un poste de construction
+   * cabane de bûcheron, une ferme et un puits qui tournent, deux postes de logistique
+   * qui vident leurs coffres dans la mairie (l'un près du puits, au bord de l'eau), un poste de construction
    * dont les bâtisseurs finissent le labo — bois livré, pierre en route, fer
    * manquant : il attend Adam.
    */
@@ -107,10 +118,12 @@ export const TEST_SCENARIOS = {
     label: 'Petite base',
     seed: 100,
     buildings: [
-      { building: 'lumberCamp', dx: -6, dy: 0 },
+      { building: 'lumberCamp', dx: -6, dy: 0, workers: 1 },
       { building: 'farm', dx: 6, dy: 0 },
-      { building: 'well', ...SHORE_SPOT },
-      { building: 'constructionPost', dx: -5, dy: 5 },
+      { building: 'well', ...WELL_SPOT },
+      { building: 'logisticsPost', dx: 0, dy: -4, workers: 2 },
+      { building: 'logisticsPost', dx: WELL_SPOT.dx + 4, dy: WELL_SPOT.dy + 3, workers: 1 },
+      { building: 'constructionPost', dx: -5, dy: 5, workers: 1 },
       { building: 'lab', dx: 4, dy: 5, delivered: { wood: 14, stone: 3 } },
     ],
     town: { wood: 40, stone: 30, food: 12, water: 12 },
