@@ -1268,6 +1268,11 @@ button:disabled,
   flex: none;
 }
 
+/* Nourriture ou eau à sec : l'objet reste au bandeau, à 0, en corail. */
+.hud-town .item-amount[data-empty='true'] {
+  color: var(--danger);
+}
+
 /*
  * La tendance d'un objet de la ville, sur la dernière minute de jeu : une
  * petite flèche menthe s'il monte, corail s'il baisse, rien s'il stagne.
