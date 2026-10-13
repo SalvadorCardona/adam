@@ -5714,6 +5714,10 @@ button:disabled,
 /* La carte reste visible derrière un voile léger : on voit le monde où l'on va entrer. */
 .title-screen {
   background: rgb(43 45 143 / 0.3);
+  /* Sur un écran bas la colonne défile en partant du haut : `safe` empêche le centrage de rogner le logo. */
+  align-items: safe center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .title-screen[data-leaving='true'] {
