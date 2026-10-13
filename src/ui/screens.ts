@@ -176,7 +176,8 @@ export class TitleScreen {
     gardenButton.addEventListener('click', () => {
       panel.hidden = true;
       gardenPanel.root.hidden = false;
-      gardenPanel.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus();
+      gardenPanel.root.scrollTop = 0;
+      gardenPanel.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus({ preventScroll: true });
     });
     panel.append(gardenButton);
     this.root.append(gardenPanel.root);
@@ -202,7 +203,8 @@ export class TitleScreen {
       collectionPanel.render();
       panel.hidden = true;
       collectionPanel.root.hidden = false;
-      collectionPanel.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus();
+      collectionPanel.root.scrollTop = 0;
+      collectionPanel.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus({ preventScroll: true });
     });
     panel.append(collectionButton);
     this.root.append(collectionPanel.root);
@@ -294,7 +296,8 @@ export class PauseScreen {
       this.asking(false);
       this.panel.hidden = true;
       this.collection.root.hidden = false;
-      this.collection.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus();
+      this.collection.root.scrollTop = 0;
+      this.collection.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus({ preventScroll: true });
     });
     this.collection = new CollectionPanel(collection, () => {
       this.collection.root.hidden = true;
