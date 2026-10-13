@@ -1,5 +1,6 @@
-import { copyFileSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import { testRoutes } from './src/ui/testRoute.ts';
 
@@ -31,6 +32,48 @@ function testPages(): Plugin {
 }
 
 /*
+ * Le service worker (`public/sw.js`) met le jeu en cache pour qu'il s'ouvre
+ * sans réseau. Il ne sait pas quels fichiers le build a produits : après la
+ * copie de `public/`, ce plugin remplace son jeton `__BUILD__` par la liste
+ * de ces fichiers et une version (empreinte de leur contenu). Une version
+ * déployée change donc `sw.js` d'au moins un octet : le navigateur l'installe
+ * au lancement suivant et jette l'ancien cache. Les sons, lourds et chargés à
+ * la demande, n'y sont pas : le worker les garde au fil de leur lecture.
+ */
+function precache(): Plugin {
+  let outDir = 'dist';
+  let base = '/';
+
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)],
+    );
+
+  return {
+    name: 'mobile-factory:precache',
+    apply: 'build',
+    enforce: 'post',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+      base = config.base;
+    },
+    closeBundle() {
+      const files = walk(outDir)
+        .map((file) => relative(outDir, file).split('\\').join('/'))
+        .filter((file) => file !== 'sw.js' && !file.startsWith('audio/') && !file.endsWith('.map'))
+        .sort();
+      const hash = createHash('sha256');
+
+      for (const file of files) hash.update(file).update(readFileSync(join(outDir, file)));
+      const worker = join(outDir, 'sw.js');
+      const build = { version: hash.digest('hex').slice(0, 12), base, files };
+
+      writeFileSync(worker, readFileSync(worker, 'utf8').replace("'__BUILD__'", JSON.stringify(build)));
+    },
+  };
+}
+
+/*
  * Le jeu est publié en project page GitHub Pages, donc servi sous un
  * sous-chemin — https://cardona.digital/mobile-factory/ — et non à la racine
  * du domaine.
@@ -50,5 +93,5 @@ function testPages(): Plugin {
  */
 export default defineConfig({
   base: '/mobile-factory/',
-  plugins: [testPages()],
+  plugins: [testPages(), precache()],
 });

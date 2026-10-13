@@ -151,8 +151,11 @@ porte un anneau cyan.
 - **Vite** (template `vanilla-ts`).
 - **Vitest** en environnement Node — aucun canvas n'est nécessaire pour tester
   la simulation.
-- **PWA d'abord.** Capacitor plus tard, et seulement s'il faut publier sur les
-  stores.
+- **PWA d'abord.** Installable (manifeste, icônes 192/512) et ouvert sans
+  réseau après une première visite : `public/sw.js` met le build en cache
+  (liste et version posées par `vite.config.ts`), le réseau passe d'abord pour
+  la page, donc une nouvelle version est lue au lancement suivant. Capacitor
+  plus tard, et seulement s'il faut publier sur les stores.
 
 La 2D n'est pas un repli : elle est bien plus légère en batterie et en GPU sur
 mobile, et un modèle 3D généré ne donne de toute façon pas un asset jouable — il
