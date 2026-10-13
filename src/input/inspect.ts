@@ -180,6 +180,9 @@ export class Inspect implements PointerConsumer {
   }
 }
 
+/** Hauteur au-dessus du toit où la barre d'un chantier ou d'un labo est dessinée, en pixels monde. */
+const BAR_LIFT = 12;
+
 /** Le point monde tombe-t-il sur Ève — son sprite entier, plus une marge ? */
 export function isOnEve(eve: Eve, x: number, y: number): boolean {
   const { width, height, anchorX, anchorY } = SPRITES.eve;
@@ -252,6 +255,10 @@ function isUnder(mobile: Mobile, x: number, y: number): boolean {
  * Deux cadres se chevauchent quand le toit d'un bâtiment de devant couvre
  * celui de derrière : le plus bas à l'écran gagne, comme le tri en
  * profondeur du rendu — on ouvre ce qu'on voit par-dessus.
+ *
+ * Un chantier et un labo portent au-dessus du toit leur barre et la rangée de
+ * ce qu'ils attendent (`barTop` de `render/entityLayer.ts`) : c'est ce que l'œil
+ * vise, la zone monte de `BAR_LIFT` pour les prendre.
  */
 export function buildingAt(entities: Iterable<Entity>, x: number, y: number): EntityId | undefined {
   let found: EntityId | undefined;
@@ -262,7 +269,8 @@ export function buildingAt(entities: Iterable<Entity>, x: number, y: number): En
     const left = entity.tx * TILE_SIZE;
     const right = left + Math.max(entity.width * TILE_SIZE, art.width);
     const bottom = (entity.ty + entity.height) * TILE_SIZE;
-    const top = bottom - Math.max(entity.height * TILE_SIZE, art.height);
+    const lift = entity.kind === 'site' || entity.kind === 'lab' ? BAR_LIFT : 0;
+    const top = bottom - Math.max(entity.height * TILE_SIZE, art.height) - lift;
 
     if (x < left || x >= right || y < top || y >= bottom) continue;
     if (bottom <= foundBottom) continue;
