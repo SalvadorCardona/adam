@@ -61,7 +61,8 @@ import type { SiteLine } from '../sim/siteLedger.ts';
 import { canPause, employs } from '../sim/staffing.ts';
 import type { WorkPriority } from '../data/workers.ts';
 import { siteMissing, timerText, type World } from '../sim/world.ts';
-import { ZOOM } from './camera.ts';
+import { ZOOM, type ChunkBounds } from './camera.ts';
+import { inSight } from './sight.ts';
 import { MobileLayer, drawHp } from './mobileLayer.ts';
 import { type HeldTool, Puppet } from './puppet.ts';
 import { NEEDS_MIN_ZOOM, SiteNeeds } from './siteNeeds.ts';
@@ -640,7 +641,7 @@ export class EntityLayer {
   }
 
   /** `alpha` est la fraction du pas de simulation déjà écoulée, dans [0, 1[. */
-  public update(alpha: number, ticker: Ticker, zoom: number): void {
+  public update(alpha: number, ticker: Ticker, zoom: number, sight: ChunkBounds): void {
     const player = this.world.adam;
     const x = player.prevX + (player.x - player.prevX) * alpha;
     const y = player.prevY + (player.y - player.prevY) * alpha;
@@ -686,7 +687,7 @@ export class EntityLayer {
       this.showTimer(view, entity);
       this.showNeeds(view, entity, zoom, ticker.deltaMS);
       this.showSign(view, entity, zoom);
-      this.showAlert(view, entity, ticker.lastTime);
+      this.showAlert(view, entity, ticker.lastTime, inSight(entity, sight));
       this.showPause(view, entity, ticker.lastTime);
       this.showPriority(view, entity);
       this.feel(view, ticker.deltaMS);
@@ -694,11 +695,14 @@ export class EntityLayer {
     }
   }
 
-  /** La bulle d'alerte flotte et bat au-dessus du toit tant qu'un problème arrête le producteur. */
-  private showAlert(view: EntityView, entity: Entity, now: number): void {
+  /**
+   * La bulle d'alerte flotte et bat au-dessus du toit tant qu'un problème arrête le producteur.
+   * Hors de la zone vue (`onScreen`), elle est cachée et on n'y touche plus.
+   */
+  private showAlert(view: EntityView, entity: Entity, now: number, onScreen: boolean): void {
     if (!view.alert || entity.kind === 'site') return;
 
-    const problem = this.world.problem(entity);
+    const problem = onScreen ? this.world.problem(entity) : null;
 
     view.alert.visible = problem !== null;
     if (problem === null) return;

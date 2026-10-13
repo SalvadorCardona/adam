@@ -32,6 +32,7 @@ import { trailsOf } from './meadow.ts';
 import { EnemyBaseLayer } from './enemyBaseLayer.ts';
 import { ChestLayer } from './chestLayer.ts';
 import { SpotLayer } from './spotLayer.ts';
+import { TILE_SIZE } from '../core/grid.ts';
 import { EntityLayer } from './entityLayer.ts';
 import { FogLayer } from './fogLayer.ts';
 import { GhostLayer } from './ghostLayer.ts';
@@ -329,7 +330,7 @@ export class GameRenderer {
     const block = building && ghost ? this.world.placementBlock(ghost.building, ghost.tx, ghost.ty) : null;
 
     this.resourceLayer.update(this.camera, this.app.ticker.deltaMS, block?.reason === 'resource' ? block.tiles : []);
-    this.entityLayer.update(alpha, this.app.ticker, this.camera.zoom);
+    this.entityLayer.update(alpha, this.app.ticker, this.camera.zoom, this.camera.visibleCells(TILE_SIZE, 1));
     this.enemyBases.update(this.app.ticker.deltaMS);
     this.chests.update(this.camera, this.app.ticker.deltaMS);
     this.spots.update(this.camera, this.app.ticker.deltaMS);
