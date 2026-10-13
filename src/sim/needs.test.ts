@@ -785,3 +785,104 @@ describe('famine', () => {
     expect(workers(loaded)).toHaveLength(before);
   });
 });
+
+/** Ajoute un puits en pause, plein d'eau, à `dx` tuiles à l'est de la mairie : un producteur à portée de ligne droite. */
+function withWell(world: World, water: number, dx = 8): World {
+  const state = world.snapshot();
+  const hall = world.warehouse()!;
+  const { width, height } = BUILDINGS.well;
+
+  state.entities = [
+    ...state.entities,
+    { kind: 'quarry', id: state.nextId, proto: 'well', tx: hall.tx + dx, ty: hall.ty, width, height, store: { water }, hp: 100, level: 1, paused: true, staff: 0, blocked: false },
+  ];
+  state.nextId += 1;
+  return World.restore(state);
+}
+
+describe('soif — le puits quand la mairie est à sec', () => {
+  it('ville à zéro eau, puits plein : l’assoiffé y boit, sa part est réservée en route, personne ne meurt', () => {
+    const world = withWell(colony({ food: 50 }), 30);
+    const well = [...world.entities.values()].find((entity) => entity.proto === 'well')!;
+    const worker = workers(world)[0]!;
+    let drank = 0;
+
+    world.events.on('needMet', ({ id, need }) => {
+      if (id === worker.id && need === 'thirst') drank += 1;
+    });
+    worker.needs.thirst = THIRST.seekBelow - 0.05;
+
+    for (let i = 0; i < 20 * 30 && drank === 0; i += 1) {
+      world.tick();
+      // Les porteurs vident aussi le puits : sa part est au moins réservée.
+      if (worker.meal === 'thirst') expect('store' in well && well.store.available('water')).toBeLessThanOrEqual(30 - THIRST.meal);
+    }
+
+    expect(drank).toBe(1);
+    expect(worker.needs.thirst).toBe(1);
+    expect(worker.meal).toBeNull();
+    expect(world.townStock()!.count('water')).toBeLessThanOrEqual(30 - THIRST.meal);
+  });
+
+  it('la mairie reste le premier choix quand elle a de l’eau', () => {
+    const world = withWell(colony({ food: 50, water: 10 }), 30);
+    const well = [...world.entities.values()].find((entity) => entity.proto === 'well')!;
+    const worker = workers(world)[0]!;
+
+    let drank = 0;
+
+    world.events.on('needMet', ({ id, need }) => {
+      if (id === worker.id && need === 'thirst') drank += 1;
+    });
+    worker.needs.thirst = THIRST.seekBelow - 0.05;
+    for (let i = 0; i < 20 * 60 && drank === 0; i += 1) world.tick();
+    expect(drank).toBe(1);
+    // La mairie a payé la gorgée (les porteurs ont pu y verser l'eau du puits, jamais l'inverse).
+    expect('store' in well && well.store.count('water')).toBeLessThanOrEqual(30);
+    expect(world.townStock()!.count('water')).toBeGreaterThanOrEqual(10 - THIRST.meal);
+  });
+
+  it('un puits vide, ou dont l’eau est réservée, n’attire personne', () => {
+    const world = withWell(colony({ food: 50 }), 0);
+    const worker = workers(world)[0]!;
+
+    worker.needs.thirst = THIRST.seekBelow - 0.05;
+    run(world, 40);
+    expect(worker.meal).toBeNull();
+
+    const reserved = withWell(colony({ food: 50 }), 1);
+    const well = [...reserved.entities.values()].find((entity) => entity.proto === 'well')!;
+
+    if (!('store' in well)) throw new Error('puits sans coffre');
+    well.store.reserveOut('water', 1);
+
+    const other = workers(reserved)[0]!;
+
+    other.needs.thirst = THIRST.seekBelow - 0.05;
+    run(reserved, 40);
+    expect(other.meal).toBeNull();
+  });
+
+  it('un chargement rejoue la réservation sur le puits', () => {
+    const world = withWell(colony({ food: 50 }), 30);
+    const well = [...world.entities.values()].find((entity) => entity.proto === 'well')!;
+    const worker = workers(world)[0]!;
+
+    worker.needs.thirst = THIRST.seekBelow - 0.05;
+    for (let i = 0; i < 40 && !worker.meal; i += 1) world.tick();
+    expect(worker.meal).toBe('thirst');
+
+    const decoded = decodeSave(encodeSave(world, 0));
+
+    if (!decoded.ok) throw new Error(decoded.reason);
+
+    const loadedWell = decoded.world.entities.get(well.id)!;
+    const loaded = decoded.world.mobiles.get(worker.id) as Worker;
+
+    expect(loaded.meal).toBe('thirst');
+    expect('store' in loadedWell && loadedWell.store.available('water')).toBeLessThanOrEqual(30 - THIRST.meal);
+    run(decoded.world, 20 * 30);
+    expect(loaded.meal).toBeNull();
+    expect(loaded.needs.thirst).toBeGreaterThan(0.8);
+  });
+});

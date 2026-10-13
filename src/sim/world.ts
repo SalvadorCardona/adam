@@ -1103,6 +1103,9 @@ export class World {
   /** Ticks passés à zéro d'un besoin, par habitant et besoin (`famineKey`). Pas sauvegardé : au chargement, le compte repart. */
   private readonly famine = new Map<number, number>();
 
+  /** Le producteur où un habitant va manger ou boire, quand la mairie n'a rien : absent, c'est la mairie. Non sauvegardé, refait au chargement. */
+  private readonly mealSites = new Map<number, EntityId>();
+
   /** Le problème que montre chaque producteur — coffre plein, ouvrier manquant —, cf. `problem()`. Jamais sauvegardé. */
   private readonly problems = new ProblemWatch();
 
@@ -7608,25 +7611,69 @@ export class World {
     return mobile.state !== 'idle';
   }
 
-  /** Sous un seuil : sa part du stock de la ville réservée, il part pour la mairie. */
-  private seekMeal(mobile: Inhabitant): void {
+  /**
+   * Où combler un besoin de `wanted` (le plus bas d'abord) : la mairie si
+   * elle a de quoi, sinon le producteur le plus proche — puits, ferme… — dont
+   * le coffre a de quoi, à portée de ligne droite. `null` si rien ne convient.
+   */
+  private mealSource(mobile: Inhabitant, wanted: readonly NeedId[]): { need: NeedId; site: Entity } | null {
     const hall = this.warehouse();
 
-    if (!hall) return;
+    if (!hall) return null;
 
+    for (const need of wanted) {
+      const { item, meal } = NEEDS[need];
+
+      if (hall.store.available(item) >= meal) {
+        const door = doorOf(hall);
+
+        return clearLine(this.seed, mobile.x, mobile.y, door.x, door.y) ? { need, site: hall } : null;
+      }
+    }
+
+    for (const need of wanted) {
+      const { item, meal } = NEEDS[need];
+      let best: Entity | null = null;
+      let bestDistance = Infinity;
+
+      for (const entity of this.entities.values()) {
+        if (!isProducer(entity) || entity.store.available(item) < meal) continue;
+
+        const door = doorOf(entity);
+        const distance = (door.x - mobile.x) ** 2 + (door.y - mobile.y) ** 2;
+
+        if (distance >= bestDistance || !clearLine(this.seed, mobile.x, mobile.y, door.x, door.y)) continue;
+        best = entity;
+        bestDistance = distance;
+      }
+      if (best) return { need, site: best };
+    }
+    return null;
+  }
+
+  /** Le coffre où un habitant en route pour manger a réservé sa part : le producteur, s'il tient encore, sinon la mairie. */
+  private mealEntity(mobile: Inhabitant): Entity | null {
+    const siteId = this.mealSites.get(mobile.id);
+    const site = siteId === undefined ? undefined : this.entities.get(siteId);
+
+    return site && isProducer(site) ? site : this.warehouse();
+  }
+
+  /** Sous un seuil : sa part du stock de la ville — ou, à sec, d'un producteur — réservée, il part pour la mairie. */
+  private seekMeal(mobile: Inhabitant): void {
     // Le plus bas d'abord ; si la ville n'a pas de quoi le combler, l'autre besoin passe devant la mort.
     const wanted = NEED_IDS.filter((id) => mobile.needs[id] < NEEDS[id].seekBelow).sort((a, b) => mobile.needs[a] - mobile.needs[b]);
-    const need = wanted.find((id) => hall.store.available(NEEDS[id].item) >= NEEDS[id].meal);
+    const source = this.mealSource(mobile, wanted);
 
-    if (need === undefined) return;
+    if (!source) return;
 
-    const { item, meal } = NEEDS[need];
-    const door = doorOf(hall);
+    const { item, meal } = NEEDS[source.need];
 
-    if (!clearLine(this.seed, mobile.x, mobile.y, door.x, door.y)) return;
-
-    hall.store.reserveOut(item, meal);
-    mobile.meal = need;
+    if (!('store' in source.site)) return;
+    source.site.store.reserveOut(item, meal);
+    if (source.site.id === this.townHallId) this.mealSites.delete(mobile.id);
+    else this.mealSites.set(mobile.id, source.site.id);
+    mobile.meal = source.need;
     if (mobile.kind !== 'kid') mobile.inside = false;
     // Il lâche sa hache : il lui faudra retourner à l'arbre.
     if (mobile.kind === 'lumberjack' && mobile.state === 'chop') mobile.state = 'toTree';
@@ -7637,42 +7684,52 @@ export class World {
     if (mobile.kind === 'farmer' && mobile.state === 'harvest') mobile.state = 'toHarvest';
   }
 
-  /** En route pour la mairie ; à la porte, il consomme sa part et sa jauge remonte. */
+  /** En route pour son repas ; à la porte, il consomme sa part et sa jauge remonte. */
   private walkToMeal(mobile: Inhabitant, need: NeedId): void {
-    const hall = this.warehouse();
+    const site = this.mealEntity(mobile);
 
-    if (!hall) {
+    if (!site || !('store' in site)) {
       mobile.meal = null;
+      this.mealSites.delete(mobile.id);
       return;
     }
 
-    const door = doorOf(hall);
+    const door = doorOf(site);
 
     if (!walkToward(mobile, door.x, door.y, this.walkStep())) return;
 
     const { item, meal } = NEEDS[need];
 
     mobile.meal = null;
-    if (hall.store.commitOut(item, meal) < meal) return;
+    this.mealSites.delete(mobile.id);
+    if (site.store.commitOut(item, meal) < meal) return;
     mobile.needs[need] = 1;
     this.events.emit('needMet', { id: mobile.id, need, x: mobile.x, y: mobile.y });
   }
 
-  /** Une vague : il rentre s'abriter, sa part rendue au stock de la ville. */
+  /** Une vague : il rentre s'abriter, sa part rendue au coffre où elle était réservée. */
   private cancelMeal(mobile: Inhabitant): void {
     const need = mobile.meal;
+    const site = this.mealEntity(mobile);
 
     mobile.meal = null;
-    if (need !== null) this.warehouse()?.store.releaseOut(NEEDS[need].item, NEEDS[need].meal);
+    this.mealSites.delete(mobile.id);
+    if (need !== null && site && 'store' in site) site.store.releaseOut(NEEDS[need].item, NEEDS[need].meal);
   }
 
-  /** Après un chargement : la part de chaque habitant en route pour manger se réserve de nouveau. */
+  /** Après un chargement : la part de chaque habitant en route pour manger se réserve de nouveau, à la mairie ou au producteur le plus proche. */
   private restoreMeals(): void {
-    const town = this.townStock();
-
     for (const mobile of this.inhabitants()) {
       if (mobile.meal === null) continue;
-      if (!town?.reserveOut(NEEDS[mobile.meal].item, NEEDS[mobile.meal].meal)) mobile.meal = null;
+
+      const source = this.mealSource(mobile, [mobile.meal]);
+      const { item, meal } = NEEDS[mobile.meal];
+
+      if (!source || !('store' in source.site) || !source.site.store.reserveOut(item, meal)) {
+        mobile.meal = null;
+        continue;
+      }
+      if (source.site.id !== this.townHallId) this.mealSites.set(mobile.id, source.site.id);
     }
   }
 
