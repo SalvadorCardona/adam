@@ -62,7 +62,8 @@ export interface TestScenarioProto {
   gear?: number;
   /**
    * Adam se tient à tant de tuiles du centre de la base mutante la plus
-   * proche de la mairie, du côté de la mairie, plutôt qu'à `adam`.
+   * proche de la mairie, du côté de la mairie, ses abords explorés, plutôt
+   * qu'à `adam`.
    */
   nearBase?: number;
   /**
@@ -257,7 +258,7 @@ export const TEST_SCENARIOS = {
     bag: {},
     adam: { dx: 1, dy: 4 },
     gear: 1,
-    nearBase: 10,
+    nearBase: 6,
   },
   /**
    * Un coffre à ouvrir : Adam à trois pas à gauche du coffre le plus proche

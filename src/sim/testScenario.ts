@@ -138,7 +138,7 @@ function standBeside(world: World, tx: number, ty: number, width: number, height
   teleport(world, (tx + width / 2) * TILE_SIZE, (ty + height + 0.5) * TILE_SIZE);
 }
 
-/** Adam à `tiles` tuiles du centre de la base debout la plus proche de la mairie, du côté de la mairie. */
+/** Adam à `tiles` tuiles du centre de la base debout la plus proche de la mairie, du côté de la mairie, ses abords explorés. */
 function besideBase(world: World, tiles: number): void {
   const base = world.leadBase();
   const hall = world.entities.get(world.townHallId);
@@ -150,6 +150,7 @@ function besideBase(world: World, tiles: number): void {
   const hy = (hall.ty + hall.height / 2) * TILE_SIZE;
   const length = Math.hypot(hx - x, hy - y) || 1;
 
+  world.revealAround(Math.floor(x / TILE_SIZE), Math.floor(y / TILE_SIZE), tiles + 8);
   teleport(world, x + ((hx - x) / length) * tiles * TILE_SIZE, y + ((hy - y) / length) * tiles * TILE_SIZE);
 }
 
@@ -243,6 +244,7 @@ function besideLair(world: World, tiles: number): void {
   const length = Math.hypot(hx - x, hy - y) || 1;
 
   world.revealAround(lair.tx, lair.ty, tiles + 8);
+  world.revealAround(Math.floor(x / TILE_SIZE), Math.floor(y / TILE_SIZE), tiles + 8);
   teleport(world, x + ((hx - x) / length) * tiles * TILE_SIZE, y + ((hy - y) / length) * tiles * TILE_SIZE);
 }
 
