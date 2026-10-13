@@ -354,6 +354,74 @@ export const UI_ICONS = {
     line(9.5, 18.5, 14.5, 18.5, ink.base),
     circle(14.5, 7.5, 1.3, yellow.light),
   ),
+  /** Une éprouvette : le verre blanc, le liquide menthe, une bulle — la recherche terminée. */
+  flask: svg(
+    S,
+    S,
+    rect(9, 2.5, 6, 5, paper.shade, 2),
+    polygon([9, 6, 15, 6, 20, 19, 4, 19], paper.shade),
+    rect(4, 16.5, 16, 5, paper.shade, 2.5),
+    polygon([10.2, 9, 13.8, 9, 17.6, 17, 6.4, 17], mint.base),
+    rect(6.4, 15.5, 11.2, 5, mint.base, 2.5),
+    pill(7.5, 16.2, 4, 1.4, mint.light),
+    circle(12, 12.5, 1.1, mint.light),
+    pill(8.4, 3.4, 7.2, 2, paper.base),
+  ),
+  /** Un berceau : la coque orange sur deux patins indigo, un petit bonnet jaune — l'enfant né. */
+  cradle: svg(
+    S,
+    S,
+    shadedPill(2.5, 10, 19, 9, 3, 'orange'),
+    circle(9.5, 9, 3.4, PALETTE.skin.base),
+    pill(6.5, 5.5, 6, 3, yellow.base),
+    pill(2, 19.5, 20, 2.5, ink.base),
+    pill(5, 12, 5, 1.4, orange.light),
+  ),
+  /** Une vague : une crête cyan qui s'enroule sur son creux — la vague annoncée. */
+  wave: svg(
+    S,
+    S,
+    rect(2, 12, 20, 9, cyan.shade, 4.5),
+    shadedPill(2, 5, 20, 12, 3, 'cyan'),
+    circle(15.5, 8.5, 3.6, cyan.shade),
+    circle(15, 8, 3.6, paper.base),
+    pill(5, 8, 6, 1.6, cyan.light),
+    pill(4.5, 16.5, 8, 1.6, paper.base),
+  ),
+  /** Une manette : le boîtier violet, la croix, deux boutons. */
+  gamepad: svg(
+    S,
+    S,
+    shadedPill(2, 6.5, 20, 12, 2.5, 'violet'),
+    rect(5.5, 10.6, 5, 1.8, paper.base, 0.9),
+    rect(7.1, 9, 1.8, 5, paper.base, 0.9),
+    circle(15.5, 9.6, 1.3, yellow.base),
+    circle(18, 12, 1.3, coral.base),
+    pill(4, 7.6, 7, 1.4, violet.light),
+  ),
+  /** Une jauge : le cadran blanc, son arc menthe et jaune, l'aiguille indigo — le compteur de performances. */
+  gauge: svg(
+    S,
+    S,
+    shadedCircle(12, 12, 9.5, 'cyan'),
+    circle(12, 12, 6.8, paper.base),
+    circle(7.6, 12, 1, mint.base),
+    circle(9.2, 7.9, 1, mint.base),
+    circle(12, 6.5, 1, yellow.base),
+    circle(16.6, 8.2, 1, coral.base),
+    line(12, 13, 15.5, 9.5, ink.base),
+    circle(12, 13, 1.8, ink.base),
+  ),
+  /** Une cloche : le corps jaune, le battant corail — l'autorisation de notifier. */
+  bell: svg(
+    S,
+    S,
+    circle(12, 3.8, 1.6, yellow.shade),
+    shadedPill(5, 4.5, 14, 13, 2.5, 'yellow'),
+    rect(3, 14.5, 18, 4, yellow.shade, 2),
+    rect(3, 14, 18, 3.5, yellow.base, 1.75),
+    circle(12, 20, 2.2, coral.base),
+  ),
   /** Le portrait d'Ève — chignon, bandeau jaune, salopette cyan — devant ses répliques. */
   eve: svg(
     S,

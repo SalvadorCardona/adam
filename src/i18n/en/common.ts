@@ -22,6 +22,6 @@ export const settings: Messages['settings'] = {
   perf: 'Performance counter',
   sfxVolume: 'Sound effects volume',
   musicVolume: 'Music volume',
-  toggle: (name, on) => `${name}: ${on ? 'on' : 'off'}`,
+  state: (on) => (on ? 'on' : 'off'),
   languageName: 'English',
 };
