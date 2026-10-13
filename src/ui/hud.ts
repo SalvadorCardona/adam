@@ -1062,9 +1062,9 @@ export class Hud {
     housing.prepend(uiIcon('home', 18));
     setTip(housing, label.housing(housed, population));
 
-    // Le Bonheur de la ville, à côté : en corail quand l'habitant moyen est malheureux.
+    // Le Bonheur de la ville, à côté : la note moyenne sur 100, la même jauge que la fiche d'un habitant ; en corail quand l'habitant moyen est malheureux.
     // L'aube qui le fait bouger y pose une flèche, le temps de la voir.
-    const happiness = text('hud-people-count hud-people-happiness', String(mood.total));
+    const happiness = text('hud-people-count hud-people-happiness', String(mood.average));
 
     happiness.dataset['alert'] = String(population > 0 && moodOf(mood.average) === 'unhappy');
     happiness.prepend(uiIcon('townMood', 18));
