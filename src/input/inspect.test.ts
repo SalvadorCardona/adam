@@ -28,8 +28,12 @@ describe('buildingAt', () => {
     expect(buildingAt([HALL], 48, HALL_TOP)).toBe(1);
   });
 
+  it('prend la barre et la rangée d’un chantier, au-dessus du toit', () => {
+    expect(buildingAt([HALL], 48, HALL_TOP - 12)).toBe(1);
+    expect(buildingAt([HALL], 48, HALL_TOP - 13)).toBeUndefined();
+  });
+
   it('laisse passer ce qui est hors du cadre', () => {
-    expect(buildingAt([HALL], 48, HALL_TOP - 1)).toBeUndefined();
     expect(buildingAt([HALL], 48, HALL_BOTTOM)).toBeUndefined();
     expect(buildingAt([HALL], -1, 48)).toBeUndefined();
     expect(buildingAt([HALL], 96, 48)).toBeUndefined();
@@ -72,7 +76,8 @@ describe('écran → monde → bâtiment', () => {
         expect(tapAt(48, HALL_TOP + 4)).toBe(1);
         expect(tapAt(2, HALL_BOTTOM - 2)).toBe(1);
         expect(tapAt(94, 2)).toBe(1);
-        expect(tapAt(48, HALL_TOP - 4)).toBeUndefined();
+        expect(tapAt(48, HALL_TOP - 4)).toBe(1);
+        expect(tapAt(48, HALL_TOP - 16)).toBeUndefined();
       });
     }
   }
