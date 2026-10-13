@@ -744,7 +744,8 @@ async function main(): Promise<void> {
   if (scenario) {
     started = true;
     hud.root.dataset['started'] = 'true';
-    hud.root.append(testBanner(scenario));
+    // En tête du HUD : tout ce qui vient après (menu, fenêtres, voiles) passe par-dessus.
+    hud.root.prepend(testBanner(scenario));
   } else if (guest) {
     // L'ami arrive dans une partie qui tourne : pas d'écran titre. Son écran de connexion passe dans le HUD.
     started = true;
