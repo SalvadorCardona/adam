@@ -81,6 +81,24 @@ export class AccountClient {
     if (isMeResponse(answer.body)) this.set({ token: session.token, user: answer.body.user });
   }
 
+  /**
+   * Un appel au serveur au nom du joueur connecté (parties hébergées). Un 401
+   * périme la session gardée : le jeton n'est plus bon, le joueur se
+   * reconnectera. Hors ligne, rien ne change.
+   */
+  public async authorized(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    body?: unknown,
+  ): Promise<{ status: 'offline' } | { status: number; body: unknown }> {
+    const token = this.session?.token;
+    const answer = await this.call(method, path, body, token);
+
+    if (token && answer.status === 401) this.set(null);
+
+    return answer;
+  }
+
   public async register(request: RegisterRequest): Promise<AccountResult> {
     return this.open(API_PATHS.register, request);
   }
@@ -123,7 +141,7 @@ export class AccountClient {
   }
 
   private async call(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     path: string,
     body?: unknown,
     token?: string,

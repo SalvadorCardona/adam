@@ -84,6 +84,30 @@ async function readJson(c: Context): Promise<Record<string, unknown> | null> {
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
+/**
+ * Qui parle ? Le compte derrière le jeton `Authorization: Bearer`, ou `null`
+ * (pas de jeton, jeton inconnu ou expiré). Les routes qui demandent un
+ * joueur connecté — parties hébergées — le lisent d'ici.
+ */
+export function sessionReader(db: DatabaseSync, clock: () => number): (c: Context) => AccountUser | null {
+  const findBySession = db.prepare(
+    'SELECT a.id, a.nickname, a.email, a.password_hash FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ? AND s.expires_at > ?',
+  );
+
+  return (c) => {
+    const token = bearer(c);
+    const row = token ? (findBySession.get(fingerprint(token), clock()) as AccountRow | undefined) : undefined;
+
+    return row ? publicUser(row) : null;
+  };
+}
+
+function bearer(c: Context): string | null {
+  const match = /^Bearer\s+(\S+)$/iu.exec(c.req.header('Authorization') ?? '');
+
+  return match?.[1] ?? null;
+}
+
 export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
   const routes = new Hono();
   const loginByEmail = new AttemptLimiter(LOGIN_MAX_PER_EMAIL, LOGIN_WINDOW_MS, clock);
@@ -95,9 +119,7 @@ export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
   const insertSession = db.prepare('INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)');
   const deleteSession = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
   const deleteExpired = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
-  const findBySession = db.prepare(
-    'SELECT a.id, a.nickname, a.email, a.password_hash FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ? AND s.expires_at > ?',
-  );
+  const currentUser = sessionReader(db, clock);
 
   function openSession(accountId: number): string {
     const token = randomBytes(32).toString('base64url');
@@ -107,12 +129,6 @@ export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
     insertSession.run(fingerprint(token), accountId, new Date(now).toISOString(), now + SESSION_MS);
 
     return token;
-  }
-
-  function bearer(c: Context): string | null {
-    const match = /^Bearer\s+(\S+)$/iu.exec(c.req.header('Authorization') ?? '');
-
-    return match?.[1] ?? null;
   }
 
   routes.post(API_PATHS.register, async (c) => {
@@ -204,12 +220,11 @@ export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
   });
 
   routes.get(API_PATHS.me, (c) => {
-    const token = bearer(c);
-    const row = token ? (findBySession.get(fingerprint(token), clock()) as AccountRow | undefined) : undefined;
+    const user = currentUser(c);
 
-    if (!row) return fail(c, 401, 'unauthorized');
+    if (!user) return fail(c, 401, 'unauthorized');
 
-    const response: MeResponse = { ok: true, user: publicUser(row) };
+    const response: MeResponse = { ok: true, user };
 
     c.header('Cache-Control', 'no-store');
 

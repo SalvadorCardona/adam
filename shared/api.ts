@@ -26,7 +26,15 @@ export const API_PATHS = {
   login: '/auth/login',
   logout: '/auth/logout',
   me: '/auth/me',
+  parties: '/parties',
 } as const;
+
+/** Le chemin d'une partie hébergée (`GET` pour la voir, `DELETE` pour la fermer). */
+export const partyPath = (code: string): string => `${API_PATHS.parties}/${code}`;
+/** Rejoindre la partie (`POST`). */
+export const partyJoinPath = (code: string): string => `${partyPath(code)}/join`;
+/** Quitter la salle d'attente d'un autre (`POST`). */
+export const partyLeavePath = (code: string): string => `${partyPath(code)}/leave`;
 
 /** La réponse de `GET /health`. */
 export interface HealthResponse {
@@ -232,4 +240,101 @@ export function isAccountError(value: unknown): value is AccountErrorResponse {
   const body = value as Record<string, unknown>;
 
   return body['ok'] === false && typeof body['error'] === 'string' && ACCOUNT_ERRORS.includes(body['error']);
+}
+
+/**
+ * Les parties hébergées. Un joueur connecté héberge sa partie : le serveur
+ * ouvre une session avec un code d'invitation court, difficile à deviner,
+ * qui expire. L'ami qui ouvre le lien se connecte, rejoint, et attend dans la
+ * salle d'attente — la synchronisation du jeu viendra ensuite.
+ */
+
+/** Pas de I, L, O, 0 ni 1 : un code se lit à voix haute et se retape sans erreur. */
+export const PARTY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+export const PARTY_LIMITS = {
+  /** 31^8, soit près de 10^12 codes : hors de portée d'un essai au hasard, que le serveur limite en plus. */
+  codeLength: 8,
+  /** Un ami : la partie se joue à deux. */
+  maxGuests: 1,
+} as const;
+
+/** Le paramètre d'URL qui porte le code d'une invitation : `…/mobile-factory/?join=ABCD2345`. */
+export const INVITE_PARAM = 'join';
+
+/**
+ * Le code, tel qu'un joueur le tape ou le colle : majuscules, sans espaces ni
+ * tirets. `null` : ce n'est pas la forme d'un code, inutile de demander au serveur.
+ */
+export function cleanPartyCode(raw: string): string | null {
+  const code = raw.toUpperCase().replace(/[\s-]+/gu, '');
+
+  if (code.length !== PARTY_LIMITS.codeLength) return null;
+
+  return [...code].every((char) => PARTY_ALPHABET.includes(char)) ? code : null;
+}
+
+/** Ce que le joueur est dans cette partie. */
+export type PartyRole = 'host' | 'guest' | 'none';
+
+/** Une partie hébergée, vue par `role` : la liste des invités n'est donnée qu'à ceux qui en font partie. */
+export interface PartyInfo {
+  readonly code: string;
+  /** Le pseudo de l'hôte. */
+  readonly host: string;
+  /** Fin de validité, en millisecondes depuis 1970. */
+  readonly expiresAt: number;
+  readonly role: PartyRole;
+  /** Les pseudos des invités, dans l'ordre d'arrivée ; vide pour qui n'est pas dans la salle. */
+  readonly guests: readonly string[];
+  /** Plus de place : un nouvel arrivant est refusé. */
+  readonly full: boolean;
+}
+
+/** La réponse de `POST /parties` (201), `GET /parties/:code` et `POST /parties/:code/join`. */
+export interface PartyResponse {
+  readonly ok: true;
+  readonly party: PartyInfo;
+}
+
+/**
+ * Ce que le serveur répond quand il refuse : 401 `unauthorized`, 404
+ * `notFound` (code inconnu ou mal formé), 410 `expired` ou `closed`, 409
+ * `full`, 403 `forbidden` (fermer la partie d'un autre), 429 `tooManyAttempts`.
+ */
+export interface PartyErrorResponse {
+  readonly ok: false;
+  readonly error: 'unauthorized' | 'notFound' | 'expired' | 'closed' | 'full' | 'forbidden' | 'tooManyAttempts';
+  readonly retryAfter?: number;
+}
+
+export function isPartyResponse(value: unknown): value is PartyResponse {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const body = value as Record<string, unknown>;
+  const party = body['party'];
+
+  if (body['ok'] !== true || typeof party !== 'object' || party === null) return false;
+
+  const info = party as Record<string, unknown>;
+
+  return (
+    typeof info['code'] === 'string' &&
+    typeof info['host'] === 'string' &&
+    typeof info['expiresAt'] === 'number' &&
+    (info['role'] === 'host' || info['role'] === 'guest' || info['role'] === 'none') &&
+    Array.isArray(info['guests']) &&
+    info['guests'].every((guest) => typeof guest === 'string') &&
+    typeof info['full'] === 'boolean'
+  );
+}
+
+const PARTY_ERRORS = ['unauthorized', 'notFound', 'expired', 'closed', 'full', 'forbidden', 'tooManyAttempts'];
+
+export function isPartyError(value: unknown): value is PartyErrorResponse {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const body = value as Record<string, unknown>;
+
+  return body['ok'] === false && typeof body['error'] === 'string' && PARTY_ERRORS.includes(body['error']);
 }

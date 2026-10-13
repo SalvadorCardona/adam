@@ -1217,7 +1217,7 @@ même Vitest) et build couvrent les deux.
   (503 si la base ne répond plus), sonde du jeu et du conteneur.
 - **Config** : variables d'environnement seulement (`server/src/config.ts`,
   `loadConfig`), liste dans `server/.env.example` : `PORT` (8790 — 8787 est
-  pris par Ponos en local), `HOST`, `DATABASE_PATH`, `CORS_ORIGINS`
+  pris par Ponos en local), `HOST`, `DATABASE_PATH`, `CORS_ORIGINS`, `INVITE_TTL_MINUTES`
   (par défaut `localhost` sur tout port). `server/.env` est lu s'il existe
   (`readEnv`), sans écraser l'environnement.
 - **Docker** : `server/Dockerfile`, construit depuis la racine
@@ -1256,6 +1256,24 @@ fenêtre `ui/accountPanel.ts` (boutons « Compte » de l'écran titre et des
 Réglages, Échap la ferme la première), textes `i18n/*/account.ts`. Sans
 serveur ou sans `VITE_API_URL`, le bouton dit « hors ligne » et rien d'autre
 ne change. Captures dans `docs/comptes/`.
+
+**Parties hébergées** (facultatif ; `shared/api.ts` : `/parties`, `PARTY_LIMITS`,
+`cleanPartyCode` ; `server/src/parties.ts`, migration `0003_parties.sql`) — un
+joueur connecté héberge sa partie (pause → « Inviter un ami »,
+`ui/invitePanel.ts`) : le serveur ouvre une session avec un **code de 8
+caractères** (`PARTY_ALPHABET`, sans I L O 0 1, tiré de `randomBytes`), qui
+expire après `INVITE_TTL_MINUTES` (60 par défaut, `ServerConfig.inviteTtlMs`) ou
+quand l'hôte la ferme (`DELETE /parties/:code`) ; une seule invitation ouverte par
+hôte, un seul ami (`maxGuests`). Chercher des codes inconnus est limité par IP
+(429). Le lien est `…/mobile-factory/?join=CODE` (`net/invite.ts` : un paramètre,
+GitHub Pages n'a pas de page de repli), son QR code un SVG de la palette
+(`ui/qrCode.ts`, `qrcode-generator`) ; partage natif (`navigator.share`) ou copie.
+L'ami arrive sur `ui/joinPanel.ts` (« Rejoindre la partie de <pseudo> ») : sans
+compte, la fenêtre Compte s'ouvre et se retire à la connexion, on retrouve
+l'invitation, « Rejoindre » le met dans la salle d'attente, que l'hôte et lui
+relisent toutes les 3 s (`POLL_MS`). Lien expiré, fermé, invalide ou partie pleine :
+message clair et « Retour à l'écran titre ». La synchronisation du jeu n'est pas là.
+Captures dans `docs/partie/`.
 
 **Scripts** : `npm run dev:all` lance serveur (`dev:server`, `node --watch`)
 et client branché dessus (`dev:online` = `vite --mode online`, qui lit

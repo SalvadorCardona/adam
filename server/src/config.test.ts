@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PORT, loadConfig, originAllowed } from './config.ts';
+import { DEFAULT_INVITE_MINUTES, DEFAULT_PORT, loadConfig, originAllowed } from './config.ts';
 
 describe('loadConfig', () => {
   it('prend les valeurs du développement quand rien n’est fixé', () => {
@@ -18,6 +18,7 @@ describe('loadConfig', () => {
       HOST: '127.0.0.1',
       DATABASE_PATH: '/data/game.sqlite',
       CORS_ORIGINS: 'https://cardona.digital, https://example.org',
+      INVITE_TTL_MINUTES: '15',
     });
 
     expect(config).toEqual({
@@ -25,12 +26,20 @@ describe('loadConfig', () => {
       host: '127.0.0.1',
       databasePath: '/data/game.sqlite',
       corsOrigins: ['https://cardona.digital', 'https://example.org'],
+      inviteTtlMs: 15 * 60_000,
     });
   });
 
   it('refuse un port illisible', () => {
     expect(() => loadConfig({ PORT: 'huit' })).toThrow(/PORT/);
     expect(() => loadConfig({ PORT: '70000' })).toThrow(/PORT/);
+  });
+
+  it('borne la durée des invitations', () => {
+    expect(loadConfig({}).inviteTtlMs).toBe(DEFAULT_INVITE_MINUTES * 60_000);
+    expect(() => loadConfig({ INVITE_TTL_MINUTES: '0' })).toThrow(/INVITE_TTL_MINUTES/);
+    expect(() => loadConfig({ INVITE_TTL_MINUTES: '2000' })).toThrow(/INVITE_TTL_MINUTES/);
+    expect(() => loadConfig({ INVITE_TTL_MINUTES: 'long' })).toThrow(/INVITE_TTL_MINUTES/);
   });
 });
 

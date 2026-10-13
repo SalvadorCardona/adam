@@ -16,6 +16,7 @@ import { menu } from './menu.ts';
 import { notifications } from './notifications.ts';
 import { offline } from './offline.ts';
 import { panel } from './panel.ts';
+import { party } from './party.ts';
 import { researchPanel } from './researchPanel.ts';
 import { resourcePanel } from './resourcePanel.ts';
 import { screens } from './screens.ts';
@@ -26,6 +27,7 @@ export const FR = {
   common,
   settings,
   account,
+  party,
   screens,
   hud,
   panel,
