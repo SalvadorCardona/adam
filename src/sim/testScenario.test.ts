@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BUILDINGS, MENU_BUILDING_IDS } from '../data/buildings.ts';
 import { TEST_SCENARIOS, type TestScenarioId } from '../data/testScenario.ts';
 import { validatePrototypes } from '../data/validate.ts';
+import { baseCenter } from './enemyBases.ts';
 import { encodeSave } from './save.ts';
 import { stageScenario } from './testScenario.ts';
 import { siteMissing } from './world.ts';
@@ -82,6 +83,18 @@ describe('parties de test', () => {
     // Le puits est vidé dans la mairie : l'eau monte au lieu de tomber à sec.
     expect(world.townStock()?.count('water')).toBeGreaterThan(TEST_SCENARIOS.base.town.water);
     expect(world.townStock()?.count('food')).toBeGreaterThan(0);
+  });
+
+  it('la base mutante : à l’ouverture, Adam la voit, sans brouillard', () => {
+    const world = stageScenario(TEST_SCENARIOS.raid);
+    const base = world.leadBase();
+
+    expect(base).not.toBeNull();
+    if (!base) return;
+    const { x, y } = baseCenter(base);
+
+    world.tick();
+    expect(world.sees(x, y)).toBe(true);
   });
 
   it('le coffre à ouvrir : trois pas à droite, Adam l’ouvre et trouve une pièce', () => {
