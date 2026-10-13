@@ -283,7 +283,11 @@ travail qu'au repos — la soif deux fois plus vite que la faim. Sous
 `seekBelow`, l'habitant lâche sa tâche (son job garde ses réservations),
 part manger un `food` ou boire un `water` à la mairie, le besoin le plus
 bas d'abord — sa part réservée au départ (`meal`, rejouée au chargement) —
-et la reprend. Sans de quoi, sous `weakBelow` il va à mi-allure, à zéro il
+et la reprend. Mairie à sec, il va au producteur le plus proche dont le coffre
+en a (`isProducer` : puits, ferme…, `World.mealSource`, en ligne droite) et
+réserve sa part là (`reserveOut`, `mealSites` : non sauvegardé, refait au
+chargement) ; la mairie reste le premier choix, un coffre vide ou déjà
+réservé n'attire personne. Sans de quoi, sous `weakBelow` il va à mi-allure, à zéro il
 s'arrête (`stopsWork`) et le compte à rebours de la mort démarre (`deathTicks`, 3 min de faim, 1 min 30 de soif, un repas le remet à rien ; avertissement `starving` au premier tick à bout, puis `workerStarved` : l'ouvrier disparaît, `colonists` baisse, toast avec son nom et la cause ; `World.starve`/`perish`, compte non sauvegardé, enfants épargnés) ; un enfant affamé ou assoiffé ne
 prend pas d'année à l'aube (`blocksGrowth`). La mairie bâtie verse
 `COLONY.startingStock` (`data/inhabitants.ts` : nourriture et eau pour
