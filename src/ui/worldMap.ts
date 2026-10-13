@@ -210,7 +210,12 @@ export class WorldMap {
     });
 
     legend.className = 'world-map-legend';
-    this.root.append(this.canvas, header, legend, hint);
+    // Légende et consigne s'empilent : la consigne peut tenir sur deux lignes.
+    const foot = document.createElement('div');
+
+    foot.className = 'world-map-foot';
+    foot.append(legend, hint);
+    this.root.append(this.canvas, header, foot);
 
     onLocale(() => {
       const { worldMap } = t().screens;

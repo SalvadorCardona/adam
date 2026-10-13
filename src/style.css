@@ -1002,11 +1002,19 @@ button:disabled,
   pointer-events: auto;
 }
 
-.world-map-hint {
+.world-map-foot {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: calc(var(--safe-bottom) + 16px);
-  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.world-map-hint {
   max-width: calc(100% - 32px);
   margin: 0;
   padding: 8px 16px;
@@ -1020,15 +1028,15 @@ button:disabled,
   pointer-events: none;
 }
 
-/* La légende des régions, en bas à gauche, au-dessus de la consigne. */
+/* La légende des régions, à gauche, empilée au-dessus de la consigne. */
 .world-map-legend {
-  position: absolute;
-  left: calc(var(--safe-left) + 12px);
-  bottom: calc(var(--safe-bottom) + 64px);
+  align-self: flex-start;
+  margin-left: calc(var(--safe-left) + 12px);
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 0;
+  margin-top: 0;
+  margin-bottom: 0;
   padding: 0;
   list-style: none;
   pointer-events: none;
