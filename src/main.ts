@@ -88,13 +88,15 @@ import { ZoomControls } from './ui/zoomControls.ts';
 import { SeenArea } from './ui/mapSight.ts';
 import { WorldMap } from './ui/worldMap.ts';
 import { AccountClient } from './net/account.ts';
-import { inviteCodeOf, withoutInvite } from './net/invite.ts';
+import { inviteCodeOf, playCodeOf, playUrl, resyncsOf, titleUrl, withoutInvite } from './net/invite.ts';
+import { GuestSession, HostSession, type GuestStatus } from './net/play.ts';
 import { PartyClient } from './net/party.ts';
 import { Connection } from './net/connection.ts';
 import { LocalAccount } from './storage/localAccount.ts';
 import { AccountPanel } from './ui/accountPanel.ts';
 import { InvitePanel } from './ui/invitePanel.ts';
 import { JoinPanel } from './ui/joinPanel.ts';
+import { PlayScreen } from './ui/playScreen.ts';
 
 /**
  * Clamp anti-spirale de la mort.
@@ -232,24 +234,6 @@ async function main(): Promise<void> {
    */
   const scenario = testScenarioOf(window.location.pathname, import.meta.env.BASE_URL);
 
-  // Une partie sauvegardée reprend là où elle s'était arrêtée ; sinon, une carte neuve.
-  const saves = scenario ? new LocalSave(null) : LocalSave.browser();
-  const loaded = saves.load();
-  // Cet onglet prend la main sur la sauvegarde ; un onglet plus ancien cesse d'y écrire (`TabLock`).
-  const tabs = scenario ? new TabLock(null) : TabLock.browser();
-
-  tabs.claim();
-  const world = scenario
-    ? stageScenario(TEST_SCENARIOS[scenario])
-    : loaded.status === 'ok'
-      ? loaded.world
-      : World.newColony(readSeed());
-
-  // Le joystick repart au repos : un doigt posé au moment où l'onglet s'est fermé ne fait plus marcher Adam.
-  if (loaded.status === 'ok') world.push({ type: 'setMoveAxis', x: 0, y: 0 });
-  // La ville a vécu pendant que le jeu était fermé : elle rattrape ce temps au premier tick, borné au plafond.
-  if (loaded.status === 'ok') world.push({ type: 'catchUp', awayMs: awayMs(loaded.savedAt, Date.now()) });
-
   /*
    * Le back-end, s'il y en a un (`VITE_API_URL`) : une sonde qui ne retarde
    * rien et n'empêche rien. Hors ligne par défaut ; serveur coupé ou absent,
@@ -261,6 +245,43 @@ async function main(): Promise<void> {
 
   // Le compte, facultatif : la session gardée sur l'appareil se revérifie au passage en ligne.
   const accounts = new AccountClient(connection.baseUrl, scenario ? new LocalAccount(null) : LocalAccount.browser());
+
+  /*
+   * `?play=CODE` : l'ami joue dans la partie de l'hôte. Son monde est l'image
+   * que l'hôte lui envoie, rejouée tick par tick (`net/lockstep.ts`) ; rien
+   * n'en est sauvegardé ici — sa propre partie, son jardin, sa collection
+   * restent intacts, il les retrouve à l'écran titre.
+   */
+  const playCode = scenario ? null : playCodeOf(window.location.search);
+  const guest = playCode === null ? null : await joinAsGuest(playCode, connection, accounts, mount);
+
+  if (playCode !== null && !guest) return;
+
+  const sandbox = scenario !== null || guest !== null;
+
+  // Une partie sauvegardée reprend là où elle s'était arrêtée ; sinon, une carte neuve.
+  const saves = sandbox ? new LocalSave(null) : LocalSave.browser();
+  const loaded = saves.load();
+  // Cet onglet prend la main sur la sauvegarde ; un onglet plus ancien cesse d'y écrire (`TabLock`).
+  const tabs = sandbox ? new TabLock(null) : TabLock.browser();
+
+  tabs.claim();
+  const world = guest
+    ? guest.world
+    : scenario
+      ? stageScenario(TEST_SCENARIOS[scenario])
+      : loaded.status === 'ok'
+        ? loaded.world
+        : World.newColony(readSeed());
+
+  // L'ami d'une partie à deux sauvegardée n'est plus là : son sac reste au sol, où il l'a laissé.
+  if (!guest && world.partner) world.push({ type: 'partnerLeave' });
+
+  // Le joystick repart au repos : un doigt posé au moment où l'onglet s'est fermé ne fait plus marcher Adam.
+  if (loaded.status === 'ok') world.push({ type: 'setMoveAxis', x: 0, y: 0 });
+  // La ville a vécu pendant que le jeu était fermé : elle rattrape ce temps au premier tick, borné au plafond.
+  if (loaded.status === 'ok') world.push({ type: 'catchUp', awayMs: awayMs(loaded.savedAt, Date.now()) });
+
   const accountPanel = new AccountPanel(accounts, connection);
 
   connection.subscribe((state) => {
@@ -269,8 +290,32 @@ async function main(): Promise<void> {
 
   // Héberger sa partie et inviter un ami ; ou, par un lien d'invitation (`?join=`), rejoindre celle d'un ami.
   const parties = new PartyClient(accounts);
-  const invitePanel = new InvitePanel(parties, accounts, connection, () => accountPanel.show());
-  const inviteCode = scenario ? null : inviteCodeOf(window.location.search);
+  /*
+   * L'hôte : dès que son invitation est ouverte, il s'annonce au serveur et
+   * l'ami qui entre reçoit la partie (`HostSession`) ; elle continue de se
+   * sauvegarder ici, comme en solo.
+   */
+  let hosting: HostSession | null = null;
+  const hostParty = (code: string | null): void => {
+    if (guest || hosting?.code === code) return;
+    hosting?.stop();
+    hosting = null;
+
+    const token = accounts.token;
+
+    if (code === null || connection.baseUrl === null || token === null) return;
+
+    const session = new HostSession(world, connection.baseUrl, code, token, (event) => {
+      if (event.kind !== 'ended' || hosting !== session) return;
+      hosting = null;
+      hud.notify(t().party.play.sessionEnded, 'good');
+    });
+
+    hosting = session;
+    session.start();
+  };
+  const invitePanel = new InvitePanel(parties, accounts, connection, () => accountPanel.show(), hostParty);
+  const inviteCode = scenario || guest ? null : inviteCodeOf(window.location.search);
   const joinPanel =
     inviteCode === null
       ? null
@@ -281,6 +326,8 @@ async function main(): Promise<void> {
           connection,
           () => accountPanel.show(),
           () => window.history.replaceState(null, '', withoutInvite(window.location.href)),
+          // Dans la salle : l'ami entre dans la partie de l'hôte.
+          (code) => window.location.replace(playUrl(window.location.href, code)),
         );
 
   // Connecté depuis l'écran « Rejoindre » : la fenêtre du compte se retire, l'invitation est là.
@@ -577,13 +624,20 @@ async function main(): Promise<void> {
 
   const autosave = wireSave(world, saves, tabs, () => started, {
     lost: () => tabPanel.show(),
-    failed: () => hud.notify(t().hud.toast.saveFailed, 'bad'),
+    // Une partie de test ou celle d'un autre ne s'écrit nulle part : ce n'est pas un échec.
+    failed: () => {
+      if (!sandbox) hud.notify(t().hud.toast.saveFailed, 'bad');
+    },
   });
-  const garden = wireGarden(world, scenario ? new LocalGarden(null) : LocalGarden.browser());
-  const record = wireRecord(world, scenario ? new LocalRecord(null) : LocalRecord.browser());
+  const garden = wireGarden(world, sandbox ? new LocalGarden(null) : LocalGarden.browser());
+  const record = wireRecord(world, sandbox ? new LocalRecord(null) : LocalRecord.browser());
 
-  const achievements = wireAchievements(world, scenario ? new LocalCollection(null) : LocalCollection.browser(), hud, audio);
-  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), () => invitePanel.show());
+  const achievements = wireAchievements(world, sandbox ? new LocalCollection(null) : LocalCollection.browser(), hud, audio);
+
+  // Jouer à deux : chacun voit l'autre arriver et partir.
+  world.events.on('partnerJoined', ({ name }) => hud.notify(t().party.play.partnerJoined(name), 'good'));
+  world.events.on('partnerLeft', ({ name }) => hud.notify(t().party.play.partnerLeft(name), 'bad'));
+  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest ? null : () => invitePanel.show());
   const title = new TitleScreen({
     resume: loaded.status === 'ok',
     notice: LOAD_NOTICES[loaded.status] ?? linkNotice(world),
@@ -669,6 +723,11 @@ async function main(): Promise<void> {
     started = true;
     hud.root.dataset['started'] = 'true';
     hud.root.append(testBanner(scenario));
+  } else if (guest) {
+    // L'ami arrive dans une partie qui tourne : pas d'écran titre. Son écran de connexion passe dans le HUD.
+    started = true;
+    hud.root.dataset['started'] = 'true';
+    hud.root.append(guest.screen.root);
   } else {
     hud.root.append(title.root);
   }
@@ -942,11 +1001,19 @@ async function main(): Promise<void> {
     pad.update(ticker.deltaMS, performance.now(), !worldMap.open);
     if (pad.padMode) padHints.update();
 
-    if (running && !celebrating) accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS);
+    if (guest) {
+      // L'ami ne fait pas autorité : sa partie avance au rythme des pas de l'hôte, pause et écrans compris.
+      pushAxisIfChanged();
+      guest.session.sync?.advance(ticker.deltaMS);
+      accumulator = (guest.session.sync?.alpha ?? 0) * STEP_MS;
+    } else if (running && !celebrating) {
+      accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS);
+    }
 
-    while (accumulator >= STEP_MS && !celebrating) {
+    while (!guest && accumulator >= STEP_MS && !celebrating) {
       pushAxisIfChanged();
       world.tick();
+      hosting?.afterTick();
       accumulator -= STEP_MS;
     }
     if (running) autosave.update(ticker.deltaMS);
@@ -1703,6 +1770,99 @@ function wireShake(world: World, renderer: GameRenderer, busy: () => boolean): v
  * Une seed dans l'URL, c'est une carte qu'on peut se repasser telle quelle —
  * indispensable pour reproduire un bug de génération.
  */
+/** Les recalages d'affilée sur une image neuve avant de renoncer : au-delà, les deux jeux ne s'accordent pas. */
+const MAX_RESYNCS = 3;
+/** Une connexion perdue en jeu : la page se rouvre dans la partie après ce délai. */
+const RECONNECT_MS = 2000;
+/** Le temps de jeu après lequel les recalages passés sont oubliés. */
+const RESYNC_FORGET_MS = 30_000;
+
+/**
+ * L'ami entre dans la partie de l'hôte : l'écran de connexion d'abord, puis,
+ * l'image de l'hôte arrivée, son monde. `null` : il n'entrera pas — l'écran
+ * dit pourquoi et rend la main à l'écran titre. Ensuite, l'écran revient si
+ * l'hôte part, si la session se ferme ; la connexion perdue ou une
+ * divergence rouvrent la page, qui se reconnecte et reçoit une image neuve.
+ */
+function joinAsGuest(
+  code: string,
+  connection: Connection,
+  accounts: AccountClient,
+  mount: HTMLElement,
+): Promise<{ world: World; session: GuestSession; screen: PlayScreen } | null> {
+  const reopen = (resync = 0): void => window.location.replace(playUrl(window.location.href, code, resync));
+  const screen = new PlayScreen(
+    () => reopen(),
+    () => window.location.replace(titleUrl(window.location.href)),
+  );
+
+  mount.append(screen.root);
+
+  const token = accounts.token;
+
+  if (connection.baseUrl === null || token === null) {
+    screen.show({ kind: 'failed', reason: connection.baseUrl === null ? 'offline' : 'signedOut' });
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    let playing = false;
+    const session = new GuestSession(connection.baseUrl!, code, token, (status: GuestStatus) => {
+      switch (status.kind) {
+        case 'connecting':
+        case 'waiting':
+          screen.show(status.kind === 'waiting' ? { kind: 'waiting', host: status.host, hostOnline: status.hostOnline } : status);
+          break;
+        case 'playing':
+          playing = true;
+          screen.show(null);
+          setTimeout(() => {
+            if (resyncsOf(window.location.search) > 0) window.history.replaceState(null, '', playUrl(window.location.href, code));
+          }, RESYNC_FORGET_MS);
+          resolve({ world: status.world, session, screen });
+          break;
+        case 'hostLeft':
+          screen.show({ kind: 'hostLeft', host: status.host });
+          break;
+        case 'hostBack':
+          reopen();
+          break;
+        case 'ended':
+          screen.show({ kind: 'ended' });
+          if (!playing) resolve(null);
+          break;
+        case 'lost':
+          if (!playing) {
+            screen.show({ kind: 'failed', reason: 'offline' });
+            resolve(null);
+            break;
+          }
+          screen.show({ kind: 'lost' });
+          setTimeout(() => reopen(), RECONNECT_MS);
+          break;
+        case 'failed':
+          screen.show({ kind: 'failed', reason: status.reason });
+          if (!playing) resolve(null);
+          break;
+        case 'desync': {
+          const done = resyncsOf(window.location.search);
+
+          session.stop();
+          if (done >= MAX_RESYNCS) {
+            screen.show({ kind: 'failed', reason: 'desync' });
+            break;
+          }
+          screen.show({ kind: 'resync' });
+          reopen(done + 1);
+          break;
+        }
+      }
+    });
+
+    session.start();
+  });
+}
+
 function readSeed(): number {
   return parseSeed(window.location.search) ?? (Math.random() * 0xffffffff) >>> 0;
 }

@@ -3,10 +3,9 @@
  * (`?join=CODE`). Il s'ouvre par-dessus l'écran titre, regarde l'invitation,
  * demande de se connecter si besoin — la fenêtre du compte s'ouvre par-dessus
  * et, une fois connecté, on retrouve ici l'invitation —, puis place l'ami
- * dans la salle d'attente de l'hôte. Lien expiré, fermé, invalide ou partie
- * pleine : un message clair et « Retour à l'écran titre ».
- *
- * La synchronisation de la partie viendra ensuite ; ici, on attend.
+ * dans la salle d'attente de l'hôte — d'où il entre aussitôt dans la partie
+ * (`onEnter`, `?play=CODE`). Lien expiré, fermé, invalide ou partie pleine :
+ * un message clair et « Retour à l'écran titre ».
  */
 
 import type { PartyInfo } from '../../shared/api.ts';
@@ -28,6 +27,7 @@ export class JoinPanel {
   private readonly accounts: AccountClient;
   private readonly openAccount: () => void;
   private readonly onLeave: () => void;
+  private readonly onEnter: (code: string) => void;
   private readonly title: HTMLHeadingElement;
   private readonly status: HTMLParagraphElement;
   private readonly signIn: HTMLButtonElement;
@@ -44,7 +44,10 @@ export class JoinPanel {
   private timer: ReturnType<typeof setInterval> | null = null;
   private busy = false;
 
-  /** `code` : le code lu dans le lien, `''` s'il est illisible. `onLeave` : retour à l'écran titre. */
+  /**
+   * `code` : le code lu dans le lien, `''` s'il est illisible. `onLeave` : retour
+   * à l'écran titre. `onEnter` : dans la salle, on entre dans la partie de l'hôte.
+   */
   public constructor(
     code: string,
     party: PartyClient,
@@ -52,7 +55,9 @@ export class JoinPanel {
     connection: Connection,
     openAccount: () => void,
     onLeave: () => void,
+    onEnter: (code: string) => void = () => {},
   ) {
+    this.onEnter = onEnter;
     this.code = code;
     this.party = party;
     this.accounts = accounts;
@@ -152,6 +157,7 @@ export class JoinPanel {
       this.info = result.party;
       this.failure = null;
       this.state = result.party.role === 'guest' ? 'waiting' : result.party.role === 'host' ? 'own' : 'ready';
+      if (this.state === 'waiting') this.onEnter(result.party.code);
       if (this.state === 'waiting' || this.state === 'own') this.timer = setInterval(() => void this.poll(), POLL_MS);
     } else {
       this.failure = result;

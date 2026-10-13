@@ -203,7 +203,21 @@ export type Command =
    * temps en agrégé, borné au plafond (`World.catchUp`), et le récap suit
    * (`offlineCaughtUp`).
    */
-  | { type: 'catchUp'; awayMs: number };
+  | { type: 'catchUp'; awayMs: number }
+  /**
+   * Jouer à deux : l'ami entre dans la partie (`sim/partner.ts`). Son
+   * personnage apparaît à côté d'Adam, sac vide, sous son pseudo ; déjà là,
+   * il ne fait que changer de nom. Poussée par l'hôte (`net/lockstep.ts`).
+   */
+  | { type: 'partnerJoin'; name: string }
+  /** L'ami est parti : son personnage disparaît, son sac reste au sol, en tas à ses pieds. */
+  | { type: 'partnerLeave' }
+  /**
+   * Une commande de l'ami, appliquée avec son personnage comme acteur : sa
+   * portée, son sac, son pas. Seules celles de `PARTNER_COMMANDS` passent ;
+   * sans ami dans la partie, elle est ignorée.
+   */
+  | { type: 'asPartner'; command: Command };
 
 /** Motif de refus d'une commande sur un chantier — remonté à l'UI par un événement. */
 export type SiteRejection =

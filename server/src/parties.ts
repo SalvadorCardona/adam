@@ -1,13 +1,14 @@
 /**
  * Les parties hébergées : un joueur connecté ouvre une session de partie, le
  * serveur lui donne un code d'invitation, un ami le rejoint et attend dans la
- * salle d'attente. La synchronisation du jeu entre les deux n'est pas ici.
+ * salle d'attente ; ils jouent ensuite par le WebSocket (`rooms.ts`).
  *
  * Le code est tiré au hasard (`randomBytes`, jamais déduit de l'id), assez long
  * pour qu'un essai au hasard ne tombe pas dessus, et chercher des codes
  * inconnus est limité par IP. La session expire (`INVITE_TTL_MINUTES`) ou se
  * ferme : lien expiré, plus personne ne rejoint. Un hôte n'a qu'une session
- * ouverte à la fois.
+ * ouverte à la fois. Le jeu lui-même passe par le WebSocket (`rooms.ts`), qui
+ * lit ici qui est l'hôte et qui est dans la salle (`partyDirectory`).
  */
 
 import { randomInt } from 'node:crypto';
@@ -39,6 +40,33 @@ export interface PartyDeps {
   readonly userOf: (c: Context) => AccountUser | null;
   /** Durée de validité d'une invitation, en millisecondes. */
   readonly ttlMs: number;
+  /** L'hôte ferme sa session : ceux qui y jouent l'apprennent (`PartyRooms.end`). */
+  readonly onClosed?: (code: string) => void;
+}
+
+/** Ce que le WebSocket a besoin de savoir d'une partie : son hôte, sa salle, si elle est fermée. */
+export interface PartyDirectory {
+  find(code: string): { readonly hostId: number; readonly host: string; readonly closed: boolean } | null;
+  isGuest(code: string, accountId: number): boolean;
+}
+
+/**
+ * Une partie expirée se joue encore : l'invitation ne sert plus à entrer,
+ * mais l'ami déjà dans la salle peut s'y reconnecter tant que l'hôte ne l'a
+ * pas fermée.
+ */
+export function partyDirectory(db: DatabaseSync): PartyDirectory {
+  const findParty = db.prepare('SELECT p.host_id, a.nickname AS host, p.closed_at FROM parties p JOIN accounts a ON a.id = p.host_id WHERE p.code = ?');
+  const findGuest = db.prepare('SELECT 1 FROM party_guests g JOIN parties p ON p.id = g.party_id WHERE p.code = ? AND g.account_id = ?');
+
+  return {
+    find(code) {
+      const row = findParty.get(code) as { host_id: number; host: string; closed_at: number | null } | undefined;
+
+      return row ? { hostId: row.host_id, host: row.host, closed: row.closed_at !== null } : null;
+    },
+    isGuest: (code, accountId) => findGuest.get(code, accountId) !== undefined,
+  };
 }
 
 interface PartyRow {
@@ -72,7 +100,7 @@ function fail(c: Context, status: 401 | 403 | 404 | 409 | 410 | 429, error: Part
   return c.json(body, status);
 }
 
-export function partyRoutes({ db, clock, clientIp, userOf, ttlMs }: PartyDeps): Hono {
+export function partyRoutes({ db, clock, clientIp, userOf, ttlMs, onClosed }: PartyDeps): Hono {
   const routes = new Hono();
   const unknownByIp = new AttemptLimiter(LOOKUP_MAX_PER_IP, LOOKUP_WINDOW_MS, clock);
 
@@ -80,6 +108,7 @@ export function partyRoutes({ db, clock, clientIp, userOf, ttlMs }: PartyDeps): 
     'SELECT p.id, p.code, p.host_id, a.nickname AS host, p.expires_at, p.closed_at FROM parties p JOIN accounts a ON a.id = p.host_id WHERE p.code = ?',
   );
   const insertParty = db.prepare('INSERT INTO parties (code, host_id, created_at, expires_at) VALUES (?, ?, ?, ?)');
+  const openOf = db.prepare('SELECT code FROM parties WHERE host_id = ? AND closed_at IS NULL AND expires_at > ?');
   const closeOf = db.prepare('UPDATE parties SET closed_at = ? WHERE host_id = ? AND closed_at IS NULL AND expires_at > ?');
   const closeOne = db.prepare('UPDATE parties SET closed_at = ? WHERE id = ?');
   const deleteOld = db.prepare('DELETE FROM parties WHERE MAX(expires_at, COALESCE(closed_at, 0)) <= ?');
@@ -138,8 +167,11 @@ export function partyRoutes({ db, clock, clientIp, userOf, ttlMs }: PartyDeps): 
     const now = clock();
 
     deleteOld.run(now - KEEP_MS);
-    // Une seule invitation ouverte par hôte : la précédente se ferme.
+    // Une seule invitation ouverte par hôte : la précédente se ferme, et ceux qui y jouaient l'apprennent.
+    const previous = openOf.all(user.id, now) as unknown as { code: string }[];
+
     closeOf.run(now, user.id, now);
+    for (const { code } of previous) onClosed?.(code);
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const code = newPartyCode();
@@ -207,6 +239,7 @@ export function partyRoutes({ db, clock, clientIp, userOf, ttlMs }: PartyDeps): 
     if (row instanceof Response) return row;
     if (row.host_id !== user.id) return fail(c, 403, 'forbidden');
     closeOne.run(clock(), row.id);
+    onClosed?.(row.code);
     c.header('Cache-Control', 'no-store');
 
     return c.json({ ok: true });

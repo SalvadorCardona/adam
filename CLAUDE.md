@@ -1272,8 +1272,34 @@ L'ami arrive sur `ui/joinPanel.ts` (« Rejoindre la partie de <pseudo> ») : san
 compte, la fenêtre Compte s'ouvre et se retire à la connexion, on retrouve
 l'invitation, « Rejoindre » le met dans la salle d'attente, que l'hôte et lui
 relisent toutes les 3 s (`POLL_MS`). Lien expiré, fermé, invalide ou partie pleine :
-message clair et « Retour à l'écran titre ». La synchronisation du jeu n'est pas là.
-Captures dans `docs/partie/`.
+message clair et « Retour à l'écran titre ». Une fois dans la salle, l'ami entre
+dans la partie (`?play=CODE`, voir Jouer à deux). Captures dans `docs/partie/`.
+
+**Jouer à deux** (`net/lockstep.ts`, `net/play.ts`, `sim/partner.ts`,
+`server/src/rooms.ts`) — la partie tourne chez l'hôte, qui fait autorité ; le
+serveur ne simule rien, il vérifie qui entre (jeton + code, l'ami doit être dans
+la salle) et relaie (`relay`). La simulation étant déterministe, l'ami **rejoue**
+la partie au tick près : à son arrivée, l'image (`key`, le `snapshot()` de la
+sauvegarde, compressé par `permessage-deflate`) ; puis les pas (`f` : une plage
+de ticks, les commandes de chacun avec leur tick, l'empreinte `World.checksum`
+une fois par seconde), dix paquets par seconde. Ses commandes partent à l'hôte
+(`World.relay`), qui les valide (`parsePartnerCommand`, `PARTNER_COMMANDS` : ni
+l'arc d'Adam, ni sa garde-robe, ni les réglages de l'hôte) et les applique
+enveloppées (`asPartner`) ; l'ami ne les voit qu'en retour, quelques ticks
+derrière l'hôte (`LOCKSTEP.bufferTicks`, rattrapage accéléré). Empreinte
+différente → la page se rouvre sur une image neuve (`resync`, trois fois au plus).
+L'ami est un second joueur de la simulation (`World.partner`, sauvegardé avec
+la partie de l'hôte, retiré au chargement en solo) : gabarit d'Adam habillé
+autrement (`PARTNER_LOOK`, sprite `partner`), pseudo dans une capsule blanche ;
+il récolte, heurte, bâtit, échange comme Adam, ne tire pas et n'est pas visé.
+`World.player` est le joueur de l'écran hors du tick (`viewAsPartner`) et celui
+qui agit pendant ; `World.adam` est toujours Adam ; `World.mine` n'écoute que
+les événements du joueur de l'écran. Déconnecté, son personnage s'arrête, puis
+part après `graceMs` (son sac reste au sol) ; il revient tant que la session est
+ouverte. L'hôte parti : l'ami le voit (`PlayScreen`) et revient à l'écran titre —
+sa propre partie intacte, rien de celle de l'hôte n'est sauvegardé chez lui. Un
+joueur invité au plus ; l'hôte en pause ou onglet caché, la partie s'arrête pour
+les deux. GIF dans `docs/partie/deux-joueurs.gif`.
 
 **Scripts** : `npm run dev:all` lance serveur (`dev:server`, `node --watch`)
 et client branché dessus (`dev:online` = `vite --mode online`, qui lit

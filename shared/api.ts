@@ -63,18 +63,55 @@ export function isHealthResponse(value: unknown): value is HealthResponse {
 }
 
 /**
- * Les messages du WebSocket. Pour l'instant, une poignée de main et un
- * ping applicatif ; la synchronisation d'une partie à deux s'y ajoutera.
+ * Les messages du WebSocket : une poignée de main, un ping applicatif, et le
+ * jeu à deux. Pour jouer, l'hôte et l'ami s'annoncent (`host`, `join`) avec
+ * le code de la partie et leur jeton de session ; le serveur vérifie qui ils
+ * sont, puis relaie entre eux, sans les lire, les messages du jeu (`relay`) —
+ * la partie tourne chez l'hôte, qui fait autorité (`src/net/lockstep.ts`).
  */
 export type ServerMessage =
   | { readonly type: 'hello'; readonly api: number }
   | { readonly type: 'pong'; readonly t: number }
-  | { readonly type: 'error'; readonly reason: SocketError };
+  | { readonly type: 'error'; readonly reason: SocketError }
+  /** L'hôte est dans la salle de sa partie. */
+  | { readonly type: 'hosting'; readonly code: string }
+  /** L'ami est dans la salle ; `hostOnline` : l'hôte y est aussi, la partie peut commencer. */
+  | { readonly type: 'joined'; readonly code: string; readonly host: string; readonly hostOnline: boolean }
+  /** À l'hôte : un ami est entré (ou revenu), un ami est parti. `guest` : l'id de son compte. */
+  | { readonly type: 'guestIn'; readonly guest: number; readonly nickname: string }
+  | { readonly type: 'guestOut'; readonly guest: number }
+  /** À l'ami : l'hôte est revenu, l'hôte est parti. */
+  | { readonly type: 'hostIn' }
+  | { readonly type: 'hostOut' }
+  /** La session est fermée par l'hôte : plus personne n'y joue. */
+  | { readonly type: 'ended' }
+  /** Un message du jeu, tel que l'autre l'a envoyé ; `from` : l'ami qui l'envoie, pour l'hôte. */
+  | { readonly type: 'relay'; readonly data: unknown; readonly from?: number };
 
-export type ClientMessage = { readonly type: 'ping'; readonly t: number };
+export type ClientMessage =
+  | { readonly type: 'ping'; readonly t: number }
+  | { readonly type: 'host'; readonly code: string; readonly token: string }
+  | { readonly type: 'join'; readonly code: string; readonly token: string }
+  /** Un message du jeu : de l'hôte à ses amis (`to` : un seul), ou de l'ami à l'hôte. */
+  | { readonly type: 'relay'; readonly data: unknown; readonly to?: number };
 
-/** Ce qu'un message refusé reçoit en retour. */
-export type SocketError = 'badMessage';
+/**
+ * Ce qu'un message refusé reçoit en retour : illisible, jeton inconnu, code
+ * inconnu, session fermée, pas sa partie, pas encore dans une salle, ou une
+ * connexion plus récente du même joueur qui prend sa place.
+ */
+export type SocketError = 'badMessage' | 'unauthorized' | 'notFound' | 'closed' | 'forbidden' | 'notInRoom' | 'replaced';
+
+export const PLAY_LIMITS = {
+  /**
+   * Le plus gros message accepté : l'image complète d'une partie, que l'hôte
+   * envoie à l'ami qui arrive. Une longue partie en fait quelques centaines de
+   * Ko ; le reste du protocole tient en quelques dizaines d'octets.
+   */
+  maxMessageBytes: 4 * 1024 * 1024,
+  /** Messages relayés par seconde au plus, par connexion : au-delà, ils sont jetés. */
+  relaysPerSecond: 60,
+} as const;
 
 /** Un message reçu par le serveur est-il l'un de ceux qu'il connaît ? */
 export function parseClientMessage(raw: string): ClientMessage | null {
@@ -88,10 +125,49 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   if (typeof value !== 'object' || value === null) return null;
 
   const message = value as Record<string, unknown>;
+  const { type, code, token, to } = message;
 
-  if (message['type'] === 'ping' && typeof message['t'] === 'number') return { type: 'ping', t: message['t'] };
+  if (type === 'ping' && typeof message['t'] === 'number') return { type: 'ping', t: message['t'] };
+  if ((type === 'host' || type === 'join') && typeof code === 'string' && typeof token === 'string') return { type, code, token };
+  if (type === 'relay' && 'data' in message && (to === undefined || (typeof to === 'number' && Number.isSafeInteger(to)))) {
+    return { type: 'relay', data: message['data'], ...(to !== undefined && { to }) };
+  }
 
   return null;
+}
+
+/** Un message reçu du serveur, s'il en a la forme ; `null` sinon. */
+export function parseServerMessage(raw: string): ServerMessage | null {
+  let value: unknown;
+
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof value !== 'object' || value === null) return null;
+
+  const message = value as Record<string, unknown>;
+
+  switch (message['type']) {
+    case 'hello':
+    case 'pong':
+    case 'error':
+    case 'hosting':
+    case 'hostIn':
+    case 'hostOut':
+    case 'ended':
+    case 'guestOut':
+      return value as ServerMessage;
+    case 'joined':
+      return typeof message['host'] === 'string' && typeof message['hostOnline'] === 'boolean' ? (value as ServerMessage) : null;
+    case 'guestIn':
+      return typeof message['guest'] === 'number' && typeof message['nickname'] === 'string' ? (value as ServerMessage) : null;
+    case 'relay':
+      return 'data' in message ? (value as ServerMessage) : null;
+    default:
+      return null;
+  }
 }
 
 /**
@@ -245,8 +321,8 @@ export function isAccountError(value: unknown): value is AccountErrorResponse {
 /**
  * Les parties hébergées. Un joueur connecté héberge sa partie : le serveur
  * ouvre une session avec un code d'invitation court, difficile à deviner,
- * qui expire. L'ami qui ouvre le lien se connecte, rejoint, et attend dans la
- * salle d'attente — la synchronisation du jeu viendra ensuite.
+ * qui expire. L'ami qui ouvre le lien se connecte, rejoint la salle, puis
+ * entre dans la partie par le WebSocket (`?play=CODE`).
  */
 
 /** Pas de I, L, O, 0 ni 1 : un code se lit à voix haute et se retape sans erreur. */
@@ -261,6 +337,9 @@ export const PARTY_LIMITS = {
 
 /** Le paramètre d'URL qui porte le code d'une invitation : `…/mobile-factory/?join=ABCD2345`. */
 export const INVITE_PARAM = 'join';
+
+/** Le paramètre d'URL de l'ami en jeu : la page se rouvre dans la partie de l'hôte (`…/?play=ABCD2345`). */
+export const PLAY_PARAM = 'play';
 
 /**
  * Le code, tel qu'un joueur le tape ou le colle : majuscules, sans espaces ni

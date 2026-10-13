@@ -135,6 +135,25 @@ export const DEFAULT_LOOK: Look = {
   colors: { eyes: 'ink', hair: 'ink', top: 'orange' },
 };
 
+/**
+ * L'ami, quand on joue à deux (`sim/partner.ts`) : un sweat cyan et une casquette, des boucles corail — rien
+ * d'Adam, sa tunique orange et son épi indigo. Des pièces de la garde-robe :
+ * il se dessine avec les calques d'Adam (`art/partner.ts`).
+ */
+export const PARTNER_LOOK: Look = {
+  pieces: {
+    hair: 'hairCurly',
+    eyes: 'eyesBright',
+    beard: 'beardNone',
+    top: 'topHoodie',
+    pants: 'pantsPatched',
+    shoes: 'shoesSneakers',
+    glasses: 'glassesNone',
+    hat: 'hatCap',
+  },
+  colors: { eyes: 'violet', hair: 'coral', top: 'cyan' },
+};
+
 /** Ce qui fait trouver une pièce. */
 export const LOOT_SOURCES = ['objective', 'enemyBase', 'chief', 'queen', 'beast', 'chest', 'ruin'] as const;
 
