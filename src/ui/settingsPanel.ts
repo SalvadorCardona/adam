@@ -15,6 +15,7 @@
 import { LOCALES, messagesOf, onLocale, t, type Locale } from '../i18n/locale.ts';
 import { NOTIFICATION_KINDS, type NotificationKind } from '../data/notifications.ts';
 import { GAMEPAD } from '../input/gamepad.ts';
+import type { UiIcon } from '../art/ui.ts';
 import { uiIcon } from './icons.ts';
 import type { NotifyPermission } from './notifier.ts';
 
@@ -237,7 +238,7 @@ export class SettingsPanel {
       this.setHaptics(this.haptics);
       this.setPerf(this.perf);
       this.padLabel.textContent = t().gamepad.heading;
-      this.padHelpButton.replaceChildren(uiIcon('hint', 22), t().gamepad.helpTitle);
+      this.padHelpButton.replaceChildren(uiIcon('gamepad', 22), t().gamepad.helpTitle);
       this.setPadRumble(this.padRumble);
       this.deadZone.setName(t().gamepad.deadZone);
       this.renderNotifications();
@@ -303,7 +304,7 @@ export class SettingsPanel {
 
   public setPerf(on: boolean): void {
     this.perf = on;
-    toggleLabel(this.perfButton, on, uiIcon('hint', 22), t().settings.perf);
+    toggleLabel(this.perfButton, on, uiIcon('gauge', 22), t().settings.perf);
   }
 
   /** La vibration de la manette et la zone morte de ses sticks (en part de leur course). */
@@ -332,15 +333,15 @@ export class SettingsPanel {
     this.notifyLabel.hidden = !supported;
     this.notifyLabel.textContent = text.heading;
     this.notifyAllow.hidden = state?.permission !== 'default';
-    this.notifyAllow.replaceChildren(uiIcon('hint', 22), text.allow);
+    this.notifyAllow.replaceChildren(uiIcon('bell', 22), text.allow);
     this.notifyDenied.hidden = state?.permission !== 'denied';
     this.notifyDenied.textContent = text.denied;
     for (const [kind, button] of this.notifyKinds) {
       button.hidden = !granted;
-      if (state) toggleLabel(button, state.kinds[kind], uiIcon('hint', 22), text.kinds[kind]);
+      if (state) toggleLabel(button, state.kinds[kind], uiIcon(NOTIFICATION_ICONS[kind], 22), text.kinds[kind]);
     }
     this.notifyLimit.hidden = !granted;
-    if (state) this.notifyLimit.replaceChildren(uiIcon('hint', 22), text.perDay(state.limit));
+    if (state) this.notifyLimit.replaceChildren(uiIcon('bell', 22), text.perDay(state.limit));
   }
 
   /** Un navigateur sans `navigator.vibrate` n'a que faire de l'interrupteur. */
@@ -397,8 +398,23 @@ class VolumeSlider {
   }
 }
 
-/** « Musique : oui » : l'icône, le nom du réglage, son état ; `aria-pressed` pour les lecteurs d'écran. */
+/** Le pictogramme de chaque type de notification. */
+const NOTIFICATION_ICONS: Record<NotificationKind, UiIcon> = {
+  research: 'flask',
+  child: 'cradle',
+  supplies: 'wheat',
+  attack: 'wave',
+};
+
+/** L'icône et le nom du réglage à gauche, son état (« oui » / « non ») dans une pastille à droite ; `aria-pressed` pour les lecteurs d'écran. */
 function toggleLabel(button: HTMLButtonElement, on: boolean, icon: HTMLElement, name: string): void {
-  button.replaceChildren(icon, t().settings.toggle(name, on));
+  const label = document.createElement('span');
+  const state = document.createElement('span');
+
+  label.className = 'settings-toggle-name';
+  label.textContent = name;
+  state.className = 'settings-toggle-state';
+  state.textContent = t().settings.state(on);
+  button.replaceChildren(icon, label, state);
   button.setAttribute('aria-pressed', String(on));
 }

@@ -5309,6 +5309,21 @@ button:disabled,
   overflow-y: auto;
 }
 
+/* La barre de défilement reste à l'intérieur des coins arrondis : sa piste s'arrête avant eux. */
+.settings-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settings-panel::-webkit-scrollbar-track {
+  margin: 22px 0;
+  background: transparent;
+}
+
+.settings-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--paper-shade);
+}
+
 .settings-note {
   margin: 0;
   font-size: 14px;
@@ -5356,7 +5371,36 @@ button:disabled,
   box-shadow: 0 2px 0 var(--violet-shade);
 }
 
+.settings-toggle {
+  justify-content: flex-start;
+  text-align: left;
+}
+
 .settings-toggle[aria-pressed='false'] {
+  color: var(--muted);
+}
+
+/* Le libellé seul à gauche, l'état dans une pastille à droite : il ne casse plus. */
+.settings-toggle-name {
+  flex: 1;
+  min-width: 0;
+  text-wrap: balance;
+  line-height: 1.15;
+}
+
+.settings-toggle-state {
+  flex: none;
+  min-width: 48px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--paper);
+  font-size: 15px;
+  text-align: center;
+}
+
+.settings-toggle[aria-pressed='false'] .settings-toggle-state {
+  background: var(--paper-shade);
   color: var(--muted);
 }
 
