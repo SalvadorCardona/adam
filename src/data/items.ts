@@ -27,6 +27,10 @@ export const ITEMS = {
   meat: { label: 'Viande', stack: 100 },
   // La viande cuite au grill (`grill`) : à la mairie, elle nourrit mieux que la crue (`HUNTING.foodPerGrilled`).
   grilledMeat: { label: 'Viande grillée', stack: 100 },
+  // Le blé de la ferme (`CROPS.item`) : on ne le mange pas, la boulangerie en fait du pain.
+  wheat: { label: 'Blé', stack: 100 },
+  // Le pain de la boulangerie : à la mairie, il devient de la nourriture (`HUNTING.foodPerBread`).
+  bread: { label: 'Pain', stack: 100 },
   // Tirée au puits : on la boit, rien d'autre (`data/needs.ts`).
   water: { label: 'Eau', stack: 100 },
   ironPlate: { label: 'Plaque de fer', stack: 50 },

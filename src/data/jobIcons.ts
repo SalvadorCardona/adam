@@ -217,6 +217,16 @@ export const JOB_DRAWINGS = {
     circle(12, 19, 3.4, orange.base),
     circle(12, 19.4, 1.7, yellow.base),
   ),
+  /** La boulangerie : un pain rond doré, trois entailles claires, et un épi de blé penché derrière. */
+  bakery: job(
+    line(17, 4, 15, 12, yellow.shade),
+    pill(15.2, 3, 3.6, 7, yellow.base),
+    shadedPill(4, 10, 16, 10, 5, 'orange'),
+    pill(6.4, 12, 5, 2, orange.light),
+    line(9, 14.5, 10.5, 17.5, orange.shade),
+    line(12.5, 14.5, 14, 17.5, orange.shade),
+    line(16, 14.5, 17, 17, orange.shade),
+  ),
   /** La briqueterie : trois briques corail empilées en quinconce. */
   brickworks: job(
     rect(4.5, 13, 7.5, 5, coral.shade, 1.5),

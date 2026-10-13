@@ -296,6 +296,7 @@ export function validatePrototypes(): string[] {
   for (const era of ERAS as readonly EraProto[]) for (const itemId of Object.keys(era.requires?.invest ?? {})) consumed.add(itemId);
   consumed.add(HUNTING.meat);
   consumed.add(HUNTING.grilledMeat);
+  consumed.add(HUNTING.bread);
   for (const id of Object.keys(ITEMS)) {
     if (!consumed.has(id)) {
       errors.push(`ITEMS.${id} : aucun débouché — ni coût de bâtiment ou d'amélioration, ni entrée de recette, ni coût de recherche, ni besoin`);

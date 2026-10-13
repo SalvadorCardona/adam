@@ -127,6 +127,8 @@ const ITEM_PARTICLES: Record<ItemId, ParticleStyle> = {
   food: PARTICLES.food,
   meat: PARTICLES.claw,
   grilledMeat: PARTICLES.claw,
+  wheat: PARTICLES.food,
+  bread: PARTICLES.food,
   water: PARTICLES.water,
   ironPlate: PARTICLES.iron,
   brick: PARTICLES.stone,

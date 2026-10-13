@@ -78,7 +78,7 @@ export const SAPLING = {
  * au même passage que les pousses du forestier (`SAPLING.passTicks`).
  *
  * Calibrage : un champ plein de 30 cases mûrit une case toutes les 7 s
- * environ, soit ~8 nourritures par minute — l'ancienne ferme au complet
+ * environ, soit ~8 blés par minute — l'ancienne ferme au complet
  * (4 nourritures toutes les 30 s).
  */
 export const CROPS = {
@@ -86,6 +86,8 @@ export const CROPS = {
   growingTicks: 1200,
   /** Ticks avant d'être mûre : trois minutes et demie. */
   ripeTicks: 4200,
-  /** Nourriture d'une case récoltée, avant les recherches (`farmYield`). */
+  /** Ce qu'une case récoltée rend : du blé, que la boulangerie transforme en pain. */
+  item: 'wheat' as ItemId,
+  /** Blé d'une case récoltée, avant les recherches (`farmYield`). */
   yield: 1,
 } as const;

@@ -280,7 +280,7 @@ export const LORE = {
         'Quelques sillons dans la terre irradiée et une cabane à outils. Ses ' +
         'fermiers sèment le champ autour, case par case, le regardent pousser, ' +
         'puis rapportent la récolte au coffre.',
-      effect: 'Jusqu’à 4 fermiers cultivent un champ de 6 × 6 : environ 9 nourritures par minute.',
+      effect: 'Jusqu’à 4 fermiers cultivent un champ de 6 × 6 : environ 9 blés par minute.',
     },
     watchtower: {
       name: 'Tour de guet',
@@ -380,6 +380,16 @@ export const LORE = {
         'cuit trois bois en un charbon, que les porteurs emportent à la mairie : ' +
         'la forge ne reste plus à sec, et le bois en trop sert enfin.',
       effect: '3 bois → 1 charbon, 1 ouvrier.',
+    },
+    bakery: {
+      name: 'Boulangerie',
+      sign: 'Pain',
+      site: 'Un four de briques à monter, une pelle à tailler. Il lui faudra un boulanger.',
+      description:
+        'Un four rond de briques récupérées, une cheminée qui fume dès l’aube et une odeur ' +
+        'de croûte dorée qui court jusqu’au campement. Son boulanger y enfourne le blé des fermes : ' +
+        'le pain nourrit bien mieux que la viande grillée.',
+      effect: '2 blé → 1 pain, 1 ouvrier.',
     },
     grill: {
       name: 'Grill',

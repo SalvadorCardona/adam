@@ -3816,7 +3816,7 @@ export class World {
       case 'farm': {
         const tiles = this.farmField(entity).filter((tile) => tile.state !== 'blocked').length;
 
-        return { item: 'food', amount: (tiles * this.cropYield() * OFFLINE.farmEfficiency * share * ticks) / CROPS.ripeTicks };
+        return { item: CROPS.item, amount: (tiles * this.cropYield() * OFFLINE.farmEfficiency * share * ticks) / CROPS.ripeTicks };
       }
 
       default:
@@ -4269,14 +4269,18 @@ export class World {
 
   /**
    * La viande libre de la ville devient de la nourriture (`HUNTING`), la
-   * grillée plus généreusement que la crue. Un grill en marche garde sa part
-   * de viande crue : ce que ses porteurs vont lui apporter n'est pas converti
-   * sous leur nez.
+   * grillée plus généreusement que la crue, le pain plus encore. Un grill en
+   * marche garde sa part de viande crue : ce que ses porteurs vont lui
+   * apporter n'est pas converti sous leur nez.
    */
   private butcherMeat(): void {
     const town = this.townStock();
 
     if (!town) return;
+
+    const bread = town.available(HUNTING.bread);
+
+    if (bread > 0) this.convertMeat(HUNTING.bread, bread, HUNTING.foodPerBread);
 
     const grilled = town.available(HUNTING.grilledMeat);
 
@@ -8838,7 +8842,7 @@ export class World {
 
     const amount = this.cropYield();
 
-    if (!farm.store.reserveIn('food', amount)) {
+    if (!farm.store.reserveIn(CROPS.item, amount)) {
       farmer.state = 'wait';
       farmer.searchTicks = FARMERS.retryTicks;
       return false;
@@ -8863,7 +8867,7 @@ export class World {
     }
   }
 
-  /** La case mûre récoltée : la nourriture dans le panier, il la rapporte au coffre. */
+  /** La case mûre récoltée : le blé dans le panier, il le rapporte au coffre. */
   private reap(farmer: Farmer, farm: Farm, door: { x: number; y: number }, bedtime: boolean): void {
     const plot = farmer.plot;
 
@@ -8881,16 +8885,16 @@ export class World {
     }
   }
 
-  /** À la porte : la place réservée devient de la nourriture dans le coffre ; il repart semer. */
+  /** À la porte : la place réservée devient du blé dans le coffre ; il repart semer. */
   private storeCrop(farmer: Farmer, farm: Farm, door: { x: number; y: number }, bedtime: boolean): void {
-    farm.store.releaseIn('food', farmer.load);
+    farm.store.releaseIn(CROPS.item, farmer.load);
 
-    const stored = farm.store.add('food', farmer.load);
+    const stored = farm.store.add(CROPS.item, farmer.load);
 
     farmer.load -= stored;
     if (stored > 0) {
-      this.tally('food', stored);
-      this.events.emit('farmProduced', { id: farm.id, item: 'food' });
+      this.tally(CROPS.item, stored);
+      this.events.emit('farmProduced', { id: farm.id, item: CROPS.item });
     }
     // Ce qui ne rentre pas — une sauvegarde retouchée, jamais en jeu — reste dans son panier : il attend.
     if (farmer.load > 0) {
@@ -8908,10 +8912,10 @@ export class World {
       const farm = this.entities.get(farmer.homeId);
 
       if (farm?.kind === 'farm' && farm.store.freeSpace() > 0) {
-        const stored = farm.store.add('food', farmer.load);
+        const stored = farm.store.add(CROPS.item, farmer.load);
 
         farmer.load -= stored;
-        if (stored > 0) this.tally('food', stored);
+        if (stored > 0) this.tally(CROPS.item, stored);
       }
     }
     if (bedtime && farmer.load === 0) {
@@ -8925,7 +8929,7 @@ export class World {
   /** Il lâche sa case ; une récolte pas encore cueillie rend sa place au coffre. */
   private dropPlot(farmer: Farmer, farm: Farm): void {
     if ((farmer.state === 'toHarvest' || farmer.state === 'harvest') && farmer.load > 0) {
-      farm.store.releaseIn('food', farmer.load);
+      farm.store.releaseIn(CROPS.item, farmer.load);
       farmer.load = 0;
     }
     farmer.plot = null;
@@ -8957,7 +8961,7 @@ export class World {
         if (claimed.has(key)) farmer.plot = null;
         else claimed.add(key);
       }
-      if (holds && farmer.load > 0 && farm?.kind === 'farm') farm.store.reserveIn('food', farmer.load);
+      if (holds && farmer.load > 0 && farm?.kind === 'farm') farm.store.reserveIn(CROPS.item, farmer.load);
     }
   }
 
