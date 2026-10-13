@@ -1529,6 +1529,9 @@ function wireNotifications(world: World, notifier: Notifier, onResearchStarted: 
 
 function wireHaptics(world: World): void {
   world.events.on('resourceHarvested', () => haptics.pulse('tick'));
+  world.events.on('buildingPlaced', () => haptics.pulse('place'));
+  world.events.on('waveAnnounced', () => haptics.pulse('wave'));
+  world.events.on('duskFell', () => haptics.pulse('wave'));
   world.events.on('buildingCompleted', () => haptics.pulse('done'));
   world.events.on('buildingUpgraded', () => haptics.pulse('done'));
   world.events.on('childBorn', () => haptics.pulse('done'));
