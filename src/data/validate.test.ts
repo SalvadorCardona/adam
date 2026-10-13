@@ -121,4 +121,53 @@ describe('prototypes', () => {
     }
     expect(validatePrototypes()).toEqual([]);
   });
+
+  it('refuse une recette sans bâtiment capable', () => {
+    const recipe = RECIPES.smeltPlate as unknown as Omit<RecipeProto, 'building'> & { building: BuildingId };
+    const building = recipe.building;
+    const forge = BUILDINGS.forge as { menu: boolean };
+
+    recipe.building = 'absent' as BuildingId;
+    try {
+      expect(validatePrototypes()).toContain('RECIPES.smeltPlate : bâtiment inconnu « absent »');
+    } finally {
+      recipe.building = building;
+    }
+    forge.menu = false;
+    try {
+      expect(validatePrototypes()).toContain("RECIPES.smeltPlate : « forge » n'est pas constructible");
+    } finally {
+      forge.menu = true;
+    }
+    expect(validatePrototypes()).toEqual([]);
+  });
+
+  it('refuse une recherche qui débloque un bâtiment non constructible', () => {
+    const forge = BUILDINGS.forge as { menu: boolean };
+
+    forge.menu = false;
+    try {
+      expect(validatePrototypes()).toContain('RESEARCH.metalworking : « forge » ne peut pas se débloquer au labo');
+    } finally {
+      forge.menu = true;
+    }
+    expect(validatePrototypes()).toEqual([]);
+  });
+
+  it('refuse un cycle de prérequis', () => {
+    const boots = RESEARCH.walkingBoots as ResearchProto & { requires: readonly string[] };
+    const metalworking = RESEARCH.metalworking as ResearchProto & { requires: readonly string[] };
+    const bootsRequires = boots.requires;
+    const metalRequires = metalworking.requires;
+
+    boots.requires = ['metalworking'];
+    metalworking.requires = ['walkingBoots'];
+    try {
+      expect(validatePrototypes()).toContain('RESEARCH.walkingBoots : prérequis en boucle, ou jamais accessibles');
+    } finally {
+      boots.requires = bootsRequires;
+      metalworking.requires = metalRequires;
+    }
+    expect(validatePrototypes()).toEqual([]);
+  });
 });
