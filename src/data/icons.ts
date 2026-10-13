@@ -89,6 +89,32 @@ export const ITEM_ICONS: Record<ItemId, string> = {
     line(7, 12, 12, 7, ink.base),
     line(10, 14, 15, 9, ink.base),
   ),
+  /** Une gerbe de blé : trois épis jaunes en éventail sur leurs tiges menthe, liés par un lien orange. */
+  wheat: svg(
+    S,
+    S,
+    line(12, 22, 6.5, 10, mint.shade),
+    line(12, 22, 12, 8, mint.shade),
+    line(12, 22, 17.5, 10, mint.shade),
+    pill(4.4, 3.5, 4.4, 8.4, yellow.shade),
+    pill(4.4, 3.5, 3.6, 7.2, yellow.base),
+    pill(9.8, 1.8, 4.4, 9.4, yellow.shade),
+    pill(9.8, 1.8, 3.6, 8.2, yellow.base),
+    pill(15.2, 3.5, 4.4, 8.4, yellow.shade),
+    pill(15.2, 3.5, 3.6, 7.2, yellow.base),
+    pill(10.8, 3.2, 1.4, 3.6, yellow.light),
+    pill(8, 15, 8, 2.8, orange.base),
+  ),
+  /** Un pain rond, sa croûte orange dorée et trois entailles claires. */
+  bread: svg(
+    S,
+    S,
+    shadedPill(2.5, 7, 19, 12, 6, 'orange'),
+    pill(5, 9, 7, 2.2, orange.light),
+    line(9, 12.5, 11, 16.5, orange.shade),
+    line(13, 12.5, 15, 16.5, orange.shade),
+    line(17, 12.5, 18.5, 15.5, orange.shade),
+  ),
   /**
    * Une goutte d'eau cyan, pointe en haut — la teinte de l'eau, mais pas la
    * forme du minerai de fer, un bloc trapu clouté : on ne les confond pas.

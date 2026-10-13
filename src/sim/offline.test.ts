@@ -126,14 +126,14 @@ describe('hors ligne — la ville rattrape', () => {
     // Le puits, la cabane et la ferme (six cases de champ seulement) ont produit ; les habitants ont bu et mangé.
     expect(report!.gained.water ?? 0).toBeGreaterThan(100);
     expect(report!.gained.wood ?? 0).toBeGreaterThan(0);
-    expect(report!.gained.food ?? 0).toBeGreaterThan(0);
+    expect(report!.gained.wheat ?? 0).toBeGreaterThan(0);
     expect(report!.spent.water ?? 0).toBeGreaterThan(0);
     expect(report!.spent.food ?? 0).toBeGreaterThan(0);
     expect(report!.alerts).not.toContain('storeFull');
 
     const after = stock(world);
 
-    for (const item of ['water', 'food'] as const) {
+    for (const item of ['water', 'food', 'wheat'] as const) {
       expect(after[item] ?? 0).toBe((before[item] ?? 0) + (report!.gained[item] ?? 0) - (report!.spent[item] ?? 0));
     }
     // Un tick de jeu, pas une heure : ni nuit ni vague.

@@ -27,6 +27,7 @@
  * monde à la demande, sans rien garder.
  */
 
+import { CROPS } from '../data/resources.ts';
 import { BUILDINGS } from '../data/buildings.ts';
 import { ITEM_IDS, type ItemId } from '../data/items.ts';
 import { RECIPES } from '../data/recipes.ts';
@@ -343,7 +344,7 @@ function producerOf(world: World, item: ItemId): EntityId | null {
 
 function producesItem(entity: Entity, item: ItemId): boolean {
   if (entity.kind === 'lumberCamp') return item === 'wood';
-  // La ferme n'a pas de recette : ses fermiers récoltent la nourriture de son champ.
-  if (entity.kind === 'farm') return item === 'food';
+  // La ferme n'a pas de recette : ses fermiers récoltent le blé de son champ.
+  if (entity.kind === 'farm') return item === CROPS.item;
   return Object.values(RECIPES).some((recipe) => recipe.building === entity.proto && item in recipe.outputs);
 }

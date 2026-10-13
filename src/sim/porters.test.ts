@@ -8,6 +8,7 @@ import { ITEM_IDS, type ItemId } from '../data/items.ts';
 import { HUNTING, NEEDS } from '../data/needs.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
 import { RECIPES } from '../data/recipes.ts';
+import { CROPS } from '../data/resources.ts';
 import { JOB_PRIORITY, WANDER } from '../data/workers.ts';
 import { doorOf } from './jobs.ts';
 import { baseCenter } from './enemyBases.ts';
@@ -33,6 +34,8 @@ interface Layout {
   kilns?: Stock[];
   /** Grills finis, coffre déjà garni, posés près de la mairie, après les fours. */
   grills?: Stock[];
+  /** Boulangeries finies, coffre déjà garni, posées près de la mairie, après les grills. */
+  bakeries?: Stock[];
   /** Nurseries finies, affamées : l'heure de la naissance est passée. */
   nurseries?: Stock[];
 }
@@ -121,6 +124,18 @@ function colony(layout: Layout): World {
       level: 1,
       paused: false,
       staff: BUILDINGS.grill.workers,
+      blocked: true,
+    });
+  }
+  for (const store of layout.bakeries ?? []) {
+    entities.push({
+      ...placeNear('bakery'),
+      kind: 'forge',
+      store,
+      hp: BUILDINGS.bakery.hp,
+      level: 1,
+      paused: false,
+      staff: BUILDINGS.bakery.workers,
       blocked: true,
     });
   }
@@ -732,6 +747,50 @@ describe('grill', () => {
 
     expect(hallOf(world).store.count('grilledMeat')).toBe(0);
     expect(hallOf(world).store.count('food')).toBe(food + 4 * HUNTING.foodPerGrilled);
+  });
+});
+
+describe('boulangerie', () => {
+  function bakeriesOf(world: World): Forge[] {
+    return [...world.entities.values()].filter((entity): entity is Forge => entity.proto === 'bakery');
+  }
+
+  it('la recette : 2 blés → 1 pain, un ouvrier, débloquée au labo, et le blé vient de la ferme', () => {
+    expect(RECIPES.bakeBread).toMatchObject({ building: 'bakery', inputs: { wheat: 2 }, outputs: { bread: 1 } });
+    expect(BUILDINGS.bakery).toMatchObject({ kind: 'forge', workers: 1, menu: true });
+    expect(unlockingResearch('bakery')).toBe('baking');
+    expect(CROPS.item).toBe('wheat');
+  });
+
+  it('le pain rapporte plus de nourriture que la viande grillée, sans rendre la chasse inutile', () => {
+    expect(HUNTING.foodPerBread).toBeGreaterThan(HUNTING.foodPerGrilled);
+    // Deux blés pour un pain : le pain ne vaut pas le double de la viande grillée.
+    expect(HUNTING.foodPerBread).toBeLessThan(HUNTING.foodPerGrilled * 2);
+  });
+
+  it('les porteurs ravitaillent la boulangerie en blé depuis la mairie, qui cuit à la cadence de la recette', () => {
+    const world = colony({ hall: { wheat: 6 }, houses: 1, bakeries: [{}] });
+    const [bakery] = bakeriesOf(world);
+    let baked = 0;
+
+    if (!bakery) throw new Error('pas de boulangerie');
+    world.events.on('forgeProduced', () => (baked += 1));
+    run(world, 120 * TICKS_PER_SECOND);
+
+    expect(baked).toBeGreaterThanOrEqual(1);
+    expect(hallOf(world).store.count('wheat')).toBeLessThan(6);
+    // Le pain n'est jamais perdu : au four, en route ou déjà converti en nourriture à la mairie.
+    expect(hallOf(world).store.count('food') + bakery.store.count('bread')).toBeGreaterThan(0);
+  });
+
+  it('le pain déposé en ville devient de la nourriture au ratio du pain', () => {
+    const world = colony({ hall: { bread: 3 }, houses: 1 });
+    const food = hallOf(world).store.count('food');
+
+    run(world, 3 * TICKS_PER_SECOND);
+
+    expect(hallOf(world).store.count('bread')).toBe(0);
+    expect(hallOf(world).store.count('food')).toBe(food + 3 * HUNTING.foodPerBread);
   });
 });
 

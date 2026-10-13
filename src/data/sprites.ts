@@ -43,6 +43,7 @@ import { FORESTER_HOUSE } from '../art/foresterHouse.ts';
 import { BRICKWORKS } from '../art/brickworks.ts';
 import { CHARCOAL_KILN } from '../art/charcoalKiln.ts';
 import { GRILL } from '../art/grill.ts';
+import { BAKERY } from '../art/bakery.ts';
 import { STEELWORKS } from '../art/steelworks.ts';
 import { WORKSHOP } from '../art/workshop.ts';
 import { FORGE } from '../art/forge.ts';
@@ -215,6 +216,7 @@ export const SPRITES = {
   forge: FORGE,
   charcoalKiln: CHARCOAL_KILN,
   grill: GRILL,
+  bakery: BAKERY,
   brickworks: BRICKWORKS,
   workshop: WORKSHOP,
   steelworks: STEELWORKS,

@@ -143,7 +143,7 @@ describe('ferme et fermiers', () => {
     expect(new Set(sown).size).toBe(sown.length);
   }, 30_000);
 
-  it('semis, pousse, mûre ; récoltée, la nourriture entre au coffre, et la case est ressemée', () => {
+  it('semis, pousse, mûre ; récoltée, le blé entre au coffre, et la case est ressemée', () => {
     const world = colony(1);
     const farm = farmOf(world);
     const first = world.farmField(farm).find((tile) => tile.state === 'free')!;
@@ -153,7 +153,7 @@ describe('ferme et fermiers', () => {
 
     world.events.on('cropSown', ({ tx, ty }) => coordKey(tx, ty) === key && events.push('sown'));
     world.events.on('cropHarvested', ({ tx, ty }) => coordKey(tx, ty) === key && events.push('harvested'));
-    world.events.on('farmProduced', () => events.push(`stored:${farm.store.count('food')}`));
+    world.events.on('farmProduced', () => events.push(`stored:${farm.store.count('wheat')}`));
 
     run(world, CROPS.ripeTicks + 3000, () => {
       const stage = world.resources.crop(first.tx, first.ty) ?? 'free';
@@ -182,7 +182,7 @@ describe('ferme et fermiers', () => {
     expect(busiest).toBeGreaterThan(1);
   }, 60_000);
 
-  it('aucune nourriture sans récolte : le coffre ne monte que de ce qui est récolté', () => {
+  it('aucun blé sans récolte : le coffre ne monte que de ce qui est récolté', () => {
     const world = colony();
     const farm = farmOf(world);
     let harvested = 0;
@@ -190,7 +190,7 @@ describe('ferme et fermiers', () => {
     world.events.on('cropHarvested', ({ amount }) => (harvested += amount));
     run(world, CROPS.ripeTicks - 100);
     // Rien n'est encore mûr : rien au coffre.
-    expect(farm.store.count('food')).toBe(0);
+    expect(farm.store.count('wheat')).toBe(0);
     expect(harvested).toBe(0);
 
     run(world, 3000);
@@ -198,7 +198,7 @@ describe('ferme et fermiers', () => {
     // Ce qui est au coffre a été récolté ; le reste est dans les paniers, en route.
     const carried = farmers(world).reduce((sum, farmer) => sum + (farmer.state === 'toFarm' ? farmer.load : 0), 0);
 
-    expect(farm.store.count('food') + carried).toBe(harvested);
+    expect(farm.store.count('wheat') + carried).toBe(harvested);
   }, 60_000);
 
   it('un champ plein produit autant que l’ancienne ferme au complet', () => {
@@ -213,7 +213,7 @@ describe('ferme et fermiers', () => {
     world.events.on('cropHarvested', ({ amount }) => (produced += amount));
     run(world, minutes * 60 * 20, () => {
       // Le coffre se vide comme si les porteurs passaient.
-      if (farm.store.count('food') > 20) world.withdraw(farm.id, 'food', 20);
+      if (farm.store.count('wheat') > 20) world.withdraw(farm.id, 'wheat', 20);
     });
 
     const perMinute = produced / minutes;
@@ -227,7 +227,7 @@ describe('ferme et fermiers', () => {
   }, 120_000);
 
   it('coffre plein : les cultures mûres attendent, l’alerte paraît ; vidé, la récolte reprend', () => {
-    const world = colony(BUILDINGS.farm.workers, { food: BUILDINGS.farm.storage });
+    const world = colony(BUILDINGS.farm.workers, { wheat: BUILDINGS.farm.storage });
     const farm = farmOf(world);
     let harvested = 0;
 
@@ -239,7 +239,7 @@ describe('ferme et fermiers', () => {
     expect(world.problem(farm)).toBe('storeFull');
     expect(farmers(world).some((farmer) => farmer.state === 'wait')).toBe(true);
 
-    world.withdraw(farm.id, 'food', BUILDINGS.farm.storage);
+    world.withdraw(farm.id, 'wheat', BUILDINGS.farm.storage);
     run(world, 600);
     expect(harvested).toBeGreaterThan(0);
     expect(farm.store.total()).toBeLessThanOrEqual(farm.store.capacity);
@@ -306,7 +306,7 @@ describe('ferme et fermiers', () => {
     run(world, 500);
     run(copy, 500);
     expect(copy.farmField(copyFarm)).toEqual(world.farmField(farm));
-    expect(copyFarm.store.count('food')).toBe(farm.store.count('food'));
+    expect(copyFarm.store.count('wheat')).toBe(farm.store.count('wheat'));
   }, 30_000);
 
   it('charge une sauvegarde d’avant les fermiers : champ vide, la ferme recommence à semer', () => {

@@ -13,8 +13,9 @@
  * recette (`drawWater`) : posé au bord d'une rivière, il y puise son eau
  * au même rythme.
  *
- * La ferme n'a pas de recette : sa nourriture vient des cases de son champ
- * que ses fermiers récoltent (`CROPS`, `data/resources.ts`).
+ * La ferme n'a pas de recette : son blé vient des cases de son champ que
+ * ses fermiers récoltent (`CROPS`, `data/resources.ts`) ; la boulangerie le
+ * cuit en pain, qui devient de la nourriture à la mairie (`HUNTING`).
  *
  * La nurserie a une recette sans sortie : ce qu'elle produit est un enfant,
  * pas un objet. Sa recette dit ce que coûte une naissance, et tous les
@@ -91,6 +92,13 @@ export const RECIPES = {
     duration: 20 * 5,
     inputs: { meat: 1 },
     outputs: { grilledMeat: 1 },
+  },
+  bakeBread: {
+    label: 'Fournée',
+    building: 'bakery',
+    duration: 20 * 6,
+    inputs: { wheat: 2 },
+    outputs: { bread: 1 },
   },
   fireBrick: {
     label: 'Cuisson',

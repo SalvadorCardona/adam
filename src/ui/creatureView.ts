@@ -11,6 +11,7 @@
  * Rien d'inventé : tout se lit dans le monde. Pur : testé sans DOM.
  */
 
+import { CROPS } from '../data/resources.ts';
 import type { BuildingId } from '../data/buildings.ts';
 import { ENEMIES, WILDLIFE } from '../data/enemies.ts';
 import type { Sex } from '../data/inhabitants.ts';
@@ -186,7 +187,7 @@ function roleOf(person: Inhabitant): Role {
 function carryOf(person: Inhabitant): CreatureView['carry'] {
   if (person.kind === 'worker' && person.job?.carried) return { item: person.job.item, amount: person.job.amount };
   if (person.kind === 'lumberjack' && person.load > 0) return { item: 'wood', amount: person.load };
-  if (person.kind === 'farmer' && person.state === 'toFarm' && person.load > 0) return { item: 'food', amount: person.load };
+  if (person.kind === 'farmer' && person.state === 'toFarm' && person.load > 0) return { item: CROPS.item, amount: person.load };
   return null;
 }
 

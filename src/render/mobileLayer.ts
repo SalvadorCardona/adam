@@ -64,6 +64,7 @@
  * suit en boitillant ; en soins, il n'est pas dessiné.
  */
 
+import { CROPS } from '../data/resources.ts';
 import { Container, Graphics, Sprite, type Texture, type Ticker } from 'pixi.js';
 import { TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { PALETTE, hex } from '../data/artDirection.ts';
@@ -460,7 +461,7 @@ export class MobileLayer {
           view.root.visible = !mobile.inside;
           this.ground(view, x, y);
           // La récolte sur la tête, de la case mûre jusqu'au coffre.
-          puppet.carry(mobile.state === 'toFarm' && mobile.load > 0 ? 'food' : null);
+          puppet.carry(mobile.state === 'toFarm' && mobile.load > 0 ? CROPS.item : null);
           this.loiter(view, mobile, deltaMs);
           this.starve(view, mobile);
           this.bedDown(view, mobile);

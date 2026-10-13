@@ -25,6 +25,8 @@ export const content: Content = {
     food: 'Food',
     meat: 'Meat',
     grilledMeat: 'Grilled meat',
+    wheat: 'Wheat',
+    bread: 'Bread',
     water: 'Water',
     ironPlate: 'Iron plate',
     brick: 'Brick',
@@ -205,7 +207,7 @@ export const content: Content = {
       siteDescription: 'A tool shed to put up before turning the soil. Four farmers will work here.',
       description:
         'A few furrows in the irradiated soil and a tool shed. Its farmers sow the field around it, tile by tile, watch it grow, then bring the harvest back to the chest.',
-      effect: 'Up to 4 farmers work a 6 × 6 field: about 9 food per minute.',
+      effect: 'Up to 4 farmers work a 6 × 6 field: about 9 wheat per minute.',
       upgrades: [],
     },
     watchtower: {
@@ -298,6 +300,15 @@ export const content: Content = {
       description:
         'A dome of pink bricks where wood smolders slowly. Its stoker bakes three wood into one coal, which porters carry to the town hall: the forge never runs dry, and spare wood finally has a use.',
       effect: '3 wood → 1 coal, 1 worker.',
+      upgrades: [],
+    },
+    bakery: {
+      label: 'Bakery',
+      sign: 'Bread',
+      siteDescription: 'A brick oven to stack, a peel to carve. It will need a baker.',
+      description:
+        'A round oven of salvaged bricks, a chimney that smokes from dawn and the smell of golden crust drifting through the camp. Its baker bakes the farms’ wheat: bread feeds far better than grilled meat.',
+      effect: '2 wheat → 1 bread, 1 worker.',
       upgrades: [],
     },
     grill: {
@@ -409,6 +420,7 @@ export const content: Content = {
     smeltPlate: 'Smelting',
     burnCharcoal: 'Charring',
     grillMeat: 'Grilling',
+    bakeBread: 'Batch',
     fireBrick: 'Firing',
     makeTools: 'Toolmaking',
     castSteel: 'Casting',
@@ -643,7 +655,7 @@ export const content: Content = {
     woodYield: { label: 'Extra wood harvested', unit: '' },
     drillTicks: { label: 'Mining time', unit: ' s' },
     purifyTicks: { label: 'Time per cleaned tile', unit: ' s' },
-    farmYield: { label: 'Food per harvest', unit: '' },
+    farmYield: { label: 'Wheat per harvest', unit: '' },
   },
   buildingCategories: {
     ore: 'Ore',
@@ -783,6 +795,10 @@ export const content: Content = {
     sporeFilters: {
       label: 'Spore filters',
       description: 'Spores from the polluted lands, packed into the filters: the station cleans faster.',
+    },
+    baking: {
+      label: 'Bakery',
+      description: 'A brick oven and hand-ground flour: the farms’ wheat becomes bread.',
     },
     grilling: {
       label: 'Grilling',

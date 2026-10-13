@@ -72,7 +72,7 @@ export type ResearchStat =
   | 'drillTicks'
   /** Ticks entre deux cases nettoyées par une station de dépollution (négatif : elle va plus vite). */
   | 'purifyTicks'
-  /** Nourriture par récolte d'une ferme. */
+  /** Blé par récolte d'une ferme. */
   | 'farmYield';
 
 /**
@@ -103,7 +103,7 @@ export const RESEARCH_STATS = {
   woodYield: { label: 'Bois récolté en plus', unit: '', ticks: false, percent: true },
   drillTicks: { label: 'Temps d’extraction', unit: ' s', ticks: true, percent: false, buildings: ['drill', 'quarry'] },
   purifyTicks: { label: 'Temps par case dépolluée', unit: ' s', ticks: true, percent: false, buildings: ['purifier'] },
-  farmYield: { label: 'Nourriture par récolte', unit: '', ticks: false, percent: false, buildings: ['farm'] },
+  farmYield: { label: 'Blé par récolte', unit: '', ticks: false, percent: false, buildings: ['farm'] },
 } as const satisfies Record<ResearchStat, ResearchStatProto>;
 
 /**
@@ -243,6 +243,19 @@ export const RESEARCH = {
     requires: ['mining'],
     effect: null,
     unlocks: ['forge', 'charcoalKiln'],
+    opens: [],
+    era: 0,
+  },
+  baking: {
+    label: 'Boulangerie',
+    description: 'Un four de briques et de la farine moulue à la main : le blé de la ferme devient du pain.',
+    icon: { building: 'bakery' },
+    theme: 'building',
+    cost: { wood: 8, stone: 6 },
+    duration: 20 * 40,
+    requires: [],
+    effect: null,
+    unlocks: ['bakery'],
     opens: [],
     era: 0,
   },
