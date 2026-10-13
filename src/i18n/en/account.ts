@@ -1,0 +1,46 @@
+import type { Messages } from '../messages.ts';
+
+export const account: Messages['account'] = {
+  title: 'Account',
+  signedInAs: (nickname) => nickname,
+  offlineButton: 'Account · offline',
+  intro: 'An account is optional: without one the game plays just as before, and your games stay on this device.',
+  offline: 'Server unreachable. The game stays playable; try again later.',
+  notConfigured: 'Accounts are not available in this version of the game.',
+  signIn: 'Sign in',
+  signUp: 'Create an account',
+  signOut: 'Sign out',
+  switchToSignUp: 'No account? Create one',
+  switchToSignIn: 'Already have an account? Sign in',
+  nickname: 'Nickname',
+  nicknameHint: 'Shown in game',
+  email: 'Email address',
+  password: 'Password',
+  passwordHint: (min) => `At least ${min} characters`,
+  showPassword: 'Show password',
+  hidePassword: 'Hide password',
+  working: 'One moment…',
+  signedIn: (nickname) => `Signed in as ${nickname}`,
+  signedInEmail: (email) => email,
+  welcome: (nickname) => `Welcome, ${nickname}!`,
+  signedOutDone: 'You are signed out.',
+  field: {
+    empty: 'Required.',
+    tooShort: (min) => `Too short (at least ${min} characters).`,
+    tooLong: (max) => `Too long (at most ${max} characters).`,
+    badFormat: {
+      nickname: 'Letters, digits, spaces, dash, dot or apostrophe only.',
+      email: 'This address doesn’t look valid.',
+      password: 'Password refused.',
+    },
+  },
+  errors: {
+    invalid: 'Check the highlighted fields.',
+    emailTaken: 'This address already has an account.',
+    badCredentials: 'Wrong email or password.',
+    unauthorized: 'Session expired: please sign in again.',
+    tooManyAttempts: (seconds) =>
+      seconds >= 90 ? `Too many attempts. Try again in ${Math.ceil(seconds / 60)} min.` : `Too many attempts. Try again in ${seconds} s.`,
+    server: 'The server answered oddly. Try again later.',
+  },
+};

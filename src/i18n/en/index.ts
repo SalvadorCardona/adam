@@ -1,6 +1,7 @@
 /** The English dictionary: the same keys as the French one, which `Messages` is derived from. */
 
 import type { Messages } from '../messages.ts';
+import { account } from './account.ts';
 import { collection } from './collection.ts';
 import { common, settings } from './common.ts';
 import { content } from './content.ts';
@@ -21,6 +22,7 @@ import { wardrobe } from './wardrobe.ts';
 export const EN: Messages = {
   common,
   settings,
+  account,
   screens,
   hud,
   panel,

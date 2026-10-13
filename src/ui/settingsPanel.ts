@@ -51,6 +51,7 @@ export class SettingsPanel {
   public readonly root: HTMLElement;
 
   private readonly panel: HTMLElement;
+  private readonly head: HTMLElement;
   private readonly closeButton: HTMLButtonElement;
   private readonly languages = new Map<Locale, HTMLButtonElement>();
   private readonly soundButton: HTMLButtonElement;
@@ -94,6 +95,7 @@ export class SettingsPanel {
     const head = document.createElement('div');
     const title = document.createElement('h2');
 
+    this.head = head;
     head.className = 'settings-head';
     title.className = 'overlay-title';
     title.id = 'settings-title';
@@ -231,6 +233,11 @@ export class SettingsPanel {
       this.sfxVolume.setName(text.sfxVolume);
       this.musicVolume.setName(text.musicVolume);
     });
+  }
+
+  /** Le bouton « Compte » (`AccountPanel.button`), juste sous le titre. */
+  public addAccountButton(button: HTMLButtonElement): void {
+    this.head.after(button);
   }
 
   public get open(): boolean {

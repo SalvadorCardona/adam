@@ -320,6 +320,17 @@ export const UI_ICONS = {
     pill(6.6, 7.4, 4.4, 2, ink.light),
     circle(12, 12, 3, paper.base),
   ),
+  /** Le compte : une tête et des épaules indigo, le reflet en haut à gauche. */
+  account: svg(
+    S,
+    S,
+    circle(12.5, 8.5, 4.6, ink.shade),
+    circle(12, 8, 4.6, ink.base),
+    rect(4.5, 14.5, 15, 7, ink.shade, 3.5),
+    rect(4, 14, 15, 7, ink.base, 3.5),
+    pill(9.6, 5.8, 2.6, 1.6, ink.light),
+    pill(6.5, 15.6, 5, 1.6, ink.light),
+  ),
   /** L'ampoule du conseil. */
   hint: svg(
     S,
