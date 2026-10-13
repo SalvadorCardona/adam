@@ -582,6 +582,11 @@ async function main(): Promise<void> {
   if (!haptics.supported) settings.hideHaptics();
   wireHaptics(world);
 
+  // Le service worker garde le jeu en cache : installable, ouvert sans réseau. Rien en développement.
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
+  }
+
   // Les notifications : demandées après la première recherche lancée, jamais au premier lancement.
   const notifier = new Notifier(
     scenario ? new LocalNotifications(null) : LocalNotifications.browser(),
