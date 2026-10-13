@@ -6322,13 +6322,14 @@ button:disabled,
  * « Partie de test » (`…/test`) : une petite capsule corail en bas à gauche,
  * au-dessus du bouton du sac, pour ne jamais la prendre pour sa vraie partie —
  * hors du haut, qui reste collé au bord comme dans une vraie partie. Elle ne
- * capte aucun tap.
+ * capte aucun tap. Sans `z-index`, et ajoutée en tête de `.hud` (`main.ts`) : le
+ * menu, les tiroirs et les fenêtres, posés après elle, passent par-dessus, et
+ * les voiles (`.overlay`, z-index 10 et plus) aussi.
  */
 .test-banner {
   position: absolute;
   bottom: calc(var(--safe-bottom) + 90px);
   left: calc(var(--safe-left) + 8px);
-  z-index: 5;
   padding: 1px 10px 2px;
   border-radius: 999px;
   background: var(--coral);
