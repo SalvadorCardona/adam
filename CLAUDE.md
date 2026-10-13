@@ -1017,6 +1017,11 @@ Les règles, en résumé :
   Médaillon seul et agrandi en reculant, rien sous `SIGN_ZOOM.icon` ; un
   enfant du sprite du bâtiment, dans son emprise (le tap l'ouvre). Réglage
   « Pancartes » (`mobile-factory:signs`, `storage/localSigns.ts`).
+- Réglage « Compteur de performances » (`mobile-factory:perf`,
+  `storage/localPerf.ts`, caché par défaut) : une capsule en bas au centre du
+  HUD donne FPS, ms par tick de sim et réveils du scheduler par tick
+  (`World.wakesLastTick`), moyennés sur `PERF_WINDOW_MS` (`ui/perfMeter.ts`,
+  mesure prise par la boucle de `main.ts`). Rien n'est envoyé.
 
 ## Système de sprites
 

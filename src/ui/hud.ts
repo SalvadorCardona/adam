@@ -85,6 +85,7 @@ import { effectLine } from './researchText.ts';
 import { moodMeter } from './moodMeter.ts';
 import { needMeter } from './needMeter.ts';
 import { personText } from './personText.ts';
+import type { PerfReading } from './perfMeter.ts';
 import { haptics } from './haptics.ts';
 import { footingText } from './placementReason.ts';
 import { mapUrl, seedLine } from './seed.ts';
@@ -247,6 +248,8 @@ export class Hud {
   private readonly bar: HTMLElement;
   private readonly floats: HTMLElement;
   private readonly stats: HTMLElement;
+  /** Le compteur de performances (réglage), caché par défaut. */
+  private readonly perf: HTMLElement;
   private readonly toasts: HTMLElement;
   /** Le libellé des icônes, au survol, au focus et à l'appui long (`tooltip.ts`). */
   private readonly tips: Tooltips;
@@ -433,6 +436,8 @@ export class Hud {
     this.floats = element('div', 'hud-floats');
     this.stats = element('div', 'panel hud-stats');
     this.stats.hidden = !debug;
+    this.perf = element('div', 'hud-perf');
+    this.perf.hidden = true;
     this.toasts = element('div', 'hud-toasts');
     this.toasts.setAttribute('aria-live', 'polite');
     this.countdown = element('div', 'hud-countdown');
@@ -555,6 +560,7 @@ export class Hud {
       this.toasts,
       this.floats,
       this.stats,
+      this.perf,
       this.celebration,
       this.victory,
       this.death,
@@ -1223,6 +1229,17 @@ export class Hud {
   public toggleDebug(): void {
     this.debug = !this.debug;
     this.stats.hidden = !this.debug;
+  }
+
+  /** Affiche ou masque le compteur de performances ; il attend sa première mesure. */
+  public setPerf(on: boolean): void {
+    this.perf.hidden = !on;
+    if (on) this.perf.textContent = '';
+  }
+
+  /** La moyenne de la dernière fenêtre du compteur (`PerfSampler`). */
+  public showPerf(reading: PerfReading): void {
+    this.perf.textContent = t().hud.perf(reading.fps, reading.tickMs, reading.wakes);
   }
 
   /** Une bulle empilée ; la plus ancienne part quand il y en a trop. */

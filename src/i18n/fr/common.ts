@@ -26,6 +26,8 @@ export const settings = {
   signs: 'Pancartes',
   /** La vibration du téléphone aux moments clés. */
   haptics: 'Vibrations',
+  /** Le compteur de FPS et de ticks, pour juger les performances sur un vrai téléphone. */
+  perf: 'Compteur de performances',
   /** Les curseurs de volume, sous chaque interrupteur. */
   sfxVolume: 'Volume des bruitages',
   musicVolume: 'Volume de la musique',

@@ -13,6 +13,7 @@ const s = (n: number): string => (n === 1 ? '' : 's');
 const lower = (name: string): string => String(name).toLowerCase();
 
 export const hud: Messages['hud'] = {
+  perf: (fps, tickMs, wakes) => `${fps.toFixed(0)} FPS · ${tickMs.toFixed(2)} ms/tick · ${wakes.toFixed(1)} wakes/tick`,
   rejection: {
     occupied: 'Spot already taken',
     terrain: 'Can’t build on this ground',
