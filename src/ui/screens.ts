@@ -249,7 +249,7 @@ export class PauseScreen {
   private readonly confirm: HTMLElement;
   private readonly collection: CollectionPanel;
 
-  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void) {
+  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: () => void) {
     this.root = document.createElement('div');
     this.root.className = 'overlay pause-screen';
     this.root.hidden = true;
@@ -277,6 +277,12 @@ export class PauseScreen {
     restart.className = 'button-secondary';
     restart.addEventListener('click', () => this.asking(true));
 
+    const invite = document.createElement('button');
+
+    invite.type = 'button';
+    invite.className = 'button-secondary';
+    invite.addEventListener('click', onInvite);
+
     const showCollection = document.createElement('button');
 
     showCollection.type = 'button';
@@ -298,6 +304,7 @@ export class PauseScreen {
       const { pause } = t().screens;
 
       showCollection.replaceChildren(uiIcon('trophy', 22), t().collection.title);
+      invite.replaceChildren(uiIcon('invite', 22), t().party.invite);
 
       title.textContent = pause.title;
       text.textContent = pause.text;
@@ -306,7 +313,7 @@ export class PauseScreen {
     });
 
     this.confirm = confirmRestart(onRestart, () => this.asking(false));
-    this.panel.append(title, text, resume, showCollection, restart, seedLine(seed));
+    this.panel.append(title, text, resume, invite, showCollection, restart, seedLine(seed));
     this.root.append(this.panel, this.confirm, this.collection.root);
     this.collection.root.hidden = true;
     this.asking(false);

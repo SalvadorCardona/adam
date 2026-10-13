@@ -88,9 +88,13 @@ import { ZoomControls } from './ui/zoomControls.ts';
 import { SeenArea } from './ui/mapSight.ts';
 import { WorldMap } from './ui/worldMap.ts';
 import { AccountClient } from './net/account.ts';
+import { inviteCodeOf, withoutInvite } from './net/invite.ts';
+import { PartyClient } from './net/party.ts';
 import { Connection } from './net/connection.ts';
 import { LocalAccount } from './storage/localAccount.ts';
 import { AccountPanel } from './ui/accountPanel.ts';
+import { InvitePanel } from './ui/invitePanel.ts';
+import { JoinPanel } from './ui/joinPanel.ts';
 
 /**
  * Clamp anti-spirale de la mort.
@@ -261,6 +265,27 @@ async function main(): Promise<void> {
 
   connection.subscribe((state) => {
     if (state === 'online') void accounts.refresh();
+  });
+
+  // Héberger sa partie et inviter un ami ; ou, par un lien d'invitation (`?join=`), rejoindre celle d'un ami.
+  const parties = new PartyClient(accounts);
+  const invitePanel = new InvitePanel(parties, accounts, connection, () => accountPanel.show());
+  const inviteCode = scenario ? null : inviteCodeOf(window.location.search);
+  const joinPanel =
+    inviteCode === null
+      ? null
+      : new JoinPanel(
+          inviteCode,
+          parties,
+          accounts,
+          connection,
+          () => accountPanel.show(),
+          () => window.history.replaceState(null, '', withoutInvite(window.location.href)),
+        );
+
+  // Connecté depuis l'écran « Rejoindre » : la fenêtre du compte se retire, l'invitation est là.
+  accounts.subscribe((user) => {
+    if (user && joinPanel?.open) accountPanel.close();
   });
 
   const renderer = await GameRenderer.create(world, mount);
@@ -558,7 +583,7 @@ async function main(): Promise<void> {
   const record = wireRecord(world, scenario ? new LocalRecord(null) : LocalRecord.browser());
 
   const achievements = wireAchievements(world, scenario ? new LocalCollection(null) : LocalCollection.browser(), hud, audio);
-  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart());
+  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), () => invitePanel.show());
   const title = new TitleScreen({
     resume: loaded.status === 'ok',
     notice: LOAD_NOTICES[loaded.status] ?? linkNotice(world),
@@ -651,7 +676,7 @@ async function main(): Promise<void> {
   hud.root.append(eras.root, eras.screen);
   // Par-dessus tout, écran titre compris : la langue se choisit avant même de jouer.
   settings.addAccountButton(accountPanel.button('button-secondary settings-toggle'));
-  hud.root.append(settings.root, accountPanel.root, padHelp.root);
+  hud.root.append(settings.root, invitePanel.root, ...(joinPanel ? [joinPanel.root] : []), accountPanel.root, padHelp.root);
   mount.append(hud.root);
 
   /*
@@ -713,6 +738,15 @@ async function main(): Promise<void> {
       // La fenêtre du compte est par-dessus les réglages (ou l'écran titre) : elle se ferme la première.
       if (accountPanel.open) {
         accountPanel.close();
+        return;
+      }
+      // L'invitation, par-dessus la pause : elle se ferme avant elle ; l'écran « Rejoindre », lui, ramène au titre.
+      if (invitePanel.open) {
+        invitePanel.close();
+        return;
+      }
+      if (joinPanel?.open) {
+        joinPanel.dismiss();
         return;
       }
       // L'aide de la manette est par-dessus les réglages : elle se ferme la première.

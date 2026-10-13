@@ -19,7 +19,13 @@ export interface ServerConfig {
    * toutes, `http://localhost:*` cet hôte sur tout port.
    */
   readonly corsOrigins: readonly string[];
+  /** Combien de temps une invitation reste valable, en millisecondes. */
+  readonly inviteTtlMs: number;
 }
+
+/** Une invitation vaut une heure par défaut ; réglable de 1 minute à 24 heures. */
+export const DEFAULT_INVITE_MINUTES = 60;
+const MAX_INVITE_MINUTES = 24 * 60;
 
 /** Le port par défaut : celui que le client vise en développement (`.env.online`). */
 export const DEFAULT_PORT = 8790;
@@ -44,6 +50,12 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): S
 
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error(`PORT invalide : ${env['PORT']}`);
 
+  const minutes = Number(env['INVITE_TTL_MINUTES'] ?? DEFAULT_INVITE_MINUTES);
+
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_INVITE_MINUTES) {
+    throw new Error(`INVITE_TTL_MINUTES invalide : ${env['INVITE_TTL_MINUTES']}`);
+  }
+
   const origins = (env['CORS_ORIGINS'] ?? '')
     .split(',')
     .map((origin) => origin.trim())
@@ -54,6 +66,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): S
     host: env['HOST'] || '0.0.0.0',
     databasePath: env['DATABASE_PATH'] || 'data/mobile-factory.sqlite',
     corsOrigins: origins.length > 0 ? origins : DEV_ORIGINS,
+    inviteTtlMs: minutes * 60_000,
   };
 }
 

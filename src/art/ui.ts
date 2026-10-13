@@ -331,6 +331,20 @@ export const UI_ICONS = {
     pill(9.6, 5.8, 2.6, 1.6, ink.light),
     pill(6.5, 15.6, 5, 1.6, ink.light),
   ),
+  /** Inviter un ami : une tête et des épaules indigo, et un plus menthe au coin. */
+  invite: svg(
+    S,
+    S,
+    circle(10.5, 8.5, 4.2, ink.shade),
+    circle(10, 8, 4.2, ink.base),
+    rect(2.5, 14.5, 13, 7, ink.shade, 3.5),
+    rect(2, 14, 13, 7, ink.base, 3.5),
+    pill(7.8, 5.9, 2.4, 1.5, ink.light),
+    circle(18.5, 15.5, 4.5, mint.shade),
+    circle(18.2, 15.2, 4.5, mint.base),
+    pill(15.8, 14.6, 4.8, 1.2, paper.base),
+    pill(17.6, 12.8, 1.2, 4.8, paper.base),
+  ),
   /** L'ampoule du conseil. */
   hint: svg(
     S,

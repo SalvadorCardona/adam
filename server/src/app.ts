@@ -10,7 +10,8 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { API_PATHS, API_SERVICE, API_VERSION, type HealthResponse } from '../../shared/api.ts';
 import { originAllowed, type ServerConfig } from './config.ts';
-import { accountRoutes } from './accounts.ts';
+import { accountRoutes, sessionReader } from './accounts.ts';
+import { partyRoutes } from './parties.ts';
 import { schemaVersion } from './db.ts';
 
 export interface AppDeps {
@@ -74,6 +75,7 @@ export function createApp({ config, db, now = () => performance.now(), clock = D
   });
 
   app.route('/', accountRoutes({ db, clock, clientIp }));
+  app.route('/', partyRoutes({ db, clock, clientIp, userOf: sessionReader(db, clock), ttlMs: config.inviteTtlMs }));
 
   app.notFound((c) => c.json({ ok: false, error: 'notFound' }, 404));
   app.onError((error, c) => {
