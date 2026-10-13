@@ -214,6 +214,7 @@ async function main(): Promise<void> {
   installCursors();
 
   // La langue d'abord : tout ce qui suit s'écrit dans elle. Au premier lancement, celle du navigateur.
+  // Lue et écrite même sur la partie de test, comme voulu : la langue est un réglage de l'appareil, pas une donnée de partie.
   const localePrefs = LocalLocale.browser();
 
   setLocale(localePrefs.load() ?? detectLocale(navigator.languages ?? [navigator.language]));
@@ -450,7 +451,7 @@ async function main(): Promise<void> {
   );
 
   // Le zoom de la carte : un niveau choisi par le joueur, mémorisé sur l'appareil.
-  const zoomPrefs = LocalZoom.browser();
+  const zoomPrefs = scenario ? new LocalZoom(null) : LocalZoom.browser();
   const savedZoom = zoomPrefs.load();
 
   if (savedZoom !== null) renderer.restoreZoom(savedZoom);
