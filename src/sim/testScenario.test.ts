@@ -52,14 +52,14 @@ describe('parties de test', () => {
     expect(MENU_BUILDING_IDS.filter((building) => world.isNewInMenu(building))).toEqual([]);
   });
 
-  it('la petite base : quatre bâtiments qui emploient, et un chantier à moitié livré', () => {
+  it('la petite base : six bâtiments qui emploient, et un chantier à moitié livré', () => {
     const world = stageScenario(TEST_SCENARIOS.base);
     const buildings = [...world.entities.values()].filter((entity) => entity.kind !== 'site' && entity.kind !== 'townHall');
     const sites = [...world.entities.values()].filter((entity) => entity.kind === 'site');
 
-    expect(buildings.map((entity) => entity.proto).sort()).toEqual(['constructionPost', 'farm', 'lumberCamp', 'well']);
+    expect(buildings.map((entity) => entity.proto).sort()).toEqual(['constructionPost', 'farm', 'logisticsPost', 'logisticsPost', 'lumberCamp', 'well']);
     expect(world.mobiles.size).toBeGreaterThan(0);
-    expect([...world.mobiles.values()].filter((mobile) => mobile.kind === 'lumberjack')).toHaveLength(BUILDINGS.lumberCamp.workers);
+    expect([...world.mobiles.values()].filter((mobile) => mobile.kind === 'lumberjack')).toHaveLength(1);
 
     expect(sites).toHaveLength(1);
 
@@ -69,6 +69,19 @@ describe('parties de test', () => {
     expect(lab.proto).toBe('lab');
     expect(lab.delivered).toEqual({ wood: 14, stone: 3 });
     expect(siteMissing(lab)).toBeGreaterThan(0);
+  });
+
+  it('la petite base tourne seule dix minutes : personne ne meurt, et l’eau de la ville remonte', () => {
+    const world = stageScenario(TEST_SCENARIOS.base);
+    const deaths: string[] = [];
+
+    world.events.on('workerStarved', (event) => deaths.push(String(event.id)));
+    for (let i = 0; i < 12000; i += 1) world.tick();
+
+    expect(deaths).toEqual([]);
+    // Le puits est vidé dans la mairie : l'eau monte au lieu de tomber à sec.
+    expect(world.townStock()?.count('water')).toBeGreaterThan(TEST_SCENARIOS.base.town.water);
+    expect(world.townStock()?.count('food')).toBeGreaterThan(0);
   });
 
   it('le coffre à ouvrir : trois pas à droite, Adam l’ouvre et trouve une pièce', () => {

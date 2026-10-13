@@ -1176,7 +1176,10 @@ Rien ne joue avant un geste du joueur.
 **`/mobile-factory/test`** — en local `http://localhost:5173/mobile-factory/test`,
 en ligne https://cardona.digital/mobile-factory/test — ouvre directement,
 sans écran titre, une petite base déjà bâtie (graine 100, matin du jour 1) :
-mairie et son stock, cabane de bûcheron, ferme, puits, poste de construction, et le
+mairie et son stock, cabane de bûcheron, ferme, puits (au bord de l'eau à l'ouest,
+`WELL_SPOT` : en ligne droite de la mairie), deux postes de logistique (l'un entre
+la cabane et la ferme, l'autre près du puits, qui vident leurs coffres dans la
+mairie ; ouvriers réglés d'emblée par `workers`, la colonie n'en a que dix), poste de construction, et le
 chantier du labo à moitié livré (bois complet, pierre en route, fer manquant).
 Bandeau « Partie de test » en bas à gauche (le haut reste celui d'une vraie partie). Elle ne lit ni n'écrit aucun stockage
 (sauvegarde, jardin, record) et repart à l'identique à chaque rechargement.

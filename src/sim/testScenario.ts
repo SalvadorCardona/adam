@@ -50,7 +50,7 @@ export function stageScenario(scenario: TestScenarioProto): World {
     if (RESEARCH[id].opens.length > 0 && !world.researchDone.includes(id)) world.researchDone.push(id);
   }
 
-  for (const { building, dx, dy, delivered } of scenario.buildings) {
+  for (const { building, dx, dy, delivered, workers } of scenario.buildings) {
     const tx = hx + dx;
     const ty = hy + dy;
     const { width, height, cost } = BUILDINGS[building];
@@ -68,6 +68,7 @@ export function stageScenario(scenario: TestScenarioProto): World {
 
     if (id === null) throw new Error(`scénario de test : ${building} pas posé en (${dx}, ${dy})`);
     deliver(world, id, delivered ?? cost);
+    if (workers !== undefined) world.push({ type: 'setWorkers', id, count: workers });
   }
 
   const town = world.townStock();
