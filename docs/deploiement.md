@@ -170,7 +170,24 @@ Dans Dokploy, après fusion et sauvegarde de la base (*Schedules* → lancer
 5. redéployer les deux, puis vérifier (section 5, `/health` → `service: "adam"`).
 
 GitHub Pages : une fois le dépôt renommé, le jeu est sous
-`cardona.digital/adam/`. L'ancien chemin vit dans le dépôt du site : y copier
-`client/legacy/index.html` sous l'ancien dossier (`index.html`, et la même
-page pour ses sous-chemins ou en `404.html` de repli), et `client/legacy/sw.js`
-à côté : la page redirige vers `/adam/` en gardant chemin, requête et fragment.
+`salvadorcardona.github.io/adam/`. `cardona.digital/<projet>/` n'est pas servi
+par Pages mais relayé par Traefik (dépôt du site, `deploy/traefik/github-pages.yml`,
+copié dans `/etc/dokploy/traefik/dynamic/`) : y ajouter `/adam/` et `/adam` aux
+deux règles, et renvoyer l'ancien chemin en 301 vers `/adam/` en gardant le
+reste du chemin et la requête (le navigateur garde le fragment). Même origine :
+les clés y sont communes, le jeu les renomme lui-même ; l'ancien service
+worker, dont la page passe par le réseau d'abord, suit la redirection, et le
+jeu le désinscrit. Relancer ensuite le workflow *Deploy* (build sous `/adam/`).
+
+### État en production (renommage)
+
+Faits : DNS `adam` et `adam-api` chez Hostinger ; sauvegarde de la base ; projet
+Dokploy `adam`, services `adam-server` et `adam-client` (`appName` et volume
+inchangés) ; domaines `adam-api.cardona.digital` (8790) et `adam.cardona.digital`
+(80), HTTPS Let's Encrypt, les anciens gardés ; `CORS_ORIGINS` avec les trois
+origines ; argument de build et variable du dépôt `VITE_API_URL` →
+`https://adam-api.cardona.digital`.
+
+Après fusion : renommer le dépôt, pointer la source GitHub des deux services
+Dokploy sur `adam` (sinon le déploiement au push ne part plus), la règle
+Traefik de `cardona.digital`, relancer *Deploy*.
