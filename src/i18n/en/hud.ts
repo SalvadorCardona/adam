@@ -73,6 +73,7 @@ export const hud: Messages['hud'] = {
     escaped: (count: number): string => (count > 1 ? `${count} pigs got away!` : 'A pig got away!'),
   },
   toast: {
+    objectiveDone: (title: string, celebration: string): string => `Goal complete: ${title}. ${celebration}`,
     saveFailed: 'Saving failed — browser storage is full or blocked',
     depositFar: 'Too far from the town hall — get closer to drop off',
     depositNoTown: 'No town yet: build the town hall first',
@@ -192,9 +193,8 @@ export const hud: Messages['hud'] = {
     bounty: (night: number, list: string): string => `Night ${night} repelled — bounty: ${list}`,
   },
   quest: {
-    objective: (index: number, total: number): string => `Goal ${index}/${total}`,
+    chapter: (index: number, total: number): string => `Chapter ${index}/${total}`,
     afterSignal: 'After the Signal',
-    buildHall: 'Build the town hall',
     defeat: 'Defeat',
     hallFallen: 'The town hall has fallen.',
     attack: 'Attack!',
@@ -209,10 +209,6 @@ export const hud: Messages['hud'] = {
     emptyPosts: 'Empty posts',
     portersBusy: 'Porters busy',
     portersIdle: 'Porters waiting',
-    stripPaused: 'paused',
-    stripMissing: (missing: number, item: string): string => `${missing} ${lower(item)}`,
-    stripBaby: (time: string): string => `baby ${time}`,
-    stripNight: (time: string): string => `night ${time}`,
     nurseryPaused: 'the nursery is paused',
     nurseryWaits: (missing: number, item: string): string => `the nursery needs ${missing} ${lower(item)}`,
     babyIn: (time: string): string => `baby in ${time}`,
@@ -275,6 +271,7 @@ export const hud: Messages['hud'] = {
   hintBulb: 'Show the tip',
   pause: 'Pause',
   objectiveDone: 'Goal complete!',
+  chapterDone: 'Chapter complete!',
   victory: {
     refound: 'Found a new colony',
     seeds: (seeds: number): string => `+${seeds} seed${s(seeds)}`,

@@ -26,8 +26,10 @@ import { ICON_SIZE, ITEM_ICONS, PRESTIGE_ICON } from './icons.ts';
 import { CATEGORY_ICONS } from './categoryIcons.ts';
 import { JOB_ICONS } from './jobIcons.ts';
 import { ITEMS } from './items.ts';
+import { HAPPINESS } from './housing.ts';
 import { HUNTING, NEEDS, type NeedProto } from './needs.ts';
-import { OBJECTIVES, type ObjectiveProto } from './objectives.ts';
+import { CHAPTERS, type ChapterProto, type Reward } from './objectives.ts';
+import { chapterReach, goalOutOfReach } from './reach.ts';
 import { PERKS, type PerkProto } from './perks.ts';
 import { QUESTS, QUEST_IDS, TOOLS, type QuestProto } from './quests.ts';
 import { RECIPES, type RecipeProto } from './recipes.ts';
@@ -648,30 +650,43 @@ export function validatePrototypes(): string[] {
     }
   }
 
-  const objectives: readonly ObjectiveProto[] = OBJECTIVES;
+  const ids = new Set<string>();
 
-  for (const [index, objective] of objectives.entries()) {
-    const at = `OBJECTIVES[${index}]`;
+  (CHAPTERS as readonly ChapterProto[]).forEach((chapter, index) => {
+    const reach = chapterReach(index);
 
-    if (objective.title === '' || objective.hint === '' || objective.celebration === '') {
-      errors.push(`${at} : titre, conseil ou célébration vide`);
+    if (chapter.title === '' || chapter.celebration === '') errors.push(`CHAPTERS[${index}] : titre ou célébration vide`);
+    if (chapter.objectives.length === 0) errors.push(`CHAPTERS[${index}] : aucun objectif, il serait fini d'office`);
+    if (!(chapter.icon in BUILDINGS)) errors.push(`CHAPTERS[${index}] : vignette inconnue « ${chapter.icon} »`);
+    errors.push(...rewardErrors(`CHAPTERS[${index}]`, chapter.reward));
+
+    for (const objective of chapter.objectives) {
+      const at = `CHAPTERS[${index}].${objective.id}`;
+
+      if (ids.has(objective.id)) errors.push(`${at} : identifiant en double`);
+      ids.add(objective.id);
+      if (objective.title === '' || objective.hint === '' || objective.celebration === '') {
+        errors.push(`${at} : titre, conseil ou célébration vide`);
+      }
+      if (objective.goals.length === 0) errors.push(`${at} : aucune condition, il serait réussi d'office`);
+
+      for (const goal of objective.goals) {
+        if (!Number.isInteger(goal.count) || goal.count <= 0) errors.push(`${at} : condition « ${goal.type} » à compte invalide`);
+        if (goal.type === 'build' && !(goal.building in BUILDINGS)) errors.push(`${at} : bâtiment inconnu « ${goal.building} »`);
+        else if (goal.type === 'produce' && !(goal.item in ITEMS)) errors.push(`${at} : objet inconnu « ${goal.item} »`);
+        else if (goal.type === 'quests' && goal.count > QUEST_IDS.length) errors.push(`${at} : plus de quêtes qu'Ève n'en donne`);
+        else if (goal.type === 'era' && goal.count >= ERAS.length) errors.push(`${at} : ère inconnue`);
+        else if (goal.type === 'mood' && goal.count > HAPPINESS.max) errors.push(`${at} : bonheur moyen au-delà du plafond`);
+        else {
+          // Rien d'impossible au moment où le chapitre s'ouvre.
+          const missing = goalOutOfReach(goal, reach);
+
+          if (missing) errors.push(`${at} : ${missing}`);
+        }
+      }
+      errors.push(...rewardErrors(at, objective.reward));
     }
-    if (objective.goals.length === 0) errors.push(`${at} : aucune condition, il serait réussi d'office`);
-
-    for (const goal of objective.goals) {
-      if (!Number.isInteger(goal.count) || goal.count <= 0) errors.push(`${at} : condition « ${goal.type} » à compte invalide`);
-      if (goal.type === 'build' && !(goal.building in BUILDINGS)) errors.push(`${at} : bâtiment inconnu « ${goal.building} »`);
-      if (goal.type === 'produce' && !(goal.item in ITEMS)) errors.push(`${at} : objet inconnu « ${goal.item} »`);
-      if (goal.type === 'quests' && goal.count > QUEST_IDS.length) errors.push(`${at} : plus de quêtes qu'Ève n'en donne`);
-    }
-
-    const { items, bag } = objective.reward;
-
-    for (const [item, amount] of Object.entries<number>(items ?? {})) {
-      if (!(item in ITEMS) || amount <= 0) errors.push(`${at} : récompense invalide en « ${item} »`);
-    }
-    if (bag !== undefined && (!Number.isInteger(bag) || bag <= 0)) errors.push(`${at} : places de sac invalides`);
-  }
+  });
 
   const labels = new Map<string, string>();
 
@@ -836,7 +851,7 @@ function eraErrors(): string[] {
     const requires = era.requires;
 
     if (requires) {
-      if (requires.objectives < 0 || requires.objectives > OBJECTIVES.length) errors.push(`${at} : objectifs hors de la chaîne`);
+      if (requires.chapters < 0 || requires.chapters > CHAPTERS.length) errors.push(`${at} : chapitres hors de la partie`);
       if (requires.population <= 0) errors.push(`${at} : population nulle`);
       for (const [building, count] of Object.entries(requires.buildings)) {
         if (!(building in BUILDINGS) || !Number.isInteger(count) || (count ?? 0) <= 0) errors.push(`${at} : bâtiment demandé incohérent « ${building} »`);
@@ -854,7 +869,7 @@ function eraErrors(): string[] {
     for (const building of era.opens) {
       const proto: BuildingProto | undefined = BUILDINGS[building];
 
-      if (!proto?.menu || proto.plan || proto.unlockObjective !== undefined) errors.push(`${at} : ouvre « ${building} », qui a sa propre condition`);
+      if (!proto?.menu || proto.plan || proto.unlockChapter !== undefined) errors.push(`${at} : ouvre « ${building} », qui a sa propre condition`);
       reachable.add(building);
     }
     for (const [id, research] of Object.entries(RESEARCH) as [string, ResearchProto][]) {
@@ -914,7 +929,7 @@ function researchErrors(): string[] {
         continue;
       }
       if (!proto.menu || proto.kind === 'lab') errors.push(`RESEARCH.${id} : « ${building} » ne peut pas se débloquer au labo`);
-      if (proto.plan || proto.unlockObjective !== undefined) errors.push(`RESEARCH.${id} : « ${building} » a déjà sa condition de déblocage`);
+      if (proto.plan || proto.unlockChapter !== undefined) errors.push(`RESEARCH.${id} : « ${building} » a déjà sa condition de déblocage`);
       if (unlockedBy.has(building)) errors.push(`RESEARCH.${id} : « ${building} » déjà débloqué par ${unlockedBy.get(building)}`);
       unlockedBy.set(building, id);
     }
@@ -927,7 +942,7 @@ function researchErrors(): string[] {
       }
       if (!proto.menu || proto.kind === 'lab') errors.push(`RESEARCH.${id} : « ${building} » ne peut pas s'ouvrir au labo`);
       if (start.includes(building)) errors.push(`RESEARCH.${id} : « ${building} » est déjà au menu de départ`);
-      if (proto.plan || proto.unlockObjective !== undefined) errors.push(`RESEARCH.${id} : « ${building} » a déjà sa condition de déblocage`);
+      if (proto.plan || proto.unlockChapter !== undefined) errors.push(`RESEARCH.${id} : « ${building} » a déjà sa condition de déblocage`);
       if (openedBy.has(building) || unlockedBy.has(building)) errors.push(`RESEARCH.${id} : « ${building} » déjà au labo, par ${openedBy.get(building) ?? unlockedBy.get(building)}`);
       openedBy.set(building, id);
     }
@@ -953,13 +968,9 @@ function researchErrors(): string[] {
     if (!done.has(id)) errors.push(`RESEARCH.${id} : prérequis en boucle, ou jamais accessibles`);
   }
 
-  // Un objectif ou une quête qui demande un bâtiment caché au menu bloquerait la partie.
-  const asked = [
-    ...QUEST_IDS.map((quest) => [`QUESTS.${quest}`, QUESTS[quest].goal.building] as const),
-    ...OBJECTIVES.flatMap((objective, index) =>
-      objective.goals.flatMap((goal) => (goal.type === 'build' ? [[`OBJECTIVES[${index}]`, goal.building] as const] : [])),
-    ),
-  ];
+  // Une quête qui demande un bâtiment caché au menu bloquerait la partie : Ève ne demande que ce que le labo ouvre sans combat.
+  // Les objectifs, eux, se vérifient chapitre par chapitre (`chapterReach`).
+  const asked = QUEST_IDS.map((quest) => [`QUESTS.${quest}`, QUESTS[quest].goal.building] as const);
 
   // Ce qu'Adam récolte : de quoi payer une recherche sans avoir à combattre.
   const harvested = new Set<string>(Object.values(RESOURCES).map((resource) => resource.item));
@@ -981,7 +992,7 @@ function researchErrors(): string[] {
 
   // Chaque bâtiment du menu a son chemin : de départ, un plan, un objectif ou le labo.
   for (const [id, building] of Object.entries(BUILDINGS) as [string, BuildingProto][]) {
-    if (!building.menu || start.includes(id) || building.plan || building.unlockObjective !== undefined || building.unlockExplored !== undefined) continue;
+    if (!building.menu || start.includes(id) || building.plan || building.unlockChapter !== undefined || building.unlockExplored !== undefined) continue;
     if (!unlockedBy.has(id) && !openedBy.has(id)) errors.push(`BUILDINGS.${id} : n'entre jamais au menu d'une colonie neuve`);
   }
 
@@ -991,6 +1002,17 @@ function researchErrors(): string[] {
     if (labels.has(research.label)) errors.push(`RESEARCH.${id} : libellé « ${research.label} » en double`);
     labels.add(research.label);
   }
+  return errors;
+}
+
+/** La récompense d'un objectif ou d'un chapitre : des objets connus en quantités positives, des places entières. */
+function rewardErrors(at: string, reward: Reward): string[] {
+  const errors: string[] = [];
+
+  for (const [item, amount] of Object.entries<number>(reward.items ?? {})) {
+    if (!(item in ITEMS) || amount <= 0) errors.push(`${at} : récompense invalide en « ${item} »`);
+  }
+  if (reward.bag !== undefined && (!Number.isInteger(reward.bag) || reward.bag <= 0)) errors.push(`${at} : places de sac invalides`);
   return errors;
 }
 
@@ -1079,7 +1101,7 @@ function validateDiscoveries(errors: string[]): void {
       const proto: BuildingProto = BUILDINGS[id];
 
       // Un plan de ruine ouvre un bâtiment masqué du menu : un autre déblocage (plan d'Ève, objectif, labo) le gouverne déjà.
-      if (!proto.menu || proto.plan || proto.unlockObjective !== undefined || (Object.values(RESEARCH) as ResearchProto[]).some((research) => (research.unlocks as readonly string[]).includes(id))) {
+      if (!proto.menu || proto.plan || proto.unlockChapter !== undefined || (Object.values(RESEARCH) as ResearchProto[]).some((research) => (research.unlocks as readonly string[]).includes(id))) {
         errors.push(`DISCOVERIES.ruin.plans[${tier}] : « ${id} » n'est pas un bâtiment masqué du menu`);
       }
     }

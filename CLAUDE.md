@@ -510,7 +510,7 @@ paliers : **Campement** (le départ, `START_BUILDINGS`), **Bourg**, **Ville**,
 **Cité industrielle** ; `World.era` (index, sauvegardé ; absent d'une ancienne
 sauvegarde : 0, le Campement). On passe à la suivante depuis la fenêtre de la
 mairie (« Ères · Campement », pastille corail quand tout est réuni) : un
-panneau liste ses conditions (`eraChecks` : objectifs réussis de la chaîne,
+panneau liste ses conditions (`eraChecks` : chapitres finis,
 habitants, bâtiments finis, recherches clés, investissement payé sac puis
 ville) et ce qu'elle apporte ; « Passer à l'ère » pousse `advanceEra`
 (refus `EraRejection`). Chaque ère peut ouvrir au menu des bâtiments
@@ -532,14 +532,30 @@ l'économie ; `validatePrototypes()` vérifie qu'une ère ne demande que ce que
 les précédentes rendent accessible. Partie testée de bout en bout dans
 `sim/eras.test.ts`.
 
-**Objectifs** — la partie est une chaîne d'objectifs en données
-(`src/data/objectives.ts`, jugés par `src/sim/objectives.ts`) : mairie,
-3 nuits (Ève arrive), les demandes d'Ève (ses quêtes), foreuse et 20 fer,
-premier enfant, 5 nuits de plus → « Acte I terminé » (`banner`), puis
-l'**Antenne** → victoire « Le Signal », puis la partie sans fin.
+**Objectifs** — la partie est une suite de dix **chapitres** en données
+(`CHAPTERS` de `src/data/objectives.ts`, jugés par `src/sim/objectives.ts`),
+chacun avec plusieurs objectifs ouverts à la fois, faits dans l'ordre qu'on
+veut ; le suivant s'ouvre quand tous sont réussis (`World.chapter`,
+`World.objectivesDone` par id, `World.chapterBase` ; événements
+`objectiveCompleted` puis `chapterCompleted`). Le premier toit (la mairie,
+seule), les fondations (cabane, carrière, puits, maison), passer la nuit
+(3 nuits, 2 tours de guet, 4 palissades), les demandes d'Ève (ses quêtes,
+postes de logistique et de construction), nourrir la ville (élevage, ferme,
+20 pains, premier enfant), l'industrie (20 fer, 20 charbons, 10 plaques,
+20 briques), une ville où l'on veut vivre (clinique, 20 grillades, bonheur
+moyen 80 : `mood`), tenir (5 nuits, 2 tours d'archers, caserne) → « Acte I
+terminé » (`banner`, `ACT_ONE_CHAPTER`), préparer le Signal (Cité
+industrielle : `era`, 10 outils, 10 aciers, station de dépollution), puis
+l'**Antenne** → victoire « Le Signal », puis la partie sans fin. Un objectif
+ne demande que ce qui est à portée quand son chapitre s'ouvre — recherche,
+plan, ère (`data/reach.ts`, `chapterReach`, vérifié par
+`validatePrototypes()` et `objectives.test.ts`). Une sauvegarde de
+l'ancienne chaîne de sept (version 10, `LEGACY_OBJECTIVES`, `migrateV10`)
+reprend au premier chapitre qui contient un ancien objectif pas réussi, les
+anciens cochés, sans récompense redonnée.
 
 **L'Antenne** (`antenna`, kind `antenna`, unique, 3 × 3) — débloquée par
-l'objectif 7 (`unlockObjective`), posée à 8 cases au moins de la mairie,
+la fin de l'acte I (`unlockChapter`), posée à 8 cases au moins de la mairie,
 de centre à centre (`hallDistance`, refus `nearHall`, disque corail du
 mode construction). Trois étages : le premier est un chantier ; les deux
 autres sont ses `upgrades`, mais **livrés** dans son coffre comme un
@@ -555,12 +571,19 @@ monde) survivants arrivent : des porteurs `survivor` logés à la mairie. Le
 record « nuits tenues après le Signal » (`World.nightsAfterSignal()`) vit
 sous sa propre clé (`storage/localRecord.ts`, à côté du jardin) et
 s'affiche à l'écran titre.
-Le panneau du haut affiche toujours l'objectif courant (la quête d'Ève en
-cours dessous) ; le conseil d'Ève retombe sur celui de l'objectif. Chaque
-objectif réussi a sa célébration (son, pluie de feuilles, bandeau) et une
-récompense concrète (objets, places de sac, réparation de la mairie). Ce
-qui est fait en avance compte ; les nuits à « tenir » se comptent depuis
-le début de l'objectif. Une condition qui n'attend qu'une horloge (naissance,
+La case de la barre montre le chapitre (vignette, nom, « 2/4 ») ; la
+fenêtre de la quête, une ligne par objectif (bouton : icône, titre, jauge,
+coché et en sourdine une fois réussi), l'objectif choisi au doigt ou à la
+croix de la manette déplié en jauges dessous (le chantier de la mairie, une
+jauge par objet), la quête d'Ève en cours dessous ; le conseil d'Ève retombe
+sur celui de l'objectif choisi (`tutorialAdvice`, `selected`, ou le chemin
+du labo qui ouvre son bâtiment). Chaque objectif réussi a sa petite
+célébration (jingle, toast, la case rebondit), chaque chapitre la grande
+(fanfare, pluie de feuilles, bandeau), et une récompense concrète (objets,
+places de sac relues dans les objectifs réussis — `objectiveBagBonus` —,
+réparation de la mairie). Ce qui est fait en avance compte ; un objectif
+réussi le reste ; les nuits à « tenir » se comptent depuis l'ouverture du
+chapitre. Une condition qui n'attend qu'une horloge (naissance,
 nuit à tenir : `goalWait`/`objectiveWait`) affiche son temps restant, ou en
 corail ce qui la retient ; Ève enchaîne alors sur de quoi s'occuper
 (réparer, une tour, l'objet le plus bas en ville, une recherche).
@@ -616,7 +639,7 @@ comme les autres, qui se **retirent** d'un tap (`removeDecor`, le coût
 retourne en ville) ; à chaque aube, chacune ajoute son `mood.amount` au
 bonheur des ouvriers à `mood.radius` tuiles, dans la limite de
 `DECOR.maxPerDawn` (`restInhabitants`, `decorMoodAt`). Elles se
-gagnent : objectif (`unlockObjective`, les parterres et bancs après les
+gagnent : chapitre (`unlockChapter`, les parterres et bancs après les
 3 nuits, la statue après l'acte I) ou exploration (`unlockExplored`, la
 fontaine : cases explorées du brouillard). Une ancienne sauvegarde charge
 tout au niveau 1 (`level` absent). Planche : `docs/niveaux/`,

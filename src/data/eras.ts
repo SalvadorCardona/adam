@@ -8,7 +8,7 @@
  * On passe à l'ère suivante depuis la fenêtre de la mairie (« Ères », panneau
  * `ui/eraPanel.ts`, commande `advanceEra`) quand tout ce que `requires`
  * demande tient en même temps :
- * - `objectives` : objectifs réussis de la chaîne (`data/objectives.ts`) —
+ * - `chapters` : chapitres d'objectifs finis (`data/objectives.ts`) —
  *   l'histoire ouvre la porte, l'ère la franchit ;
  * - `population` : habitants (`World.population()`, Adam et Ève compris) ;
  * - `buildings` : bâtiments finis et debout, par type ;
@@ -41,8 +41,8 @@ import type { ItemId } from './items.ts';
 import type { ResearchId } from './research.ts';
 
 export interface EraRequirement {
-  /** Objectifs de la chaîne déjà réussis (`World.objective`), au moins. */
-  objectives: number;
+  /** Chapitres d'objectifs finis (`World.chapter`), au moins. */
+  chapters: number;
   /** Habitants de la colonie, au moins. */
   population: number;
   /** Bâtiments finis et debout, par type. */
@@ -84,7 +84,7 @@ export const ERAS = [
     label: 'Bourg',
     motto: 'Des rues, des fours, des voisins : ça sent le pain et la brique chaude.',
     requires: {
-      objectives: 2,
+      chapters: 3,
       population: 13,
       buildings: { home: 2, nursery: 1 },
       research: [],
@@ -99,7 +99,7 @@ export const ERAS = [
     label: 'Ville',
     motto: 'Des ateliers, des outils, des enfants qui courent : la ville bourdonne.',
     requires: {
-      objectives: 4,
+      chapters: 6,
       population: 16,
       buildings: { well: 1, lab: 1, brickworks: 1, watchtower: 2 },
       research: ['brickmaking', 'metalworking'],
@@ -114,7 +114,7 @@ export const ERAS = [
     label: 'Cité industrielle',
     motto: 'Cheminées, rails, sirènes : la cité gronde, et tout le désert l’entend.',
     requires: {
-      objectives: 6,
+      chapters: 8,
       population: 20,
       buildings: { workshop: 1, forge: 1, charcoalKiln: 1, home: 4, constructionPost: 1 },
       research: ['toolmaking'],

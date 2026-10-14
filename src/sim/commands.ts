@@ -380,7 +380,7 @@ export type PlacementRejection =
   /**
    * Pas encore débloqué : il faut d'abord le plan, qu'Ève donne en récompense
    * d'une quête, la recherche du labo qui le débloque (`RESEARCH.unlocks`),
-   * ou finir l'acte I (`unlockObjective`).
+   * ou finir l'acte I (`unlockChapter`).
    */
   | 'locked'
   /** Une base mutante tient la zone : on n'y bâtit pas tant qu'elle est debout. */

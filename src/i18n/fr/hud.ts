@@ -90,6 +90,8 @@ export const hud = {
   },
   /** Les bulles empilées des événements. */
   toast: {
+    /** Un objectif réussi en cours de chapitre : son nom, ce qu'il rapporte. */
+    objectiveDone: (title: string, celebration: string): string => `Objectif réussi : ${title}. ${celebration}`,
     saveFailed: 'Sauvegarde impossible — le stockage du navigateur est plein ou bloqué',
     depositFar: 'Trop loin de la mairie — rapprochez-vous pour déposer',
     depositNoTown: 'Pas encore de ville : bâtissez d’abord la mairie',
@@ -237,9 +239,8 @@ export const hud = {
   },
   /** La quête en haut de l'écran. */
   quest: {
-    objective: (index: number, total: number): string => `Objectif ${index}/${total}`,
+    chapter: (index: number, total: number): string => `Chapitre ${index}/${total}`,
     afterSignal: 'Après le Signal',
-    buildHall: `Bâtir la ${HALL}`,
     defeat: 'Défaite',
     hallFallen: `La ${HALL.toLowerCase()} est tombée.`,
     attack: 'Attaque !',
@@ -256,12 +257,6 @@ export const hud = {
     emptyPosts: 'Postes vides',
     portersBusy: 'Porteurs occupés',
     portersIdle: 'Porteurs en attente',
-    /** La ligne repliée d'une naissance retenue ou attendue. */
-    stripPaused: 'en pause',
-    /** `item` : le nom de l'objet qui manque, avec sa majuscule. */
-    stripMissing: (missing: number, item: string): string => `${missing} ${lower(item)}${s(missing)}`,
-    stripBaby: (time: string): string => `bébé ${time}`,
-    stripNight: (time: string): string => `nuit ${time}`,
     nurseryPaused: `la ${NURSERY} est en pause`,
     nurseryWaits: (missing: number, item: string): string => `la ${NURSERY} attend ${missing} ${lower(item)}${s(missing)}`,
     babyIn: (time: string): string => `bébé dans ${time}`,
@@ -341,6 +336,7 @@ export const hud = {
   pause: 'Pause',
   /** Le bandeau d'un objectif réussi sans bandeau à lui. */
   objectiveDone: 'Objectif réussi !',
+  chapterDone: 'Chapitre terminé !',
   victory: {
     refound: 'Fonder une nouvelle colonie',
     seeds: (seeds: number): string => `+${seeds} graine${s(seeds)}`,

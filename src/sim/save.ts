@@ -30,7 +30,7 @@ import { COLONY, SEXES, type Sex } from '../data/inhabitants.ts';
 import { TRAIT_IDS } from '../data/traits.ts';
 import { ITEMS, type ItemId } from '../data/items.ts';
 import { NEED_IDS, NEEDS, type NeedId } from '../data/needs.ts';
-import { OBJECTIVES } from '../data/objectives.ts';
+import { CHAPTERS, LEGACY_OBJECTIVES, OBJECTIVES, OBJECTIVE_IDS, type ObjectiveId } from '../data/objectives.ts';
 import { JOB_PRIORITY, WORK_PRIORITY, type JobPriority, type WorkPriority } from '../data/workers.ts';
 import { PERKS, type PerkId } from '../data/perks.ts';
 import { PRODUCTION } from '../data/production.ts';
@@ -79,7 +79,7 @@ import { World } from './world.ts';
  * `WorldState` ; une migration de l'ancienne version se branche alors dans
  * `decodeSave`, sinon l'ancienne sauvegarde est ignorée.
  */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 /** Une entité telle qu'elle est rangée : son coffre devient un simple stock. */
 export type SavedEntity = Stored<Entity>;
@@ -165,8 +165,10 @@ export interface WorldState {
   era?: number;
   /** Offres rares de la caravane déjà prises, par offre. Absent des sauvegardes d'avant elle : aucune. */
   rareTrades: Partial<Record<RareOfferId, number>>;
-  /** Index de l'objectif en cours ; `OBJECTIVES.length` une fois la chaîne bouclée. */
-  objective: number;
+  /** Index du chapitre en cours ; `CHAPTERS.length` une fois la partie bouclée. */
+  chapter: number;
+  /** Les objectifs réussis, de tous les chapitres. */
+  objectivesDone: ObjectiveId[];
   /** Le Signal est lancé : l'antenne a son troisième étage, la chaîne est bouclée. */
   victory: boolean;
   victoryTick: number;
@@ -191,8 +193,8 @@ export interface WorldState {
    */
   regions?: SavedRegions;
   stats: WorldStats;
-  /** Les compteurs au début de l'objectif en cours. */
-  objectiveBase: WorldStats;
+  /** Les compteurs à l'ouverture du chapitre en cours. */
+  chapterBase: WorldStats;
   player: SavedPlayer;
   /** L'ami, s'il jouait à deux. Absent en solo, et d'une sauvegarde d'avant le jeu à deux. */
   partner?: SavedPartner;
@@ -269,7 +271,7 @@ export function decodeSave(text: string): DecodedSave {
   if (!isRecord(file) || typeof file['version'] !== 'number') return { ok: false, reason: 'corrupt' };
   const version = file['version'];
 
-  if (version !== SAVE_VERSION && version !== 9 && version !== 8 && version !== 7 && version !== 6 && version !== 5 && version !== 4) return { ok: false, reason: 'version' };
+  if (version !== SAVE_VERSION && version !== 10 && version !== 9 && version !== 8 && version !== 7 && version !== 6 && version !== 5 && version !== 4) return { ok: false, reason: 'version' };
 
   try {
     const v5 = version === 4 ? migrateV4(file['state']) : file['state'];
@@ -277,7 +279,8 @@ export function decodeSave(text: string): DecodedSave {
     const v7 = version <= 6 ? migrateV6(v6) : v6;
     const v8 = version <= 7 ? migrateV7(v7) : v7;
     const v9 = version <= 8 ? migrateV8(v8) : v8;
-    const state = version === SAVE_VERSION ? v9 : migrateV9(v9);
+    const v10 = version <= 9 ? migrateV9(v9) : v9;
+    const state = version === SAVE_VERSION ? v10 : migrateV10(v10);
 
     return { ok: true, world: deserialize(state), savedAt: finite(file['savedAt']) };
   } catch {
@@ -442,6 +445,32 @@ function migrateV9(raw: unknown): unknown {
   };
 }
 
+/**
+ * Version 10 : un seul objectif à la fois, dans une chaîne de sept
+ * (`LEGACY_OBJECTIVES`). Désormais des chapitres, plusieurs objectifs
+ * ouverts à la fois. La partie reprend au premier chapitre qui contient un
+ * ancien objectif pas encore réussi — celui de l'ancien index, ou le premier
+ * enfant, passé avant la foreuse ; les chapitres d'avant sont tenus pour
+ * finis, et les anciens objectifs réussis restent réussis, même dans un
+ * chapitre à venir : aucune récompense ne retombe. Les objectifs nouveaux du
+ * chapitre se réévaluent au tick suivant, sur l'état du monde. Les compteurs
+ * de l'objectif en cours deviennent ceux du chapitre : ses nuits continuent.
+ */
+function migrateV10(raw: unknown): unknown {
+  if (!isRecord(raw) || typeof raw['objective'] !== 'number') return raw;
+
+  const { objective, objectiveBase, ...rest } = raw;
+
+  if (!Number.isInteger(objective) || objective < 0 || objective > LEGACY_OBJECTIVES.length) throw new SaveError(`objectif inconnu : ${objective}`);
+
+  const done = LEGACY_OBJECTIVES.slice(0, objective);
+  const pending = LEGACY_OBJECTIVES.slice(objective).map((id) => OBJECTIVES.find((proto) => proto.id === id)!.chapter);
+  const chapter = pending.length === 0 ? CHAPTERS.length : Math.min(...pending);
+  const passed = OBJECTIVES.filter((proto) => proto.chapter < chapter).map((proto) => proto.id);
+
+  return { ...rest, chapter, objectivesDone: [...new Set([...passed, ...done])], chapterBase: objectiveBase ?? rest['stats'] };
+}
+
 /** L'objectif qui débloquait la station de dépollution en version 9. */
 const V9_PURIFIER_OBJECTIVE = 5;
 
@@ -545,36 +574,45 @@ function parseState(raw: unknown): WorldState {
 }
 
 /**
- * La chaîne d'objectifs. Une sauvegarde d'avant les objectifs reprend au
+ * Les chapitres d'objectifs. Une sauvegarde d'avant les objectifs reprend au
  * premier : ce qui est déjà fait tombe au tick suivant, récompenses
  * comprises ; les nuits déjà survécues se relisent dans le numéro de nuit.
  */
 function parseObjectives(
   state: Json,
-): Pick<WorldState, 'objective' | 'victory' | 'victoryTick' | 'signalNights' | 'lureNight' | 'stats' | 'objectiveBase'> {
-  if (state['objective'] === undefined) {
+): Pick<WorldState, 'chapter' | 'objectivesDone' | 'victory' | 'victoryTick' | 'signalNights' | 'lureNight' | 'stats' | 'chapterBase'> {
+  if (state['chapter'] === undefined) {
     const mutants = array(state['mobiles']).some((mobile) => isRecord(mobile) && mobile['kind'] === 'mutant');
     const night = int(state['night']);
     const stats: WorldStats = { nightsSurvived: mutants ? Math.max(0, night - 1) : night, births: 0, produced: {} };
 
-    return { objective: 0, victory: false, victoryTick: 0, stats, objectiveBase: { ...stats, produced: {} } };
+    return { chapter: 0, objectivesDone: [], victory: false, victoryTick: 0, stats, chapterBase: { ...stats, produced: {} } };
   }
 
-  const objective = int(state['objective']);
+  const chapter = int(state['chapter']);
 
-  if (objective < 0 || objective > OBJECTIVES.length) throw new SaveError(`objectif inconnu : ${objective}`);
+  if (chapter < 0 || chapter > CHAPTERS.length) throw new SaveError(`chapitre inconnu : ${chapter}`);
 
+  const objectivesDone = [
+    ...new Set(
+      array(state['objectivesDone'] ?? []).map((id) => {
+        if (typeof id !== 'string' || !(OBJECTIVE_IDS as readonly string[]).includes(id)) throw new SaveError(`objectif inconnu : ${String(id)}`);
+        return id as ObjectiveId;
+      }),
+    ),
+  ];
   // Une victoire d'avant l'Antenne n'était que la fin de l'acte I : la partie reprend à l'acte II.
-  const victory = bool(state['victory']) && objective === OBJECTIVES.length;
+  const victory = bool(state['victory']) && chapter === CHAPTERS.length;
 
   return {
-    objective,
+    chapter,
+    objectivesDone,
     victory,
     victoryTick: victory ? int(state['victoryTick']) : 0,
     signalNights: state['signalNights'] === undefined ? 0 : int(state['signalNights']),
     lureNight: state['lureNight'] === undefined ? 0 : int(state['lureNight']),
     stats: parseStats(state['stats']),
-    objectiveBase: parseStats(state['objectiveBase']),
+    chapterBase: parseStats(state['chapterBase']),
   };
 }
 

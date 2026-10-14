@@ -54,7 +54,7 @@ describe('dictionnaires', () => {
     // Le bandeau d'un objectif ordinaire est vide (il dit « Objectif réussi ! »), une statistique sans unité
     // aussi, et un refus de pose sans remède.
     for (const [path, value] of [...fr, ...en]) {
-      if (/^objectives\[\d+\]\.banner$|^researchStats\.\w+\.unit$|^panel\.placement\..*\.remedy$/.test(path)) continue;
+      if (/^chapters\[\d+\]\.banner$|^researchStats\.\w+\.unit$|^panel\.placement\..*\.remedy$/.test(path)) continue;
       expect(sample(value).trim(), path).not.toBe('');
     }
   });

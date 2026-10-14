@@ -2,13 +2,13 @@
  * Objectifs : où en est chaque condition de `data/objectives.ts`.
  *
  * Fonctions pures qui lisent le monde sans le toucher. `World` s'en sert au
- * tick pour savoir si l'objectif courant est réussi ; le HUD, pour dessiner
- * une jauge par condition. Un seul juge, donc : la jauge pleine et
- * l'objectif réussi ne peuvent pas diverger.
+ * tick pour savoir quels objectifs du chapitre en cours sont réussis ; le
+ * HUD, pour dessiner une jauge par condition. Un seul juge, donc : la jauge
+ * pleine et l'objectif réussi ne peuvent pas diverger.
  */
 
 import type { ItemId } from '../data/items.ts';
-import { OBJECTIVES, type Goal, type ObjectiveProto } from '../data/objectives.ts';
+import { CHAPTERS, OBJECTIVES, type ChapterProto, type Goal, type ObjectiveId, type ObjectiveProto } from '../data/objectives.ts';
 import { RECIPES } from '../data/recipes.ts';
 import { CYCLE_TICKS, ticksToDawn } from './dayNight.ts';
 import type { Nursery, WorldStats } from './types.ts';
@@ -49,7 +49,7 @@ function count(world: World, goal: Goal): number {
     }
 
     case 'nights':
-      return world.stats.nightsSurvived - world.objectiveBase.nightsSurvived;
+      return world.stats.nightsSurvived - world.chapterBase.nightsSurvived;
 
     case 'produce':
       return world.stats.produced[goal.item] ?? 0;
@@ -62,6 +62,12 @@ function count(world: World, goal: Goal): number {
 
     case 'happiness':
       return world.happiness().total;
+
+    case 'mood':
+      return world.happiness().average;
+
+    case 'era':
+      return world.era;
   }
 }
 
@@ -134,13 +140,23 @@ function rank(wait: GoalWait): number {
   return wait.blockedBy === null ? wait.remainingTicks : wait.blockedBy === 'paused' ? Infinity : 1e9 + wait.missing;
 }
 
-/** L'attente de la condition qui retient l'objectif courant — la première pas remplie —, s'il en est une. */
-export function objectiveWait(world: World): (GoalWait & { goal: Goal }) | null {
-  const objective = currentObjective(world);
-  const goal = objective?.goals.find((condition) => count(world, condition) < condition.count);
-  const wait = goal ? goalWait(world, goal) : null;
+/**
+ * L'attente de la condition qui retient l'objectif `id` — la première pas
+ * remplie —, s'il en est une. Sans `id`, celle du premier objectif du
+ * chapitre qui attend une horloge.
+ */
+export function objectiveWait(world: World, id?: ObjectiveId | null): (GoalWait & { goal: Goal }) | null {
+  const objectives = id ? OBJECTIVES.filter((objective) => objective.id === id) : chapterObjectives(world);
 
-  return goal && wait ? { ...wait, goal } : null;
+  for (const objective of objectives) {
+    if (world.objectivesDone.has(objective.id)) continue;
+
+    const goal = objective.goals.find((condition) => count(world, condition) < condition.count);
+    const wait = goal ? goalWait(world, goal) : null;
+
+    if (goal && wait) return { ...wait, goal };
+  }
+  return null;
 }
 
 /** Toutes les conditions tiennent-elles en même temps ? */
@@ -148,9 +164,24 @@ export function objectiveDone(world: World, objective: ObjectiveProto): boolean 
   return objective.goals.every((goal) => count(world, goal) >= goal.count);
 }
 
-/** L'objectif en cours, ou `null` une fois la chaîne bouclée — la partie sans fin, après le Signal. */
-export function currentObjective(world: World): ObjectiveProto | null {
-  return OBJECTIVES[world.objective] ?? null;
+/** Le chapitre en cours, ou `null` une fois la partie bouclée — la partie sans fin, après le Signal. */
+export function currentChapter(world: World): ChapterProto | null {
+  return (CHAPTERS as readonly ChapterProto[])[world.chapter] ?? null;
+}
+
+/** Les objectifs du chapitre en cours, dans l'ordre du panneau — vide après le Signal. */
+export function chapterObjectives(world: World): (ObjectiveProto & { id: ObjectiveId })[] {
+  return OBJECTIVES.filter((objective) => objective.chapter === world.chapter);
+}
+
+/** Les objectifs du chapitre en cours qui restent à réussir. */
+export function openObjectives(world: World): (ObjectiveProto & { id: ObjectiveId })[] {
+  return chapterObjectives(world).filter((objective) => !world.objectivesDone.has(objective.id));
+}
+
+/** Le premier objectif ouvert du chapitre, celui que le panneau choisit d'office ; `null` après le Signal. */
+export function firstOpenObjective(world: World): ObjectiveId | null {
+  return openObjectives(world)[0]?.id ?? null;
 }
 
 /** Une copie des compteurs : le point de départ d'un objectif. */

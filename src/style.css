@@ -482,6 +482,101 @@ button:disabled,
   font-weight: 700;
 }
 
+/*
+ * Les objectifs du chapitre : une ligne chacun, un bouton qu'on touche (ou
+ * qu'on atteint à la croix de la manette) pour le choisir — ses jauges se
+ * déplient dessous, son conseil passe à l'ampoule. Réussi, il est coché et
+ * passe en sourdine jusqu'à la fin du chapitre.
+ */
+.hud-chapter-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-chapter-head .hud-strip-title {
+  flex: 1;
+}
+
+.hud-chapter-head .hud-strip-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-objectives {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-objective-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 52px auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 2px 8px 2px 6px;
+  border: none;
+  border-radius: 14px;
+  background: var(--paper);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  cursor: var(--cursor-hand);
+}
+
+.hud-objective-row[aria-pressed='true'] {
+  background: var(--yellow-light);
+  box-shadow: 0 3px 0 var(--yellow-shade);
+}
+
+.hud-objective-row:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.hud-objective-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+}
+
+.hud-objective-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-objective-row .hud-meter-value {
+  min-width: 40px;
+}
+
+.hud-objective-row[data-done='true'] {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.hud-objective-row[data-done='true'] .hud-objective-title {
+  text-decoration: line-through;
+  text-decoration-color: var(--paper-shade);
+  text-decoration-thickness: 2px;
+}
+
+.hud-objective-row[data-done='true'] .hud-bar-fill {
+  background: var(--mint);
+}
+
+.hud-objective-row[data-done='true'] .hud-bar-fill::after {
+  background: var(--mint-light);
+}
+
+.hud-objective-row[data-done='true'] .hud-meter-value {
+  color: var(--good);
+}
+
 .hud-quest-line {
   display: flex;
   flex-wrap: wrap;

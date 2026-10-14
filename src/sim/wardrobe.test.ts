@@ -234,7 +234,7 @@ describe('pièces trouvées', () => {
     completeSite(world, world.townHallId);
     completeSite(twin, twin.townHallId);
 
-    expect(world.objective).toBeGreaterThan(0);
+    expect(world.chapter).toBeGreaterThan(0);
     expect(found).toHaveLength(1);
     expect(world.player.wardrobe).toEqual(found);
     expect(owns(world.player.wardrobe, found[0]!)).toBe(true);

@@ -7,8 +7,9 @@
  *
  * C'est Ève qui parle (`t().eve.hints`) : par radio tant qu'elle n'est pas
  * arrivée, de vive voix ensuite. Elle tutoie Adam. Quand elle n'a rien de
- * plus pressé à dire, c'est le conseil de l'objectif en cours
- * (`data/objectives.ts`) : le joueur sait toujours quoi faire ensuite.
+ * plus pressé à dire, c'est le conseil de l'objectif choisi dans le panneau
+ * (`data/objectives.ts`) — le premier du chapitre qui reste, si le joueur
+ * n'en a pas touché un : il sait toujours quoi faire ensuite.
  *
  * Fonction pure, sans DOM : `hud.ts` l'affiche, les tests la lisent.
  */
@@ -17,10 +18,11 @@ import { BUILDINGS, REPAIR, buildingLevel, type BuildingId } from '../data/build
 import { EVE } from '../data/eve.ts';
 import { COLONY } from '../data/inhabitants.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
-import type { Goal } from '../data/objectives.ts';
+import { objectiveProto, type Goal, type ObjectiveId } from '../data/objectives.ts';
+import { RECIPES, type RecipeProto } from '../data/recipes.ts';
 import { RESEARCH_IDS, type ResearchId } from '../data/research.ts';
 import { RESOURCES } from '../data/resources.ts';
-import { currentObjective, objectiveWait, type GoalWait } from '../sim/objectives.ts';
+import { firstOpenObjective, goalProgress, objectiveWait, type GoalWait } from '../sim/objectives.ts';
 import { eraReady, nextEra } from '../sim/eras.ts';
 import { openingResearch, researchStatus, unlockingResearch } from '../sim/research.ts';
 import type { Building } from '../sim/types.ts';
@@ -103,11 +105,18 @@ function viaLab(world: World, building: BuildingId, line: string): Advice {
   };
 }
 
-export function tutorialHint(world: World, progress: HintProgress, towers: boolean, mutants: number): string | null {
-  return tutorialAdvice(world, progress, towers, mutants)?.text ?? null;
+export function tutorialHint(world: World, progress: HintProgress, towers: boolean, mutants: number, selected?: ObjectiveId | null): string | null {
+  return tutorialAdvice(world, progress, towers, mutants, selected)?.text ?? null;
 }
 
-export function tutorialAdvice(world: World, progress: HintProgress, towers: boolean, mutants: number): Advice | null {
+/** `selected` : l'objectif choisi dans le panneau ; absent, le premier du chapitre qui reste. */
+export function tutorialAdvice(
+  world: World,
+  progress: HintProgress,
+  towers: boolean,
+  mutants: number,
+  selected: ObjectiveId | null = firstOpenObjective(world),
+): Advice | null {
   const say = (text: string, wants: ItemId | null = null): Advice => ({ text, wants });
   const hall = world.entities.get(world.townHallId);
   const { inventory } = world.player;
@@ -189,15 +198,45 @@ export function tutorialAdvice(world: World, progress: HintProgress, towers: boo
 
   // L'objectif n'attend plus qu'une horloge qui court : le temps qu'il reste, et de quoi s'occuper d'ici là.
   // Une nuit à tenir n'est une attente que de jour : le soir, le conseil de l'objectif dit comment la tenir.
-  const wait = mutants === 0 ? objectiveWait(world) : null;
+  const wait = mutants === 0 && selected ? objectiveWait(world, selected) : null;
 
   if (wait && wait.blockedBy === null && (wait.goal.type !== 'nights' || world.clock()?.phase === 'day')) {
     return waitingAdvice(world, wait);
   }
 
-  const objective = currentObjective(world);
+  return selected ? objectiveAdvice(world, selected) : null;
+}
 
-  return objective ? say(t().objectives[world.objective]!.hint) : null;
+/**
+ * Le conseil d'un objectif : sa réplique, ou, si le bâtiment qu'il demande —
+ * ou qui produit ce qu'il demande — n'est pas encore au menu, le chemin du
+ * labo qui l'ouvre, tant que la recherche est de l'ère atteinte.
+ */
+function objectiveAdvice(world: World, id: ObjectiveId): Advice {
+  const line = t().objectives[id].hint;
+  const goal = objectiveProto(id).goals.find((condition) => {
+    const { have, need } = goalProgress(world, condition);
+
+    return have < need;
+  });
+  const building = goal ? goalBuilding(goal) : null;
+
+  if (building && !world.isUnlocked(building)) {
+    const research = openingResearch(building) ?? unlockingResearch(building);
+
+    if (research !== null && world.researchOpen(research)) return viaLab(world, building, line);
+  }
+  return { text: line, wants: null };
+}
+
+/** Le bâtiment qu'une condition demande, ou celui qui produit l'objet qu'elle compte. */
+function goalBuilding(goal: Goal): BuildingId | null {
+  if (goal.type === 'build') return goal.building;
+  if (goal.type !== 'produce') return null;
+
+  const recipe = (Object.values(RECIPES) as RecipeProto[]).find((proto) => goal.item in proto.outputs);
+
+  return recipe?.building ?? null;
 }
 
 /**

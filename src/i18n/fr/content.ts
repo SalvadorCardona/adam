@@ -15,7 +15,7 @@ import { EVE_LINES } from '../../data/eve.ts';
 import { GEAR } from '../../data/gear.ts';
 import { ITEMS } from '../../data/items.ts';
 import { LORE } from '../../data/lore.ts';
-import { OBJECTIVES, type ObjectiveProto } from '../../data/objectives.ts';
+import { CHAPTERS, OBJECTIVES, type ChapterProto, type ObjectiveId } from '../../data/objectives.ts';
 import { PERKS } from '../../data/perks.ts';
 import { QUESTS, TOOLS } from '../../data/quests.ts';
 import { RECIPES } from '../../data/recipes.ts';
@@ -66,7 +66,12 @@ interface ObjectiveText {
   title: string;
   hint: string;
   celebration: string;
-  /** Vide : le bandeau dit « Objectif réussi ! ». */
+}
+
+interface ChapterText {
+  title: string;
+  celebration: string;
+  /** Vide : le bandeau dit « Chapitre terminé ! ». */
   banner: string;
 }
 
@@ -95,9 +100,10 @@ export const content = {
   pieces: mapTable(PIECES, (piece): string => piece.label),
   tools: mapTable(TOOLS, (tool): string => tool.label),
   quests: mapTable(QUESTS, ({ label, give, done }): { label: string; give: string; done: string } => ({ label, give, done })),
-  objectives: (OBJECTIVES as readonly ObjectiveProto[]).map(
-    ({ title, hint, celebration, banner }): ObjectiveText => ({ title, hint, celebration, banner: banner ?? '' }),
-  ),
+  /** Les objectifs, par identifiant. */
+  objectives: Object.fromEntries(OBJECTIVES.map(({ id, title, hint, celebration }) => [id, { title, hint, celebration }])) as Record<ObjectiveId, ObjectiveText>,
+  /** Les chapitres, dans l'ordre de `CHAPTERS`. */
+  chapters: (CHAPTERS as readonly ChapterProto[]).map(({ title, celebration, banner }): ChapterText => ({ title, celebration, banner: banner ?? '' })),
   eve: EVE_LINES,
   /** Les ères de la colonie, dans l'ordre de `ERAS`. */
   eras: (ERAS as readonly EraProto[]).map(({ label, motto, threatLine }): { label: string; motto: string; threat: string } => ({

@@ -125,10 +125,10 @@ export interface BuildingProto {
   /** Un seul par colonie, chantier compris : le labo de recherche, l'antenne. */
   unique: boolean;
   /**
-   * L'objectif à atteindre — son index dans `OBJECTIVES` — avant de pouvoir
+   * Les chapitres à finir (`CHAPTERS`, `data/objectives.ts`) avant de pouvoir
    * le poser : l'antenne attend la fin de l'acte I. Absent : dès le début.
    */
-  unlockObjective?: number;
+  unlockChapter?: number;
   /**
    * Distance minimale à la mairie, en tuiles, de centre d'emprise à centre
    * d'emprise : l'antenne se dresse loin, il faudra la défendre. Absent : aucune.
@@ -979,8 +979,8 @@ export const BUILDINGS = {
     menu: true,
     unique: true,
     plan: false,
-    // Après « Tenir 5 nuits » : l'objectif 7.
-    unlockObjective: 6,
+    // Après « Tenir », la fin de l'acte I : le chapitre 9.
+    unlockChapter: 8,
     hallDistance: 8,
     sprite: 'antenna',
     weapon: null,
@@ -1025,7 +1025,7 @@ export const BUILDINGS = {
     mood: { amount: 1, radius: 4 },
     menu: true,
     unique: false,
-    unlockObjective: 2,
+    unlockChapter: 3,
     plan: false,
     sprite: 'flowerBed',
     weapon: null,
@@ -1051,7 +1051,7 @@ export const BUILDINGS = {
     mood: { amount: 1, radius: 5 },
     menu: true,
     unique: false,
-    unlockObjective: 2,
+    unlockChapter: 3,
     plan: false,
     sprite: 'bench',
     weapon: null,
@@ -1077,7 +1077,7 @@ export const BUILDINGS = {
     mood: { amount: 2, radius: 6 },
     menu: true,
     unique: false,
-    unlockObjective: 3,
+    unlockChapter: 4,
     plan: false,
     sprite: 'streetLamp',
     weapon: null,
@@ -1129,7 +1129,7 @@ export const BUILDINGS = {
     mood: { amount: 4, radius: 10 },
     menu: true,
     unique: false,
-    unlockObjective: 6,
+    unlockChapter: 8,
     plan: false,
     sprite: 'adamStatue',
     weapon: null,

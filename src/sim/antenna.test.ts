@@ -3,16 +3,24 @@ import { TILE_SIZE } from '../core/grid.ts';
 import { BUILDINGS } from '../data/buildings.ts';
 import { SURVIVORS } from '../data/dayNight.ts';
 import type { ItemId } from '../data/items.ts';
-import { OBJECTIVES } from '../data/objectives.ts';
+import { ACT_ONE_CHAPTER, CHAPTERS, OBJECTIVES } from '../data/objectives.ts';
 import { floorMissing } from './antenna.ts';
 import { CYCLE_TICKS, clockAt } from './dayNight.ts';
-import { currentObjective, goalProgress } from './objectives.ts';
+import { chapterObjectives, currentChapter, goalProgress } from './objectives.ts';
 import { decodeSave, encodeSave } from './save.ts';
 import type { Antenna, EntityId } from './types.ts';
 import { World } from './world.ts';
 
-/** L'index de l'objectif « Bâtir l'Antenne », le septième. */
-const ANTENNA_OBJECTIVE = OBJECTIVES.findIndex((objective) => objective.goals.some((goal) => goal.type === 'build' && goal.building === 'antenna'));
+/** L'objectif « Bâtir l'Antenne », seul de son chapitre, le dernier. */
+const ANTENNA_OBJECTIVE = OBJECTIVES.find((objective) => objective.goals.some((goal) => goal.type === 'build' && goal.building === 'antenna'))!;
+const ANTENNA_CHAPTER = ANTENNA_OBJECTIVE.chapter;
+
+/** La partie au début du chapitre `chapter` : ceux d'avant finis, leurs objectifs cochés. */
+function atChapter(world: World, chapter: number): void {
+  world.chapter = chapter;
+  for (const objective of OBJECTIVES) if (objective.chapter < chapter) world.objectivesDone.add(objective.id);
+  world.chapterBase = { ...world.stats, produced: { ...world.stats.produced } };
+}
 
 /** La mairie bâtie d'un coup, sans passer par le sac. */
 function withTownHall(seed = 7): World {
@@ -27,12 +35,11 @@ function withTownHall(seed = 7): World {
   return world;
 }
 
-/** L'acte I fini : la partie en est à l'objectif de l'Antenne. */
+/** L'acte I fini, le Signal préparé : la partie en est au chapitre de l'Antenne. */
 function actTwo(seed = 7): World {
   const world = withTownHall(seed);
 
-  world.objective = ANTENNA_OBJECTIVE;
-  world.objectiveBase = { ...world.stats, produced: { ...world.stats.produced } };
+  atChapter(world, ANTENNA_CHAPTER);
   return world;
 }
 
@@ -122,23 +129,22 @@ function runTo(world: World, cycle: number, phase: 'night' | 'dawn' | 'day', cal
 }
 
 describe('l’Antenne', () => {
-  it('n’est l’objectif qu’après « Tenir 5 nuits »', () => {
+  it('ne se pose qu’après « Tenir », la fin de l’acte I', () => {
     const world = withTownHall();
 
-    world.objective = ANTENNA_OBJECTIVE - 1;
-    world.objectiveBase = { ...world.stats, produced: {} };
-    expect(currentObjective(world)?.title).toBe(OBJECTIVES[ANTENNA_OBJECTIVE - 1]!.title);
+    atChapter(world, ACT_ONE_CHAPTER);
+    expect(currentChapter(world)?.title).toBe(CHAPTERS[ACT_ONE_CHAPTER]!.title);
     expect(world.isUnlocked('antenna')).toBe(false);
     expect(world.canPlace('antenna', antennaAt(world, 9, 0).tx, antennaAt(world, 9, 0).ty)).toBe('locked');
 
-    // Les cinq nuits tenues : l'acte I finit, l'Antenne devient l'objectif — sans victoire.
+    // Les cinq nuits tenues, les tours et la caserne cochées : l'acte I finit, l'Antenne se pose — sans victoire.
     let victory = false;
 
     world.events.on('victory', () => (victory = true));
+    for (const { id } of chapterObjectives(world)) if (id !== 'nights5') world.objectivesDone.add(id);
     world.stats.nightsSurvived += 5;
     world.tick();
-    expect(world.objective).toBe(ANTENNA_OBJECTIVE);
-    expect(currentObjective(world)?.title).toBe(OBJECTIVES[ANTENNA_OBJECTIVE]!.title);
+    expect(world.chapter).toBe(ACT_ONE_CHAPTER + 1);
     expect(world.isUnlocked('antenna')).toBe(true);
     expect(victory).toBe(false);
     expect(world.victory).toBe(false);
@@ -165,7 +171,7 @@ describe('l’Antenne', () => {
   it('monte d’un étage quand tout est livré, et pas sans cœur radioactif', () => {
     const world = actTwo();
     const antenna = firstFloor(world);
-    const progress = (): { have: number; need: number } => goalProgress(world, OBJECTIVES[ANTENNA_OBJECTIVE]!.goals[0]);
+    const progress = (): { have: number; need: number } => goalProgress(world, ANTENNA_OBJECTIVE.goals[0]!);
 
     expect(antenna.level).toBe(1);
     expect(progress()).toEqual({ have: 1, need: 3 });
@@ -297,7 +303,7 @@ describe('l’Antenne', () => {
       expect(copy.hp).toBe(live.hp);
       expect(copy.store.toJSON()).toEqual(live.store.toJSON());
       expect(loaded.lureNight).toBe(world.lureNight);
-      expect(loaded.objective).toBe(world.objective);
+      expect(loaded.chapter).toBe(world.chapter);
       expect(loaded.victory).toBe(floor === 3);
       expect(loaded.signalNights).toBe(world.signalNights);
 
