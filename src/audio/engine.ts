@@ -47,10 +47,10 @@ import {
 import { SampleBank, type PickedSample } from './samples.ts';
 import { SOUNDS, type SoundName, type VoiceName } from './synth.ts';
 
-const MUTE_KEY = 'mobile-factory:muted';
-const MUSIC_KEY = 'mobile-factory:music';
-const MUSIC_VOLUME_KEY = 'mobile-factory:music-volume';
-const SFX_VOLUME_KEY = 'mobile-factory:sfx-volume';
+const MUTE_KEY = 'adam:muted';
+const MUSIC_KEY = 'adam:music';
+const MUSIC_VOLUME_KEY = 'adam:music-volume';
+const SFX_VOLUME_KEY = 'adam:sfx-volume';
 
 /** Le bus des bruitages, à plein volume du joueur : un peu sous le maître. */
 const SFX_GAIN = 0.8;

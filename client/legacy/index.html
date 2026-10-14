@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+  L'ancienne adresse du jeu, qui s'appelait Mobile Factory et s'appelle Adam.
+
+  - Sur cardona.digital (GitHub Pages), `/mobile-factory/…` et `/adam/…` sont la
+    même origine : leurs clés sont communes, le jeu les renomme lui-même
+    (`src/storage/legacyKeys.ts`). On redirige en gardant chemin, requête et
+    fragment.
+  - Sur mobile-factory.cardona.digital, les clés sont dans le `localStorage` de
+    cette origine, qu'adam.cardona.digital ne voit pas : on les lit, on les
+    compresse (`deflate-raw`, base64 d'URL) et on les envoie dans le fragment —
+    jamais dans la requête, donc jamais dans un journal — vers
+    `adam.cardona.digital/adam/#import=…`, que le jeu importe une seule fois
+    sans rien écraser. Les clés restent ici : rien n'est perdu si le transfert
+    échoue.
+
+  Dans les deux cas, l'ancien service worker et ses caches sont retirés.
+-->
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Adam</title>
+    <style>
+      body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #2b2d5c; color: #fff; font: 600 18px/1.4 system-ui, sans-serif; text-align: center; }
+      a { color: #ffd23f; }
+    </style>
+  </head>
+  <body>
+    <p>Mobile Factory s'appelle désormais Adam.<br /><a id="go" href="https://adam.cardona.digital/adam/">Ouvrir Adam</a></p>
+    <script>
+      (async () => {
+        const OLD = '/mobile-factory';
+        const NEW = '/adam';
+        const TARGET = 'https://adam.cardona.digital';
+        const KEYS = ['mobile-factory:', 'adam:'];
+        const path = location.pathname === OLD || location.pathname.startsWith(OLD + '/') ? NEW + location.pathname.slice(OLD.length) : NEW + '/';
+        const fragment = new URLSearchParams(location.hash.slice(1));
+
+        try {
+          for (const registration of await navigator.serviceWorker.getRegistrations()) {
+            if (new URL(registration.scope).pathname.startsWith(OLD + '/')) await registration.unregister();
+          }
+          for (const key of await caches.keys()) if (key.startsWith('mobile-factory-')) await caches.delete(key);
+        } catch {}
+
+        if (location.hostname === 'cardona.digital') {
+          location.replace(path + location.search + location.hash);
+          return;
+        }
+
+        try {
+          const entries = {};
+
+          for (let index = 0; index < localStorage.length; index++) {
+            const key = localStorage.key(index);
+
+            if (key && KEYS.some((prefix) => key.startsWith(prefix)) && !key.endsWith(':tab')) entries[key] = localStorage.getItem(key);
+          }
+          if (Object.keys(entries).length > 0) {
+            const json = new Blob([JSON.stringify(entries)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+            const bytes = new Uint8Array(await new Response(json).arrayBuffer());
+            let binary = '';
+
+            for (const byte of bytes) binary += String.fromCharCode(byte);
+            fragment.set('import', btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, ''));
+          }
+        } catch {}
+
+        const hash = fragment.toString();
+        const target = TARGET + path + location.search + (hash ? '#' + hash : '');
+
+        document.getElementById('go').href = target;
+        location.replace(target);
+      })();
+    </script>
+  </body>
+</html>

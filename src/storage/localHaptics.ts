@@ -8,7 +8,7 @@
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé des vibrations — distincte de celles de la sauvegarde, du jardin, du record, du zoom et des pancartes. */
-export const HAPTICS_KEY = 'mobile-factory:haptics';
+export const HAPTICS_KEY = 'adam:haptics';
 
 export class LocalHaptics {
   private readonly storage: SaveStorage | null;

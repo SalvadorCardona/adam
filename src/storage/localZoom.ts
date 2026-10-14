@@ -8,7 +8,7 @@
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé du zoom — distincte de celles de la sauvegarde, du jardin et du record. */
-export const ZOOM_KEY = 'mobile-factory:zoom';
+export const ZOOM_KEY = 'adam:zoom';
 
 export class LocalZoom {
   private readonly storage: SaveStorage | null;

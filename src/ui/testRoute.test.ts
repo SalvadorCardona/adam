@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { testRoutes, testScenarioOf } from './testRoute.ts';
 
-const BASE = '/mobile-factory/';
+const BASE = '/adam/';
 
 describe('testScenarioOf', () => {
   it('ouvre le scénario par défaut sur /test, avec ou sans barre finale', () => {
-    expect(testScenarioOf('/mobile-factory/test', BASE)).toBe('base');
-    expect(testScenarioOf('/mobile-factory/test/', BASE)).toBe('base');
-    expect(testScenarioOf('/mobile-factory/test/index.html', BASE)).toBe('base');
+    expect(testScenarioOf('/adam/test', BASE)).toBe('base');
+    expect(testScenarioOf('/adam/test/', BASE)).toBe('base');
+    expect(testScenarioOf('/adam/test/index.html', BASE)).toBe('base');
   });
 
   it('ouvre un scénario nommé sur /test/<id>', () => {
-    expect(testScenarioOf('/mobile-factory/test/base', BASE)).toBe('base');
+    expect(testScenarioOf('/adam/test/base', BASE)).toBe('base');
   });
 
   it('laisse la partie normale partout ailleurs', () => {
-    expect(testScenarioOf('/mobile-factory/', BASE)).toBeNull();
-    expect(testScenarioOf('/mobile-factory/index.html', BASE)).toBeNull();
-    expect(testScenarioOf('/mobile-factory/test/inconnu', BASE)).toBeNull();
-    expect(testScenarioOf('/mobile-factory/testeur', BASE)).toBeNull();
+    expect(testScenarioOf('/adam/', BASE)).toBeNull();
+    expect(testScenarioOf('/adam/index.html', BASE)).toBeNull();
+    expect(testScenarioOf('/adam/test/inconnu', BASE)).toBeNull();
+    expect(testScenarioOf('/adam/testeur', BASE)).toBeNull();
     expect(testScenarioOf('/test', BASE)).toBeNull();
   });
 });

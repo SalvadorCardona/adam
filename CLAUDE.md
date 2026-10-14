@@ -1,4 +1,4 @@
-# Mobile Factory — contexte du projet
+# Adam — contexte du projet
 
 Ce fichier est lu au début de chaque session. Il dit ce qui ne doit pas se
 perdre d'une session à l'autre : le pitch, la direction artistique, et les
@@ -7,7 +7,7 @@ lire avant de toucher au domaine concerné.
 
 ## Le jeu
 
-Jeu d'usine 2D pour navigateur mobile (TypeScript, PixiJS v8, Vite).
+Jeu de construction et de survie 2D pour navigateur mobile (TypeScript, PixiJS v8, Vite).
 
 **Pitch** — `src/data/lore.ts` fait foi. Un futur apocalyptique, quelques
 survivants. Le héros est **Adam** ; **Ève** le rejoindra ; des **humains
@@ -579,7 +579,7 @@ cosmétiques : un **skin** (pièce de la garde-robe, offerte par la commande
 **trophée** (décoration, variante de bâtiment : exposé à la collection, pas
 encore dessiné sur la carte). Les **bâtiments rares** (`RARE_BUILDINGS`) se
 trouvent en les bâtissant une fois. La collection n'est pas l'état d'une
-partie : clé `mobile-factory:collection` (`storage/localCollection.ts`), jamais
+partie : clé `adam:collection` (`storage/localCollection.ts`), jamais
 effacée par « Recommencer ». L'écran Collection s'ouvre depuis l'écran titre et
 la pause.
 
@@ -858,7 +858,7 @@ serveur ni Web Push : la partie s'arrête onglet caché et rien n'arrive page
 fermée, donc rien à notifier tant que le jeu n'a pas de temps hors ligne.
 Réglages (section Notifications, cachée si l'API manque) : un interrupteur par
 type et un plafond par jour (1, 3, 5, 10 ; `Notifier.cycleLimit`), gardés sur
-l'appareil (`mobile-factory:notifications`, jamais dans la partie). La
+l'appareil (`adam:notifications`, jamais dans la partie). La
 permission n'est jamais demandée au lancement : `NotificationPrompt` explique
 d'abord, après la première recherche lancée (une fois, `explained`) ou depuis
 les réglages ; il arrête l'horloge. Android n'accepte que les notifications d'un
@@ -978,7 +978,7 @@ Les règles, en résumé :
   « Bâtir »). Débranchée en partie : pause et bulle. Pictogrammes des boutons
   dans `art/padGlyphs.ts` ; aide « Contrôles manette » (`ui/padHelp.ts`) et
   section Manette des Réglages (zone morte, vibration ;
-  `mobile-factory:gamepad`, `storage/localGamepad.ts`). Steam Deck : README.
+  `adam:gamepad`, `storage/localGamepad.ts`). Steam Deck : README.
 - `src/ui/icons.ts` sert icônes d'objets, vignettes de bâtiments et
   pictogrammes (`src/art/ui.ts`) en `data:` URL SVG pour le DOM. Le menu de construction est un tiroir derrière un
   seul bouton, « Bâtir » — aucun autre bouton ne porte ce libellé ; armer un bâtiment passe la carte en mode construction
@@ -1020,8 +1020,8 @@ Les règles, en résumé :
   d'état (⏸, coffre plein) flottent au-dessus du toit : rien ne se recouvre.
   Médaillon seul et agrandi en reculant, rien sous `SIGN_ZOOM.icon` ; un
   enfant du sprite du bâtiment, dans son emprise (le tap l'ouvre). Réglage
-  « Pancartes » (`mobile-factory:signs`, `storage/localSigns.ts`).
-- Réglage « Compteur de performances » (`mobile-factory:perf`,
+  « Pancartes » (`adam:signs`, `storage/localSigns.ts`).
+- Réglage « Compteur de performances » (`adam:perf`,
   `storage/localPerf.ts`, caché par défaut) : une capsule en bas au centre du
   HUD donne FPS, ms par tick de sim et réveils du scheduler par tick
   (`World.wakesLastTick`), moyennés sur `PERF_WINDOW_MS` (`ui/perfMeter.ts`,
@@ -1080,7 +1080,7 @@ Les règles, en résumé :
   revenir sur Adam, reculer ; Pause, Réglages et la carte du monde au-dessus), à la molette sous le curseur et au pinch
   (`input/zoom.ts`, le geste à deux doigts de `PointerDispatch`, qui ne
   prend que des doigts libres ou de tap) ; mémorisé sous
-  `mobile-factory:zoom` (`storage/localZoom.ts`), jamais dans la partie.
+  `adam:zoom` (`storage/localZoom.ts`), jamais dans la partie.
   La **carte du monde** (`ui/worldMap.ts`) s'ouvre au bouton en tête de
   cette colonne ou à la touche M (Échap la ferme) : un canvas 2D plein
   écran, le fond peint par blocs de 16 × 16 tuiles en basse résolution
@@ -1119,7 +1119,7 @@ dernière vague tuée → nuit, aube → jour — et le passage est un fondu
 enchaîné (`MUSIC_FADE_S`) ; musique allumée, la couche de tension
 synthétique se tait. Bouclée par un `AudioBufferSourceNode`, coupée onglet
 caché, baissée en pause ; interrupteur « Musique » et deux volumes
-(musique, bruitages) dans les réglages (`mobile-factory:music`,
+(musique, bruitages) dans les réglages (`adam:music`,
 `…:music-volume`, `…:sfx-volume`).
 Un nouvel effet = une entrée dans `SOUNDS` (`synth.ts`), une dans
 `SAMPLES` (`samples.ts`) avec ses fichiers et leur crédit, et une
@@ -1145,14 +1145,15 @@ Rien ne joue avant un geste du joueur.
   les rochers ferment, pas les arbres).
 - Sauvegarde automatique : `sim/save.ts` sérialise le monde (format versionné
   `{ version, savedAt, state }`, validé à la lecture) ; `storage/localSave.ts`
-  est le seul à toucher au `localStorage` (clé `mobile-factory:save`), et tout
+  est le seul à toucher au `localStorage` (clé `adam:save`), et tout
   y est dans un try/catch. Un nouvel état de simulation doit entrer dans
   `World.snapshot()` / `restore()` — sinon il se perd au rechargement ; un
   changement incompatible incrémente `SAVE_VERSION`.
-- **Deux onglets, une partie** : `storage/localTab.ts` (`TabLock`, clé `mobile-factory:tab`) donne la main au dernier onglet arrivé ; un onglet dépassé n'écrit plus, saute son rattrapage au retour et affiche `ui/tabLockPanel.ts` (« Reprendre la main » recharge). Un échec d'écriture (`LocalSave.save` à `false`) lève un toast une fois. La sauvegarde de fermeture attend le tick qui consomme un `catchUp` en attente (`Autosave.hold`).
+- **Ancien nom** : les clés de l'appareil sont sous `adam:*`. Au démarrage, `storage/legacyKeys.ts` (`adoptLegacyData`) renomme celles de l'ancien préfixe sans jamais écraser, importe le transfert `#import=…` envoyé par l'ancienne adresse (`client/legacy/`, servie par le second bloc de `client/nginx.conf`) et retire l'ancien service worker ; le serveur renomme sa base (`adoptLegacyDatabase`). Voir `docs/deploiement.md`, section 6.
+- **Deux onglets, une partie** : `storage/localTab.ts` (`TabLock`, clé `adam:tab`) donne la main au dernier onglet arrivé ; un onglet dépassé n'écrit plus, saute son rattrapage au retour et affiche `ui/tabLockPanel.ts` (« Reprendre la main » recharge). Un échec d'écriture (`LocalSave.save` à `false`) lève un toast une fois. La sauvegarde de fermeture attend le tick qui consomme un `catchUp` en attente (`Autosave.hold`).
 - Le **jardin des souvenirs** (graines laissées par chaque colonie tombée ou refondée après le Signal — « Fonder une nouvelle colonie » de l'écran de victoire verse les graines du bilan, `ColonyScore` : nuits, enfants, bâtiments, bases abattues, habitants, temps, Signal, puis repart sur une carte neuve ;
   bonus plantés, « Partie pure ») n'est pas l'état d'une partie : format
-  versionné dans `sim/garden.ts`, clé dédiée `mobile-factory:garden`
+  versionné dans `sim/garden.ts`, clé dédiée `adam:garden`
   (`storage/localGarden.ts`), jamais effacé par « Recommencer ». Les bonus
   sont de la donnée (`src/data/perks.ts`) et entrent dans la partie par la
   commande `applyPerks`, au départ d'une nouvelle colonie seulement.
@@ -1168,13 +1169,13 @@ Rien ne joue avant un geste du joueur.
   libellé fixe se réécrit dans un `onLocale` du constructeur ; un cache de
   rendu met la langue dans sa clé. Le choix se fait au menu Réglages (bouton
   engrenage, `ui/settingsPanel.ts` : langue, sons, musique ; il arrête
-  l'horloge) et se garde sous `mobile-factory:locale`
+  l'horloge) et se garde sous `adam:locale`
   (`storage/localLocale.ts`), langue du navigateur au premier lancement.
 
 ## Partie de test
 
-**`/mobile-factory/test`** — en local `http://localhost:5173/mobile-factory/test`,
-en ligne https://cardona.digital/mobile-factory/test — ouvre directement,
+**`/adam/test`** — en local `http://localhost:5173/adam/test`,
+en ligne https://cardona.digital/adam/test — ouvre directement,
 sans écran titre, une petite base déjà bâtie (graine 100, matin du jour 1) :
 mairie et son stock, cabane de bûcheron, ferme, puits (au bord de l'eau à l'ouest,
 `WELL_SPOT` : en ligne droite de la mairie), deux postes de logistique (l'un entre
@@ -1192,8 +1193,8 @@ build copie `index.html` sous chaque route (`vite.config.ts`).
 
 `.claude/launch.json` déclare le serveur Vite (`npm run dev`, port 5173) :
 dans l'app Claude Code (onglet Code), l'aperçu lance le jeu et le recharge à
-chaque modification (HMR). Le jeu est sous `/mobile-factory/`, la partie de
-test sous `/mobile-factory/test`.
+chaque modification (HMR). Le jeu est sous `/adam/`, la partie de
+test sous `/adam/test`.
 
 ## Back-end
 
@@ -1203,7 +1204,7 @@ sauvegardes restent locales ; le serveur n'ajoute que des fonctions en ligne
 et se joue exactement pareil.
 
 Monorepo léger, workspaces npm : la racine est le client, `server/` le
-back-end (`@mobile-factory/server`), `shared/` le contrat que les deux
+back-end (`@adam/server`), `shared/` le contrat que les deux
 importent (`shared/api.ts` : `API_VERSION`, `API_PATHS`, `HealthResponse`,
 messages du WebSocket — ni DOM ni Node, ESLint le garde). Un `npm ci` à la
 racine installe tout ; lint, typecheck, tests (`server/src/**/*.test.ts`,
@@ -1246,7 +1247,7 @@ l'API ou un autre service = hors ligne), `socketUrl`. `connection.ts` :
 ligne, de plus en plus rarement hors ligne (`OFFLINE_BACKOFF_MS`, jusqu'à
 5 min) ; rien onglet caché ni sans réseau (`navigator.onLine`), resonde à
 leur retour. `main.ts` la crée et la démarre ; en dev, elle est sous
-`window.mobileFactory.connection`. **Sans `VITE_API_URL` (le build de
+`window.adam.connection`. **Sans `VITE_API_URL` (le build de
 GitHub Pages, `npm run dev`), aucune requête n'est faite.** Avec une URL et
 le serveur coupé, le navigateur inscrit lui-même l'échec de la sonde dans la
 console (aucun script ne peut l'en empêcher) : le backoff en limite le
@@ -1263,7 +1264,7 @@ l'empreinte SHA-256, 90 jours. Limites de tentatives en mémoire (5 échecs par
 adresse, 20 par IP, 15 min ; 10 inscriptions par IP et heure), IP lue dans
 `X-Forwarded-For` derrière le proxy. Client : `net/account.ts` (`AccountClient`,
 jamais d'exception, hors ligne = `offline`), session gardée sous
-`mobile-factory:account` (`storage/localAccount.ts`, jamais dans la partie),
+`adam:account` (`storage/localAccount.ts`, jamais dans la partie),
 fenêtre `ui/accountPanel.ts` (boutons « Compte » de l'écran titre et des
 Réglages, Échap la ferme la première), textes `i18n/*/account.ts`. Sans
 serveur ou sans `VITE_API_URL`, le bouton dit « hors ligne » et rien d'autre
@@ -1277,7 +1278,7 @@ caractères** (`PARTY_ALPHABET`, sans I L O 0 1, tiré de `randomBytes`), qui
 expire après `INVITE_TTL_MINUTES` (60 par défaut, `ServerConfig.inviteTtlMs`) ou
 quand l'hôte la ferme (`DELETE /parties/:code`) ; une seule invitation ouverte par
 hôte, un seul ami (`maxGuests`). Chercher des codes inconnus est limité par IP
-(429). Le lien est `…/mobile-factory/?join=CODE` (`net/invite.ts` : un paramètre,
+(429). Le lien est `…/adam/?join=CODE` (`net/invite.ts` : un paramètre,
 GitHub Pages n'a pas de page de repli), son QR code un SVG de la palette
 (`ui/qrCode.ts`, `qrcode-generator`) ; partage natif (`navigator.share`) ou copie.
 L'ami arrive sur `ui/joinPanel.ts` (« Rejoindre la partie de <pseudo> ») : sans

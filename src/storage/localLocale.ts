@@ -9,7 +9,7 @@ import { isLocale, type Locale } from '../i18n/locale.ts';
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé de la langue — distincte de celles de la sauvegarde, du jardin, du record et du zoom. */
-export const LOCALE_KEY = 'mobile-factory:locale';
+export const LOCALE_KEY = 'adam:locale';
 
 export class LocalLocale {
   private readonly storage: SaveStorage | null;

@@ -1,8 +1,8 @@
 {
-  "name": "@mobile-factory/server",
+  "name": "@adam/server",
   "private": true,
   "version": "0.1.0",
-  "description": "Back-end de Mobile Factory : API HTTP, WebSocket et base SQLite.",
+  "description": "Back-end d'Adam : API HTTP, WebSocket et base SQLite.",
   "type": "module",
   "license": "MIT",
   "engines": {

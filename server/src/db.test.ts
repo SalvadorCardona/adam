@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { migrate, openDatabase, readMigrations, schemaVersion, type Migration } from './db.ts';
+import { adoptLegacyDatabase, migrate, openDatabase, readMigrations, schemaVersion, type Migration } from './db.ts';
 
 const dirs: string[] = [];
 
@@ -78,5 +78,29 @@ describe('migrate', () => {
     expect(() => migrate(db, [first])).toThrow(/plus récente/);
     expect(() => migrate(db, [{ ...first, name: 'renamed' }, { version: 2, name: 'b', sql: '' }])).toThrow(/s'appelait/);
     db.close();
+  });
+});
+
+describe('adoptLegacyDatabase', () => {
+  it('reprend la base de l’ancien nom, puis plus rien', () => {
+    const dir = migrationsDir({});
+    const legacy = openDatabase(join(dir, 'mobile-factory.sqlite'));
+
+    legacy.exec("CREATE TABLE t (v TEXT); INSERT INTO t VALUES ('gardée');");
+    legacy.close();
+
+    const db = openDatabase(join(dir, 'adam.sqlite'));
+
+    expect(db.prepare('SELECT v FROM t').get()).toEqual({ v: 'gardée' });
+    db.close();
+    expect(existsSync(join(dir, 'mobile-factory.sqlite'))).toBe(false);
+    expect(adoptLegacyDatabase(join(dir, 'adam.sqlite'))).toBe(false);
+  });
+
+  it('ne touche jamais une base déjà au nouveau nom', () => {
+    const dir = migrationsDir({ 'adam.sqlite': '', 'mobile-factory.sqlite': '' });
+
+    expect(adoptLegacyDatabase(join(dir, 'adam.sqlite'))).toBe(false);
+    expect(existsSync(join(dir, 'mobile-factory.sqlite'))).toBe(true);
   });
 });

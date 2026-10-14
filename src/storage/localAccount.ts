@@ -9,7 +9,7 @@ import { isAccountUser, type AccountUser } from '../../shared/api.ts';
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé du compte — distincte de celles de la sauvegarde, du jardin, du record et des préférences. */
-export const ACCOUNT_KEY = 'mobile-factory:account';
+export const ACCOUNT_KEY = 'adam:account';
 
 export interface StoredSession {
   readonly token: string;

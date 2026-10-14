@@ -7,9 +7,16 @@ describe('loadConfig', () => {
 
     expect(config.port).toBe(DEFAULT_PORT);
     expect(config.host).toBe('0.0.0.0');
-    expect(config.databasePath).toBe('data/mobile-factory.sqlite');
+    expect(config.databasePath).toBe('data/adam.sqlite');
     expect(originAllowed(config, 'http://localhost:5174')).toBe(true);
     expect(originAllowed(config, 'http://localhost.evil.example:5173')).toBe(false);
+    expect(originAllowed(config, 'https://adam.cardona.digital')).toBe(true);
+    expect(originAllowed(config, 'https://mobile-factory.cardona.digital')).toBe(true);
+  });
+
+  it('donne à la base le nom du jeu', () => {
+    expect(loadConfig({ DATABASE_PATH: '/data/mobile-factory.sqlite' }).databasePath).toBe('/data/adam.sqlite');
+    expect(loadConfig({ DATABASE_PATH: '/mobile-factory/game.sqlite' }).databasePath).toBe('/mobile-factory/game.sqlite');
   });
 
   it('lit les variables d’environnement', () => {

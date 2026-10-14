@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { World } from '../sim/world.ts';
 import { formatSeed, mapUrl, parseSeed, shareUrl } from './seed.ts';
 
-const PAGE = 'https://cardona.digital/mobile-factory/?debug&seed=7#x';
+const PAGE = 'https://cardona.digital/adam/?debug&seed=7#x';
 
 describe('seed', () => {
   it('lit la seed de l’URL, ou rien', () => {
@@ -21,13 +21,13 @@ describe('seed', () => {
     const world = new World(3_000_000_001);
     const link = new URL(shareUrl(PAGE, world.seed));
 
-    expect(`${link.origin}${link.pathname}`).toBe('https://cardona.digital/mobile-factory/');
+    expect(`${link.origin}${link.pathname}`).toBe('https://cardona.digital/adam/');
     expect(link.search).toBe(`?seed=${world.seed}`);
     expect(new World(parseSeed(link.search) ?? -1).seed).toBe(world.seed);
   });
 
   it('rejoue la carte ou en tire une neuve, sans perdre les autres paramètres', () => {
-    expect(mapUrl(PAGE, 99)).toBe('https://cardona.digital/mobile-factory/?debug=&seed=99');
-    expect(mapUrl(PAGE, null)).toBe('https://cardona.digital/mobile-factory/?debug=');
+    expect(mapUrl(PAGE, 99)).toBe('https://cardona.digital/adam/?debug=&seed=99');
+    expect(mapUrl(PAGE, null)).toBe('https://cardona.digital/adam/?debug=');
   });
 });

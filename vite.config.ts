@@ -5,11 +5,11 @@ import { defineConfig, type Plugin } from 'vite';
 import { testRoutes } from './src/ui/testRoute.ts';
 
 /*
- * Les parties de test s'ouvrent par un chemin — `…/mobile-factory/test`.
+ * Les parties de test s'ouvrent par un chemin — `…/adam/test`.
  * GitHub Pages ne connaît pas de page de repli : un chemin sans fichier y
  * répond 404. Le build pose donc une copie d'`index.html` sous chaque route
  * (`test/index.html`), que Pages sert pour `/test` comme pour `/test/`. Les
- * URLs du HTML sont absolues (`/mobile-factory/assets/…`) : la copie les
+ * URLs du HTML sont absolues (`/adam/assets/…`) : la copie les
  * trouve telle quelle. En développement, Vite renvoie déjà `index.html` sur
  * un chemin inconnu ; rien à faire.
  */
@@ -17,7 +17,7 @@ function testPages(): Plugin {
   let outDir = 'dist';
 
   return {
-    name: 'mobile-factory:test-pages',
+    name: 'adam:test-pages',
     apply: 'build',
     configResolved(config) {
       outDir = resolve(config.root, config.build.outDir);
@@ -50,7 +50,7 @@ function precache(): Plugin {
     );
 
   return {
-    name: 'mobile-factory:precache',
+    name: 'adam:precache',
     apply: 'build',
     enforce: 'post',
     configResolved(config) {
@@ -75,7 +75,7 @@ function precache(): Plugin {
 
 /*
  * Le jeu est publié en project page GitHub Pages, donc servi sous un
- * sous-chemin — https://cardona.digital/mobile-factory/ — et non à la racine
+ * sous-chemin — https://cardona.digital/adam/ — et non à la racine
  * du domaine.
  *
  * Sans cette `base`, Vite écrit des URLs absolues `/assets/…` dans le HTML
@@ -84,7 +84,7 @@ function precache(): Plugin {
  * c'est le canvas qui n'arrive jamais.
  *
  * La base est volontairement la même en développement — Vite redirige `/` vers
- * `/mobile-factory/` — pour qu'un chemin ne puisse pas marcher en local et
+ * `/adam/` — pour qu'un chemin ne puisse pas marcher en local et
  * casser en production.
  *
  * Si le dépôt est renommé, cette valeur doit suivre le nouveau nom.
@@ -92,6 +92,6 @@ function precache(): Plugin {
  * Les tests ne passent pas par ici : `vitest.config.ts` a la priorité.
  */
 export default defineConfig({
-  base: '/mobile-factory/',
+  base: '/adam/',
   plugins: [testPages(), precache()],
 });

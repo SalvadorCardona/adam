@@ -95,6 +95,7 @@ import { GuestSession, HostSession, type GuestStatus } from './net/play.ts';
 import { PartyClient } from './net/party.ts';
 import { Connection } from './net/connection.ts';
 import { LocalAccount } from './storage/localAccount.ts';
+import { adoptLegacyData } from './storage/legacyKeys.ts';
 import { AccountPanel } from './ui/accountPanel.ts';
 import { InvitePanel } from './ui/invitePanel.ts';
 import { JoinPanel } from './ui/joinPanel.ts';
@@ -212,6 +213,9 @@ async function main(): Promise<void> {
 
   // Les curseurs dessinés, sur un appareil à souris seulement.
   installCursors();
+
+  // Les données de l'appareil d'avant le renommage du jeu, avant toute lecture.
+  await adoptLegacyData();
 
   // La langue d'abord : tout ce qui suit s'écrit dans elle. Au premier lancement, celle du navigateur.
   // Lue et écrite même sur la partie de test, comme voulu : la langue est un réglage de l'appareil, pas une donnée de partie.
@@ -343,7 +347,7 @@ async function main(): Promise<void> {
 
   // En dev seulement : le monde sous la main dans la console du navigateur,
   // pour provoquer une vague ou une naissance sans attendre trois minutes.
-  if (import.meta.env.DEV) Object.assign(window, { mobileFactory: { world, audio, connection } });
+  if (import.meta.env.DEV) Object.assign(window, { adam: { world, audio, connection } });
 
   const joystick = new Joystick();
   const stick = new JoystickView(joystick);
@@ -931,7 +935,7 @@ async function main(): Promise<void> {
   settings.setGamepad(gamepadPrefs.rumble, gamepadPrefs.deadZone);
   document.body.append(pad.cursor.root);
   // En dev : la manette aussi sous la main dans la console, pour poser son curseur sans stick.
-  if (import.meta.env.DEV) Object.assign(window, { mobileFactory: { world, audio, pad, connection } });
+  if (import.meta.env.DEV) Object.assign(window, { adam: { world, audio, pad, connection } });
   wireRumble(world, pad);
 
   // Les étiquettes de la manette sur le sac (△ / Y) et « Bâtir » (□ / X) : visibles seulement en mode manette.

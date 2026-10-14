@@ -1,7 +1,7 @@
 /**
  * Parties de test — contenu pur.
  *
- * Une partie de test s'ouvre par une URL (`/mobile-factory/test`) sur une
+ * Une partie de test s'ouvre par une URL (`/adam/test`) sur une
  * base déjà construite, pour essayer une fenêtre, un ouvrier ou un chantier
  * sans rejouer les dix premières minutes. Elle n'est pas une sauvegarde
  * figée : `sim/testScenario.ts` la rebâtit à chaque chargement avec les

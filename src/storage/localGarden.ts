@@ -12,7 +12,7 @@ import { EMPTY_GARDEN, decodeGarden, encodeGarden, type Garden } from '../sim/ga
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé du jardin — distincte de `SAVE_KEY`. */
-export const GARDEN_KEY = 'mobile-factory:garden';
+export const GARDEN_KEY = 'adam:garden';
 
 export class LocalGarden {
   private readonly storage: SaveStorage | null;

@@ -1,6 +1,6 @@
 /* global self, caches, fetch, URL */
 /*
- * Le service worker de Mobile Factory fait deux choses.
+ * Le service worker d'Adam fait deux choses.
  *
  * 1. Il pose les notifications (Android n'accepte que celles d'un service
  *    worker) et ramène le jeu au premier plan quand on en touche une.
@@ -18,7 +18,7 @@
 
 const BUILD = '__BUILD__';
 const BUILT = typeof BUILD === 'object' ? BUILD : null;
-const PREFIX = 'mobile-factory-';
+const PREFIX = 'adam-';
 const CACHE = BUILT ? `${PREFIX}${BUILT.version}` : null;
 
 self.addEventListener('install', (event) => {

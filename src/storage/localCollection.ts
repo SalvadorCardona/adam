@@ -11,7 +11,7 @@ import { decodeCollection, emptyCollection, encodeCollection, type Collection } 
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé de la collection — distincte de `SAVE_KEY`, `GARDEN_KEY` et `RECORD_KEY`. */
-export const COLLECTION_KEY = 'mobile-factory:collection';
+export const COLLECTION_KEY = 'adam:collection';
 
 export class LocalCollection {
   private readonly storage: SaveStorage | null;

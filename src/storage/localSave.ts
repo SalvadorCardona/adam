@@ -12,10 +12,10 @@ import { decodeSave, encodeSave } from '../sim/save.ts';
 import type { World } from '../sim/world.ts';
 
 /** La clé de la partie en cours. */
-export const SAVE_KEY = 'mobile-factory:save';
+export const SAVE_KEY = 'adam:save';
 
 /** Où part une sauvegarde illisible avant qu'une nouvelle partie n'écrase la clé principale. */
-export const CORRUPT_SAVE_KEY = 'mobile-factory:save:corrupt';
+export const CORRUPT_SAVE_KEY = 'adam:save:corrupt';
 
 /** Ce dont la sauvegarde a besoin d'un `Storage` — de quoi le remplacer en test. */
 export type SaveStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;

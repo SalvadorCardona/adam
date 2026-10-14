@@ -55,9 +55,9 @@ const AAC = 'audio/mp4; codecs="mp4a.40.2"';
  * thème du jour est mixé plus fort que les deux autres.
  */
 const SONGS: Record<MusicState, { readonly file: string; readonly loopEndS: number; readonly level: number }> = {
-  day: { file: 'mobile-factory-melancolique-loop', loopEndS: 4_811_751 / 44_100, level: MUSIC_DAY.volume },
-  night: { file: 'mobile-factory-night-loop', loopEndS: 2_116_800 / 44_100, level: 0.7 },
-  combat: { file: 'mobile-factory-combat-loop', loopEndS: 2_116_800 / 44_100, level: 0.75 },
+  day: { file: 'adam-melancolique-loop', loopEndS: 4_811_751 / 44_100, level: MUSIC_DAY.volume },
+  night: { file: 'adam-night-loop', loopEndS: 2_116_800 / 44_100, level: 0.7 },
+  combat: { file: 'adam-combat-loop', loopEndS: 2_116_800 / 44_100, level: 0.75 },
 };
 
 const MUSIC_STATES = ['day', 'night', 'combat'] as const satisfies readonly MusicState[];

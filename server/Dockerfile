@@ -1,8 +1,8 @@
-# Le back-end de Mobile Factory. À construire depuis la racine du dépôt —
+# Le back-end d'Adam. À construire depuis la racine du dépôt —
 # le serveur importe le contrat partagé (`shared/`) :
 #
-#   docker build -f server/Dockerfile -t mobile-factory-server .
-#   docker run -p 8790:8790 -v mf-data:/data mobile-factory-server
+#   docker build -f server/Dockerfile -t adam-server .
+#   docker run -p 8790:8790 -v mf-data:/data adam-server
 #
 # Node 24 exécute le TypeScript tel quel (types effacés) et embarque SQLite
 # (`node:sqlite`) : pas d'étape de build, pas de module natif à compiler.
@@ -12,7 +12,7 @@ FROM node:24-alpine
 ENV NODE_ENV=production \
     PORT=8790 \
     HOST=0.0.0.0 \
-    DATABASE_PATH=/data/mobile-factory.sqlite
+    DATABASE_PATH=/data/adam.sqlite
 
 WORKDIR /app
 

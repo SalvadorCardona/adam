@@ -1,5 +1,5 @@
 /**
- * La route des parties de test : `…/mobile-factory/test`.
+ * La route des parties de test : `…/adam/test`.
  *
  * `/test` ouvre le scénario par défaut, `/test/<id>` un autre
  * (`data/testScenario.ts`). GitHub Pages ne sert pas de page de repli pour
@@ -17,7 +17,7 @@ const TEST_SEGMENT = 'test';
 
 /**
  * Le scénario que demande le chemin de la page, ou `null` pour une partie
- * normale. `base` est la base de Vite (`/mobile-factory/`). Un scénario
+ * normale. `base` est la base de Vite (`/adam/`). Un scénario
  * inconnu ouvre une partie normale plutôt qu'une page blanche.
  */
 export function testScenarioOf(pathname: string, base: string): TestScenarioId | null {

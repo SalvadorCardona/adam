@@ -10,7 +10,7 @@ import { NOTIFICATIONS, NOTIFICATION_KINDS, type NotificationKind } from '../dat
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé des notifications — distincte de celles de la sauvegarde, du jardin, du record, du zoom, des pancartes et des vibrations. */
-export const NOTIFICATIONS_KEY = 'mobile-factory:notifications';
+export const NOTIFICATIONS_KEY = 'adam:notifications';
 
 export interface NotificationPrefs {
   kinds: Record<NotificationKind, boolean>;

@@ -1,11 +1,11 @@
-![mobile-factory](docs/banner.png)
+![adam](docs/banner.png)
 
-# Mobile Factory
+# Adam
 
-**[▶ Jouer](https://cardona.digital/mobile-factory/)** — dans le navigateur,
+**[▶ Jouer](https://cardona.digital/adam/)** — dans le navigateur,
 téléphone compris.
 
-Jeu d'usine 2D pour navigateur mobile, en TypeScript et PixiJS. On explore une
+Jeu de construction et de survie 2D pour navigateur mobile, en TypeScript et PixiJS. On explore une
 carte générée à l'infini, on pose des machines qui extraient et transforment des
 ressources, et on fait circuler les matériaux — non pas par des convoyeurs, mais
 par des **porteurs** qui parcourent physiquement la distance entre les
@@ -124,14 +124,14 @@ tableau avec les boutons de votre manette. Débranchée en pleine partie, la
 manette met le jeu en pause.
 
 **Steam Deck.** En mode Bureau, ouvrez le jeu dans le navigateur
-(https://cardona.digital/mobile-factory/) : la manette intégrée est reconnue
+(https://cardona.digital/adam/) : la manette intégrée est reconnue
 directement. En mode Game :
 
 1. en mode Bureau, installez un navigateur (Chrome ou Firefox, depuis Discover),
    puis dans Steam : *Jeux → Ajouter un jeu non-Steam* et choisissez-le ;
 2. dans les *Propriétés* du raccourci, mettez l'URL du jeu en option de
    lancement — pour Chrome en Flatpak :
-   `--kiosk https://cardona.digital/mobile-factory/` (`--kiosk` pour un plein
+   `--kiosk https://cardona.digital/adam/` (`--kiosk` pour un plein
    écran sans barre d'adresse) ;
 3. *Contrôleur → Disposition* : choisissez le modèle **« Gamepad »** (manette),
    pas « Web browser » — ce dernier transforme les sticks en souris et en
@@ -262,7 +262,7 @@ bug n'existe pas structurellement.
 
 Pas d'ECS complet — une `Map<EntityId, Entity>` avec union discriminée est plus
 lisible, et `sim/` étant isolé, le stockage se changera sans toucher au rendu.
-Pas de moteur physique : il n'y a pas de dynamique dans un jeu d'usine, la
+Pas de moteur physique : il n'y a pas de dynamique dans un jeu de construction, la
 grille et des AABB suffisent. Pas de multijoueur — mais le pas fixe, le PRNG à
 seed et les commandes laissent la porte ouverte au lockstep déterministe. Ne pas
 fermer cette porte, ne pas ouvrir ce chantier.
@@ -273,7 +273,7 @@ Chrome, sur un vrai téléphone.
 ## Déploiement
 
 Chaque push sur `main` construit le jeu et le publie sur GitHub Pages, à
-[cardona.digital/mobile-factory](https://cardona.digital/mobile-factory/)
+[cardona.digital/adam](https://cardona.digital/adam/)
 (`.github/workflows/deploy.yml`).
 
 Le site est servi sous un sous-chemin, d'où le `base` de `vite.config.ts`. Ces
