@@ -11,7 +11,7 @@ export const eraPanel = {
   next: (era: string): string => `Next era: ${era}`,
   last: 'The colony has reached its last era: the city rumbles, keep it standing.',
   conditions: 'To get there',
-  objectives: 'Objectives completed',
+  chapters: 'Chapters completed',
   population: 'Inhabitants',
   research: (name: string): string => `Research: ${name}`,
   invest: 'To invest on the way (bag, then town)',

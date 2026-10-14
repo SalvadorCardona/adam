@@ -773,6 +773,13 @@ export const UI_ICONS = {
     pill(9, 6, 5, 2, coral.light),
     pill(3.5, 18.5, 9, 3, mint.base),
   ),
+  /** Un objectif réussi : une pastille menthe, sa coche blanche — deux capsules en équerre. */
+  check: svg(
+    S,
+    S,
+    shadedCircle(12, 12, 9.5, 'mint'),
+    group('rotate(45 12 12)', pill(12.2, 5.4, 3.2, 11.4, paper.base), pill(7.6, 13.6, 7.8, 3.2, paper.base)),
+  ),
   /** Zoomer : une croix en capsules indigo, comme les deux barres de la pause. */
   zoomIn: svg(S, S, pill(4, 9.75, 16, 4.5, ink.base), pill(9.75, 4, 4.5, 16, ink.base), pill(5.5, 10.5, 4, 1.4, ink.light)),
   /** Dézoomer : la barre seule. */

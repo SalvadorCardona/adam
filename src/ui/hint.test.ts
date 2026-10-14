@@ -5,6 +5,7 @@ import { DAY_CYCLE } from '../data/dayNight.ts';
 import { EVE, EVE_LINES } from '../data/eve.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
 import { OBJECTIVES } from '../data/objectives.ts';
+import { chapterObjectives } from '../sim/objectives.ts';
 import type { EntityId } from '../sim/types.ts';
 import { World } from '../sim/world.ts';
 import { setLocale } from '../i18n/locale.ts';
@@ -17,7 +18,7 @@ const FRESH: HintProgress = { harvestedWood: false, harvestedStone: false, deliv
 const WAITING_DAWN = /^Prochaine aube dans \d+ minutes?\./;
 
 /** Un monde dont la mairie est bâtie : le sac livré, le dernier objet l'achève. */
-function builtWorld(): World {
+function hallWorld(): World {
   const world = new World(1);
 
   world.player.inventory.add('wood', 25);
@@ -26,6 +27,23 @@ function builtWorld(): World {
   world.tick();
   return world;
 }
+
+/**
+ * La mairie bâtie et les fondations cochées d'office : le chapitre « Passer
+ * la nuit » est ouvert, son premier objectif une nuit à tenir. Le sac vidé
+ * de la récompense du chapitre.
+ */
+function builtWorld(): World {
+  const world = hallWorld();
+
+  for (const { id } of chapterObjectives(world)) world.objectivesDone.add(id);
+  world.tick();
+  for (const [item, count] of world.player.inventory.entries()) world.player.inventory.remove(item, count);
+  return world;
+}
+
+/** Le conseil de l'objectif `id`. */
+const hintOf = (id: string): string => OBJECTIVES.find((objective) => objective.id === id)!.hint;
 
 describe('tutorialHint', () => {
   it('commence par le bois du chantier de la mairie', () => {
@@ -152,7 +170,7 @@ describe('tutorialHint', () => {
 
     // De la pierre en ville : Ève ne parle pas de carrière, c'est l'attente de l'objectif en cours qui parle.
     world.townStock()!.add('stone', 1);
-    expect(world.objective).toBe(1);
+    expect(world.chapter).toBe(2);
     expect(tutorialHint(world, FRESH, true, 0)).toMatch(WAITING_DAWN);
 
     // Tant qu'Ève annonce son arrivée par radio, c'est elle qui parle d'abord ; puis elle envoie au labo.
@@ -289,7 +307,7 @@ describe('conseil d’attente', () => {
 
     world.townStock()!.add('stone', 1);
     buildTower(world);
-    expect(world.objective).toBe(1);
+    expect(world.chapter).toBe(2);
     expect(world.clock()?.phase).toBe('day');
     return world;
   }
@@ -335,6 +353,25 @@ describe('conseil d’attente', () => {
 
     world.cycleStartTick -= DAY_CYCLE.day;
     expect(world.clock()?.phase).toBe('dusk');
-    expect(tutorialHint(world, FRESH, true, 0)).toBe(OBJECTIVES[1].hint);
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(hintOf('nights3'));
+  });
+
+  it('donne le conseil de l’objectif choisi dans le panneau', () => {
+    const world = builtWorld();
+
+    world.townStock()!.add('stone', 1);
+    world.cycleStartTick -= DAY_CYCLE.day;
+    // Choisi : la palissade ; pas de labo encore, Ève y envoie d'abord.
+    expect(tutorialHint(world, FRESH, true, 0, 'palisade')).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.palisade.label));
+    expect(tutorialHint(world, FRESH, true, 0, 'nights3')).toBe(hintOf('nights3'));
+  });
+
+  it('après la mairie, conseille le premier objectif des fondations', () => {
+    const world = hallWorld();
+
+    world.townStock()!.add('stone', 1);
+    expect(world.chapter).toBe(1);
+    // La maison est au menu de départ : sa réplique telle quelle.
+    expect(tutorialHint(world, FRESH, true, 0, 'home')).toBe(hintOf('home'));
   });
 });

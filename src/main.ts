@@ -25,7 +25,6 @@ import { NOTIFICATION_KINDS, type NotificationKind } from './data/notifications.
 import { CHIEF, type WildlifeId } from './data/enemies.ts';
 import { STORY_SEXES } from './data/inhabitants.ts';
 import type { ItemId } from './data/items.ts';
-import { OBJECTIVES, type ObjectiveProto } from './data/objectives.ts';
 import { TEST_SCENARIOS, type TestScenarioProto } from './data/testScenario.ts';
 import { PIECES } from './data/wardrobe.ts';
 import { IndicatorTap } from './input/indicatorTap.ts';
@@ -1291,10 +1290,11 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
     audio.play('defeat');
     audio.night('dawn');
   });
-  // Le dernier objectif, et la fin d'un acte, ont leur fanfare à eux.
-  world.events.on('objectiveCompleted', ({ index }) =>
-    audio.play(index < OBJECTIVES.length - 1 && !(OBJECTIVES[index] as ObjectiveProto).banner ? 'objective' : 'colony'),
-  );
+  // Un objectif a son jingle ; le dernier d'un chapitre laisse la fanfare à la fin du chapitre.
+  world.events.on('objectiveCompleted', ({ closing }) => {
+    if (!closing) audio.play('objective');
+  });
+  world.events.on('chapterCompleted', () => audio.play('colony'));
   // Une ère atteinte a la fanfare d'une fin d'acte.
   world.events.on('eraReached', () => audio.play('colony'));
   world.events.on('antennaRaised', () => audio.play('build'));
@@ -1373,6 +1373,9 @@ function wireSave(
     due = true;
   });
   world.events.on('objectiveCompleted', () => {
+    due = true;
+  });
+  world.events.on('chapterCompleted', () => {
     due = true;
   });
   world.events.on('eraReached', () => {
@@ -1572,7 +1575,7 @@ function wireHaptics(world: World): void {
   world.events.on('buildingUpgraded', () => haptics.pulse('done'));
   world.events.on('childBorn', () => haptics.pulse('done'));
   world.events.on('researchCompleted', () => haptics.pulse('win'));
-  world.events.on('objectiveCompleted', () => haptics.pulse('win'));
+  world.events.on('chapterCompleted', () => haptics.pulse('win'));
   world.events.on('levelUp', () => haptics.pulse('win'));
 }
 

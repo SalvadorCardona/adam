@@ -36,9 +36,10 @@
  * Et le temps change : pluie acide, coup de vent, brouillard, arc-en-ciel,
  * lus dans la seed (`sim/weather.ts`) ; le monde n'en garde rien.
  *
- * La partie suit une chaîne d'objectifs (`data/objectives.ts`) : la mairie
- * d'abord, puis des nuits à tenir, les demandes d'Ève, une foreuse, un
- * enfant, cinq nuits à tenir — la fin de l'acte I. L'acte II est l'Antenne :
+ * La partie suit des chapitres d'objectifs (`data/objectives.ts`), plusieurs
+ * objectifs ouverts à la fois : la mairie d'abord, puis les fondations, les
+ * nuits, les demandes d'Ève, la nourriture, l'industrie, une ville où l'on
+ * veut vivre, cinq nuits à tenir — la fin de l'acte I. L'acte II est l'Antenne :
  * trois étages livrés l'un après l'autre, chacun attirant toutes les vagues
  * de la nuit suivante. Le dernier lance le Signal : c'est la victoire, et la
  * partie continue sans fin, des survivants arrivant à chaque aube.
@@ -99,7 +100,7 @@ import {
   type ColonyScore,
   type PerkId,
 } from '../data/perks.ts';
-import { OBJECTIVES, objectiveBagBonus, type Reward } from '../data/objectives.ts';
+import { CHAPTERS, objectiveBagBonus, type ChapterProto, type ObjectiveId, type Reward } from '../data/objectives.ts';
 import { OFFLINE, OFFLINE_ALERTS, type OfflineAlertId } from '../data/offline.ts';
 import type { QuestId } from '../data/quests.ts';
 import { RECIPES, recipeOf, type RecipeId, type RecipeProto } from '../data/recipes.ts';
@@ -147,7 +148,7 @@ import { drainNeeds, stuntingNeed, freshNeeds, needState, needsPace, pacedTick, 
 import { decorMoodAt, type DecorSpot } from './decor.ts';
 import { assignBeds, freshHousing, moodCauses, nightlyMood, moodOf, type Lodging } from './housing.ts';
 import { rollLoot, stepPickup } from './loot.ts';
-import { copyStats, emptyStats, objectiveDone } from './objectives.ts';
+import { chapterObjectives, copyStats, emptyStats, objectiveDone } from './objectives.ts';
 import { eraReady, nextEra, withEraThreat } from './eras.ts';
 import { denSize, densOfChunk, stepBeast, type Den } from './wildlife.ts';
 import { pigSpotsOfChunk, stepPig as stepPigBody, type PigSpot } from './pigs.ts';
@@ -742,11 +743,14 @@ export type WorldEvents = {
   /** La pluie acide a rongé un bâtiment abîmé ; `hp` est ce qui lui reste. */
   buildingCorroded: { id: EntityId; hp: number };
   /**
-   * L'objectif `index` est réussi et sa récompense est tombée. `stored` : ce
-   * qui n'a pas tenu dans le sac et attend à la mairie.
+   * L'objectif `id` est réussi et sa récompense est tombée. `stored` : ce
+   * qui n'a pas tenu dans le sac et attend à la mairie. `closing` : c'était
+   * le dernier de son chapitre — `chapterCompleted` suit, qui le fête en grand.
    */
-  objectiveCompleted: { index: number; stored: Partial<Record<ItemId, number>> };
-  /** Le dernier objectif est réussi : le Signal est lancé. La partie continue, sans fin. */
+  objectiveCompleted: { id: ObjectiveId; stored: Partial<Record<ItemId, number>>; closing: boolean };
+  /** Le chapitre `index` est fini, sa récompense tombée ; le suivant s'ouvre. `stored` : comme un objectif. */
+  chapterCompleted: { index: number; stored: Partial<Record<ItemId, number>> };
+  /** Le dernier chapitre est fini : le Signal est lancé. La partie continue, sans fin. */
   victory: Record<string, never>;
   /**
    * L'antenne `id` a son étage `floor` (1 à 3) : la nuit `lureNight`, toutes
@@ -938,7 +942,7 @@ export class World {
   private menuKnown: Set<BuildingId> | null = null;
 
   /** Ce dont dépendait le menu au dernier compte : tant que rien n'en change, `watchUnlocks` ne recompte pas. */
-  private unlockStamp: { hall: boolean; research: number; quests: number; objective: number; open: number; explored: number; era: number } | null = null;
+  private unlockStamp: { hall: boolean; research: number; quests: number; chapter: number; open: number; explored: number; era: number } | null = null;
   private exploredStamp = { revision: -1, count: 0 };
 
   /**
@@ -950,8 +954,11 @@ export class World {
   /** Chantiers offerts par les bonus et pas encore ouverts : le prochain de ce bâtiment arrive livré. */
   private giftedSites: BuildingId[] = [];
 
-  /** Index de l'objectif en cours dans `OBJECTIVES` ; leur nombre une fois la chaîne bouclée. */
-  public objective = 0;
+  /** Index du chapitre en cours dans `CHAPTERS` ; leur nombre une fois la partie bouclée. */
+  public chapter = 0;
+
+  /** Les objectifs réussis : un objectif réussi le reste, et sa récompense ne retombe jamais. */
+  public objectivesDone = new Set<ObjectiveId>();
 
   /** Vrai une fois le dernier objectif réussi : le Signal est lancé, la partie continue sans fin. */
   public victory = false;
@@ -984,8 +991,8 @@ export class World {
   /** Les compteurs que les objectifs lisent. */
   public stats: WorldStats = emptyStats();
 
-  /** Les compteurs au début de l'objectif en cours : « tenir 5 nuits », c'est à partir de là. */
-  public objectiveBase: WorldStats = emptyStats();
+  /** Les compteurs à l'ouverture du chapitre en cours : « tenir 5 nuits », c'est à partir de là. */
+  public chapterBase: WorldStats = emptyStats();
 
   private readonly scheduler = new Scheduler();
   /** Réveils du scheduler au dernier tick — une mesure pour le compteur de performances, pas de l'état. */
@@ -1233,7 +1240,8 @@ export class World {
       openBuildings: [...this.openBuildings],
       era: this.era,
       rareTrades: { ...this.rareTrades },
-      objective: this.objective,
+      chapter: this.chapter,
+      objectivesDone: [...this.objectivesDone],
       victory: this.victory,
       victoryTick: this.victoryTick,
       signalNights: this.signalNights,
@@ -1243,7 +1251,7 @@ export class World {
       enemyBases: this.enemyBases.map((base) => ({ ...base })),
       regions: { conquered: [...this.conquered].sort((a, b) => a - b), guardians: [...this.guardianHp].map(([id, hp]) => ({ id, hp })) },
       stats: copyStats(this.stats),
-      objectiveBase: copyStats(this.objectiveBase),
+      chapterBase: copyStats(this.chapterBase),
       player: savePlayer(this.adam),
       ...(partner && { partner: { ...partner, player: savePlayer(partner.player) } }),
       resources: this.resources.toJSON(),
@@ -1310,13 +1318,14 @@ export class World {
     this.openBuildings = new Set([...(state.openBuildings ?? BUILDING_IDS), ...START_BUILDINGS]);
     this.era = state.era ?? 0;
     this.rareTrades = { ...state.rareTrades };
-    this.objective = state.objective;
+    this.chapter = state.chapter;
+    this.objectivesDone = new Set(state.objectivesDone);
     this.victory = state.victory;
     this.victoryTick = state.victoryTick;
     this.signalNights = state.signalNights ?? 0;
     this.lureNight = state.lureNight ?? 0;
     this.stats = copyStats(state.stats);
-    this.objectiveBase = copyStats(state.objectiveBase);
+    this.chapterBase = copyStats(state.chapterBase);
 
     const { inventory, ...player } = state.player;
     // La taille du sac se relit dans les bonus, les recherches, les récompenses déjà tombées et les trocs.
@@ -1324,7 +1333,7 @@ export class World {
       INVENTORY_CAPACITY +
       bagBonus(this.perks) +
       this.bonus('bagCapacity') +
-      objectiveBagBonus(state.objective) +
+      objectiveBagBonus(state.objectivesDone, state.chapter) +
       caravanBagBonus(this.rareTrades);
 
     Object.assign(this.adam, player, {
@@ -3294,7 +3303,7 @@ export class World {
   /**
    * Le bâtiment est-il débloqué ? Il faut son plan, s'il en demande un (quêtes
    * d'Ève), la recherche qui le débloque, s'il s'obtient au labo, et
-   * l'objectif `unlockObjective`, s'il en attend un. Un bâtiment de base est
+   * le chapitre `unlockChapter`, s'il en attend un. Un bâtiment de base est
    * ouvert d'emblée (`openBuildings`) ou par la recherche qui l'ouvre (`opens`).
    */
   public isUnlocked(building: BuildingId): boolean {
@@ -3303,14 +3312,14 @@ export class World {
     const opening = openingResearch(building);
 
     // Un bâtiment sans plan, recherche ni objectif n'est là que s'il est ouvert.
-    const gated = proto.plan || research !== null || proto.unlockObjective !== undefined || proto.unlockExplored !== undefined;
+    const gated = proto.plan || research !== null || proto.unlockChapter !== undefined || proto.unlockExplored !== undefined;
     const open = this.openBuildings.has(building) || (opening !== null && this.researchDone.includes(opening));
 
     return (
       (gated || open) &&
       isUnlocked(building, this.questsDone) &&
       (research === null || this.researchDone.includes(research)) &&
-      this.objective >= (proto.unlockObjective ?? 0) &&
+      this.chapter >= (proto.unlockChapter ?? 0) &&
       this.exploredTiles() >= (proto.unlockExplored ?? 0)
     );
   }
@@ -3336,7 +3345,7 @@ export class World {
    * chargement, rien n'est annoncé.
    */
   private watchUnlocks(): void {
-    // Le menu ne bouge qu'avec la mairie, les recherches, les quêtes et l'objectif : sans eux, rien à recompter.
+    // Le menu ne bouge qu'avec la mairie, les recherches, les quêtes et le chapitre : sans eux, rien à recompter.
     const hall = this.warehouse() !== null;
     const stamp = this.unlockStamp;
 
@@ -3345,7 +3354,7 @@ export class World {
       stamp.hall === hall &&
       stamp.research === this.researchDone.length &&
       stamp.quests === this.questsDone &&
-      stamp.objective === this.objective &&
+      stamp.chapter === this.chapter &&
       stamp.open === this.openBuildings.size &&
       stamp.explored === this.exploredTiles() &&
       stamp.era === this.era
@@ -3356,7 +3365,7 @@ export class World {
       hall,
       research: this.researchDone.length,
       quests: this.questsDone,
-      objective: this.objective,
+      chapter: this.chapter,
       open: this.openBuildings.size,
       explored: this.exploredTiles(),
       era: this.era,
@@ -5767,25 +5776,36 @@ export class World {
   }
 
   /**
-   * L'objectif courant est-il réussi ? Alors sa récompense tombe et le
-   * suivant commence — dans le même tick s'il est déjà rempli : une tour
-   * posée avant qu'on la demande compte.
+   * Les objectifs du chapitre en cours sont-ils réussis ? Chacun l'est pour
+   * de bon, sa récompense tombe une fois. Tous réussis, la récompense du
+   * chapitre tombe et le suivant s'ouvre — dans le même tick s'il est déjà
+   * rempli : une tour posée avant qu'on la demande compte.
    */
   private checkObjectives(): void {
     if (this.defeated || this.victory) return;
 
-    while (this.objective < OBJECTIVES.length) {
-      const index = this.objective;
-      const objective = OBJECTIVES[index]!;
+    while (this.chapter < CHAPTERS.length) {
+      const index = this.chapter;
+      const objectives = chapterObjectives(this);
+      const reached = objectives.filter((objective) => !this.objectivesDone.has(objective.id) && objectiveDone(this, objective));
 
-      if (!objectiveDone(this, objective)) return;
+      for (const objective of reached) {
+        this.objectivesDone.add(objective.id);
 
-      this.objective += 1;
-      this.objectiveBase = copyStats(this.stats);
+        const stored = this.grant(objective.reward);
+        const closing = objectives.every((other) => this.objectivesDone.has(other.id));
 
-      const stored = this.grant(objective.reward);
+        this.events.emit('objectiveCompleted', { id: objective.id, stored, closing });
+      }
 
-      this.events.emit('objectiveCompleted', { index, stored });
+      if (!objectives.every((objective) => this.objectivesDone.has(objective.id))) return;
+
+      this.chapter += 1;
+      this.chapterBase = copyStats(this.stats);
+
+      const stored = this.grant((CHAPTERS[index] as ChapterProto).reward);
+
+      this.events.emit('chapterCompleted', { index, stored });
       this.findPiece('objective', index);
     }
 
@@ -7081,7 +7101,7 @@ export class World {
 
   /** L'ère de la colonie (`waveEraOf`), celle qui renforce les vagues : 0 pendant l'acte I, 1 ensuite, 2 après le Signal. */
   public waveEra(): number {
-    return waveEraOf(this.objective, this.victory);
+    return waveEraOf(this.chapter, this.victory);
   }
 
   /** Les bâtiments finis de la ville, mairie comprise — les palissades ne comptent pas : c'est ce que convoitent les vagues. */

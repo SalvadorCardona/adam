@@ -61,7 +61,7 @@ function dawnHappiness(world: World): number[] {
 function withDecor(world: World, id: BuildingId): void {
   const worker = [...world.mobiles.values()].find((mobile) => mobile.kind === 'worker')!;
 
-  world.objective = 6;
+  world.chapter = 8;
   build(world, id, Math.floor(worker.x / TILE_SIZE), Math.floor(worker.y / TILE_SIZE));
 }
 
@@ -81,7 +81,7 @@ describe('décorations : les données', () => {
     expect(BUILDINGS.fountain.mood.amount).toBeGreaterThan(BUILDINGS.flowerBed.mood.amount);
     expect(BUILDINGS.adamStatue.mood.amount).toBeGreaterThan(BUILDINGS.fountain.mood.amount);
     expect(BUILDINGS.fountain.unlockExplored).toBeGreaterThan(0);
-    expect(BUILDINGS.adamStatue.unlockObjective).toBeGreaterThan(0);
+    expect(BUILDINGS.adamStatue.unlockChapter).toBeGreaterThan(0);
   });
 });
 
@@ -149,7 +149,7 @@ describe('décorations : le déblocage', () => {
     expect(world.isUnlocked('fountain')).toBe(false);
     expect(world.isUnlocked('adamStatue')).toBe(false);
 
-    world.objective = 6;
+    world.chapter = 8;
     expect(world.isUnlocked('flowerBed')).toBe(true);
     expect(world.isUnlocked('bench')).toBe(true);
     expect(world.isUnlocked('streetLamp')).toBe(true);

@@ -109,15 +109,16 @@ describe('prototypes', () => {
     expect(validatePrototypes()).toEqual([]);
   });
 
-  it('refuse un objectif qui demande un bâtiment dont la recherche coûte du butin', () => {
+  it('refuse un objectif qui demande un bâtiment pas encore à portée de son chapitre', () => {
     const mining = RESEARCH.mining as ResearchProto;
-    const cost = mining.cost;
+    const era = mining.era;
 
-    mining.cost = { wood: 10, wolfFang: 2 };
+    // La carrière n'ouvrirait qu'au Bourg : les fondations la demandent trop tôt.
+    mining.era = 1;
     try {
-      expect(validatePrototypes()).toContain('OBJECTIVES[3] : demande « drill », dont la recherche coûte du butin');
+      expect(validatePrototypes()).toContain("CHAPTERS[1].quarry : « quarry » n'est pas encore au menu");
     } finally {
-      mining.cost = cost;
+      mining.era = era;
     }
     expect(validatePrototypes()).toEqual([]);
   });

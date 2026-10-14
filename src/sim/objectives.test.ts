@@ -3,14 +3,16 @@ import { TILE_SIZE, worldToTile } from '../core/grid.ts';
 import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
 import type { ItemId } from '../data/items.ts';
-import { OBJECTIVES } from '../data/objectives.ts';
-import { QUEST_IDS } from '../data/quests.ts';
+import { CHAPTERS, LEGACY_OBJECTIVES, OBJECTIVES, OBJECTIVE_IDS, objectiveBagBonus, type Goal } from '../data/objectives.ts';
+import { chapterReach, goalOutOfReach } from '../data/reach.ts';
 import { RECIPES } from '../data/recipes.ts';
+import type { ResearchId } from '../data/research.ts';
 import { validatePrototypes } from '../data/validate.ts';
 import { BUILD_REACH_TILES, INVENTORY_CAPACITY } from './player.ts';
 import { SAVE_VERSION, decodeSave, encodeSave, serialize } from './save.ts';
-import { currentObjective, goalProgress, goalWait, objectiveWait } from './objectives.ts';
+import { chapterObjectives, currentChapter, goalProgress, objectiveWait, openObjectives } from './objectives.ts';
 import { CYCLE_TICKS } from './dayNight.ts';
+import { Store } from './store.ts';
 import type { Entity, EntityId } from './types.ts';
 import { World } from './world.ts';
 
@@ -109,43 +111,6 @@ function spot(world: World, building: BuildingId, iron = false, reserved: Reserv
   return null;
 }
 
-function build(world: World, building: BuildingId, reserved: Reserved = null): Entity {
-  const found = spot(world, building, false, reserved);
-
-  if (!found) throw new Error(`aucune case posable pour ${building}`);
-  return buildAt(world, building, found.tx, found.ty);
-}
-
-/** Une tour de guet sur chaque côté de la mairie, au plus près de `gap` tuiles d'elle. */
-function fortify(world: World, reserved: Reserved, gap = 2): void {
-  const hall = world.entities.get(world.townHallId)!;
-  const cx = hall.tx + 1;
-  const cy = hall.ty + 1;
-  const sides = [
-    [cx - gap - 2, cy],
-    [cx + gap + 2, cy],
-    [cx, cy - gap - 2],
-    [cx, cy + gap + 2],
-  ] as const;
-
-  for (const [x, y] of sides) {
-    guardTownHall(world);
-
-    let placed = false;
-
-    for (let radius = 0; radius < 4 && !placed; radius += 1) {
-      for (let dy = -radius; dy <= radius && !placed; dy += 1) {
-        for (let dx = -radius; dx <= radius && !placed; dx += 1) {
-          if (overlaps(x + dx, y + dy, reserved) || world.canPlace('watchtower', x + dx, y + dy) !== null) continue;
-          buildAt(world, 'watchtower', x + dx, y + dy);
-          placed = true;
-        }
-      }
-    }
-  }
-  guardTownHall(world);
-}
-
 /** Adam revient au pied de la mairie, où son arc la défend. */
 function guardTownHall(world: World): void {
   const hall = world.entities.get(world.townHallId)!;
@@ -214,9 +179,9 @@ function antennaSpot(world: World): { tx: number; ty: number } {
 }
 
 /** Avance jusqu'à ce que `done` soit vrai, en `limit` ticks au plus. */
-function runUntil(world: World, done: () => boolean, limit: number): void {
+function runUntil(world: World, done: () => boolean, limit: number, what = ''): void {
   for (let i = 0; i < limit && !done(); i += 1) world.tick();
-  if (!done()) throw new Error(`rien au bout de ${limit} ticks (objectif ${world.objective}, mairie tombée : ${world.defeated})`);
+  if (!done()) throw new Error(`${what} rien au bout de ${limit} ticks (chapitre ${world.chapter}, mairie tombée : ${world.defeated})`);
 }
 
 /** Une seed qui offre, à portée du point d'apparition, un filon de fer où poser une foreuse. */
@@ -227,176 +192,282 @@ function seedWithIron(): number {
   throw new Error('aucune seed testable — la génération de filons a changé');
 }
 
-/** Un jour, son crépuscule, sa nuit et son aube. */
-const CYCLE = DAY_CYCLE.day + DAY_CYCLE.dusk + DAY_CYCLE.night + DAY_CYCLE.dawn;
 
-describe('objectifs', () => {
+/** Ajoute aux objectifs réussis tous ceux du chapitre en cours, sans rien bâtir : le chapitre se ferme au tick suivant. */
+function passChapter(world: World): void {
+  for (const { id } of chapterObjectives(world)) world.objectivesDone.add(id);
+  world.tick();
+}
+
+/** Un sac à la mesure d'un chantier d'antenne : le test ne va pas chercher les matériaux. */
+function bigBag(world: World): void {
+  const { inventory } = world.player;
+
+  world.player.inventory = Store.fromJSON(inventory.capacity + 1000, inventory.toJSON());
+}
+
+/**
+ * Une case où poser `building` dans la prairie, au plus près de la mairie :
+ * Adam s'y poste, le brouillard est levé. Une foreuse veut le bord d'un filon
+ * de fer — Adam en casse les rochers.
+ */
+function siteFor(world: World, building: BuildingId): { tx: number; ty: number } {
+  const hall = world.entities.get(world.townHallId)!;
+  const { width, height } = BUILDINGS[building];
+
+  for (let r = 3; r <= 28; r += 1) {
+    for (let dy = -r; dy <= r; dy += 1) {
+      for (let dx = -r; dx <= r; dx += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+
+        const tx = hall.tx + dx;
+        const ty = hall.ty + dy;
+
+        world.player.x = (tx + width / 2) * TILE_SIZE;
+        world.player.y = (ty + height + 1.5) * TILE_SIZE;
+        if (building === 'drill') {
+          const footing = world.footing(building, tx, ty);
+
+          if (!footing?.valid) continue;
+          for (const tile of footing.tiles) if (tile.state === 'ore') world.resources.clear(tile.tx, tile.ty);
+        }
+        if (world.canPlace(building, tx, ty) === null) return { tx, ty };
+      }
+    }
+  }
+  throw new Error(`aucune case pour ${building}`);
+}
+
+/** Pose `building` par la commande du joueur, lui livre son coût depuis le sac, et attend qu'il soit bâti — bâtisseurs compris. */
+function raise(world: World, building: BuildingId): Entity {
+  const at = building === 'antenna' ? antennaSpot(world) : siteFor(world, building);
+  let id = -1;
+  const off = world.events.on('buildingPlaced', (event) => (id = event.id));
+
+  // Les bâtisseurs d'un poste de construction prendraient leur temps : le poste en pause, le chantier livré s'achève aussitôt.
+  for (const entity of world.entities.values()) {
+    if (entity.kind !== 'site' && entity.proto === 'constructionPost' && !('paused' in entity && entity.paused)) {
+      world.push({ type: 'pauseBuilding', id: entity.id, paused: true });
+    }
+  }
+  world.push({ type: 'placeBuilding', building, tx: at.tx, ty: at.ty });
+  world.tick();
+  off();
+  if (id < 0) throw new Error(`${building} n’a pas été posé`);
+  for (const [item, amount] of Object.entries(BUILDINGS[building].cost) as [ItemId, number][]) world.player.inventory.add(item, amount);
+  world.push({ type: 'transferToSite', id });
+  world.tick();
+  runUntil(world, () => world.entities.get(id)?.kind !== 'site', 20 * 120, building);
+  return world.entities.get(id)!;
+}
+
+/** Remplit une condition : par la commande du joueur pour un bâtiment, par ses compteurs pour le reste. */
+function satisfy(world: World, goal: Goal): void {
+  switch (goal.type) {
+    case 'build': {
+      if (goal.building === 'antenna') {
+        raiseAntenna(world);
+        return;
+      }
+      expect(world.inMenu(goal.building), goal.building).toBe(true);
+
+      const built = [...world.entities.values()].filter((entity) => entity.kind !== 'site' && entity.proto === goal.building).length;
+
+      for (let i = built; i < goal.count; i += 1) raise(world, goal.building);
+      return;
+    }
+    case 'nights':
+      world.stats.nightsSurvived = world.chapterBase.nightsSurvived + goal.count;
+      return;
+    case 'produce':
+      world.stats.produced[goal.item] = Math.max(world.stats.produced[goal.item] ?? 0, goal.count);
+      return;
+    case 'births':
+      world.stats.births = Math.max(world.stats.births, goal.count);
+      return;
+    case 'quests':
+      world.questsDone = goal.count;
+      return;
+    case 'happiness':
+    case 'mood':
+      for (const mobile of world.mobiles.values()) if ('happiness' in mobile) mobile.happiness = 100;
+      return;
+    case 'era':
+      world.era = Math.max(world.era, goal.count);
+      return;
+  }
+}
+
+describe('objectifs en chapitres', () => {
   it('sont une donnée valide', () => {
-    expect(validatePrototypes().filter((error) => error.startsWith('OBJECTIVES'))).toEqual([]);
+    expect(validatePrototypes().filter((error) => error.startsWith('CHAPTERS'))).toEqual([]);
+    expect(new Set(OBJECTIVE_IDS).size).toBe(OBJECTIVES.length);
   });
 
-  it('commencent sur le chantier de la mairie', () => {
+  it('commencent sur le chantier de la mairie, seule au premier chapitre', () => {
     const world = new World(7);
 
-    expect(world.objective).toBe(0);
-    expect(currentObjective(world)?.title).toBe(OBJECTIVES[0].title);
-    expect(goalProgress(world, OBJECTIVES[0].goals[0])).toEqual({ have: 0, need: 1 });
+    expect(world.chapter).toBe(0);
+    expect(currentChapter(world)?.title).toBe(CHAPTERS[0].title);
+    expect(chapterObjectives(world).map(({ id }) => id)).toEqual(['townHall']);
+    expect(goalProgress(world, OBJECTIVES[0]!.goals[0]!)).toEqual({ have: 0, need: 1 });
   });
 
-  /*
-   * Une partie scriptée, de la mairie à la victoire : seed + commandes. Adam
-   * ne triche que pour le sac — il reçoit le coût de chaque chantier et la
-   * nourriture de l'enfant au lieu d'aller les chercher — et pour se poster
-   * au pied de la mairie. Une dizaine de nuits simulées tick par tick :
-   * plusieurs secondes, au-delà du délai par défaut.
-   */
-  it('s’enchaînent d’une partie scriptée jusqu’à la victoire', () => {
-    const world = new World(seedWithIron());
-    const completed: number[] = [];
-    let victories = 0;
+  describe('ne demandent que ce qui est à portée', () => {
+    it.each(CHAPTERS.map((chapter, index) => [index, chapter.title] as const))('chapitre %i — %s', (index) => {
+      const reach = chapterReach(index);
 
-    world.events.on('objectiveCompleted', ({ index }) => completed.push(index));
-    world.events.on('victory', () => (victories += 1));
+      for (const objective of CHAPTERS[index]!.objectives) {
+        for (const goal of objective.goals) expect(goalOutOfReach(goal, reach), `${objective.id} : ${goal.type}`).toBeNull();
+      }
+    });
 
-    // Là où Adam s'éveille, un filon de fer est à portée : la case est gardée pour la foreuse.
-    const iron = spot(world, 'drill', true);
+    it('et l’ère suit les chapitres : le Bourg pour la brique, la Cité industrielle pour l’acier', () => {
+      const chapterOf = (id: string): number => OBJECTIVES.find((objective) => objective.id === id)!.chapter;
 
-    // 1. La mairie : elle devient la ville.
+      expect(chapterReach(0).era).toBe(0);
+      expect(chapterReach(1).buildings.has('quarry')).toBe(true);
+      expect(chapterReach(1).buildings.has('brickworks')).toBe(false);
+      expect(chapterReach(chapterOf('brick')).era).toBeGreaterThanOrEqual(1);
+      expect(chapterReach(chapterOf('steel')).era).toBe(3);
+      expect(chapterReach(chapterOf('eveQuests')).eve).toBe(true);
+      expect(chapterReach(chapterOf('nights3')).eve).toBe(false);
+    });
+
+    it('refusent un objectif dont le bâtiment arrive trop tard', () => {
+      const brick = OBJECTIVES.find((objective) => objective.id === 'brick')!.goals[0]!;
+
+      expect(goalOutOfReach(brick, chapterReach(1))).toMatch(/rien ne produit/);
+      expect(goalOutOfReach({ type: 'build', building: 'steelworks', count: 1 }, chapterReach(1))).toMatch(/pas encore au menu/);
+      expect(goalOutOfReach({ type: 'era', count: 3 }, chapterReach(4))).not.toBeNull();
+    });
+  });
+
+  it('ouvrent les fondations après la mairie : quatre objectifs à la fois, dans l’ordre qu’on veut', () => {
+    const world = World.newColony(7);
+    const completed: { id: string; closing: boolean }[] = [];
+    const chapters: number[] = [];
+
+    world.events.on('objectiveCompleted', ({ id, closing }) => completed.push({ id, closing }));
+    world.events.on('chapterCompleted', ({ index }) => chapters.push(index));
+    world.revealAround(world.entities.get(world.townHallId)!.tx, world.entities.get(world.townHallId)!.ty, 40);
+    bigBag(world);
     completeSite(world, world.townHallId);
-    expect(completed).toEqual([0]);
-    expect(world.objective).toBe(1);
-    expect(world.townStock()).not.toBeNull();
+    expect(chapters).toEqual([0]);
+    expect(world.chapter).toBe(1);
+    expect(openObjectives(world).map(({ id }) => id)).toEqual(['lumberCamp', 'quarry', 'well', 'home']);
 
-    // Des tours tout de suite, comme le conseil le dit : elles compteront pour la quête d'Ève.
-    fortify(world, iron);
-    fortify(world, iron, 6);
+    // Le labo mène ce qu'il faut : les recherches du chapitre, payées d'avance pour le test.
+    for (const id of chapterReach(1).research) world.researchDone.push(id as ResearchId);
 
-    // La nurserie aussi, nourrie : l'enfant naîtra bien avant qu'on le demande, et comptera.
-    const nursery = build(world, 'nursery', iron);
+    // À rebours de la liste : la maison d'abord, le puits, la carrière, la cabane en dernier.
+    raise(world, 'home');
+    expect(world.chapter).toBe(1);
+    raise(world, 'well');
+    raise(world, 'quarry');
+    expect(world.chapter).toBe(1);
+    expect(openObjectives(world).map(({ id }) => id)).toEqual(['lumberCamp']);
 
-    world.player.inventory.add('food', RECIPES.raiseChild.inputs.food);
-    world.push({ type: 'supplyBuilding', id: nursery.id });
+    const wood = world.player.inventory.count('wood') + world.townStock()!.count('wood');
+
+    raise(world, 'lumberCamp');
+    expect(completed.slice(1)).toEqual([
+      { id: 'home', closing: false },
+      { id: 'well', closing: false },
+      { id: 'quarry', closing: false },
+      { id: 'lumberCamp', closing: true },
+    ]);
+    expect(chapters).toEqual([0, 1]);
+    expect(world.chapter).toBe(2);
+    // La récompense du chapitre tombe en plus de celle du dernier objectif.
+    expect(world.player.inventory.count('wood') + world.townStock()!.count('wood') - wood).toBeGreaterThanOrEqual(
+      (CHAPTERS[1].reward.items.wood ?? 0) - BUILDINGS.lumberCamp.cost.wood,
+    );
+    expect(openObjectives(world).map(({ id }) => id)).toEqual(['nights3', 'watchtowers', 'palisade']);
+  }, 20_000);
+
+  it('gardent un objectif réussi, même si son bâtiment tombe', () => {
+    const world = World.newColony(7);
+
+    bigBag(world);
+    completeSite(world, world.townHallId);
+
+    const home = raise(world, 'home');
+
+    expect(world.objectivesDone.has('home')).toBe(true);
+    world.entities.delete(home.id);
     world.tick();
-    guardTownHall(world);
+    expect(world.objectivesDone.has('home')).toBe(true);
+    expect(openObjectives(world).map(({ id }) => id)).not.toContain('home');
+    expect(world.chapter).toBe(1);
+  });
 
-    // 2. Trois nuits survécues : Ève arrive, le sac grandit.
-    runUntil(world, () => world.objective === 2, CYCLE * 4);
-    expect(world.stats.nightsSurvived).toBeGreaterThanOrEqual(3);
-    expect(world.player.inventory.capacity).toBe(INVENTORY_CAPACITY + 20);
-    runUntil(world, () => world.eve()?.state === 'idle' || world.eve()?.state === 'repair', 20 * 60);
-    expect(world.population().adults).toBe(2);
-
-    // 3. Les demandes d'Ève : la ferme donne le plan de la maison, les tours sont déjà là.
-    const hall = world.entities.get(world.townHallId)!;
-
-    if (hall.kind === 'site') throw new Error('la mairie est redevenue un chantier');
-    build(world, 'home', iron);
-    runUntil(world, () => world.questsDone >= 2, 20 * 5);
-    expect(world.isUnlocked('builderHouse')).toBe(true);
-    build(world, 'builderHouse', iron);
-    guardTownHall(world);
-    hall.hp -= 30;
-    runUntil(world, () => world.objective === 3, 20 * 5);
-    expect(world.questsDone).toBe(QUEST_IDS.length);
-    expect(hall.hp).toBe(BUILDINGS.townHall.hp);
-
-    // 4. Une foreuse sur le fer, et vingt minerais sortis.
-    if (!iron) throw new Error('pas de filon de fer à portée');
-    standNextTo(world, iron.tx, iron.ty, 2, 2);
-    buildAt(world, 'drill', iron.tx, iron.ty);
-    guardTownHall(world);
-    runUntil(world, () => world.objective >= 4, RECIPES.mineOre.duration * 25 + 10);
-    expect(world.stats.produced.ironOre).toBeGreaterThanOrEqual(20);
-
-    // 5. Le premier enfant : la nurserie posée au début a fait son œuvre — l'objectif tombe dans la foulée.
-    runUntil(world, () => world.objective >= 5, RECIPES.raiseChild.duration + 10);
-    expect(world.stats.births).toBeGreaterThanOrEqual(1);
-    expect(victories).toBe(0);
-
-    // 6. Cinq nuits de plus, comptées depuis le début de l'objectif : l'acte I est fini, pas la partie.
-    const survived = world.stats.nightsSurvived;
-
-    runUntil(world, () => world.objective >= 6, CYCLE * 6);
-    expect(world.stats.nightsSurvived - survived).toBe(5);
-    expect(completed).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(victories).toBe(0);
-    expect(currentObjective(world)?.title).toBe(OBJECTIVES[6].title);
-
-    // 7. L'Antenne, ses trois étages livrés depuis la ville : le Signal, c'est la victoire.
-    raiseAntenna(world);
-    expect(completed).toEqual([0, 1, 2, 3, 4, 5, 6]);
-    expect(victories).toBe(1);
-    expect(world.victory).toBe(true);
-    expect(world.objective).toBe(OBJECTIVES.length);
-    expect(currentObjective(world)).toBeNull();
-    expect(world.defeated).toBe(false);
-
-    // Le mode sans fin : les nuits continuent, la victoire ne se refête pas.
-    const night = world.night;
-
-    for (let i = 0; i < CYCLE + 1; i += 1) world.tick();
-    expect(world.night).toBeGreaterThan(night);
-    expect(victories).toBe(1);
-  }, 30_000);
-
-  it('comptent ce qui a été fait avant qu’on le demande', () => {
-    const world = new World(seedWithIron());
-    const completed: number[] = [];
-
-    world.events.on('objectiveCompleted', ({ index }) => completed.push(index));
+  it('comptent les nuits à tenir depuis l’ouverture du chapitre', () => {
+    const world = new World(7);
 
     completeSite(world, world.townHallId);
+    // Des nuits passées pendant les fondations ne comptent pas pour « Passer la nuit ».
+    world.stats.nightsSurvived = 5;
+    passChapter(world);
+    expect(world.chapter).toBe(2);
+    expect(world.chapterBase.nightsSurvived).toBe(5);
 
-    // Une foreuse bâtie et du fer extrait bien avant qu'on les demande : l'objectif 4 les trouvera.
+    const nights = OBJECTIVES.find((objective) => objective.id === 'nights3')!.goals[0]!;
+
+    expect(goalProgress(world, nights)).toEqual({ have: 0, need: 3 });
+    world.stats.nightsSurvived = 7;
+    expect(goalProgress(world, nights)).toEqual({ have: 2, need: 3 });
+    world.tick();
+    expect(world.objectivesDone.has('nights3')).toBe(false);
+    world.stats.nightsSurvived = 8;
+    world.tick();
+    expect(world.objectivesDone.has('nights3')).toBe(true);
+  });
+
+  it('comptent ce qui a été fait avant que le chapitre s’ouvre', () => {
+    const world = new World(seedWithIron());
+    const completed: string[] = [];
+
+    world.events.on('objectiveCompleted', ({ id }) => completed.push(id));
+    completeSite(world, world.townHallId);
+
+    // Une foreuse bâtie et du fer extrait dès les fondations : « L’industrie » les trouvera.
     const iron = spot(world, 'drill', true);
 
     if (!iron) throw new Error('pas de filon de fer à portée');
     buildAt(world, 'drill', iron.tx, iron.ty);
     world.stats.produced.ironOre = 20;
-    expect(world.objective).toBe(1);
-
-    world.stats.nightsSurvived = 3;
-    world.questsDone = QUEST_IDS.length;
-    world.tick();
-    expect(completed).toEqual([0, 1, 2, 3]);
-  });
-
-  it('comptent les nuits à tenir depuis le début de l’objectif', () => {
-    const world = new World(7);
-
-    completeSite(world, world.townHallId);
-    world.stats.nightsSurvived = 2;
-    world.objectiveBase = { ...world.stats };
-    world.tick();
-    expect(world.objective).toBe(1);
-    expect(goalProgress(world, OBJECTIVES[1].goals[0])).toEqual({ have: 0, need: 3 });
-
-    world.stats.nightsSurvived = 4;
-    expect(goalProgress(world, OBJECTIVES[1].goals[0])).toEqual({ have: 2, need: 3 });
+    while (world.chapter < 5) passChapter(world);
+    expect(world.chapter).toBe(5);
+    expect(world.objectivesDone.has('ironOre')).toBe(true);
+    expect(completed).toContain('ironOre');
   });
 
   it('dépose dans la mairie ce qui ne tient pas dans le sac', () => {
     const world = new World(seedWithIron());
     let stored: Partial<Record<ItemId, number>> = {};
 
-    world.events.on('objectiveCompleted', (event) => (stored = event.stored));
+    world.events.on('objectiveCompleted', (event) => {
+      if (event.id === 'ironOre') stored = event.stored;
+    });
     completeSite(world, world.townHallId);
 
     const iron = spot(world, 'drill', true);
 
     if (!iron) throw new Error('pas de filon de fer à portée');
     buildAt(world, 'drill', iron.tx, iron.ty);
+    while (world.chapter < 5) passChapter(world);
 
     // Le sac est presque plein quand la foreuse remplit son objectif : rien de la récompense ne doit se perdre.
     const town = world.townStock()!;
     const before = { wood: town.count('wood'), stone: town.count('stone') };
 
+    world.player.inventory = new Store(world.player.inventory.capacity);
     world.player.inventory.add('coal', world.player.inventory.freeSpace() - 5);
-    world.objective = 3;
     world.stats.produced.ironOre = 20;
     world.tick();
 
-    expect(world.objective).toBe(4);
+    expect(world.objectivesDone.has('ironOre')).toBe(true);
     expect(world.player.inventory.freeSpace()).toBe(0);
     expect(world.player.inventory.count('wood')).toBe(5);
     expect(stored).toEqual({ wood: 9, stone: 6 });
@@ -409,28 +480,39 @@ describe('objectifs', () => {
 
     completeSite(world, world.townHallId);
     world.defeated = true;
-    world.stats.nightsSurvived = 3;
+    world.objectivesDone.add('home');
     world.tick();
-    expect(world.objective).toBe(1);
+    expect(world.chapter).toBe(1);
   });
 
-  it('survivent à la sauvegarde : objectif, compteurs et taille du sac', () => {
+  it('relisent le sac dans tous les objectifs réussis', () => {
+    expect(objectiveBagBonus([], 0)).toBe(0);
+    expect(objectiveBagBonus(['nights3'], 3)).toBe(20);
+    expect(objectiveBagBonus(['nights3', 'firstChild', 'nights3'], 5)).toBe(40);
+    // L'ordre ne compte pas : un objectif d'un chapitre à venir, réussi d'avance, donne ses places.
+    expect(objectiveBagBonus(['firstChild'], 1)).toBe(20);
+  });
+
+  it('survivent à la sauvegarde : chapitre, objectifs, compteurs et taille du sac', () => {
     const world = new World(7);
 
     completeSite(world, world.townHallId);
+    passChapter(world);
     world.stats.nightsSurvived = 3;
     world.tick();
-    expect(world.objective).toBe(2);
+    expect(world.chapter).toBe(2);
+    expect(world.objectivesDone.has('nights3')).toBe(true);
 
     const decoded = decodeSave(encodeSave(world, 1));
 
     if (!decoded.ok) throw new Error(`sauvegarde refusée : ${decoded.reason}`);
-    expect(decoded.world.objective).toBe(2);
+    expect(decoded.world.chapter).toBe(2);
+    expect([...decoded.world.objectivesDone]).toEqual([...world.objectivesDone]);
     expect(decoded.world.player.inventory.capacity).toBe(INVENTORY_CAPACITY + 20);
     expect(serialize(decoded.world)).toEqual(serialize(world));
   });
 
-  it('reprennent une sauvegarde d’avant les objectifs au premier', () => {
+  it('reprennent une sauvegarde d’avant les objectifs au premier chapitre', () => {
     const world = new World(7);
 
     completeSite(world, world.townHallId);
@@ -438,27 +520,132 @@ describe('objectifs', () => {
     // Ce qu'une sauvegarde d'avant les objectifs ne connaissait pas.
     const old: Record<string, unknown> = { ...serialize(world) };
 
-    for (const key of ['objective', 'victory', 'victoryTick', 'stats', 'objectiveBase']) delete old[key];
+    for (const key of ['chapter', 'objectivesDone', 'victory', 'victoryTick', 'stats', 'chapterBase']) delete old[key];
 
     const decoded = decodeSave(JSON.stringify({ version: SAVE_VERSION, savedAt: 1, state: old }));
 
     if (!decoded.ok) throw new Error(`sauvegarde refusée : ${decoded.reason}`);
-    expect(decoded.world.objective).toBe(0);
+    expect(decoded.world.chapter).toBe(0);
 
-    // La mairie est debout : le premier objectif tombe au tick suivant, récompense comprise.
+    // La mairie est debout : le premier chapitre tombe au tick suivant, récompense comprise.
     decoded.world.tick();
-    expect(decoded.world.objective).toBe(1);
+    expect(decoded.world.chapter).toBe(1);
+  });
+
+  describe('une sauvegarde de l’ancienne chaîne (version 10)', () => {
+    /** La partie telle que l'ancienne chaîne l'aurait rangée, à l'objectif `objective` de ses sept. */
+    function legacySave(world: World, objective: number): string {
+      const state: Record<string, unknown> = { ...serialize(world) };
+
+      delete state['chapter'];
+      delete state['objectivesDone'];
+      delete state['chapterBase'];
+      state['objective'] = objective;
+      state['objectiveBase'] = { ...world.stats, produced: { ...world.stats.produced } };
+      state['victory'] = objective === LEGACY_OBJECTIVES.length;
+      return JSON.stringify({ version: 10, savedAt: 1, state });
+    }
+
+    function load(text: string): World {
+      const decoded = decodeSave(text);
+
+      if (!decoded.ok) throw new Error(`sauvegarde refusée : ${decoded.reason}`);
+      return decoded.world;
+    }
+
+    const chapterOf = (id: string): number => OBJECTIVES.find((objective) => objective.id === id)!.chapter;
+
+    it.each([
+      [0, 0],
+      [1, chapterOf('nights3')],
+      [2, chapterOf('eveQuests')],
+      // La foreuse attendait, l'enfant venait après : il est passé avant, dans « Nourrir la ville ».
+      [3, chapterOf('firstChild')],
+      [4, chapterOf('firstChild')],
+      [5, chapterOf('nights5')],
+      [6, chapterOf('antenna')],
+      [7, CHAPTERS.length],
+    ])('l’objectif %i reprend au chapitre %i, les anciens objectifs réussis cochés', (objective, chapter) => {
+      const world = new World(7);
+
+      completeSite(world, world.townHallId);
+
+      const loaded = load(legacySave(world, objective));
+
+      expect(loaded.chapter).toBe(chapter);
+      for (const id of LEGACY_OBJECTIVES.slice(0, objective)) expect(loaded.objectivesDone.has(id), id).toBe(true);
+      for (const id of LEGACY_OBJECTIVES.slice(objective)) expect(loaded.objectivesDone.has(id), id).toBe(false);
+      // Les chapitres d'avant sont tenus pour finis.
+      for (const proto of OBJECTIVES.filter((other) => other.chapter < chapter)) expect(loaded.objectivesDone.has(proto.id), proto.id).toBe(true);
+      expect(loaded.victory).toBe(objective === LEGACY_OBJECTIVES.length);
+    });
+
+    it('garde le sac de l’ancienne chaîne, sans une place de plus ni de moins', () => {
+      // Les places de l'ancienne chaîne : +20 après trois nuits, +20 au premier enfant.
+      const legacyBag = [0, 0, 20, 20, 20, 40, 40, 40];
+
+      for (let objective = 0; objective <= LEGACY_OBJECTIVES.length; objective += 1) {
+        const world = new World(7);
+
+        completeSite(world, world.townHallId);
+        expect(load(legacySave(world, objective)).player.inventory.capacity, `objectif ${objective}`).toBe(INVENTORY_CAPACITY + legacyBag[objective]!);
+      }
+    });
+
+    it('ne redonne aucune récompense déjà tombée, même d’un chapitre à venir', () => {
+      const world = new World(seedWithIron());
+
+      completeSite(world, world.townHallId);
+
+      const iron = spot(world, 'drill', true);
+
+      if (!iron) throw new Error('pas de filon de fer à portée');
+      buildAt(world, 'drill', iron.tx, iron.ty);
+      world.stats.produced.ironOre = 20;
+      world.stats.nightsSurvived = 3;
+
+      // Au premier enfant de l'ancienne chaîne : trois nuits, Ève et la foreuse déjà payées.
+      const loaded = load(legacySave(world, 4));
+      const completed: string[] = [];
+
+      loaded.events.on('objectiveCompleted', ({ id }) => completed.push(id));
+      expect(loaded.chapter).toBe(chapterOf('firstChild'));
+      for (let i = 0; i < 3; i += 1) loaded.tick();
+      while (loaded.chapter <= chapterOf('ironOre')) passChapter(loaded);
+      expect(completed).not.toContain('ironOre');
+      expect(completed).not.toContain('nights3');
+      expect(completed).not.toContain('eveQuests');
+      // Les seules places sont celles des trois nuits : `passChapter` coche sans payer.
+      expect(loaded.player.inventory.capacity).toBe(INVENTORY_CAPACITY + 20);
+    });
+
+    it('reprend les nuits de l’objectif en cours dans le chapitre', () => {
+      const world = new World(7);
+
+      completeSite(world, world.townHallId);
+      world.stats.nightsSurvived = 4;
+
+      const state = (JSON.parse(legacySave(world, 1)) as { state: Record<string, unknown> }).state;
+
+      state['objectiveBase'] = { nightsSurvived: 3, births: 0, produced: {} };
+
+      const loaded = load(JSON.stringify({ version: 10, savedAt: 1, state }));
+      const nights = OBJECTIVES.find((objective) => objective.id === 'nights3')!.goals[0]!;
+
+      expect(loaded.chapterBase.nightsSurvived).toBe(3);
+      expect(goalProgress(loaded, nights)).toEqual({ have: 1, need: 3 });
+    });
   });
 
   describe('attentes', () => {
-    /** La mairie bâtie, l'objectif « premier enfant » en cours et sa nurserie debout. */
+    /** La mairie bâtie, le chapitre du premier enfant ouvert et sa nurserie debout. */
     function nurseryWorld(): { world: World; nursery: Entity } {
       const world = new World(7);
 
       completeSite(world, world.townHallId);
-      world.objective = 4;
+      while (world.chapter < 4) passChapter(world);
 
-      const nursery = build(world, 'nursery');
+      const nursery = buildAt(world, 'nursery', ...Object.values(spot(world, 'nursery')!) as [number, number]);
 
       guardTownHall(world);
       return { world, nursery };
@@ -473,7 +660,9 @@ describe('objectifs', () => {
       nursery.nextBirthTick = world.tickCount + duration;
       for (let i = 0; i < duration / 2; i += 1) world.tick();
 
-      expect(objectiveWait(world)).toMatchObject({ remainingTicks: duration / 2, durationTicks: duration, blockedBy: null, missing: 0 });
+      expect(objectiveWait(world, 'firstChild')).toMatchObject({ remainingTicks: duration / 2, durationTicks: duration, blockedBy: null, missing: 0 });
+      // Sans objectif choisi : le premier du chapitre qui attend une horloge.
+      expect(objectiveWait(world)?.goal.type).toBe('births');
     });
 
     it('disent ce qui manque à une nurserie sans nourriture', () => {
@@ -482,34 +671,79 @@ describe('objectifs', () => {
       if (nursery.kind !== 'nursery') throw new Error('pas une nurserie');
       nursery.store.add('food', RECIPES.raiseChild.inputs.food - 2);
 
-      expect(objectiveWait(world)).toMatchObject({ blockedBy: 'food', missing: 2 });
+      expect(objectiveWait(world, 'firstChild')).toMatchObject({ blockedBy: 'food', missing: 2 });
 
       world.push({ type: 'pauseBuilding', id: nursery.id, paused: true });
       world.tick();
-      expect(objectiveWait(world)?.blockedBy).toBe('paused');
+      expect(objectiveWait(world, 'firstChild')?.blockedBy).toBe('paused');
     });
 
     it('ne parlent pas d’attente tant qu’il reste une action : la nurserie à bâtir', () => {
       const world = new World(7);
 
       completeSite(world, world.townHallId);
-      world.objective = 4;
-      expect(objectiveWait(world)).toBeNull();
-      expect(goalWait(world, OBJECTIVES[4].goals[1])).toBeNull();
+      while (world.chapter < 4) passChapter(world);
+      expect(objectiveWait(world, 'firstChild')).toBeNull();
+      expect(objectiveWait(world, 'bread')).toBeNull();
     });
 
     it('comptent jusqu’à la prochaine aube pour les nuits à tenir', () => {
       const world = new World(7);
 
       completeSite(world, world.townHallId);
-      expect(world.objective).toBe(1);
+      passChapter(world);
+      expect(world.chapter).toBe(2);
 
-      const first = objectiveWait(world)!;
+      const first = objectiveWait(world, 'nights3')!;
 
       expect(first.durationTicks).toBe(CYCLE_TICKS);
       expect(first.remainingTicks).toBe(DAY_CYCLE.day + DAY_CYCLE.dusk + DAY_CYCLE.night - (world.tickCount - world.cycleStartTick));
       world.tick();
-      expect(objectiveWait(world)!.remainingTicks).toBe(first.remainingTicks - 1);
+      expect(objectiveWait(world, 'nights3')!.remainingTicks).toBe(first.remainingTicks - 1);
     });
   });
+
+  /*
+   * La partie entière, chapitre par chapitre, dans une colonie neuve : à
+   * l'ouverture de chaque chapitre, le labo n'a fini que les recherches à
+   * portée (`chapterReach`) et la colonie n'a que l'ère qu'elle peut
+   * atteindre ; chaque bâtiment demandé doit être au menu, et se pose par la
+   * commande du joueur. Le reste — nuits, productions, naissances, quêtes —
+   * se joue ailleurs : ici, ses compteurs avancent d'un coup.
+   */
+  it('se jouent du premier toit à l’Antenne, chaque chapitre avec ce qu’il a débloqué', () => {
+    const world = World.newColony(7);
+    const chapters: number[] = [];
+    let victories = 0;
+
+    world.events.on('chapterCompleted', ({ index }) => chapters.push(index));
+    world.events.on('victory', () => (victories += 1));
+    bigBag(world);
+    completeSite(world, world.townHallId);
+
+    while (world.chapter < CHAPTERS.length) {
+      const index = world.chapter;
+      const reach = chapterReach(index);
+
+      world.revealAround(world.entities.get(world.townHallId)!.tx, world.entities.get(world.townHallId)!.ty, 40);
+      for (const id of reach.research) if (!world.researchDone.includes(id as ResearchId)) world.researchDone.push(id as ResearchId);
+      world.era = Math.max(world.era, reach.era);
+      world.tick();
+
+      for (const objective of openObjectives(world)) {
+        for (const goal of objective.goals) satisfy(world, goal);
+        world.tick();
+        expect(world.objectivesDone.has(objective.id) || world.chapter > index, objective.id).toBe(true);
+      }
+      guardTownHall(world);
+      expect(world.chapter, CHAPTERS[index]!.title).toBeGreaterThan(index);
+    }
+
+    expect(chapters).toEqual(CHAPTERS.map((_, index) => index));
+    expect(victories).toBe(1);
+    expect(world.victory).toBe(true);
+    expect(currentChapter(world)).toBeNull();
+    expect(world.objectivesDone.size).toBe(OBJECTIVES.length);
+    expect(world.defeated).toBe(false);
+  }, 60_000);
 });

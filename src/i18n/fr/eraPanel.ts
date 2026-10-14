@@ -17,7 +17,7 @@ export const eraPanel = {
   next: (era: string): string => `Prochaine ère : ${era}`,
   last: 'La colonie est à sa dernière ère : la cité gronde, tenez-la debout.',
   conditions: 'Pour y passer',
-  objectives: 'Objectifs réussis',
+  chapters: 'Chapitres terminés',
   population: 'Habitants',
   /** Une recherche clé : « Recherche : Fonderie ». */
   research: (name: string): string => `Recherche : ${name}`,

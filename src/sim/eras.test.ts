@@ -61,7 +61,7 @@ function colony(): World {
 function readyForBorough(world: World): void {
   const requires = ERAS[1].requires;
 
-  world.objective = requires.objectives;
+  world.chapter = requires.chapters;
   for (const [building, count] of Object.entries(requires.buildings) as [BuildingId, number][]) {
     for (let i = 0; i < count; i += 1) build(world, building);
   }
@@ -108,7 +108,7 @@ describe('ères — données', () => {
 
   it('les durées vont croissant : chaque ère attend plus d’objectifs et d’habitants que la précédente', () => {
     for (let era = 2; era <= LAST_ERA; era += 1) {
-      expect(ERAS[era]!.requires!.objectives).toBeGreaterThan(ERAS[era - 1]!.requires!.objectives);
+      expect(ERAS[era]!.requires!.chapters).toBeGreaterThan(ERAS[era - 1]!.requires!.chapters);
       expect(ERAS[era]!.requires!.population).toBeGreaterThan(ERAS[era - 1]!.requires!.population);
     }
   });
@@ -213,7 +213,7 @@ describe('ères — de bout en bout', () => {
     for (let next = 1; next <= LAST_ERA; next += 1) {
       const requires = ERAS[next]!.requires!;
 
-      world.objective = Math.max(world.objective, requires.objectives);
+      world.chapter = Math.max(world.chapter, requires.chapters);
       // Les recherches clés, finies au labo de l'ère d'avant.
       for (const research of requires.research) if (!world.researchDone.includes(research)) world.researchDone.push(research);
       for (const [building, count] of Object.entries(requires.buildings) as [BuildingId, number][]) {

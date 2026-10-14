@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TILE_SIZE, tileToChunk, worldToTile } from '../core/grid.ts';
 import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, type BuildingId, type BuildingProto } from '../data/buildings.ts';
-import { OBJECTIVES } from '../data/objectives.ts';
+import { CHAPTERS } from '../data/objectives.ts';
 import { QUEST_IDS } from '../data/quests.ts';
 import { RESEARCH, RESEARCH_IDS, type ResearchId } from '../data/research.ts';
 import { missingRequirements } from './research.ts';
@@ -1617,7 +1617,7 @@ describe('bâtiments de départ', () => {
     }
     world.researchDone = [...done];
     world.questsDone = QUEST_IDS.length;
-    world.objective = OBJECTIVES.length;
+    world.chapter = CHAPTERS.length;
     world.fog.reveal(world.player.x / TILE_SIZE, world.player.y / TILE_SIZE, 20);
     for (const id of MENU_BUILDING_IDS) expect(free(world, id)).toBe(true);
   });

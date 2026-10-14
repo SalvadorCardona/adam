@@ -529,49 +529,177 @@ export const content: Content = {
       done: 'Four more pairs of hands! And for you, a scrap pickaxe.',
     },
   },
-  objectives: [
-    {
+  objectives: {
+    townHall: {
       title: 'Build the Town hall',
       hint: 'Wood and stone to the site, Adam.',
       celebration: 'The first roof stands: the town hall becomes the town’s storehouse.',
-      banner: '',
     },
-    {
+    lumberCamp: {
+      title: 'Build a lumber camp',
+      hint: 'Lumberjacks will cut wood for us. “Woodcraft” at the lab, and the camp shows up in “Build”!',
+      celebration: 'Axes sing in the forest: +6 stone.',
+    },
+    quarry: {
+      title: 'Build a quarry',
+      hint: 'The quarry cuts stone out of the ruins. “Mining” at the lab opens it.',
+      celebration: 'Stone comes out of the ruins by itself: +8 wood.',
+    },
+    well: {
+      title: 'Build a well',
+      hint: 'A well on the waterside, and nobody’s thirsty anymore. “Well digging” at the lab!',
+      celebration: 'Water comes up in the bucket: +6 food to celebrate.',
+    },
+    home: {
+      title: 'Build a house',
+      hint: 'Four beds under one roof: the workers will sleep somewhere warm.',
+      celebration: 'Four workers sleep somewhere warm: +6 wood.',
+    },
+    nights3: {
       title: 'Survive 3 nights',
       hint: 'At night, stay near the town hall: your bow shoots by itself. I’ll show up after the third!',
-      celebration: 'Eve rolls in on her cargo bike, with a spare bag: +20 slots.',
-      banner: '',
+      celebration: 'Three nights held. Eve has a spare bag for Adam: +20 slots.',
     },
-    {
+    watchtowers: {
+      title: 'Build 2 watchtowers',
+      hint: 'Two watchtowers on either side of the town hall: they shoot all night long. “Lookout” at the lab.',
+      celebration: 'Two towers watch over the town: +10 wood.',
+    },
+    palisade: {
+      title: 'Build 4 palisades',
+      hint: 'Stakes in front of the town hall: a mutant has to break them before it gets through. “Fortifications” at the lab, for a bit of goo.',
+      celebration: 'The palisade keeps the mutants at bay: +8 stone.',
+    },
+    eveQuests: {
       title: 'Answer Eve’s requests',
       hint: 'Tap me to see what I need. Every request done, a blueprint or a tool!',
       celebration: 'All of Eve’s requests done: she fixes the town hall up like new.',
-      banner: '',
     },
-    {
-      title: 'Mine 20 iron ore',
-      hint: 'A drill near the blue rocks: that’s where the iron sleeps.',
-      celebration: 'The drill is spinning. Enough to build a nursery: +14 wood, +6 stone.',
-      banner: '',
+    logisticsPost: {
+      title: 'Build a logistics post',
+      hint: 'A logistics post near our producers: its runners empty their chests into the town hall.',
+      celebration: 'Crates move around on their own: +6 food.',
     },
-    {
+    constructionPost: {
+      title: 'Build a construction post',
+      hint: 'Builders who supply and build our sites! “Organized sites” at the lab.',
+      celebration: 'The yellow helmets take over: +10 wood, +6 stone.',
+    },
+    pigPen: {
+      title: 'Build a pig pen',
+      hint: 'A pen, then bring a pig back from the forest: stay close and it’ll follow you. “Pig farming” at the lab.',
+      celebration: 'The pen is waiting for its pigs: +8 wood.',
+    },
+    farm: {
+      title: 'Build a farm',
+      hint: 'A farm on bare grass: its farmers sow all around it.',
+      celebration: 'The first sprouts are up: +8 water.',
+    },
+    bread: {
+      title: 'Bake 20 loaves of bread',
+      hint: 'Wheat from the farm, a bakery to bake it: “Bakery” at the lab.',
+      celebration: 'You can smell warm bread all the way to the town hall: +10 stone.',
+    },
+    firstChild: {
       title: 'See the first child born',
-      hint: 'A nursery, with six food from the hunt inside: a baby!',
+      hint: 'A nursery, with six food inside: a baby!',
       celebration: 'A child is born: the colony has a future. Town hall repaired, +20 bag slots.',
-      banner: '',
     },
-    {
+    ironOre: {
+      title: 'Mine 20 iron ore',
+      hint: 'A drill on the edge of the blue rocks: that’s where the iron sleeps.',
+      celebration: 'The drill is spinning: +14 wood, +6 stone.',
+    },
+    coal: {
+      title: 'Make 20 coal',
+      hint: 'A charcoal kiln turns wood into coal. “Foundry” at the lab opens it along with the forge.',
+      celebration: 'The kiln smokes all day long: +12 wood.',
+    },
+    ironPlate: {
+      title: 'Make 10 iron plates',
+      hint: 'The forge melts iron and coal into plates: our towers need them.',
+      celebration: 'The first plates come out of the forge: +10 iron ore.',
+    },
+    brick: {
+      title: 'Make 20 bricks',
+      hint: 'The brickworks is learned at the lab once we’re a Borough: move to the next era from the town hall!',
+      celebration: 'Red bricks, stacked like loaves: +12 stone.',
+    },
+    clinic: {
+      title: 'Build a clinic',
+      hint: 'A stunned mutant can be healed: “Makeshift medicine” at the lab, for some goo.',
+      celebration: 'The clinic opens its beds: +10 food.',
+    },
+    grilledMeat: {
+      title: 'Grill 20 pieces of meat',
+      hint: 'Meat from the pig pen over the coals of a grill: it feeds better! “Grilling” at the lab.',
+      celebration: 'The grill sizzles, the town feasts: +10 wood, +6 stone.',
+    },
+    happiness: {
+      title: 'Reach an average Happiness of 80',
+      hint: 'A bed for everyone, and flowers, benches, street lamps near the houses: spirits rise every dawn.',
+      celebration: 'People are smiling in the streets: +10 food.',
+    },
+    nights5: {
       title: 'Hold out for 5 nights',
       hint: 'Towers all around the town hall, and you in the middle. Five nights and we’re safe, Adam!',
-      celebration: 'The colony will live. Eve has an idea: an antenna to call other survivors.',
-      banner: 'Act I complete',
+      celebration: 'Five more nights: the town won’t bend.',
     },
-    {
+    archerTowers: {
+      title: 'Build 2 archer towers',
+      hint: 'Two archers per tower, and the waves melt away. “Fortifications” at the lab.',
+      celebration: 'The archers take their posts: +12 wood, +8 stone.',
+    },
+    barracks: {
+      title: 'Build a barracks',
+      hint: 'An escort for you: “Militia” at the lab, for two wolf fangs.',
+      celebration: 'The barracks is recruiting: +10 food.',
+    },
+    industrialEra: {
+      title: 'Reach the Industrial city',
+      hint: 'Eras are passed at the town hall, “Eras”: each step opens its research at the lab.',
+      celebration: 'The city rumbles: +10 bricks.',
+    },
+    tools: {
+      title: 'Make 10 tools',
+      hint: 'A workshop shapes tools from plates and wood: “Toolmaking” at the lab, once we’re a Town.',
+      celebration: 'Tools for everyone: +6 iron plates.',
+    },
+    steel: {
+      title: 'Make 10 steel',
+      hint: 'A steelworks casts steel once we’re an Industrial city: “Blast furnace” at the lab.',
+      celebration: 'Steel is flowing: +10 coal.',
+    },
+    purifier: {
+      title: 'Build a cleanup station',
+      hint: 'The purple mud washes clean: “Decontamination” at the lab, and a cleanup station by the polluted land.',
+      celebration: 'The land is healthy again: +12 stone.',
+    },
+    antenna: {
       title: 'Build the Antenna',
       hint: 'An antenna 8 tiles from the town hall, three floors: you’ll need the Queen’s cores, and to defend it!',
       celebration: 'Someone’s answering!',
+    },
+  },
+  chapters: [
+    { title: 'The first roof', celebration: 'The first roof stands: the town hall becomes the town’s storehouse.', banner: '' },
+    {
+      title: 'The foundations',
+      celebration: 'The town has its foundations: wood, stone, water and a roof. +20 wood, +12 stone.',
       banner: '',
     },
+    { title: 'Through the night', celebration: 'The town makes it through the night. Eve patches up the town hall.', banner: '' },
+    { title: 'Eve’s requests', celebration: 'Eve is at home: the town gets organized. +8 iron ore.', banner: '' },
+    { title: 'Feeding the town', celebration: 'Nobody goes hungry anymore: +20 food.', banner: '' },
+    { title: 'Industry', celebration: 'The chimneys are smoking: the town can smelt and bake. +4 iron plates, +6 coal.', banner: '' },
+    { title: 'A town worth living in', celebration: 'The town has its care, its hot meals and its smiles. +10 bricks.', banner: '' },
+    {
+      title: 'Holding on',
+      celebration: 'The colony will live. Eve has an idea: an antenna to call other survivors.',
+      banner: 'Act I complete',
+    },
+    { title: 'Preparing the Signal', celebration: 'Everything is ready for the Antenna: +10 iron plates, +20 food.', banner: '' },
+    { title: 'The Signal', celebration: 'Someone’s answering!', banner: '' },
   ],
   eve: {
     hints: {

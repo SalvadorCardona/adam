@@ -4,7 +4,7 @@ import { BUILDINGS, RUIN, type BuildingId } from '../data/buildings.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
 import { ENEMIES, WAVE_BOUNTY, WAVE_STRENGTH, WAVE_WARNING, isBossNight } from '../data/enemies.ts';
 import type { ItemId } from '../data/items.ts';
-import { OBJECTIVES } from '../data/objectives.ts';
+import { ACT_ONE_CHAPTER, CHAPTERS } from '../data/objectives.ts';
 import { CYCLE_TICKS } from './dayNight.ts';
 import { breed, raidCapacity, raidTicks } from './enemyBases.ts';
 import type { Building, EnemyBase, EntityId, Mutant } from './types.ts';
@@ -216,12 +216,12 @@ describe('montée en difficulté', () => {
   });
 
   it('l’ère : l’acte I, puis sa fin, puis le Signal', () => {
-    const actOne = OBJECTIVES.findIndex((objective) => 'banner' in objective);
+    const actOne = ACT_ONE_CHAPTER;
 
     expect(waveEraOf(0, false)).toBe(0);
     expect(waveEraOf(actOne, false)).toBe(0);
     expect(waveEraOf(actOne + 1, false)).toBe(1);
-    expect(waveEraOf(OBJECTIVES.length, true)).toBe(2);
+    expect(waveEraOf(CHAPTERS.length, true)).toBe(2);
   });
 
   it('l’acte I fini, la vague compte ses renforts et ils sortent de la base de tête', () => {
@@ -229,7 +229,7 @@ describe('montée en difficulté', () => {
     const night = world.clock()!.cycle;
     const before = world.raidSize(night).count;
 
-    world.objective = OBJECTIVES.findIndex((objective) => 'banner' in objective) + 1;
+    world.chapter = ACT_ONE_CHAPTER + 1;
     expect(world.waveEra()).toBe(1);
     expect(world.waveReinforcements()).toBe(WAVE_STRENGTH.perEra);
     expect(world.raidSize(night).count).toBe(before + WAVE_STRENGTH.perEra);

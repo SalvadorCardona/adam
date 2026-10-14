@@ -260,7 +260,7 @@ export class EraPanel {
 
 function checkIcon(check: EraCheck): HTMLElement {
   switch (check.type) {
-    case 'objectives':
+    case 'chapters':
       return uiIcon('goal', 24);
     case 'population':
       return uiIcon('people', 24);
@@ -277,8 +277,8 @@ function checkLabel(check: EraCheck): string {
   const words = t().eraPanel;
 
   switch (check.type) {
-    case 'objectives':
-      return words.objectives;
+    case 'chapters':
+      return words.chapters;
     case 'population':
       return words.population;
     case 'building':

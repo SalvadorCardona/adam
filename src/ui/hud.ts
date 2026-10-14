@@ -9,10 +9,11 @@
  * jamais — c'est le rôle des commandes.
  *
  * Ce qu'il montre :
- * - la **quête** en haut : l'objectif en cours (`data/objectives.ts`) — le
- *   chantier de la mairie avec une barre par ressource, puis une jauge par
- *   condition — sous lequel restent la santé de la mairie, la nuit et son
- *   compte à rebours ;
+ * - la **quête** en haut : le chapitre en cours (`data/objectives.ts`) et
+ *   une ligne par objectif, l'objectif choisi déplié en jauges — le chantier
+ *   de la mairie avec une barre par ressource, sinon une par condition —,
+ *   sous lesquels restent la santé de la mairie, la nuit et son compte à
+ *   rebours ;
  * - la **météo** dessous, en capsule : ce qui arrive et dans combien de
  *   temps, puis ce qui tombe et pour combien de temps encore ;
  * - un **conseil** sous la quête, qui suit ce que fait le joueur (couper,
@@ -60,7 +61,7 @@ import type { ItemId } from '../data/items.ts';
 import { NEEDS, NEED_IDS, type NeedId } from '../data/needs.ts';
 import { BIOMES } from '../data/regions.ts';
 import { SIGNAL_WAVES } from '../data/artDirection.ts';
-import { OBJECTIVES, type Goal } from '../data/objectives.ts';
+import { CHAPTERS, objectiveProto, type Goal, type ObjectiveId } from '../data/objectives.ts';
 import { seedsFor } from '../data/perks.ts';
 import { QUESTS, type QuestReward } from '../data/quests.ts';
 import { RESEARCH, type ResearchId } from '../data/research.ts';
@@ -74,7 +75,7 @@ import type { Entity, Mobile, MobileId } from '../sim/types.ts';
 import { DIAL_ARCS } from '../sim/dayNight.ts';
 import { currentQuest, questProgress } from '../sim/eve.ts';
 import { moodOf } from '../sim/housing.ts';
-import { currentObjective, goalProgress, goalWait, type GoalWait } from '../sim/objectives.ts';
+import { chapterObjectives, currentChapter, firstOpenObjective, goalProgress, goalWait, openObjectives, type GoalWait } from '../sim/objectives.ts';
 import { TICKS_PER_SECOND, type Inhabitant, type Workforce, type World } from '../sim/world.ts';
 import { locale, onLocale, t } from '../i18n/locale.ts';
 import { carriesWanted, harvestRefusedText, tutorialAdvice, type Advice } from './hint.ts';
@@ -160,6 +161,8 @@ const CELEBRATION_WIDTH = 380;
 
 /** Durée du bandeau d'objectif réussi, en ms (cf. `celebration-in` dans le CSS). */
 const CELEBRATION_MS = 4200;
+/** Le rebond menthe de la case de la barre, pour un objectif réussi en cours de chapitre. */
+const OBJECTIVE_DONE_MS = 1800;
 /** Rangé sous la quête quand une fenêtre est ouverte, le bandeau en garde ce jeu. */
 const CELEBRATION_GAP = 8;
 
@@ -187,6 +190,11 @@ export class Hud {
   /** L'objectif dans la barre du haut, tout à droite : icône, progression (et intitulé court dès 600 px). Un tap ouvre la quête. */
   private readonly objective: HTMLButtonElement;
   private readonly questStrip: HTMLElement;
+  /** Les lignes des objectifs du chapitre, dans la fenêtre de la quête. */
+  private readonly objectiveList: HTMLElement;
+  private readonly objectiveRows = new Map<ObjectiveId, ObjectiveRowView>();
+  /** L'objectif touché dans le panneau ; `null` : le premier qui reste. Rien de la simulation. */
+  private chosenObjective: ObjectiveId | null = null;
   /** Tick jusqu'auquel la quête reste ouverte (en fenêtre sous la barre) ; fermée au-delà. */
   private questOpenUntil = 0;
   /** La mairie est déjà sous `QUEST_ALERT_HP` : elle ne déplie la quête qu'en y passant. */
@@ -274,6 +282,7 @@ export class Hud {
   private readonly victorySeeds: HTMLElement;
   private readonly celebration: HTMLElement;
   private readonly confetti: HTMLElement;
+  private objectiveDoneTimer = 0;
   private celebrationTimer = 0;
   private onContinue: () => void = () => {};
   private onRefound: () => void = () => {};
@@ -345,6 +354,7 @@ export class Hud {
     this.hintBulb.addEventListener('click', () => this.unfoldHint());
 
     this.questStrip = element('div', 'hud-quest-strip');
+    this.objectiveList = element('div', 'hud-objectives');
     this.objective = element('button', 'hud-objective');
     this.objective.type = 'button';
     this.objective.setAttribute('aria-haspopup', 'true');
@@ -853,18 +863,17 @@ export class Hud {
       if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
       if (reason === 'nothingToGive') this.notify(t().hud.toast.researchNothing, 'bad');
     });
-    world.events.on('objectiveCompleted', ({ index, stored }) => {
-      // Le dernier objectif, c'est l'écran de victoire qui le fête.
-      if (index < OBJECTIVES.length - 1) this.celebrateObjective(index);
+    world.events.on('objectiveCompleted', ({ id, stored, closing }) => {
+      // Le dernier objectif d'un chapitre, c'est la fin du chapitre qui le fête, en grand.
+      if (!closing) this.celebrateObjective(id);
       this.unfoldQuest(QUEST_ALERT_TICKS);
-
-      const kept = (Object.entries(stored) as [ItemId, number][]).filter(([, amount]) => amount > 0);
-
-      if (kept.length > 0) {
-        const list = kept.map(([item, amount]) => t().hud.toast.storedItem(amount, t().items[item])).join(', ');
-
-        this.notify(t().hud.toast.storedAtHall(list), 'info');
-      }
+      this.notifyStored(stored);
+    });
+    world.events.on('chapterCompleted', ({ index, stored }) => {
+      // Le dernier chapitre, c'est l'écran de victoire qui le fête.
+      if (index < CHAPTERS.length - 1) this.celebrateChapter(index);
+      this.unfoldQuest(QUEST_ALERT_TICKS);
+      this.notifyStored(stored);
     });
     // L'antenne s'allume d'abord, ses ondes couvrent l'écran : l'écran du Signal vient après.
     world.events.on('victory', () => window.setTimeout(() => this.showVictory(), SIGNAL_WAVES.durationMs));
@@ -1648,27 +1657,6 @@ export class Hud {
     const words = t().hud.quest;
     let key: string;
 
-    if (hall?.kind === 'site') {
-      key = `site:${JSON.stringify(hall.delivered)}`;
-      if (key === this.lastQuest) return;
-      this.lastQuest = key;
-
-      const cost = Object.entries(BUILDINGS[hall.proto].cost) as [ItemId, number][];
-
-      this.quest.dataset['mode'] = 'build';
-      this.questTitle.textContent = objectiveLabel(world.objective);
-      this.questBody.replaceChildren(
-        text('hud-quest-goal', words.buildHall),
-        ...cost.map(([item, needed]) => meter(item, hall.delivered[item] ?? 0, needed)),
-      );
-
-      const have = cost.reduce((sum, [item, needed]) => sum + Math.min(hall.delivered[item] ?? 0, needed), 0);
-      const need = cost.reduce((sum, [, needed]) => sum + needed, 0);
-
-      this.questStrip.replaceChildren(buildingIcon(hall.proto, 22), text('hud-strip-title', words.buildHall), text('hud-strip-value', `${have}/${need}`));
-      return;
-    }
-
     if (!hall) {
       key = 'fallen';
       if (key === this.lastQuest) return;
@@ -1677,6 +1665,29 @@ export class Hud {
       this.questTitle.textContent = words.defeat;
       this.questBody.replaceChildren(text('hud-quest-goal', words.hallFallen));
       this.questStrip.replaceChildren(uiIcon('heart', 18), text('hud-strip-title', words.hallFallen));
+      return;
+    }
+
+    // Les objectifs du chapitre : une ligne chacun, le choisi déplié en jauges.
+    const objectives = chapterObjectives(world);
+    const selected = this.selectedObjective();
+    const lines = objectives.map((objective) => objectiveLine(world, objective.id, objective.goals));
+    const chapter = currentChapter(world);
+    const done = objectives.filter(({ id }) => world.objectivesDone.has(id)).length;
+    const detail = selected ? objectiveDetail(world, selected) : [];
+    const progressKey = lines.map((line) => `${line.done}:${line.have}/${line.need}`).join(',');
+    const detailKey = detail.map((row) => row.key).join(',');
+
+    if (hall.kind === 'site') {
+      key = `site:${progressKey}:${detailKey}:${selected}`;
+      if (key === this.lastQuest) return;
+      this.lastQuest = key;
+      this.quest.dataset['mode'] = 'build';
+      this.questTitle.textContent = chapterLabel(world.chapter);
+      this.renderObjectives(lines, selected);
+      this.questBody.replaceChildren(chapterHead(world.chapter, done, objectives.length), this.objectiveList, ...detail.map((row) => row.node));
+      this.questStrip.dataset['urgent'] = 'false';
+      this.questStrip.replaceChildren(...chapterStrip(world.chapter, done, objectives.length));
       return;
     }
 
@@ -1696,23 +1707,13 @@ export class Hud {
     const quest = world.eve()?.state === 'idle' || world.eve()?.state === 'repair' ? currentQuest(world.questsDone) : null;
     const progress = quest ? questProgress(quest, world.entities.values()) : null;
 
-    const objective = currentObjective(world);
-    const goals = objective?.goals ?? [];
-    const reached = goals.map((goal) => goalProgress(world, goal));
-    const waits = goals.map((goal) => goalWait(world, goal));
-    const waiting = goals.map((goal, i) => waitLabel(goal, waits[i]!));
-
-    key = `hall:${world.objective}:${reached.map(({ have }) => have).join(',')}:${waiting.join(',')}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}`;
+    key = `hall:${world.chapter}:${progressKey}:${detailKey}:${selected}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}`;
     if (key === this.lastQuest) return;
     this.lastQuest = key;
 
-    // L'objectif reste affiché pendant l'attaque : seul le titre crie.
+    // Les objectifs restent affichés pendant l'attaque : seul le titre crie.
     this.quest.dataset['mode'] = mutants > 0 ? 'wave' : 'defend';
-    this.questTitle.textContent = mutants > 0 ? words.attack : objectiveLabel(world.objective);
-
-    const title = objective ? t().objectives[world.objective]!.title : words.endless;
-    const goal = text('hud-quest-goal', title);
-    const meters = goals.map((condition, i) => goalMeter(condition, reached[i]!.have, reached[i]!.need, waits[i]!));
+    this.questTitle.textContent = mutants > 0 ? words.attack : chapterLabel(world.chapter);
 
     const hp = element('div', 'hud-meter hud-meter-hp');
     const hpLabel = text('hud-meter-label', name);
@@ -1730,7 +1731,14 @@ export class Hud {
     chips.append(chip('people', people + workers, words.inhabitants), this.crewChip(crew.free, crew.total), chip('mutant', world.kills, words.kills));
     if (status) line.append(text('hud-quest-wave', status));
     line.append(chips);
-    this.questBody.replaceChildren(goal, ...meters, hp, line);
+    this.renderObjectives(lines, selected);
+    this.questBody.replaceChildren(
+      ...(chapter
+        ? [chapterHead(world.chapter, done, objectives.length), this.objectiveList, ...detail.map((row) => row.node)]
+        : [text('hud-quest-goal', words.endless)]),
+      hp,
+      line,
+    );
     if (this.crewOpen) this.questBody.append(crewDetail(crew));
 
     if (quest && progress) {
@@ -1740,11 +1748,7 @@ export class Hud {
       this.questBody.append(row);
     }
 
-    // La ligne repliée : la première condition qui reste à remplir, l'attaque si elle crie.
-    const shown = Math.max(0, reached.findIndex(({ have, need }) => have < need));
-    const condition = goals[shown];
-    // Une naissance qui se fait attendre prend la place du titre et du « 0/1 » : la ligne n'a pas la place des deux.
-    const stripWait = condition?.type === 'births' && mutants === 0 ? stripTitle(condition, waits[shown]!, waiting[shown]!) : null;
+    // La ligne repliée : le chapitre et son avancement, l'attaque si elle crie.
     const stripHp = element('div', 'hud-strip-hp');
 
     stripHp.append(bar(hall.hp / max));
@@ -1752,15 +1756,55 @@ export class Hud {
     stripHp.dataset['low'] = hp.dataset['low'];
     this.questStrip.dataset['urgent'] = String(mutants > 0);
     this.questStrip.replaceChildren(
-      mutants > 0 ? uiIcon('mutant', 20) : condition ? goalIcon(condition) : uiIcon('goal', 20),
-      ...(stripWait
-        ? [stripWait]
-        : [
-            text('hud-strip-title', mutants > 0 ? words.attack : title),
-            ...(condition && mutants === 0 ? [text('hud-strip-value', `${reached[shown]!.have}/${reached[shown]!.need}`)] : []),
-          ]),
+      ...(mutants > 0
+        ? [uiIcon('mutant', 20), text('hud-strip-title', words.attack)]
+        : chapter
+          ? chapterStrip(world.chapter, done, objectives.length)
+          : [uiIcon('goal', 20), text('hud-strip-title', words.afterSignal)]),
       stripHp,
     );
+  }
+
+  /**
+   * L'objectif choisi dans le panneau : celui que le joueur a touché, tant
+   * qu'il reste à réussir ; sinon le premier qui reste. Son conseil passe
+   * à l'ampoule, ses jauges se déplient sous sa ligne.
+   */
+  public selectedObjective(): ObjectiveId | null {
+    const { world } = this;
+    const open = openObjectives(world);
+    const chosen = this.chosenObjective;
+
+    if (chosen && open.some(({ id }) => id === chosen)) return chosen;
+    return firstOpenObjective(world);
+  }
+
+  /** Les lignes des objectifs, gardées d'une mise à jour à l'autre : le focus de la manette ne saute pas. */
+  private renderObjectives(lines: ObjectiveLine[], selected: ObjectiveId | null): void {
+    const ids = lines.map((line) => line.id).join(',');
+
+    if (this.objectiveList.dataset['ids'] !== ids) {
+      this.objectiveList.dataset['ids'] = ids;
+      this.objectiveRows.clear();
+      this.objectiveList.replaceChildren(
+        ...lines.map((line) => {
+          const row = objectiveRow(line.id, () => this.chooseObjective(line.id));
+
+          this.objectiveRows.set(line.id, row);
+          return row.node;
+        }),
+      );
+    }
+    for (const line of lines) this.objectiveRows.get(line.id)?.update(line, line.id === selected);
+  }
+
+  /** Un tap sur la ligne d'un objectif le choisit : ses jauges, et son conseil à l'ampoule. */
+  private chooseObjective(id: ObjectiveId): void {
+    this.chosenObjective = id;
+    this.unfoldQuest(QUEST_TAP_TICKS);
+    this.updateQuest();
+    this.updateHint();
+    this.unfoldHint();
   }
 
   /**
@@ -1855,6 +1899,7 @@ export class Hud {
       },
       towers,
       this.mutantCount(),
+      this.selectedObjective(),
     );
   }
 
@@ -2057,14 +2102,36 @@ export class Hud {
 
   /* ------------------------------------------------------------ célébration */
 
-  /** Un objectif réussi : un bandeau qui dit ce qu'il rapporte, et des feuilles qui pleuvent. */
-  private celebrateObjective(index: number): void {
-    const objective = OBJECTIVES[index];
+  /** Ce qu'une récompense n'a pas pu mettre dans le sac attend à la mairie : le joueur le sait. */
+  private notifyStored(stored: Partial<Record<ItemId, number>>): void {
+    const kept = (Object.entries(stored) as [ItemId, number][]).filter(([, amount]) => amount > 0);
 
-    if (!objective) return;
+    if (kept.length === 0) return;
 
-    const words = t().objectives[index]!;
-    const title = text('hud-celebration-title', words.banner || t().hud.objectiveDone);
+    const list = kept.map(([item, amount]) => t().hud.toast.storedItem(amount, t().items[item])).join(', ');
+
+    this.notify(t().hud.toast.storedAtHall(list), 'info');
+  }
+
+  /** Un objectif réussi, le chapitre continue : la case de la barre rebondit en menthe, un toast dit ce qu'il rapporte. */
+  private celebrateObjective(id: ObjectiveId): void {
+    const words = t().objectives[id];
+
+    this.notify(t().hud.toast.objectiveDone(words.title, words.celebration), 'good');
+    this.objective.dataset['done'] = 'true';
+    window.clearTimeout(this.objectiveDoneTimer);
+    this.objectiveDoneTimer = window.setTimeout(() => {
+      if (this.celebration.hidden) delete this.objective.dataset['done'];
+    }, OBJECTIVE_DONE_MS);
+  }
+
+  /** Un chapitre fini : un bandeau qui dit ce qu'il rapporte, et des feuilles qui pleuvent. */
+  private celebrateChapter(index: number): void {
+    const words = t().chapters[index];
+
+    if (!words) return;
+
+    const title = text('hud-celebration-title', words.banner || t().hud.chapterDone);
 
     title.prepend(uiIcon('goal', 28));
     this.celebration.replaceChildren(
@@ -2338,9 +2405,132 @@ function isInhabitant(mobile: Mobile): mobile is Inhabitant {
   return mobile.kind === 'kid' || mobile.kind === 'worker' || mobile.kind === 'lumberjack' || mobile.kind === 'forester' || mobile.kind === 'farmer';
 }
 
-/** « Objectif 3/7 », ou « Après le Signal » une fois la chaîne bouclée : la partie sans fin. */
-function objectiveLabel(index: number): string {
-  return index < OBJECTIVES.length ? t().hud.quest.objective(index + 1, OBJECTIVES.length) : t().hud.quest.afterSignal;
+/** « Chapitre 3/10 », ou « Après le Signal » une fois la partie bouclée : la partie sans fin. */
+function chapterLabel(index: number): string {
+  return index < CHAPTERS.length ? t().hud.quest.chapter(index + 1, CHAPTERS.length) : t().hud.quest.afterSignal;
+}
+
+/** La case de la barre : la vignette du chapitre, son nom, ses objectifs réussis sur le total. */
+function chapterStrip(index: number, done: number, total: number): HTMLElement[] {
+  const proto = CHAPTERS[index];
+
+  if (!proto) return [uiIcon('goal', 20), text('hud-strip-title', t().hud.quest.afterSignal)];
+  return [buildingIcon(proto.icon, 22), text('hud-strip-title', t().chapters[index]!.title), text('hud-strip-value', `${done}/${total}`)];
+}
+
+/** La tête de la liste, dans la fenêtre : la vignette du chapitre, son nom, « 2/4 ». */
+function chapterHead(index: number, done: number, total: number): HTMLElement {
+  const head = element('div', 'hud-quest-goal hud-chapter-head');
+
+  head.append(...chapterStrip(index, done, total));
+  return head;
+}
+
+/** Où en est un objectif, pour sa ligne : réussi, et sa jauge — la condition seule, ou les conditions remplies. */
+interface ObjectiveLine {
+  id: ObjectiveId;
+  done: boolean;
+  have: number;
+  need: number;
+  icon: Goal;
+}
+
+function objectiveLine(world: World, id: ObjectiveId, goals: readonly Goal[]): ObjectiveLine {
+  const done = world.objectivesDone.has(id);
+  const icon = goals[0]!;
+  const hall = world.entities.get(world.townHallId);
+
+  // La mairie en chantier se compte en objets livrés : la jauge avance à chaque bois.
+  if (!done && icon.type === 'build' && icon.building === 'townHall' && hall?.kind === 'site') {
+    const cost = Object.entries(BUILDINGS[hall.proto].cost) as [ItemId, number][];
+
+    return {
+      id,
+      done,
+      have: cost.reduce((sum, [item, needed]) => sum + Math.min(hall.delivered[item] ?? 0, needed), 0),
+      need: cost.reduce((sum, [, needed]) => sum + needed, 0),
+      icon,
+    };
+  }
+  if (goals.length === 1) {
+    const { have, need } = goalProgress(world, icon);
+
+    return { id, done, have: done ? need : have, need, icon };
+  }
+
+  const met = goals.filter((goal) => {
+    const { have, need } = goalProgress(world, goal);
+
+    return have >= need;
+  }).length;
+
+  return { id, done, have: done ? goals.length : met, need: goals.length, icon };
+}
+
+/**
+ * Le détail de l'objectif choisi, sous les lignes : une jauge par objet du
+ * chantier de la mairie, ou par condition — seulement s'il en a plusieurs,
+ * ou qu'une attend une horloge (la naissance et son compte à rebours).
+ */
+function objectiveDetail(world: World, id: ObjectiveId): { key: string; node: HTMLElement }[] {
+  const { goals } = objectiveProto(id);
+  const hall = world.entities.get(world.townHallId);
+  const first = goals[0];
+
+  if (first?.type === 'build' && first.building === 'townHall' && hall?.kind === 'site') {
+    return (Object.entries(BUILDINGS[hall.proto].cost) as [ItemId, number][]).map(([item, needed]) => {
+      const have = hall.delivered[item] ?? 0;
+
+      return { key: `${item}:${have}`, node: meter(item, have, needed) };
+    });
+  }
+
+  const reached = goals.map((goal) => goalProgress(world, goal));
+  const waits = goals.map((goal) => goalWait(world, goal));
+
+  if (goals.length === 1 && !waits[0]) return [];
+  return goals.map((goal, i) => ({
+    key: `${reached[i]!.have}:${waitLabel(goal, waits[i]!)}:${waits[i]?.remainingTicks ?? ''}`,
+    node: goalMeter(goal, reached[i]!.have, reached[i]!.need, waits[i]!),
+  }));
+}
+
+/** La ligne d'un objectif : un bouton, gardé d'une mise à jour à l'autre, que l'on remet à jour. */
+interface ObjectiveRowView {
+  node: HTMLButtonElement;
+  update(line: ObjectiveLine, selected: boolean): void;
+}
+
+function objectiveRow(id: ObjectiveId, choose: () => void): ObjectiveRowView {
+  const node = element('button', 'hud-objective-row');
+  const icon = element('span', 'hud-objective-icon');
+  const title = text('hud-objective-title', '');
+  const gauge = bar(0);
+  const value = text('hud-meter-value', '');
+  let shown = '';
+
+  node.type = 'button';
+  node.dataset['objective'] = id;
+  node.append(icon, title, gauge, value);
+  node.addEventListener('click', choose);
+  return {
+    node,
+    update(line, selected) {
+      const look = `${line.done}:${locale()}`;
+      const label = t().objectives[id].title;
+
+      if (look !== shown) {
+        shown = look;
+        icon.replaceChildren(line.done ? uiIcon('check', 18) : goalIcon(line.icon));
+      }
+      title.textContent = label;
+      node.dataset['done'] = String(line.done);
+      node.setAttribute('aria-pressed', String(selected));
+      (gauge.firstElementChild as HTMLElement).style.width = `${Math.round((Math.min(line.have, line.need) / line.need) * 100)}%`;
+      value.textContent = `${line.have}/${line.need}`;
+      node.setAttribute('aria-label', `${label} ${line.have}/${line.need}${line.done ? ` — ${t().hud.objectiveDone}` : ''}`);
+    },
+  };
 }
 
 /**
@@ -2360,27 +2550,6 @@ function goalMeter(goal: Goal, have: number, need: number, wait: GoalWait | null
 
   if (label) row.append(text('hud-meter-wait', label));
   return row;
-}
-
-/** L'attente en version courte, pour la ligne repliée : « bébé 2:41 », « 2 nourritures » ; `null` sans attente. */
-function stripTitle(goal: Goal, wait: GoalWait | null, label: string): HTMLElement | null {
-  if (!wait) return null;
-
-  const words = t().hud.quest;
-  const time = clock(Math.ceil(wait.remainingTicks / TICKS_PER_SECOND));
-  const short =
-    wait.blockedBy === 'paused'
-      ? words.stripPaused
-      : wait.blockedBy
-        ? words.stripMissing(wait.missing, t().items[wait.blockedBy])
-        : goal.type === 'births'
-          ? words.stripBaby(time)
-          : words.stripNight(time);
-  const node = text('hud-strip-title', short);
-
-  setTip(node, label);
-  node.dataset['blocked'] = String(wait.blockedBy !== null);
-  return node;
 }
 
 /**
@@ -2405,9 +2574,11 @@ function goalIcon(goal: Goal): HTMLElement {
     ? tipped(buildingIcon(goal.building, 22), t().buildings[goal.building].label)
     : goal.type === 'produce'
       ? tipped(itemIcon(goal.item, 18), t().items[goal.item])
-      : goal.type === 'happiness'
+      : goal.type === 'happiness' || goal.type === 'mood'
         ? tipped(uiIcon('townMood', 18), t().hud.people.happinessName)
-        : uiIcon(goal.type === 'nights' ? 'mutant' : goal.type === 'quests' ? 'eve' : 'people', 18);
+        : goal.type === 'era'
+          ? tipped(uiIcon('town', 18), t().eras[goal.count]!.label)
+          : uiIcon(goal.type === 'nights' ? 'mutant' : goal.type === 'quests' ? 'eve' : 'people', 18);
 }
 
 /** Une ligne de quête : icône, barre, « 7/20 ». */

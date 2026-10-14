@@ -12,18 +12,16 @@
 import { WAVE_BOUNTY, WAVE_STRENGTH, isBossNight } from '../data/enemies.ts';
 import { raidCapacity, raidTicks, isStanding } from './enemyBases.ts';
 import type { ItemId } from '../data/items.ts';
-import { OBJECTIVES } from '../data/objectives.ts';
+import { ACT_ONE_CHAPTER } from '../data/objectives.ts';
 import type { EnemyBase } from './types.ts';
 
-/** L'objectif qui clôt l'acte I : celui qui porte un bandeau. Le franchir ouvre la deuxième ère. */
-const ACT_ONE = OBJECTIVES.findIndex((objective) => 'banner' in objective);
-
 /**
- * L'ère de la colonie : 0 pendant l'acte I, 1 une fois l'acte I terminé, 2
- * après le Signal. `objective` est le nombre d'objectifs réussis.
+ * L'ère de la colonie : 0 pendant l'acte I, 1 une fois l'acte I terminé — le
+ * chapitre qui porte un bandeau —, 2 après le Signal. `chapter` est le
+ * nombre de chapitres finis.
  */
-export function waveEraOf(objective: number, signalSent: boolean): number {
-  return (ACT_ONE >= 0 && objective > ACT_ONE ? 1 : 0) + (signalSent ? 1 : 0);
+export function waveEraOf(chapter: number, signalSent: boolean): number {
+  return (ACT_ONE_CHAPTER >= 0 && chapter > ACT_ONE_CHAPTER ? 1 : 0) + (signalSent ? 1 : 0);
 }
 
 /**

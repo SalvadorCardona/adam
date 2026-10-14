@@ -20,7 +20,7 @@ import type { World } from './world.ts';
  * le panneau affiche « 14/13 » si la ville a de l'avance.
  */
 export type EraCheck =
-  | { type: 'objectives'; have: number; need: number }
+  | { type: 'chapters'; have: number; need: number }
   | { type: 'population'; have: number; need: number }
   | { type: 'building'; building: BuildingId; have: number; need: number }
   | { type: 'research'; research: ResearchId; have: number; need: 1 }
@@ -58,7 +58,7 @@ export function eraChecks(world: World, era: number): EraCheck[] {
 
   const { adults, children, workers } = world.population();
   const checks: EraCheck[] = [
-    { type: 'objectives', have: world.objective, need: requires.objectives },
+    { type: 'chapters', have: world.chapter, need: requires.chapters },
     { type: 'population', have: adults + children + workers, need: requires.population },
   ];
 
