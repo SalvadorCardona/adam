@@ -9,7 +9,7 @@
 
 export const LORE = {
   /** Nom du jeu, tel qu'affiché. */
-  title: 'Mobile Factory',
+  title: 'Adam',
 
   /**
    * Le pitch, en une respiration.

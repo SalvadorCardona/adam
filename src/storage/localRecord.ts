@@ -11,7 +11,7 @@
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé du record — distincte de `SAVE_KEY` et de `GARDEN_KEY`. */
-export const RECORD_KEY = 'mobile-factory:signal-record';
+export const RECORD_KEY = 'adam:signal-record';
 
 export class LocalRecord {
   private readonly storage: SaveStorage | null;

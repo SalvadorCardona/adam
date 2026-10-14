@@ -364,8 +364,8 @@ console.log(`${LENGTH} échantillons à ${RATE} Hz par boucle (${(LENGTH / RATE)
 console.log(
   ['night', 'combat']
     .flatMap((name) => [
-      `ffmpeg -y -i ${out}/${name}.wav -c:a libvorbis -q:a 2 ${music}/mobile-factory-${name}-loop.ogg`,
-      `ffmpeg -y -i ${out}/${name}.wav -c:a aac -b:a 96k ${music}/mobile-factory-${name}-loop.m4a`,
+      `ffmpeg -y -i ${out}/${name}.wav -c:a libvorbis -q:a 2 ${music}/adam-${name}-loop.ogg`,
+      `ffmpeg -y -i ${out}/${name}.wav -c:a aac -b:a 96k ${music}/adam-${name}-loop.m4a`,
     ])
     .join('\n'),
 );

@@ -1,7 +1,7 @@
 # Déployer le jeu et le serveur sur Dokploy
 
 Le serveur (`server/`, voir CLAUDE.md « Back-end ») et le client tournent sur
-le Dokploy de cardona.digital, deux services du projet **mobile-factory** :
+le Dokploy de cardona.digital, deux services du projet **adam** :
 le serveur construit depuis `server/Dockerfile`, le client depuis
 `client/Dockerfile`. Le jeu ne parle au serveur que si `VITE_API_URL` est
 fixée à son build.
@@ -12,32 +12,33 @@ statique (nginx) qui se reconstruit sans toucher à la base ni couper les
 WebSockets ouverts. Le coût est un CORS (`CORS_ORIGINS`) et un second
 enregistrement DNS.
 
-Adresse retenue : **https://mobile-factory-api.cardona.digital** (wss:// sur le
+Adresse retenue : **https://adam-api.cardona.digital** (wss:// sur le
 même hôte, chemin `/ws`).
 
 ## 1. DNS (à la main)
 
 Aucun joker `*.cardona.digital` n'existe : créer un enregistrement
-`A mobile-factory-api.cardona.digital → 148.230.109.72` (l'IP de
+`A adam-api.cardona.digital → 148.230.109.72` (l'IP de
 `dokploy.cardona.digital`). Sans lui, Let's Encrypt ne délivre pas le certificat.
 
 ## 2. Service Dokploy
 
-Projet **mobile-factory**, service **Application** `mobile-factory-server` :
+Projet **adam**, service **Application** `adam-server` :
 
-- **Source** : GitHub, `SalvadorCardona/mobile-factory`, branche `main`,
+- **Source** : GitHub, `SalvadorCardona/adam`, branche `main`,
   « Trigger type » *On push* (déploiement automatique) ;
 - **Build** : type *Dockerfile*, Dockerfile `server/Dockerfile`, contexte `.`
   (la racine : le serveur importe `shared/`) ;
-- **Volume** : *Volume mount* `mobile-factory-data` → `/data` (la base SQLite
-  et ses sauvegardes : elle survit aux redéploiements) ;
-- **Domaine** : `mobile-factory-api.cardona.digital`, chemin `/`, port
+- **Volume** : *Volume mount* → `/data` (la base SQLite et ses sauvegardes :
+  elle survit aux redéploiements) — `adam-data` sur une installation neuve ; en
+  production, le volume d'origine, gardé sous son nom (section 6) ;
+- **Domaine** : `adam-api.cardona.digital`, chemin `/`, port
   conteneur `8790`, HTTPS activé, certificat *Let's Encrypt* (Traefik transmet
   les WebSockets sans réglage) ;
 - **Variables d'environnement** (onglet Environment, jamais commitées) :
 
   ```
-  CORS_ORIGINS=https://cardona.digital,https://mobile-factory.cardona.digital
+  CORS_ORIGINS=https://cardona.digital,https://adam.cardona.digital
   INVITE_TTL_MINUTES=60
   ```
 
@@ -57,45 +58,45 @@ onglet **Schedules** : tâche `sauvegarde-sqlite`, cron `0 3 * * *`, type
 
 Les copies restent dans le même volume : pour les sortir du serveur, ajouter
 une destination S3 dans *Settings → S3 Destinations* et une sauvegarde de
-volume (*Volume Backups*) du volume `mobile-factory-data`.
+volume (*Volume Backups*) de ce volume.
 
 ## 4. Le client de production
 
 ### DNS (à la main)
 
-Créer `A mobile-factory.cardona.digital → 148.230.109.72` (même IP que le
+Créer `A adam.cardona.digital → 148.230.109.72` (même IP que le
 serveur). Sans lui, Let's Encrypt ne délivre pas le certificat.
 
 ### Service Dokploy
 
-Projet **mobile-factory**, service **Application** `mobile-factory-client` :
+Projet **adam**, service **Application** `adam-client` :
 
-- **Source** : GitHub, `SalvadorCardona/mobile-factory`, branche `main`,
+- **Source** : GitHub, `SalvadorCardona/adam`, branche `main`,
   « Trigger type » *On push* ;
 - **Build** : type *Dockerfile*, Dockerfile `client/Dockerfile`, contexte `.` ;
 - **Build-time Arguments** (onglet Environment — pas les variables
   d'exécution : Vite fige `VITE_API_URL` dans le bundle) :
 
   ```
-  VITE_API_URL=https://mobile-factory-api.cardona.digital
+  VITE_API_URL=https://adam-api.cardona.digital
   ```
 
-- **Domaine** : `mobile-factory.cardona.digital`, chemin `/`, port conteneur
+- **Domaine** : `adam.cardona.digital`, chemin `/`, port conteneur
   `80`, HTTPS activé, certificat *Let's Encrypt*.
 
-nginx (`client/nginx.conf`) sert le jeu sous `/mobile-factory/` (la `base` de
+nginx (`client/nginx.conf`) sert le jeu sous `/adam/` (la `base` de
 `vite.config.ts`, comme sur GitHub Pages) et renvoie `/` vers ce chemin en
 gardant la requête. Le lien d'invitation (`?join=`) et son QR code sont bâtis
-sur l'adresse de la page : ils prennent donc `https://mobile-factory.cardona.digital/mobile-factory/?join=CODE`
+sur l'adresse de la page : ils prennent donc `https://adam.cardona.digital/adam/?join=CODE`
 sans réglage.
 
-Essai local : `docker build -f client/Dockerfile --build-arg VITE_API_URL=… -t mobile-factory-client .`
+Essai local : `docker build -f client/Dockerfile --build-arg VITE_API_URL=… -t adam-client .`
 
 ### État en production
 
-Créés dans Dokploy (projet **mobile-factory**) : le service `mobile-factory-client`
+Créés dans Dokploy (projet **adam**) : le service `adam-client`
 (GitHub `main`, Dockerfile `client/Dockerfile`, autodeploy, argument de build
-`VITE_API_URL`), son domaine `mobile-factory.cardona.digital` (port 80, HTTPS,
+`VITE_API_URL`), son domaine `adam.cardona.digital` (port 80, HTTPS,
 Let's Encrypt) et le DNS chez Hostinger. `CORS_ORIGINS` du serveur contient le
 nouveau domaine (vérifié : `access-control-allow-origin` renvoyé). Le premier
 déploiement du client part à la fusion de la branche dans `main`, qui apporte
@@ -113,9 +114,9 @@ sauvegardes locales (`localStorage`) sont par origine et divergeraient.
 ## 5. Vérifier
 
 ```bash
-curl https://mobile-factory-api.cardona.digital/health
-npx wscat -c wss://mobile-factory-api.cardona.digital/ws -H "Origin: https://mobile-factory.cardona.digital"
-curl -I https://mobile-factory.cardona.digital/
+curl https://adam-api.cardona.digital/health
+npx wscat -c wss://adam-api.cardona.digital/ws -H "Origin: https://adam.cardona.digital"
+curl -I https://adam.cardona.digital/
 ```
 
 Parcours à deux, en production : A crée un compte, lance une partie, pause →
@@ -127,3 +128,66 @@ Hors ligne et sans compte, le jeu se joue comme avant.
 
 Un redéploiement (bouton *Deploy*, ou un push sur `main`) ne doit pas perdre
 les comptes : se connecter avant et après.
+
+## 6. Le renommage en Adam
+
+Le jeu s'appelait autrement ; tout ce qui le nommait a pris le nom d'Adam
+(`adam`, `/adam/`, `adam.cardona.digital`, `adam-api.cardona.digital`,
+`SalvadorCardona/adam`). Rien ne se perd :
+
+- **clés de l'appareil** : au démarrage, `src/storage/legacyKeys.ts` copie
+  chaque clé de l'ancien préfixe vers `adam:*` si elle manque, puis retire
+  l'ancienne ; il désinscrit l'ancien service worker et vide ses caches (même
+  origine : GitHub Pages) ;
+- **ancienne adresse du client** : nginx (`client/nginx.conf`, second bloc
+  `server`) y sert la page de transfert `client/legacy/index.html` pour tout
+  chemin. Elle lit les clés de cette origine, les compresse et les envoie dans
+  le fragment (`https://adam.cardona.digital/adam/#import=…`, jamais dans la
+  requête ni les journaux) ; le jeu les importe sans rien écraser et nettoie
+  l'adresse. Pas de 301 pour le client, donc : une redirection perdrait les
+  sauvegardes. L'ancien `sw.js` y est remplacé par `client/legacy/sw.js`, qui
+  se désinscrit ;
+- **base** : `DATABASE_PATH` prend le nouveau nom (`config.ts`), et
+  `openDatabase` renomme l'ancien fichier (avec `-wal` et `-shm`) s'il est seul ;
+- **CORS** : sans `CORS_ORIGINS`, le serveur accepte les nouvelles origines et
+  l'ancienne ; en production, la variable doit les lister aussi.
+
+Dans Dokploy, après fusion et sauvegarde de la base (*Schedules* → lancer
+`sauvegarde-sqlite`, ou une *Volume Backup*) :
+
+1. DNS : `A adam` et `A adam-api` → `148.230.109.72` (Hostinger) ;
+2. renommer le projet et les services (`adam-server`, `adam-client`) — le
+   volume garde son nom ;
+3. `adam-client` : ajouter le domaine `adam.cardona.digital` (port 80,
+   HTTPS) en **gardant** l'ancien domaine du client (il sert la page de
+   transfert) ; argument de build `VITE_API_URL=https://adam-api.cardona.digital` ;
+4. `adam-server` : ajouter `adam-api.cardona.digital` (port 8790, HTTPS) en
+   gardant l'ancien domaine de l'API sur le même service, sans redirection —
+   un `fetch` cross-origin ne suit pas une redirection de prévol CORS, et un
+   client encore en cache doit joindre l'API ;
+   `CORS_ORIGINS=https://cardona.digital,https://adam.cardona.digital,` suivi
+   de l'ancienne origine du client ;
+5. redéployer les deux, puis vérifier (section 5, `/health` → `service: "adam"`).
+
+GitHub Pages : une fois le dépôt renommé, le jeu est sous
+`salvadorcardona.github.io/adam/`. `cardona.digital/<projet>/` n'est pas servi
+par Pages mais relayé par Traefik (dépôt du site, `deploy/traefik/github-pages.yml`,
+copié dans `/etc/dokploy/traefik/dynamic/`) : y ajouter `/adam/` et `/adam` aux
+deux règles, et renvoyer l'ancien chemin en 301 vers `/adam/` en gardant le
+reste du chemin et la requête (le navigateur garde le fragment). Même origine :
+les clés y sont communes, le jeu les renomme lui-même ; l'ancien service
+worker, dont la page passe par le réseau d'abord, suit la redirection, et le
+jeu le désinscrit. Relancer ensuite le workflow *Deploy* (build sous `/adam/`).
+
+### État en production (renommage)
+
+Faits : DNS `adam` et `adam-api` chez Hostinger ; sauvegarde de la base ; projet
+Dokploy `adam`, services `adam-server` et `adam-client` (`appName` et volume
+inchangés) ; domaines `adam-api.cardona.digital` (8790) et `adam.cardona.digital`
+(80), HTTPS Let's Encrypt, les anciens gardés ; `CORS_ORIGINS` avec les trois
+origines ; argument de build et variable du dépôt `VITE_API_URL` →
+`https://adam-api.cardona.digital`.
+
+Après fusion : renommer le dépôt, pointer la source GitHub des deux services
+Dokploy sur `adam` (sinon le déploiement au push ne part plus), la règle
+Traefik de `cardona.digital`, relancer *Deploy*.

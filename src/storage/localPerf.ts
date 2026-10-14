@@ -9,7 +9,7 @@
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé du compteur — distincte de celles de la sauvegarde et des autres préférences. */
-export const PERF_KEY = 'mobile-factory:perf';
+export const PERF_KEY = 'adam:perf';
 
 export class LocalPerf {
   private readonly storage: SaveStorage | null;

@@ -9,7 +9,7 @@ import { GAMEPAD } from '../input/gamepad.ts';
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé de la manette — distincte de celles de la sauvegarde, du jardin, du record, du zoom et des vibrations. */
-export const GAMEPAD_KEY = 'mobile-factory:gamepad';
+export const GAMEPAD_KEY = 'adam:gamepad';
 
 export interface GamepadPrefs {
   /** Zone morte des deux sticks, dans `GAMEPAD.deadZoneRange`. */

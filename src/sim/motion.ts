@@ -8,7 +8,7 @@
  * ce rocher qu'on heurte, pas l'arbre qu'on frôle.
  *
  * Pas de vitesse, pas d'inertie, pas de masse : une position voulue, une
- * position obtenue. C'est tout ce qu'un jeu d'usine demande.
+ * position obtenue. C'est tout ce qu'un jeu de construction demande.
  *
  * Adam seul voit plus fin que la tuile (`moveBoxAmong`) : un arbre ne
  * l'arrête que par son tronc, et il glisse autour au lieu de s'y coller.

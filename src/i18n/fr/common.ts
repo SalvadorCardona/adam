@@ -13,7 +13,7 @@ export const common = {
   /** « s » au pluriel : en français, 0 et 1 sont au singulier. */
   plural: (count: number): string => (count > 1 ? 's' : ''),
   /** Le titre de l'onglet. */
-  pageTitle: 'Mobile Factory — après la fin du monde',
+  pageTitle: 'Adam — après la fin du monde',
 };
 
 export const settings = {

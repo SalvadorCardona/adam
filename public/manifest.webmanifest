@@ -1,7 +1,7 @@
 {
-  "name": "Mobile Factory",
-  "short_name": "Mobile Factory",
-  "description": "Jeu d'usine 2D pour navigateur mobile, en TypeScript et PixiJS.",
+  "name": "Adam",
+  "short_name": "Adam",
+  "description": "Jeu de construction et de survie 2D pour navigateur mobile, en TypeScript et PixiJS.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

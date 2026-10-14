@@ -34,7 +34,7 @@ describe('Notifier', () => {
     const { notifier, shown } = setup();
 
     expect(notifier.notify('research', message)).toBe(true);
-    expect(shown).toEqual([{ title: 'Titre', tag: 'mobile-factory:research' }]);
+    expect(shown).toEqual([{ title: 'Titre', tag: 'adam:research' }]);
   });
 
   it('se tait sans permission, ou quand on regarde le jeu', () => {

@@ -16,7 +16,7 @@
 export const API_VERSION = 1;
 
 /** Le nom que `/health` renvoie : un autre service sur la même URL n'est pas « en ligne ». */
-export const API_SERVICE = 'mobile-factory';
+export const API_SERVICE = 'adam';
 
 /** Les chemins de l'API, des deux côtés la même chaîne. */
 export const API_PATHS = {
@@ -335,7 +335,7 @@ export const PARTY_LIMITS = {
   maxGuests: 1,
 } as const;
 
-/** Le paramètre d'URL qui porte le code d'une invitation : `…/mobile-factory/?join=ABCD2345`. */
+/** Le paramètre d'URL qui porte le code d'une invitation : `…/adam/?join=ABCD2345`. */
 export const INVITE_PARAM = 'join';
 
 /** Le paramètre d'URL de l'ami en jeu : la page se rouvre dans la partie de l'hôte (`…/?play=ABCD2345`). */

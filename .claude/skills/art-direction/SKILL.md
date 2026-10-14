@@ -1,6 +1,6 @@
 ---
 name: art-direction
-description: Direction artistique vectorielle « post-apo joyeux » de Mobile Factory. À charger AVANT toute création ou modification de visuel — sprite, bâtiment, personnage, terrain, décor, effet, icône, écran d'interface, bannière. Donne les dix règles, la palette chiffrée, les helpers SVG de src/data/artDirection.ts et la check-list de relecture.
+description: Direction artistique vectorielle « post-apo joyeux » d'Adam. À charger AVANT toute création ou modification de visuel — sprite, bâtiment, personnage, terrain, décor, effet, icône, écran d'interface, bannière. Donne les dix règles, la palette chiffrée, les helpers SVG de src/data/artDirection.ts et la check-list de relecture.
 ---
 
 # Direction artistique — « post-apo joyeux »

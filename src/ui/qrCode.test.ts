@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { auditSvg } from '../data/artDirection.ts';
 import { qrModules, qrSvg } from './qrCode.ts';
 
-const LINK = 'https://cardona.digital/mobile-factory/?join=ABCD2345';
+const LINK = 'https://cardona.digital/adam/?join=ABCD2345';
 
 describe('qrModules', () => {
   it('donne une grille carrée, avec les trois repères aux coins', () => {

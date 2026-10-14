@@ -13,8 +13,8 @@
  * et le serveur ne démarre pas.
  */
 
-import { readdirSync, readFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, mkdirSync, renameSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -51,9 +51,34 @@ export function readMigrations(dir: string = MIGRATIONS_DIR): Migration[] {
   return migrations;
 }
 
+/** Le nom de la base avant le renommage du jeu (`adam.sqlite` ← `mobile-factory.sqlite`). */
+const LEGACY_NAME: Readonly<Record<string, string>> = { 'adam.sqlite': 'mobile-factory.sqlite' };
+
+/**
+ * Le jeu a changé de nom, sa base aussi : si le fichier attendu manque et que
+ * l'ancien est là, à côté, on le renomme avec son journal WAL et sa mémoire
+ * partagée. Rend `true` s'il y a eu renommage.
+ */
+export function adoptLegacyDatabase(path: string): boolean {
+  const legacyName = LEGACY_NAME[basename(path)];
+
+  if (legacyName === undefined || existsSync(path)) return false;
+
+  const legacy = join(dirname(path), legacyName);
+
+  if (!existsSync(legacy)) return false;
+  for (const suffix of ['-wal', '-shm']) if (existsSync(legacy + suffix)) renameSync(legacy + suffix, path + suffix);
+  renameSync(legacy, path);
+
+  return true;
+}
+
 /** Ouvre la base (et crée son dossier) avec les réglages du serveur. */
 export function openDatabase(path: string): DatabaseSync {
-  if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+  if (path !== ':memory:') {
+    mkdirSync(dirname(path), { recursive: true });
+    adoptLegacyDatabase(path);
+  }
 
   const db = new DatabaseSync(path);
 

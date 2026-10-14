@@ -1,10 +1,10 @@
-# Le client de Mobile Factory : build Vite, puis nginx qui sert `dist/`.
+# Le client d'Adam : build Vite, puis nginx qui sert `dist/`.
 # À construire depuis la racine du dépôt, avec l'adresse du serveur en argument :
 #
 #   docker build -f client/Dockerfile \
-#     --build-arg VITE_API_URL=https://mobile-factory-api.cardona.digital \
-#     -t mobile-factory-client .
-#   docker run -p 8080:80 mobile-factory-client
+#     --build-arg VITE_API_URL=https://adam-api.cardona.digital \
+#     -t adam-client .
+#   docker run -p 8080:80 adam-client
 #
 # Sans `VITE_API_URL`, le jeu est construit hors ligne : aucune requête serveur.
 
@@ -26,6 +26,7 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 COPY client/nginx.conf /etc/nginx/conf.d/default.conf
+COPY client/legacy /usr/share/nginx/legacy
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80

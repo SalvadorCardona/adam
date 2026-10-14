@@ -8,7 +8,7 @@
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé des pancartes — distincte de celles de la sauvegarde, du jardin, du record et du zoom. */
-export const SIGNS_KEY = 'mobile-factory:signs';
+export const SIGNS_KEY = 'adam:signs';
 
 export class LocalSigns {
   private readonly storage: SaveStorage | null;

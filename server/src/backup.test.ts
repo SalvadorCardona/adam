@@ -11,7 +11,7 @@ describe('sauvegarde de la base', () => {
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'mf-backup-'));
-    path = join(dir, 'mobile-factory.sqlite');
+    path = join(dir, 'adam.sqlite');
 
     const db = new DatabaseSync(path);
 
@@ -22,7 +22,7 @@ describe('sauvegarde de la base', () => {
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
   it('nomme la copie d’après la base et l’instant', () => {
-    expect(backupName(path, new Date('2026-10-13T03:04:05.678Z'))).toBe('mobile-factory-20261013T030405Z.sqlite');
+    expect(backupName(path, new Date('2026-10-13T03:04:05.678Z'))).toBe('adam-20261013T030405Z.sqlite');
   });
 
   it('copie les données dans backups/', async () => {
@@ -44,9 +44,9 @@ describe('sauvegarde de la base', () => {
     const kept = listBackups(join(dir, 'backups'), path);
 
     expect(kept).toEqual([
-      'mobile-factory-20261003T000000Z.sqlite',
-      'mobile-factory-20261004T000000Z.sqlite',
-      'mobile-factory-20261005T000000Z.sqlite',
+      'adam-20261003T000000Z.sqlite',
+      'adam-20261004T000000Z.sqlite',
+      'adam-20261005T000000Z.sqlite',
     ]);
   });
 

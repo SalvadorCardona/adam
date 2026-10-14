@@ -9,7 +9,7 @@ export const common: Messages['common'] = {
   cancel: 'Cancel',
   number: (value) => NUMBER.format(value),
   plural: (count) => (count === 1 ? '' : 's'),
-  pageTitle: 'Mobile Factory — after the end of the world',
+  pageTitle: 'Adam — after the end of the world',
 };
 
 export const settings: Messages['settings'] = {

@@ -30,8 +30,30 @@ const MAX_INVITE_MINUTES = 24 * 60;
 /** Le port par défaut : celui que le client vise en développement (`.env.online`). */
 export const DEFAULT_PORT = 8790;
 
-/** Le serveur de Vite, en local, quel que soit son port (5173 pris, il passe au suivant). */
-const DEV_ORIGINS = ['http://localhost:*', 'http://127.0.0.1:*'];
+/**
+ * Les origines par défaut : le serveur de Vite, en local, quel que soit son
+ * port (5173 pris, il passe au suivant), et les adresses publiques du jeu —
+ * les nouvelles, et l'ancienne, qu'un client encore en cache peut appeler
+ * pendant la transition.
+ */
+const DEFAULT_ORIGINS = [
+  'http://localhost:*',
+  'http://127.0.0.1:*',
+  'https://cardona.digital',
+  'https://adam.cardona.digital',
+  'https://mobile-factory.cardona.digital',
+];
+
+/** Le fichier de la base, par défaut. */
+const DEFAULT_DATABASE = 'data/adam.sqlite';
+
+/**
+ * Le nom de la base suit celui du jeu : un `DATABASE_PATH` resté à l'ancien
+ * nom prend le nouveau, et `openDatabase` renomme le fichier au démarrage.
+ */
+export function currentDatabasePath(path: string): string {
+  return path.replace(/mobile-factory(?=[^/\\]*$)/, 'adam');
+}
 
 /**
  * L'environnement du processus, complété par `.env` s'il existe dans le
@@ -64,8 +86,8 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): S
   return {
     port,
     host: env['HOST'] || '0.0.0.0',
-    databasePath: env['DATABASE_PATH'] || 'data/mobile-factory.sqlite',
-    corsOrigins: origins.length > 0 ? origins : DEV_ORIGINS,
+    databasePath: currentDatabasePath(env['DATABASE_PATH'] || DEFAULT_DATABASE),
+    corsOrigins: origins.length > 0 ? origins : DEFAULT_ORIGINS,
     inviteTtlMs: minutes * 60_000,
   };
 }

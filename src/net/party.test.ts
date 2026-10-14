@@ -7,7 +7,7 @@ const USER = { id: 1, nickname: 'Adam', email: 'adam@example.com' };
 const PARTY = { code: 'ABCD2345', host: 'Adam', expiresAt: 1, role: 'host', guests: [], full: false };
 
 function store(): LocalAccount {
-  const data = new Map<string, string>([['mobile-factory:account', JSON.stringify({ token: 'jeton', user: USER })]]);
+  const data = new Map<string, string>([['adam:account', JSON.stringify({ token: 'jeton', user: USER })]]);
 
   return new LocalAccount({
     getItem: (key) => data.get(key) ?? null,

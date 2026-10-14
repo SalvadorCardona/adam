@@ -119,7 +119,7 @@ export class Notifier {
     this.prefs.sent = (this.prefs.day === today ? this.prefs.sent : 0) + 1;
     this.prefs.day = today;
     this.store.save(this.prefs);
-    this.backend.show(message.title, message.body, `mobile-factory:${kind}`);
+    this.backend.show(message.title, message.body, `adam:${kind}`);
     return true;
   }
 }

@@ -1,6 +1,6 @@
 /**
  * Le verrou d'onglet : deux onglets sur la même partie s'écraseraient la
- * sauvegarde l'un l'autre. La clé `mobile-factory:tab` porte l'identifiant de
+ * sauvegarde l'un l'autre. La clé `adam:tab` porte l'identifiant de
  * l'onglet qui a la main — le dernier arrivé, ou celui qui l'a reprise. Un
  * onglet qui ne la porte plus n'écrit plus rien et propose de la reprendre.
  *
@@ -11,7 +11,7 @@
 import type { SaveStorage } from './localSave.ts';
 
 /** La clé de l'onglet qui a la main. */
-export const TAB_KEY = 'mobile-factory:tab';
+export const TAB_KEY = 'adam:tab';
 
 export class TabLock {
   public readonly id: string;

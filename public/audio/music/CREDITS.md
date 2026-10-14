@@ -6,9 +6,9 @@ pour Safari). Le jeu les boucle sur leur longueur exacte en échantillons
 
 | Fichier | Moment | Origine | Durée |
 | --- | --- | --- | --- |
-| `mobile-factory-melancolique-loop` | le jour | thème orchestral (violoncelle, harpe, cordes) choisi pour le jeu | 4 811 751 éch. à 44,1 kHz |
-| `mobile-factory-night-loop` | la nuit calme, du crépuscule à l'aube | composé et synthétisé pour ce jeu | 2 116 800 éch. (48 s) |
-| `mobile-factory-combat-loop` | tant que des mutants sont dehors | composé et synthétisé pour ce jeu | 2 116 800 éch. (48 s) |
+| `adam-melancolique-loop` | le jour | thème orchestral (violoncelle, harpe, cordes) choisi pour le jeu | 4 811 751 éch. à 44,1 kHz |
+| `adam-night-loop` | la nuit calme, du crépuscule à l'aube | composé et synthétisé pour ce jeu | 2 116 800 éch. (48 s) |
+| `adam-combat-loop` | tant que des mutants sont dehors | composé et synthétisé pour ce jeu | 2 116 800 éch. (48 s) |
 
 ## Nuit et combat — composés dans le dépôt
 
