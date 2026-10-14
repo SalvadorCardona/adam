@@ -188,6 +188,11 @@ inchangés) ; domaines `adam-api.cardona.digital` (8790) et `adam.cardona.digita
 origines ; argument de build et variable du dépôt `VITE_API_URL` →
 `https://adam-api.cardona.digital`.
 
-Après fusion : renommer le dépôt, pointer la source GitHub des deux services
-Dokploy sur `adam` (sinon le déploiement au push ne part plus), la règle
-Traefik de `cardona.digital`, relancer *Deploy*.
+Après fusion, faits le 2026-10-14 : dépôt renommé `SalvadorCardona/adam` ; source
+GitHub des deux services Dokploy pointée sur `adam` (branche `main`) puis
+redéployés (`/health` → `service: "adam"`) ; règles Traefik de `cardona.digital`
+(`/adam/` et `/adam` ajoutés, `/mobile-factory` et `/mobile-factory/…` renvoyés
+vers `/adam/…`, chemin et requête gardés — Traefik répond par un 308, redirection
+permanente qui garde aussi la méthode) ; workflow *Deploy* relancé
+(`https://cardona.digital/adam/`) ; transfert des clés vérifié de
+`mobile-factory.cardona.digital` vers `adam.cardona.digital/adam/`.
