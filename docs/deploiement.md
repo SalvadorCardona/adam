@@ -37,7 +37,7 @@ Projet **mobile-factory**, service **Application** `mobile-factory-server` :
 - **Variables d'environnement** (onglet Environment, jamais commitées) :
 
   ```
-  CORS_ORIGINS=https://mobile-factory.cardona.digital
+  CORS_ORIGINS=https://cardona.digital,https://mobile-factory.cardona.digital
   INVITE_TTL_MINUTES=60
   ```
 
@@ -90,6 +90,16 @@ sur l'adresse de la page : ils prennent donc `https://mobile-factory.cardona.dig
 sans réglage.
 
 Essai local : `docker build -f client/Dockerfile --build-arg VITE_API_URL=… -t mobile-factory-client .`
+
+### État en production
+
+Créés dans Dokploy (projet **mobile-factory**) : le service `mobile-factory-client`
+(GitHub `main`, Dockerfile `client/Dockerfile`, autodeploy, argument de build
+`VITE_API_URL`), son domaine `mobile-factory.cardona.digital` (port 80, HTTPS,
+Let's Encrypt) et le DNS chez Hostinger. `CORS_ORIGINS` du serveur contient le
+nouveau domaine (vérifié : `access-control-allow-origin` renvoyé). Le premier
+déploiement du client part à la fusion de la branche dans `main`, qui apporte
+`client/Dockerfile`.
 
 ### Retirer GitHub Pages
 
