@@ -1185,7 +1185,8 @@ async function main(): Promise<void> {
         stick.root.getBoundingClientRect(),
         zoom.root.getBoundingClientRect(),
       ]);
-      if (renderer.zoomLevel !== shownZoom) {
+      // Seul un niveau choisi se mémorise : le cadrage de départ suit l'écran.
+      if (renderer.zoomChosen && renderer.zoomLevel !== shownZoom) {
         shownZoom = renderer.zoomLevel;
         zoomPrefs.save(shownZoom);
       }

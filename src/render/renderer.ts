@@ -26,13 +26,13 @@ import type { GhostState } from '../input/placement.ts';
 import type { EntityId } from '../sim/types.ts';
 import type { Selection } from '../ui/creatureView.ts';
 import { STEP_MS, type World } from '../sim/world.ts';
-import { Camera, ZOOM, stepZoom } from './camera.ts';
+import { Camera, FIT_REACH, ZOOM, fitZoom, knownSpan, stepZoom } from './camera.ts';
 import { ChunkLayer } from './chunkLayer.ts';
 import { trailsOf } from './meadow.ts';
 import { EnemyBaseLayer } from './enemyBaseLayer.ts';
 import { ChestLayer } from './chestLayer.ts';
 import { SpotLayer } from './spotLayer.ts';
-import { TILE_SIZE } from '../core/grid.ts';
+import { TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { EntityLayer } from './entityLayer.ts';
 import { FogLayer } from './fogLayer.ts';
 import { GhostLayer } from './ghostLayer.ts';
@@ -78,6 +78,9 @@ export class GameRenderer {
   private selected: Selection | null = null;
   private readonly nightLayer: NightLayer;
   private readonly fogLayer: FogLayer;
+  /** La taille d'écran pour laquelle la caméra a cadré la zone explorée. */
+  private fittedWidth = 0;
+  private fittedHeight = 0;
   public readonly particles: ParticleLayer;
   private readonly library: SpriteLibrary;
   private readonly signboards: Signboards;
@@ -272,6 +275,11 @@ export class GameRenderer {
     this.camera.resetZoom();
   }
 
+  /** Le joueur a-t-il choisi son niveau de zoom ? Sinon, la caméra cadre la zone explorée et rien ne se mémorise. */
+  public get zoomChosen(): boolean {
+    return this.camera.levelChosen;
+  }
+
   /** Reprend un niveau de zoom mémorisé, sans glisser. */
   public restoreZoom(level: number): void {
     this.camera.restoreLevel(level);
@@ -297,12 +305,36 @@ export class GameRenderer {
     this.camera.shake(amount);
   }
 
+  /**
+   * Tant que le joueur n'a pas choisi son zoom, cadre la zone explorée autour
+   * d'Adam : au premier cadre, puis à chaque taille d'écran. Pas en marchant —
+   * la carte ne recule pas sous ses pas à mesure qu'il explore.
+   */
+  private fitCamera(): void {
+    const { width, height } = this.app.screen;
+
+    if (this.camera.levelChosen || (width === this.fittedWidth && height === this.fittedHeight)) return;
+    this.fittedWidth = width;
+    this.fittedHeight = height;
+
+    const { player } = this.world;
+    const span = knownSpan(
+      (tx, ty) => this.world.sightAt(tx, ty) !== 'unexplored',
+      floorDiv(player.x, TILE_SIZE),
+      floorDiv(player.y, TILE_SIZE),
+      FIT_REACH,
+    );
+
+    this.camera.fit(fitZoom(width, height, span.width, span.height));
+  }
+
   /** `armed` : le bâtiment armé au menu de construction, ou `null` hors du mode construction. */
   public draw(alpha: number, armed: BuildingId | null, ghost: GhostState | null): void {
     const building = armed !== null;
     const { player } = this.world;
 
     this.camera.resize(this.app.screen.width, this.app.screen.height);
+    this.fitCamera();
     // La caméra suit la position interpolée, pas la position de simulation :
     // sinon elle avance par sauts de 7 pixels à 20 TPS. La vitesse, elle, se
     // lit sur le dernier pas : c'est elle qui décide de l'avance.
@@ -336,7 +368,7 @@ export class GameRenderer {
     this.spots.update(this.camera, this.app.ticker.deltaMS);
     this.particles.update(this.app.ticker.deltaMS);
     this.nightLayer.update(alpha);
-    this.fogLayer.update(this.camera);
+    this.fogLayer.update(this.camera, this.app.ticker.deltaMS);
     this.ghostLayer.update(armed, ghost, block, this.app.ticker.deltaMS);
     this.workReach.update(building ? ghost : null, this.selected?.kind === 'building' ? this.selected.id : null);
     this.selection.update(this.selected, alpha, this.app.ticker.deltaMS);
