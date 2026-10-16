@@ -55,6 +55,7 @@ import { DEATH } from '../data/death.ts';
 import { COMPANIONS, COMPANION_CLASSES, type CompanionClassId } from '../data/companions.ts';
 import { PIGS, PIG_FARM } from '../data/pigs.ts';
 import { DAWN_REWARD, DAY_CYCLE, SURVIVORS } from '../data/dayNight.ts';
+import { DAILY_MODS, type DailyGame, type DailyModProto } from '../data/dailyMods.ts';
 import { BOON_OFFER, BOONS, type BoonId } from '../data/boons.ts';
 import { boonBonus, drawBoons } from './boons.ts';
 import { CHALLENGE_STREAK, CHALLENGES, type ChallengeId, type ChallengeStat } from '../data/challenges.ts';
@@ -1036,6 +1037,13 @@ export class World {
   public colonists: number = COLONY.startingWorkers;
 
   /**
+   * La carte du jour (`sim/daily.ts`) : sa date UTC et son modificateur, lus
+   * par `bonus`, `dailyCycle`, le pas des mutants et le départ de la colonie.
+   * `null` : une partie ordinaire. Sauvegardé.
+   */
+  public dailyMap: DailyGame | null = null;
+
+  /**
    * Les bases mutantes, debout ou abattues (`data/enemyBases.ts`) : tirées de
    * la seed à la création de la partie, puis de l'état — leurs points de vie.
    */
@@ -1177,8 +1185,11 @@ export class World {
   private readonly problems = new ProblemWatch();
 
   /** Une colonie neuve : seuls les bâtiments de départ sont au menu. */
-  public static newColony(seed: number): World {
+  public static newColony(seed: number, daily: DailyGame | null = null): World {
     const world = new World(seed);
+
+    world.dailyMap = daily;
+    world.colonists = (daily && (DAILY_MODS[daily.mod] as DailyModProto).startingWorkers) ?? COLONY.startingWorkers;
 
     world.openBuildings = new Set(START_BUILDINGS);
     // Une seule région : la prairie de départ. Le reste se conquiert.
@@ -1316,6 +1327,7 @@ export class World {
       signalNights: this.signalNights,
       lureNight: this.lureNight,
       colonists: this.colonists,
+      ...(this.dailyMap && { dailyMap: { ...this.dailyMap } }),
       staffPosts: [...(this.posts ?? [])].map(([id, { filled, since }]) => ({ id, filled, since })),
       enemyBases: this.enemyBases.map((base) => ({ ...base })),
       regions: { conquered: [...this.conquered].sort((a, b) => a - b), guardians: [...this.guardianHp].map(([id, hp]) => ({ id, hp })) },
@@ -1400,6 +1412,7 @@ export class World {
     this.victoryTick = state.victoryTick;
     this.signalNights = state.signalNights ?? 0;
     this.lureNight = state.lureNight ?? 0;
+    this.dailyMap = state.dailyMap ? { ...state.dailyMap } : null;
     this.stats = copyStats(state.stats);
     this.chapterBase = copyStats(state.chapterBase);
 
@@ -3005,7 +3018,26 @@ export class World {
    * d'Adam (`sim/levels.ts`) s'y ajoutent : un seul cumul, aucun doublon.
    */
   public bonus(stat: ResearchStat): number {
-    return researchBonus(this.researchDone, stat) + levelBonus(this.level(), stat) + boonBonus(this.activeBoon()?.id ?? null, stat);
+    return researchBonus(this.researchDone, stat) + levelBonus(this.level(), stat) + boonBonus(this.activeBoon()?.id ?? null, stat) + this.dailyBonus(stat);
+  }
+
+  /** Ce que le modificateur de la carte du jour ajoute à une statistique. */
+  private dailyBonus(stat: ResearchStat): number {
+    const bonuses: Partial<Record<ResearchStat, number>> = this.dailyMap ? (DAILY_MODS[this.dailyMap.mod] as DailyModProto).bonuses ?? {} : {};
+
+    return bonuses[stat] ?? 0;
+  }
+
+  /** Le facteur de durée du cycle d'un producteur que le modificateur du jour ralentit ; 1 sinon. */
+  private dailyCycle(proto: BuildingId): number {
+    const slow: Partial<Record<BuildingId, number>> = this.dailyMap ? (DAILY_MODS[this.dailyMap.mod] as DailyModProto).slowCycle ?? {} : {};
+
+    return slow[proto] ?? 1;
+  }
+
+  /** Le facteur de vitesse des mutants que le modificateur du jour impose ; 1 sinon. */
+  private dailyFoeSpeed(): number {
+    return this.dailyMap ? (DAILY_MODS[this.dailyMap.mod] as DailyModProto).foeSpeed ?? 1 : 1;
   }
 
   /* ------------------------------------------------------ faveurs de l'aube */
@@ -4006,7 +4038,7 @@ export class World {
   private scheduleFarm(farm: Quarry): void {
     const { filled, max } = this.staffing(farm) ?? { filled: 1, max: 1 };
     const recipe = quarryRecipe(farm);
-    const duration = Math.ceil((recipe.duration * max * speedOf(farm.proto, farm.level)) / Math.max(1, filled));
+    const duration = Math.ceil((recipe.duration * max * speedOf(farm.proto, farm.level) * this.dailyCycle(farm.proto)) / Math.max(1, filled));
 
     this.scheduler.schedule(farm.id, this.tickCount + duration, this.tickCount);
   }
@@ -4259,7 +4291,7 @@ export class World {
         const recipe = quarryRecipe(entity);
         const [item, amount] = (Object.entries(recipe.outputs) as [ItemId, number][])[0] ?? ['stone', 1];
 
-        return { item, amount: (amount * ticks * share) / recipe.duration };
+        return { item, amount: (amount * ticks * share) / (recipe.duration * this.dailyCycle(entity.proto)) };
       }
 
       case 'pigPen':
@@ -4809,7 +4841,7 @@ export class World {
         case 'mutant': {
           const spell = this.spell;
           const wind = spell && { windX: spell.windX, windY: spell.windY, downwind: WEATHER[spell.id].mutantDownwind };
-          const step = mobile.queen ? this.stepQueen(mobile, wind) : stepMutant(mobile, this.mutantGoal(mobile), this.blockerAt, STEP_SECONDS, wind);
+          const step = mobile.queen ? this.stepQueen(mobile, wind) : stepMutant(mobile, this.mutantGoal(mobile), this.blockerAt, STEP_SECONDS, wind, this.dailyFoeSpeed());
 
           if (step.strikes && step.blockedBy !== null) {
             this.damageBuilding(step.blockedBy, ENEMIES[mobile.proto].damage);

@@ -11,6 +11,7 @@ import { cors } from 'hono/cors';
 import { API_PATHS, API_SERVICE, API_VERSION, type HealthResponse } from '../../shared/api.ts';
 import { originAllowed, type ServerConfig } from './config.ts';
 import { accountRoutes, sessionReader } from './accounts.ts';
+import { dailyRoutes } from './daily.ts';
 import { partyRoutes } from './parties.ts';
 import { schemaVersion } from './db.ts';
 
@@ -77,6 +78,7 @@ export function createApp({ config, db, now = () => performance.now(), clock = D
   });
 
   app.route('/', accountRoutes({ db, clock, clientIp }));
+  app.route('/', dailyRoutes({ db, clock, userOf: sessionReader(db, clock) }));
   app.route('/', partyRoutes({ db, clock, clientIp, userOf: sessionReader(db, clock), ttlMs: config.inviteTtlMs, ...(onPartyClosed && { onClosed: onPartyClosed }) }));
 
   app.notFound((c) => c.json({ ok: false, error: 'notFound' }, 404));

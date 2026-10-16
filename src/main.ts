@@ -50,7 +50,9 @@ import { STEP_MS, TICKS_PER_SECOND, World } from './sim/world.ts';
 import { LocalCollection } from './storage/localCollection.ts';
 import { LocalGarden } from './storage/localGarden.ts';
 import { LocalRecord } from './storage/localRecord.ts';
-import { LocalSave, type LoadResult } from './storage/localSave.ts';
+import { submitDailyScore } from './net/dailyBoard.ts';
+import { LocalDaily } from './storage/localDaily.ts';
+import { DAILY_SAVE_KEY, LocalSave, type LoadResult } from './storage/localSave.ts';
 import { TAB_KEY, TabLock } from './storage/localTab.ts';
 import { LocalLocale } from './storage/localLocale.ts';
 import { LocalGamepad, type GamepadPrefs } from './storage/localGamepad.ts';
@@ -86,6 +88,8 @@ import { TabLockPanel } from './ui/tabLockPanel.ts';
 import { Notifier, browserBackend } from './ui/notifier.ts';
 import { SettingsPanel } from './ui/settingsPanel.ts';
 import { formatSeed, parseSeed } from './ui/seed.ts';
+import { dailyUrl, parseDailyDate } from './ui/dailyMap.ts';
+import { dailyDate, dailyGame, dailySeed } from './sim/daily.ts';
 import { testBanner, testScenarioOf } from './ui/testRoute.ts';
 import { ZoomControls } from './ui/zoomControls.ts';
 import { FogSight } from './ui/mapSight.ts';
@@ -265,8 +269,16 @@ async function main(): Promise<void> {
   const sandbox = scenario !== null || guest !== null;
 
   // Une partie sauvegardée reprend là où elle s'était arrêtée ; sinon, une carte neuve.
-  const saves = sandbox ? new LocalSave(null) : LocalSave.browser();
-  const loaded = saves.load();
+  // La carte du jour (`?daily=`) a son emplacement : la partie principale n'est ni lue ni écrite.
+  const dailyOf = sandbox ? null : parseDailyDate(window.location.search);
+  const saves = sandbox ? new LocalSave(null) : LocalSave.browser(dailyOf === null ? undefined : DAILY_SAVE_KEY);
+  let loaded = saves.load();
+
+  // Une partie du jour d'un autre jour n'est plus la carte d'aujourd'hui : elle s'efface.
+  if (loaded.status === 'ok' && dailyOf !== null && loaded.world.dailyMap?.date !== dailyOf) {
+    saves.clear();
+    loaded = { status: 'none' };
+  }
   // Cet onglet prend la main sur la sauvegarde ; un onglet plus ancien cesse d'y écrire (`TabLock`).
   const tabs = sandbox ? new TabLock(null) : TabLock.browser();
 
@@ -277,7 +289,9 @@ async function main(): Promise<void> {
       ? stageScenario(TEST_SCENARIOS[scenario])
       : loaded.status === 'ok'
         ? loaded.world
-        : World.newColony(readSeed());
+        : dailyOf !== null
+          ? World.newColony(dailySeed(dailyOf), dailyGame(dailyOf))
+          : World.newColony(readSeed());
 
   // L'ami d'une partie à deux sauvegardée n'est plus là : son sac reste au sol, où il l'a laissé.
   if (!guest && world.partner) world.push({ type: 'partnerLeave' });
@@ -695,6 +709,9 @@ async function main(): Promise<void> {
   });
   const garden = wireGarden(world, sandbox ? new LocalGarden(null) : LocalGarden.browser());
   const record = wireRecord(world, sandbox ? new LocalRecord(null) : LocalRecord.browser());
+  const today = dailyDate(Date.now());
+  const dailies = sandbox ? new LocalDaily(null) : LocalDaily.browser();
+  const dailyBest = wireDaily(world, dailies, (date, score) => void submitDailyScore(connection.baseUrl, accounts.token, date, score));
 
   const achievements = wireAchievements(world, sandbox ? new LocalCollection(null) : LocalCollection.browser(), hud, audio);
 
@@ -713,10 +730,17 @@ async function main(): Promise<void> {
     garden: garden.current(),
     gardenActions: garden,
     record,
+    daily: {
+      date: world.dailyMap?.date ?? today,
+      mod: world.dailyMap?.mod ?? dailyGame(today).mod,
+      best: dailyBest(world.dailyMap?.date ?? today),
+      playing: world.dailyMap !== null,
+      open: () => window.location.assign(dailyUrl(window.location.href, world.dailyMap === null ? today : null)),
+    },
     collection: () => achievements.collection,
     onPlay: () => {
-      // Une nouvelle colonie part avec les bonus du jardin ; une colonie reprise garde les siens.
-      if (loaded.status !== 'ok') world.push({ type: 'applyPerks', perks: activePerks(garden.current()) });
+      // Une nouvelle colonie part avec les bonus du jardin ; une colonie reprise garde les siens. La carte du jour, jamais : même départ pour tous.
+      if (loaded.status !== 'ok' && !world.dailyMap) world.push({ type: 'applyPerks', perks: activePerks(garden.current()) });
       // Les compteurs de colonie repartent de zéro ; les skins gagnés l'attendent dans sa garde-robe.
       if (loaded.status !== 'ok') achievements.newRun();
       world.push({ type: 'grantPieces', pieces: earnedSkins(achievements.collection), silent: true });
@@ -1597,6 +1621,29 @@ function wireRecord(world: World, records: LocalRecord): number {
   world.events.on('dawnBroke', offer);
   world.events.on('townHallDestroyed', offer);
   return records.load();
+}
+
+/**
+ * Le score de la carte du jour : le bilan de la colonie en graines
+ * (`seedsFor(colonyScore())`), gardé s'il bat le meilleur du jour. Mesuré à
+ * chaque aube, à la chute de la mairie et au Signal. Rend la lecture du
+ * meilleur d'une date, pour l'écran titre.
+ */
+function wireDaily(world: World, dailies: LocalDaily, submit: (date: string, score: number) => void): (date: string) => number {
+  const offer = (): void => {
+    if (!world.dailyMap) return;
+
+    const { date } = world.dailyMap;
+    const score = seedsFor(world.colonyScore());
+
+    // Au classement du serveur, s'il y en a un, seulement un record du jour.
+    if (dailies.offer(date, score) === score) submit(date, score);
+  };
+
+  world.events.on('dawnBroke', offer);
+  world.events.on('townHallDestroyed', offer);
+  world.events.on('victory', offer);
+  return (date) => dailies.best(date);
 }
 
 /** Le téléphone vibre aux moments clés : un bâtiment fini, une recherche, un objectif, une naissance. */

@@ -26,6 +26,21 @@ export const screens = {
     /** Un lien vers une autre carte que celle de la sauvegarde. */
     linkedMap: (seed: string): string => `Le lien mène à la carte n° ${seed} : « Nouvelle partie » pour la jouer.`,
   },
+  daily: {
+    /** Le bouton de l'écran titre : la carte de la date UTC du jour, la même pour tous. */
+    button: 'Carte du jour',
+    /** Dans une partie du jour, le bouton qui ramène à la partie principale. */
+    back: 'Partie principale',
+    today: (date: string): string => `Carte du jour · ${date}`,
+    best: (score: number): string => `Meilleur score du jour : ${score}`,
+    mods: {
+      drought: { name: 'Sécheresse', text: 'Les puits donnent deux fois moins d’eau.' },
+      scarceWood: { name: 'Bois rare', text: 'Les arbres donnent moitié moins de bois.' },
+      fastMutants: { name: 'Mutants rapides', text: 'Les mutants marchent un tiers plus vite.' },
+      smallColony: { name: 'Colonie de 6', text: 'Six ouvriers au départ, pas dix.' },
+      slowDrills: { name: 'Foreuses lentes', text: 'Chaque minerai prend une moitié de temps de plus.' },
+    },
+  },
   pause: {
     title: 'Pause',
     text: 'Les mutants attendent, eux aussi.',

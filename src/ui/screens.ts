@@ -22,6 +22,7 @@
  * `main.ts` de jouer, d'arrêter l'horloge ou de recommencer, et c'est tout.
  */
 
+import type { DailyModId } from '../data/dailyMods.ts';
 import { onLocale, t } from '../i18n/locale.ts';
 import { progressOf, type Collection } from '../sim/collection.ts';
 import type { Garden } from '../sim/garden.ts';
@@ -43,6 +44,11 @@ export interface TitleOptions {
   /** Le record « nuits tenues après le Signal » ; 0 tant qu'aucune antenne n'a parlé. */
   record: number;
   gardenActions: GardenActions;
+  /**
+   * La carte du jour : `date` et `mod` sont ceux du jour affiché, `best` le meilleur score de cette date,
+   * `playing` si la page est déjà la partie du jour, `open` l'ouvre (ou, `playing`, revient à la partie principale).
+   */
+  daily: { date: string; mod: DailyModId; best: number; playing: boolean; open: () => void };
   /** La collection de succès : l'écran titre l'ouvre. */
   collection: () => Collection;
   /** L'engrenage du coin : le menu des réglages, la langue d'abord. */
@@ -55,7 +61,7 @@ export class TitleScreen {
   public readonly root: HTMLElement;
   private readonly unsubscribe: () => void;
 
-  public constructor({ resume, notice, onPlay, onRestart, garden, gardenActions, record, collection, onSettings, accountButton }: TitleOptions) {
+  public constructor({ resume, notice, onPlay, onRestart, garden, gardenActions, record, daily, collection, onSettings, accountButton }: TitleOptions) {
     this.root = document.createElement('div');
     this.root.className = 'overlay title-screen';
 
@@ -210,6 +216,36 @@ export class TitleScreen {
     this.root.append(collectionPanel.root);
 
     panel.append(accountButton);
+
+    const dailyButton = document.createElement('button');
+
+    dailyButton.type = 'button';
+    dailyButton.className = 'button-secondary title-garden';
+    labels.push(() => dailyButton.replaceChildren(uiIcon('play', 22), daily.playing ? t().screens.daily.back : t().screens.daily.button));
+    dailyButton.addEventListener('click', daily.open);
+    panel.append(dailyButton);
+
+    if (daily.playing) {
+      const line = document.createElement('p');
+
+      line.className = 'title-notice';
+      labels.push(() => {
+        const mod = t().screens.daily.mods[daily.mod];
+
+        line.textContent = `${t().screens.daily.today(daily.date)} — ${mod.name} : ${mod.text}`;
+      });
+      panel.append(line);
+    }
+
+    if (daily.best > 0) {
+      const best = document.createElement('p');
+
+      best.className = 'title-record';
+      labels.push(() => {
+        best.textContent = t().screens.daily.best(daily.best);
+      });
+      panel.append(best);
+    }
 
     if (record > 0) {
       const best = document.createElement('p');
