@@ -24,6 +24,9 @@ export const menu = {
   searchClear: 'Effacer la recherche',
   /** La recherche n'a rien trouvé parmi les cartes du menu. */
   searchEmpty: 'Aucun bâtiment ne correspond',
+  /** Une carte grisée, pour un bâtiment que le chapitre demande et que le labo n'a pas encore ouvert. */
+  discover: 'À découvrir au labo',
+  discoverResearch: (research: string): string => `Recherche : ${research}`,
   /** La première puce du filtre : toutes les familles. */
   allCategories: 'Tous',
   /** Le libellé d'une puce : « Minerai, 2 bâtiments ». */

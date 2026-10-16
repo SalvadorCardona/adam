@@ -260,6 +260,10 @@ export const hud = {
     nurseryPaused: `la ${NURSERY} est en pause`,
     nurseryWaits: (missing: number, item: string): string => `la ${NURSERY} attend ${missing} ${lower(item)}${s(missing)}`,
     babyIn: (time: string): string => `bébé dans ${time}`,
+    /** Sous une ligne d'objectif dont le bâtiment n'est pas au menu : `cost`, « 8 bois, 4 pierres ». */
+    labLock: (research: string, cost: string): string => `Au labo : ${research} (${cost})`,
+    /** Un objet du coût d'une recherche : « 4 pierres », « 8 bois ». */
+    labCost: (amount: number, item: string): string => `${amount} ${item.toLowerCase()}${amount > 1 && !/[sx]$/i.test(item) ? 's' : ''}`,
   },
   /** L'horloge du jour et de la nuit. */
   clock: {

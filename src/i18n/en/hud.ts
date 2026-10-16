@@ -212,6 +212,8 @@ export const hud: Messages['hud'] = {
     nurseryPaused: 'the nursery is paused',
     nurseryWaits: (missing: number, item: string): string => `the nursery needs ${missing} ${lower(item)}`,
     babyIn: (time: string): string => `baby in ${time}`,
+    labLock: (research: string, cost: string): string => `At the lab: ${research} (${cost})`,
+    labCost: (amount: number, item: string): string => `${amount} ${item.toLowerCase()}`,
   },
   clock: {
     night: (day: number, left: string): string => `Night ${day} · dawn in ${left}`,

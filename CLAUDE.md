@@ -590,7 +590,7 @@ chacun avec plusieurs objectifs ouverts à la fois, faits dans l'ordre qu'on
 veut ; le suivant s'ouvre quand tous sont réussis (`World.chapter`,
 `World.objectivesDone` par id, `World.chapterBase` ; événements
 `objectiveCompleted` puis `chapterCompleted`). Le premier toit (la mairie,
-seule), les fondations (cabane, carrière, puits, maison), passer la nuit
+seule), les fondations (labo, cabane, carrière, puits, maison), passer la nuit
 (3 nuits, 2 tours de guet, 4 palissades), les demandes d'Ève (ses quêtes,
 postes de logistique et de construction), nourrir la ville (élevage, ferme,
 20 pains, premier enfant), l'industrie (20 fer, 20 charbons, 10 plaques,
@@ -636,7 +636,11 @@ poste de logistique (`storeStuck`). Chaque objectif réussi a sa petite
 célébration (jingle, toast, la case rebondit), chaque chapitre la grande
 (fanfare, pluie de feuilles, bandeau), et une récompense concrète (objets,
 places de sac relues dans les objectifs réussis — `objectiveBagBonus` —,
-réparation de la mairie). Ce qui est fait en avance compte ; un objectif
+réparation de la mairie). Un objectif dont le bâtiment n'est pas au menu porte
+un cadenas et « Au labo : Bûcheronnage (8 bois, 4 pierres) » sous son titre
+(`objectiveLock`, `sim/objectives.ts`) ; le toucher montre le labo, ou son chantier
+(`labSpot`) ; tant que le labo est l'objectif et que son fer manque, le repère de
+gisement pointe le filon de fer (`labIronShort`, `ui/hint.ts`). Ce qui est fait en avance compte ; un objectif
 réussi le reste ; les nuits à « tenir » se comptent depuis l'ouverture du
 chapitre. Une condition qui n'attend qu'une horloge (naissance,
 nuit à tenir : `goalWait`/`objectiveWait`) affiche son temps restant, ou en
@@ -1066,7 +1070,9 @@ Les règles, en résumé :
   `PlacementBlock.blocked`) dans un contour pointillé ; une bulle sous lui dit le blocage en une
   ligne ; on en sort par « Annuler » ou Échap. Le bouton n'apparaît qu'une fois la mairie
   debout, et le tiroir ne montre que ce qui se bâtit (`World.inMenu`) : ni carte grisée ni
-  cadenas. Un champ de recherche (loupe) en tête du tiroir prend le focus à chaque
+  cadenas, sauf les bâtiments que le chapitre en cours demande et que le labo n'a pas encore
+  ouverts — une carte « À découvrir au labo » avec sa recherche (`lockedObjectiveBuildings`),
+  au bout de la liste. Un champ de recherche (loupe) en tête du tiroir prend le focus à chaque
   ouverture, vidé, et filtre à la frappe sur le nom, le métier et ce que produit le bâtiment,
   sans casse ni accents (`ui/buildSearch.ts`) ; il ne révèle rien de verrouillé. Entrée choisit
   la première carte, Échap vide puis ferme ; ses touches n'atteignent pas le jeu. Dessous, des

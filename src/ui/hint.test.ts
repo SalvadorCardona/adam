@@ -120,6 +120,21 @@ describe('tutorialHint', () => {
     expect(tutorialAdvice(world, FRESH, false, 0)?.text).toBe(camp);
   });
 
+  it('le labo est l’objectif : le repère montre le filon de fer tant que le fer manque, puis se tait', () => {
+    const world = World.newColony(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    const lab = OBJECTIVES.find((objective) => objective.id === 'lab')!;
+
+    expect(tutorialAdvice(world, FRESH, false, 0, lab.id, true)?.pointTo).toBe('ironOre');
+    world.player.inventory.add('ironOre', BUILDINGS.lab.cost.ironOre);
+    expect(tutorialAdvice(world, FRESH, false, 0, lab.id, true)?.pointTo ?? null).toBeNull();
+  });
+
   it('dix ouvriers qui glandent, la tour posée : Ève les envoie travailler, et loger si les lits manquent', () => {
     const world = World.newColony(1);
 

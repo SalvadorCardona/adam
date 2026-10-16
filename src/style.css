@@ -537,6 +537,33 @@ button:disabled,
   box-shadow: none;
 }
 
+.hud-objective-row[data-locked='true'] {
+  row-gap: 0;
+}
+
+/* Sous le titre d'un objectif fermé au menu : le cadenas et la recherche du labo qui l'ouvre. */
+.hud-objective-lock {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.hud-objective-lock[hidden] {
+  display: none;
+}
+
+.hud-objective-lock-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .hud-objective-icon {
   display: inline-flex;
   align-items: center;
@@ -4153,6 +4180,24 @@ button:disabled,
   color: var(--paper);
   font-size: 13px;
   font-weight: 700;
+  pointer-events: none;
+}
+
+/* Une carte « À découvrir au labo » : le bâtiment que le chapitre demande, grisé, avec son cadenas. Rien à toucher. */
+.build-teaser {
+  opacity: 0.7;
+  background: var(--paper-shade);
+  box-shadow: none;
+}
+
+.build-teaser .icon-building {
+  filter: grayscale(0.8);
+}
+
+.build-teaser .icon-ui {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
   pointer-events: none;
 }
 

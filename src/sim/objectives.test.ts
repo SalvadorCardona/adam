@@ -10,7 +10,7 @@ import type { ResearchId } from '../data/research.ts';
 import { validatePrototypes } from '../data/validate.ts';
 import { BUILD_REACH_TILES, INVENTORY_CAPACITY } from './player.ts';
 import { SAVE_VERSION, decodeSave, encodeSave, serialize } from './save.ts';
-import { chapterObjectives, currentChapter, goalProgress, objectiveWait, openObjectives } from './objectives.ts';
+import { chapterObjectives, currentChapter, goalProgress, labSpot, lockedObjectiveBuildings, objectiveLock, objectiveWait, openObjectives } from './objectives.ts';
 import { CYCLE_TICKS } from './dayNight.ts';
 import { Store } from './store.ts';
 import type { Entity, EntityId } from './types.ts';
@@ -355,7 +355,7 @@ describe('objectifs en chapitres', () => {
     completeSite(world, world.townHallId);
     expect(chapters).toEqual([0]);
     expect(world.chapter).toBe(1);
-    expect(openObjectives(world).map(({ id }) => id)).toEqual(['lumberCamp', 'quarry', 'well', 'home']);
+    expect(openObjectives(world).map(({ id }) => id)).toEqual(['lab', 'lumberCamp', 'quarry', 'well', 'home']);
 
     // Le labo mène ce qu'il faut : les recherches du chapitre, payées d'avance pour le test.
     for (const id of chapterReach(1).research) world.researchDone.push(id as ResearchId);
@@ -365,6 +365,7 @@ describe('objectifs en chapitres', () => {
     expect(world.chapter).toBe(1);
     raise(world, 'well');
     raise(world, 'quarry');
+    raise(world, 'lab');
     expect(world.chapter).toBe(1);
     expect(openObjectives(world).map(({ id }) => id)).toEqual(['lumberCamp']);
 
@@ -375,6 +376,7 @@ describe('objectifs en chapitres', () => {
       { id: 'home', closing: false },
       { id: 'well', closing: false },
       { id: 'quarry', closing: false },
+      { id: 'lab', closing: false },
       { id: 'lumberCamp', closing: true },
     ]);
     expect(chapters).toEqual([0, 1]);
@@ -385,6 +387,40 @@ describe('objectifs en chapitres', () => {
     );
     expect(openObjectives(world).map(({ id }) => id)).toEqual(['nights3', 'watchtowers', 'palisade']);
   }, 20_000);
+
+  it('disent au labo ce que le menu n’a pas encore : un cadenas par objectif, une carte grisée par bâtiment demandé', () => {
+    const world = World.newColony(7);
+
+    bigBag(world);
+    completeSite(world, world.townHallId);
+
+    const lock = (id: string) => objectiveLock(world, id as never);
+
+    // Cabane, carrière, puits : rien au menu, chacun nomme sa recherche. Le labo, lui, y est d'emblée.
+    expect(lock('lab')).toBeNull();
+    expect(lock('lumberCamp')).toEqual({ building: 'lumberCamp', research: 'woodcraft' });
+    expect(lock('quarry')).toEqual({ building: 'quarry', research: 'mining' });
+    expect(lock('well')).toEqual({ building: 'well', research: 'waterWell' });
+    expect(lock('home')).toBeNull();
+    expect(lockedObjectiveBuildings(world).map(({ building }) => building)).toEqual(['lumberCamp', 'quarry', 'well']);
+    // Pas de labo, pas de chantier : rien à montrer du doigt ; son chantier, une fois posé, si.
+    expect(labSpot(world)).toBeNull();
+
+    const at = siteFor(world, 'lab');
+
+    world.push({ type: 'placeBuilding', building: 'lab', tx: at.tx, ty: at.ty });
+    world.tick();
+
+    const site = [...world.entities.values()].find((entity) => entity.kind === 'site' && entity.proto === 'lab');
+
+    expect(site).toBeDefined();
+    expect(labSpot(world)?.id).toBe(site!.id);
+
+    // La recherche finie, la cabane entre au menu : plus de cadenas.
+    world.researchDone.push('woodcraft');
+    expect(lock('lumberCamp')).toBeNull();
+    expect(lockedObjectiveBuildings(world).map(({ building }) => building)).toEqual(['quarry', 'well']);
+  });
 
   it('gardent un objectif réussi, même si son bâtiment tombe', () => {
     const world = World.newColony(7);
