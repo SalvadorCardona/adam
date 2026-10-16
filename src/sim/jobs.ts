@@ -35,7 +35,8 @@
 import { TILE_SIZE, distanceSq } from '../core/grid.ts';
 import { BUILDINGS } from '../data/buildings.ts';
 import type { ItemId } from '../data/items.ts';
-import { BUILDERS, JOB_PRIORITY, LOGISTICIANS, PORTERS, SUPPLY } from '../data/workers.ts';
+import { NEEDS } from '../data/needs.ts';
+import { BUILDERS, JOB_PRIORITY, LOGISTICIANS, PORTERS, SUPPLY, VOLUNTEERS } from '../data/workers.ts';
 import { floorCost, floorWants } from './antenna.ts';
 import { labSurplus, labWants, researchCost } from './research.ts';
 import { consumerDemands, forgeOutputs, isConsumer } from './consumers.ts';
@@ -56,6 +57,9 @@ type Offer = Omit<Job, 'carried'>;
  * de la clinique), un logisticien ou un bâtisseur, avec le poste qui le loge.
  */
 export type Crew = { kind: 'porter' } | { kind: 'volunteer' } | { kind: 'logistician'; depot: Depot } | { kind: 'builder'; yard: Yard };
+
+/** Ce dont la colonie vit (`NEEDS`) : un volontaire va le chercher au producteur, même loin de la mairie. */
+const VITAL_ITEMS: readonly ItemId[] = Object.values(NEEDS).map((need) => need.item);
 
 export const PORTER_CREW: Crew = { kind: 'porter' };
 
@@ -249,6 +253,10 @@ export class JobBoard {
       }
 
       if (crew.kind === 'volunteer') {
+        // Un puits ou une ferme loin de la mairie : l'eau et le pain y pourriraient sans porteurs ni poste.
+        if (isProducer(entity) && inRadius(hall, entity, VOLUNTEERS.fetchReach) && !depots.some((depot) => inDepotRange(depot, entity))) {
+          this.emptyOffers(entity, hall, carry, offers, VITAL_ITEMS);
+        }
         // Un coup de main : les chantiers et les labos du rayon de la mairie, rien d'autre.
         if (!inLogisticRange(hall, entity)) continue;
         if (entity.kind === 'site' && !yards.some((yard) => inYardRange(yard, entity))) this.siteOffers(entity, hall, carry, offers);
@@ -353,8 +361,9 @@ export class JobBoard {
   }
 
   /** Vider le coffre d'un producteur dans la mairie : un voyage par objet qu'il contient. */
-  private emptyOffers(entity: Drill | Farm | Quarry | PigPen | LumberCamp, hall: TownHall, carry: number, offers: Offer[]): void {
+  private emptyOffers(entity: Drill | Farm | Quarry | PigPen | LumberCamp, hall: TownHall, carry: number, offers: Offer[], only?: readonly ItemId[]): void {
     for (const [item] of entity.store.entries()) {
+      if (only && !only.includes(item)) continue;
       const available = entity.store.available(item);
       const amount = Math.min(carry, available, hall.store.freeSpace());
 
