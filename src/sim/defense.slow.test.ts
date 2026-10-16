@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { TILE_SIZE } from '../core/grid.ts';
 import { BUILDINGS, buildingLevel, type BuildingId } from '../data/buildings.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
-import { WAVE_STRENGTH } from '../data/enemies.ts';
+import { WAVE_STRENGTH, nightBosses } from '../data/enemies.ts';
 import { CYCLE_TICKS } from './dayNight.ts';
+import { raidCapacity } from './enemyBases.ts';
+import { earlyCap } from './waves.ts';
 import type { World} from './world.ts';
 import { repairCost } from './world.ts';
 import { addFactory, addTowers, guard, hallOf, jumpToNight, playThroughNight, queenOf, towersOf, worldWithTownHall } from './defenseKit.ts';
@@ -51,7 +53,8 @@ describe('courbe des nuits', () => {
 
     expect(world.defeated).toBe(false);
     expect(world.night).toBe(10);
-    expect(lowest).toBeGreaterThan(BUILDINGS.townHall.hp / 3);
+    // Le gros mutant de la nuit 6 (et non plus 5) frappe une mairie moins réparée : un tiers, à quelques points près.
+    expect(lowest).toBeGreaterThan(BUILDINGS.townHall.hp * 0.3);
   }, 60_000);
 });
 
@@ -162,13 +165,53 @@ describe('premières nuits', () => {
   it('les nuits 1 à 3 plafonnent l’effectif, et il varie peu d’une carte à l’autre', () => {
     const all = SEEDS.map((seed) => raidsOf(seed, 3));
 
-    for (const [index, cap] of WAVE_STRENGTH.earlyCaps.entries()) {
+    for (let index = 0; index < WAVE_STRENGTH.graceNights; index += 1) {
       const night = all.map((counts) => counts[index]!);
 
-      expect(Math.max(...night)).toBeLessThanOrEqual(cap);
+      expect(Math.max(...night)).toBeLessThanOrEqual(WAVE_STRENGTH.earlyCaps[index]!);
       expect(Math.max(...night) - Math.min(...night)).toBeLessThanOrEqual(SPREAD);
     }
   }, 120_000);
+
+  it('le plafond monte d’un ou deux par nuit, sans saut de plus de ×1,6', () => {
+    const caps = WAVE_STRENGTH.earlyCaps;
+
+    expect(caps.length).toBeGreaterThanOrEqual(8);
+    expect(caps.slice(0, WAVE_STRENGTH.graceNights + 1)).toEqual([2, 3, 4, 4]);
+    caps.slice(1).forEach((cap, k) => {
+      expect(cap - caps[k]!, `nuit ${k + 2}`).toBeGreaterThanOrEqual(0);
+      expect(cap - caps[k]!, `nuit ${k + 2}`).toBeLessThanOrEqual(2);
+      expect(cap / caps[k]!, `nuit ${k + 2}`).toBeLessThanOrEqual(1.6);
+    });
+  });
+
+  it('la vague la plus forte que les bases permettent, nuits 1 à 8, ne saute jamais de plus de ×1,6', () => {
+    for (const seed of SEEDS) {
+      const { enemyBases } = worldWithTownHall(seed);
+      // Les bases pleines, plafond commun appliqué : le plus que la carte puisse lâcher cette nuit-là.
+      const ceiling = (night: number): number =>
+        Math.min(earlyCap(night), enemyBases.reduce((sum, base) => sum + raidCapacity(base.level, night), 0)) +
+        Object.values(nightBosses(night)).reduce((sum, n) => sum + n, 0);
+      const counts = Array.from({ length: 8 }, (_, k) => ceiling(k + 1));
+
+      counts.slice(1).forEach((count, k) => {
+        if (counts[k] === 0) return;
+        expect(count / counts[k]!, `graine ${seed}, nuit ${k + 2} : ${counts.join(', ')}`).toBeLessThanOrEqual(1.6);
+      });
+    }
+  });
+
+  it('Ève prévient au crépuscule de la première nuit sans grâce, et de celle-là seule', () => {
+    const world = worldWithTownHall(42);
+    const warned: number[] = [];
+
+    world.events.on('graceEnding', ({ night }) => warned.push(night));
+    for (const night of [2, 3, 4, 5]) {
+      jumpToNight(world, night, DAY_CYCLE.dusk);
+      world.tick();
+    }
+    expect(warned).toEqual([WAVE_STRENGTH.graceNights + 1]);
+  });
 
   it('l’annonce longue donne le même effectif que la vague', () => {
     const world = worldWithTownHall(1234);
@@ -201,7 +244,7 @@ describe('premières nuits', () => {
     // Adam part loin, hors de portée de son arc : rien ne défend la mairie.
     world.player.x = world.player.prevX = (hall.tx + 60) * TILE_SIZE;
     world.player.y = world.player.prevY = (hall.ty + 60) * TILE_SIZE;
-    for (let night = 1; night <= WAVE_STRENGTH.earlyCaps.length; night += 1) {
+    for (let night = 1; night <= WAVE_STRENGTH.graceNights; night += 1) {
       playThroughNight(world, night, () => {
         lowest = Math.min(lowest, hallOf(world).hp);
       });

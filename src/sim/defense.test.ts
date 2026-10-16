@@ -91,14 +91,14 @@ describe('réparer', () => {
 
 
 describe('Reine des flaques — calendrier', () => {
-  it('sort aux nuits 10, 15, 20 ; la nuit 5 garde son gros mutant', () => {
+  it('sort aux nuits 10, 15, 20 ; la nuit 6 garde son gros mutant', () => {
     expect(nightBosses(10).queen).toBe(1);
     expect(queenWave(10)).not.toBeNull();
     expect(queenWave(15)).not.toBeNull();
     expect(queenWave(20)).not.toBeNull();
 
     for (const night of [1, 4, 5, 6, 9, 11, 14, 16]) expect(queenWave(night), `nuit ${night}`).toBeNull();
-    expect(nightBosses(5).brute).toBe(1);
+    expect(nightBosses(6).brute).toBe(1);
     expect(nightBosses(9).queen ?? 0).toBe(0);
   });
 

@@ -343,7 +343,7 @@ describe('objectifs en chapitres', () => {
     });
   });
 
-  it('ouvrent les fondations après la mairie : quatre objectifs à la fois, dans l’ordre qu’on veut', () => {
+  it('ouvrent les fondations après la mairie : cinq objectifs à la fois, dans l’ordre qu’on veut', () => {
     const world = World.newColony(7);
     const completed: { id: string; closing: boolean }[] = [];
     const chapters: number[] = [];
@@ -355,12 +355,13 @@ describe('objectifs en chapitres', () => {
     completeSite(world, world.townHallId);
     expect(chapters).toEqual([0]);
     expect(world.chapter).toBe(1);
-    expect(openObjectives(world).map(({ id }) => id)).toEqual(['lab', 'lumberCamp', 'quarry', 'well', 'home']);
+    expect(openObjectives(world).map(({ id }) => id)).toEqual(['lab', 'lumberCamp', 'quarry', 'well', 'home', 'firstTower']);
 
     // Le labo mène ce qu'il faut : les recherches du chapitre, payées d'avance pour le test.
     for (const id of chapterReach(1).research) world.researchDone.push(id as ResearchId);
 
-    // À rebours de la liste : la maison d'abord, le puits, la carrière, la cabane en dernier.
+    // À rebours de la liste : la tour d'abord, la maison, le puits, la carrière, la cabane en dernier.
+    raise(world, 'watchtower');
     raise(world, 'home');
     expect(world.chapter).toBe(1);
     raise(world, 'well');
@@ -373,6 +374,7 @@ describe('objectifs en chapitres', () => {
 
     raise(world, 'lumberCamp');
     expect(completed.slice(1)).toEqual([
+      { id: 'firstTower', closing: false },
       { id: 'home', closing: false },
       { id: 'well', closing: false },
       { id: 'quarry', closing: false },

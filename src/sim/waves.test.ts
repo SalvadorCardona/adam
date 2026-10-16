@@ -259,7 +259,7 @@ describe('montée en difficulté', () => {
   it('la prime d’une vague repoussée grandit avec les nuits, et une nuit de chef paie plus', () => {
     const first = new Map(waveBounty(1));
     const later = new Map(waveBounty(9));
-    const boss = new Map(waveBounty(5));
+    const boss = new Map(waveBounty(6));
 
     expect(first).toEqual(new Map(Object.entries(WAVE_BOUNTY.items)));
     for (const [item, amount] of first) expect(later.get(item)).toBeGreaterThan(amount);
