@@ -531,6 +531,41 @@ export interface Pig extends Moving {
   fleeTicks: number;
 }
 
+export type WandererRole = 'wounded' | 'deer';
+
+/**
+ * Ce que fait quelqu'un croisé sur la route (`data/encounters.ts`) :
+ * `idle` : il attend ou flâne là où la seed l'a posé ; `following` : le
+ * survivant blessé boite derrière Adam jusqu'à la mairie ; `fleeing` : il
+ * détale, effrayé.
+ */
+export type WandererState = 'idle' | 'following' | 'fleeing';
+
+/**
+ * Un survivant blessé ou une biche dorée : une rencontre que la seed a posée
+ * (`encounterId`), montrée à l'approche d'Adam et rangée quand il s'éloigne.
+ * Ni ennemi ni cible : l'arc ne le voit pas. Le blessé n'a de colon que le
+ * nom (son id devient celui de l'ouvrier) ; la biche ne sert qu'à la pièce
+ * de garde-robe qu'elle laisse.
+ */
+export interface Wanderer extends Moving {
+  kind: 'wanderer';
+  role: WandererRole;
+  state: WandererState;
+  sex: Sex;
+  /** L'id de la rencontre (`sim/encounters.ts`) : résolue, elle ne revient pas. */
+  encounterId: number;
+  homeX: number;
+  homeY: number;
+  dirX: number;
+  dirY: number;
+  wanderTicks: number;
+  /** Biche : la jauge d'apprivoisement, de 0 à `catchTicks`. Blessé : ticks passés trop loin d'Adam. */
+  gauge: number;
+  /** Ticks de fuite restants. */
+  fleeTicks: number;
+}
+
 /** Ce que les arcs peuvent viser : un mutant ou une bête. */
 export type Foe = Mutant | Beast;
 
@@ -937,7 +972,7 @@ export interface Companion extends Moving {
  * déjà été fait. Chaque échange ne se fait qu'une fois.
  */
 export interface TradeOffer {
-  kind: 'surplus' | 'loot' | 'rare';
+  kind: 'surplus' | 'loot' | 'rare' | 'wayside';
   cost: Partial<Record<ItemId, number>>;
   items: Partial<Record<ItemId, number>>;
   bag: number;
@@ -970,9 +1005,15 @@ export interface Caravan extends Moving {
   offers: TradeOffer[];
   /** Vrai tant qu'Adam est au contact : la fenêtre Troc ne s'ouvre qu'en arrivant. */
   met: boolean;
+  /**
+   * Le marchand ambulant d'une rencontre (`data/encounters.ts`) : l'id de la
+   * rencontre. Sa charrette reste garée, sans départ, jusqu'à son unique
+   * échange ; ce n'est pas la caravane du calendrier (`World.caravan()`).
+   */
+  encounterId?: number;
 }
 
-export type Mobile = Mutant | Beast | Arrow | Spit | Fireball | Kid | Eve | Worker | Lumberjack | Forester | Farmer | Pickup | Patient | Companion | Caravan | Pig;
+export type Mobile = Mutant | Beast | Arrow | Spit | Fireball | Kid | Eve | Worker | Lumberjack | Forester | Farmer | Pickup | Patient | Companion | Caravan | Pig | Wanderer;
 
 /**
  * Les compteurs de la partie, que les objectifs lisent. Ils ne font que

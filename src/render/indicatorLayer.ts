@@ -43,6 +43,7 @@
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import { CHUNK_SIZE, TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { FAMILY_TONES, PALETTE, hex, type Tone } from '../data/artDirection.ts';
+import { ENCOUNTER_KINDS } from '../data/encounters.ts';
 import { ICON_SIZE, ITEM_ICONS } from '../data/icons.ts';
 import { ITEM_IDS, type ItemId } from '../data/items.ts';
 import { findDeposit, type Deposit } from '../sim/deposits.ts';
@@ -172,7 +173,7 @@ export class IndicatorLayer {
   private readonly flagLabel = label();
   private readonly spotLabel = label();
   /** Le coffre ou la ruine visé, cherché toutes les `SEARCH_MS`. */
-  private spot: { x: number; y: number } | null = null;
+  private spot: { x: number; y: number; mystery: boolean } | null = null;
   private spotIn = 0;
   private readonly world: World;
   private readonly library: SpriteLibrary;
@@ -332,7 +333,7 @@ export class IndicatorLayer {
     }
   }
 
-  /** Le repère du coffre ou de la ruine le plus proche qu'Adam n'a pas encore trouvé, sur une case explorée. */
+  /** Le repère du coffre, de la ruine ou de la rencontre le plus proche qu'Adam n'a pas encore trouvé, sur une case explorée. */
   private pointSpot(camera: Camera, zone: Zone, px: number, py: number, deltaMs: number): void {
     const { world } = this;
 
@@ -347,8 +348,14 @@ export class IndicatorLayer {
 
       for (let cy = ccy - SPOT_CHUNKS; cy <= ccy + SPOT_CHUNKS; cy += 1) {
         for (let cx = ccx - SPOT_CHUNKS; cx <= ccx + SPOT_CHUNKS; cx += 1) {
-          for (const found of [world.chestOfChunk(cx, cy), world.spotOfChunk('ruin', cx, cy)]) {
-            if (!found || world.isFound(found.id) || world.sightAt(found.tx, found.ty) === 'unexplored') continue;
+          // Une rencontre vue mais pas résolue (survivant, marchand, biche) se montre d'un « ? ».
+          const candidates = [
+            ...[world.chestOfChunk(cx, cy), world.spotOfChunk('ruin', cx, cy)].map((found) => found && { ...found, mystery: false }),
+            ...ENCOUNTER_KINDS.map((kind) => world.encounterOfChunk(kind, cx, cy)).map((found) => found && { ...found, mystery: true }),
+          ];
+
+          for (const found of candidates) {
+            if (!found || world.isFound(found.id) || world.isEncounterResolved(found.id) || world.sightAt(found.tx, found.ty) === 'unexplored') continue;
 
             const x = (found.tx + 0.5) * TILE_SIZE;
             const y = (found.ty + 0.5) * TILE_SIZE;
@@ -356,7 +363,7 @@ export class IndicatorLayer {
 
             if (distance < best) {
               best = distance;
-              this.spot = { x, y };
+              this.spot = { x, y, mystery: found.mystery };
             }
           }
         }
@@ -370,7 +377,9 @@ export class IndicatorLayer {
 
     const tiles = Math.hypot(this.spot.x - px, this.spot.y - py) / TILE_SIZE;
 
-    if (tiles >= LABEL_TILES) this.tag(this.spotLabel, center, meters(tiles));
+    const label = this.spot.mystery ? (tiles >= LABEL_TILES ? `? ${meters(tiles)}` : '?') : meters(tiles);
+
+    if (this.spot.mystery || tiles >= LABEL_TILES) this.tag(this.spotLabel, center, label);
   }
 
   /** Le repère d'une alerte de la ville : il bat, et s'éteint au bout de `FLAG_MS` ou si le bâtiment tombe. */

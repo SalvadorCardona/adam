@@ -791,8 +791,28 @@ au sol), événement `discoveryFound`, et le HUD le fait voler vers le sac
 dans la sauvegarde ; une ancienne sauvegarde n'en a aucun. Le repère de bord
 (`IndicatorLayer.pointSpot`, violet, étincelle, distance en mètres comme la
 mairie et le gisement) et la carte du monde montrent coffres et ruines pas
-encore trouvés, sur les cases explorées. Les rencontres (voyageur, animal rare)
-ne sont pas faites.
+encore trouvés, sur les cases explorées.
+
+**Rencontres sur la route** (`data/encounters.ts`, `sim/encounters.ts`) — trois
+sortes, tirées de la seed par chunk comme les ruines (`encounterOfChunk`, jamais
+stockées, hors des 24 tuiles du départ), de plus en plus fréquentes par palier
+(`DISCOVERY_TIERS`, `chance`). Le monde montre celles des chunks voisins à
+`spawnTiles` d'Adam et les range au-delà de `despawnTiles` (`World.stepEncounters`) ;
+seules les **résolues** sont de l'état (`encounters` : ids, absent d'une ancienne
+sauvegarde : aucune). Le **survivant blessé** (mobile `wanderer`, rôle `wounded`) :
+Adam le touche, il le suit en boitant (l'allure du patient) jusqu'à la porte de la
+mairie, où il devient un ouvrier libre sous le même id (`colonists` + 1, toast
+avec son prénom, `survivorJoined`) ; un ennemi à `fearTiles` le fait fuir
+(`woundedFled`), et trop longtemps loin d'Adam il renonce et attend. Le **marchand
+ambulant** est une charrette `Caravan` à `encounterId` (ni la caravane du calendrier,
+`World.caravan()` l'ignore) : une seule offre rare par palier (`waysideOffer`), la
+fenêtre Troc, payée sac puis ville ; l'échange fait, il repart. La **biche dorée**
+(`wanderer`, rôle `deer`, sprite `art/deer.ts`) fuit Adam sous `flinchTiles` ; rester
+entre les deux distances `catchTicks` remplit sa jauge et elle laisse une pièce de
+garde-robe (source `encounter`). Une rencontre vue (case explorée) mais pas résolue
+porte un « ? » violet : repère de bord (`IndicatorLayer.pointSpot`) et carte du monde.
+Hasard des flâneries haché de la seed (jamais le PRNG du monde). Partie de test
+`/test/encounter`.
 
 
 **Bases mutantes** (`src/data/enemyBases.ts`, `src/sim/enemyBases.ts`) —

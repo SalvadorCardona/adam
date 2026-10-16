@@ -74,6 +74,7 @@ import { DUST_RING, PARTICLE_FX } from '../art/particles.ts';
 import { PAUSED } from '../art/paused.ts';
 import { PRIORITY } from '../art/priority.ts';
 import { QUARRY } from '../art/quarry.ts';
+import { DEER } from '../art/deer.ts';
 import { PIG } from '../art/pig.ts';
 import { PIG_PEN } from '../art/pigPen.ts';
 import { WELL } from '../art/well.ts';
@@ -147,6 +148,8 @@ export const SPRITES = {
   wolf: WOLF,
   /** Le cochon sauvage, puis apprivoisé (`data/pigs.ts`). */
   pig: PIG,
+  /** La biche dorée de la route (`data/encounters.ts`). */
+  deer: DEER,
   /** Le gardien d'une base mutante : seau de ruine sur la tête, couvercle pour bouclier. */
   guardian: GUARDIAN,
   /** Le cracheur d'une base : jabot de gelée, lunettes de piscine violettes. */

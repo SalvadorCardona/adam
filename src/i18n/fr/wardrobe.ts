@@ -46,10 +46,11 @@ export const wardrobe = {
     beast: 'Trouvée sur une bête',
     chest: 'Trouvée dans un coffre',
     ruin: 'Trouvée dans une ruine',
+    encounter: 'Offerte par une biche dorée',
   },
   locked: 'À trouver',
   /** Sous une pièce verrouillée choisie : où la chercher. */
-  lockedHint: 'Elle se trouve en jouant : coffres de la carte, objectifs, bases mutantes et leurs chefs, la Reine, parfois une bête.',
+  lockedHint: 'Elle se trouve en jouant : coffres de la carte, rencontres de la route, objectifs, bases mutantes et leurs chefs, la Reine, parfois une bête.',
   new: 'Nouveau',
   /** Le compte des pièces qu'Adam peut porter. */
   owned: (owned: number, total: number): string => `${owned}/${total} pièces`,

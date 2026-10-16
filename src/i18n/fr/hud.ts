@@ -88,6 +88,14 @@ export const hud = {
     penned: (pigs: number): string => `Un cochon rejoint l’élevage (${pigs})`,
     escaped: (count: number): string => (count > 1 ? `${count} cochons se sont échappés !` : 'Un cochon s’est échappé !'),
   },
+  /** Les rencontres de la route (`data/encounters.ts`) : survivant blessé, marchand, biche dorée. */
+  encounters: {
+    following: 'Le survivant vous suit en boitant — direction la mairie !',
+    fledScare: 'Le survivant, effrayé, s’est enfui…',
+    fledLost: 'Le survivant vous a perdu : il attend là où il est.',
+    joined: (name: string): string => `${name} rejoint la colonie : un ouvrier de plus !`,
+    deerCaught: 'La biche dorée se laisse approcher !',
+  },
   /** Les bulles empilées des événements. */
   toast: {
     /** Un objectif réussi en cours de chapitre : son nom, ce qu'il rapporte. */

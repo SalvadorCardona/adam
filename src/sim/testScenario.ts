@@ -82,6 +82,7 @@ export function stageScenario(scenario: TestScenarioProto): World {
   if (scenario.nearChest !== undefined) besideChest(world, scenario.nearChest);
   if (scenario.nearLair !== undefined) besideLair(world, scenario.nearLair);
   if (scenario.nearPig !== undefined) besidePig(world, scenario.nearPig);
+  if (scenario.nearEncounter !== undefined) besideEncounter(world, scenario.nearEncounter);
   if (scenario.wardrobe) {
     world.player.wardrobe = [...scenario.wardrobe.found];
     if (scenario.wardrobe.look) world.player.look = copyLook(scenario.wardrobe.look);
@@ -214,6 +215,44 @@ function besidePig(world: World, tiles: number): void {
     }
   }
   throw new Error('scénario de test : pas de place pour un cochon près de la mairie');
+}
+
+/**
+ * Adam à `tiles` tuiles à gauche d'un survivant blessé, le marchand trois tuiles au-dessus de lui et la
+ * biche quatre en dessous, sur une herbe libre à une quinzaine de tuiles de la mairie au moins, au bout
+ * d'une ligne droite sans eau jusqu'à elle ; leurs abords explorés.
+ */
+function besideEncounter(world: World, tiles: number): void {
+  const hall = world.entities.get(world.townHallId);
+
+  if (!hall) throw new Error('scénario de test : pas de mairie');
+
+  const free = (tx: number, ty: number): boolean => terrainAt(world.seed, tx, ty) === 'grass' && resourceAt(world.seed, tx, ty) === null;
+
+  for (let radius = 14; radius < 60; radius += 1) {
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+
+        const tx = hall.tx + 1 + dx;
+        const ty = hall.ty + 1 + dy;
+
+        if (!free(tx, ty) || !free(tx, ty - 3) || !free(tx, ty + 4)) continue;
+        // Le chemin d'Adam jusqu'au survivant est libre : ni eau, ni arbre, ni rocher.
+        if (!Array.from({ length: tiles + 1 }, (_, i) => tx - i).every((x) => free(x, ty))) continue;
+        // Et le chemin du retour : une ligne droite sans eau jusqu'à la mairie.
+        if (!dryLine(world, tx, ty, hall.tx + 1, hall.ty + 4)) continue;
+
+        world.placeEncounter('wounded', tx, ty);
+        world.placeEncounter('merchant', tx, ty - 3);
+        world.placeEncounter('deer', tx, ty + 4);
+        world.revealAround(tx, ty, tiles + 8);
+        teleport(world, (tx - tiles + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE);
+        return;
+      }
+    }
+  }
+  throw new Error('scénario de test : pas de place pour les rencontres près de la mairie');
 }
 
 /** La ligne droite de (ax, ay) à (bx, by) ne croise ni eau ni bâti, au demi-pas près. */

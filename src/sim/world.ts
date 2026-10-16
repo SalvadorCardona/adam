@@ -90,6 +90,7 @@ import { CHESTS } from '../data/chests.ts';
 import { PURIFIER } from '../data/contamination.ts';
 import { chestOfChunk, type Chest } from './chests.ts';
 import { DISCOVERIES, type DiscoveryKind, type RuinReward } from '../data/discoveries.ts';
+import { ENCOUNTERS, ENCOUNTER_KINDS, type EncounterKind } from '../data/encounters.ts';
 import { rollDiscoveryLoot, rollRuinReward, spotOfChunk, tierAt, type Spot, type SpotKind } from './discoveries.ts';
 import { HOUSING } from '../data/housing.ts';
 import { REACTIONS, type ReactionId, type TraitId } from '../data/traits.ts';
@@ -160,6 +161,7 @@ import { rollLoot, stepPickup } from './loot.ts';
 import { chapterObjectives, copyStats, emptyStats, objectiveDone } from './objectives.ts';
 import { eraReady, nextEra, withEraThreat } from './eras.ts';
 import { denSize, densOfChunk, stepBeast, type Den } from './wildlife.ts';
+import { encounterOfChunk, stepDeer, stepWounded, waysideOffer, type Encounter, type WandererContext } from './encounters.ts';
 import { pigSpotsOfChunk, stepPig as stepPigBody, type PigSpot } from './pigs.ts';
 import { FULL_TILE, blockingTile, facingOf, type TileBox } from './motion.ts';
 import {
@@ -261,6 +263,7 @@ import type {
   Patient,
   Pig,
   PigPen,
+  Wanderer,
   Pickup,
   Player,
   Site,
@@ -844,6 +847,16 @@ export type WorldEvents = {
   pigPenned: { id: EntityId; pigs: number };
   /** L'élevage `id` est tombé : `count` cochons s'échappent. */
   pigsEscaped: { id: EntityId; count: number };
+  /** Le survivant blessé suit Adam jusqu'à la mairie. */
+  woundedFollowing: { id: MobileId; x: number; y: number };
+  /** Le survivant détale, effrayé par un ennemi (`scare`) ou laissé trop loin (`lost`) : il attend là où il s'arrête. */
+  woundedFled: { id: MobileId; reason: 'scare' | 'lost' };
+  /** Le survivant blessé est arrivé à la mairie : un ouvrier de plus, `name` son prénom. */
+  survivorJoined: { id: MobileId; name: string; x: number; y: number };
+  /** La biche dorée se laisse approcher : Adam trouve une pièce de garde-robe (`pieceFound`). */
+  deerCaught: { id: MobileId; x: number; y: number };
+  /** Une rencontre est résolue (survivant arrivé, échange fait, biche attrapée) : elle ne reviendra pas. */
+  encounterResolved: { id: number; kind: EncounterKind };
   /** Adam ouvre un coffre de la carte, au centre (x, y) de sa case. */
   chestOpened: { id: number; tx: number; ty: number; x: number; y: number };
   /**
@@ -1098,6 +1111,10 @@ export class World {
   private readonly spotCache = new Map<string, Spot | null>();
   /** Les ruines fouillées et les secrets trouvés, par id. */
   private readonly foundSpots = new Set<number>();
+  /** Les rencontres de la route de chaque chunk déjà regardé, telles que la seed les pose (`sim/encounters.ts`). */
+  private readonly encounterCache = new Map<string, Encounter | null>();
+  /** Les rencontres résolues, par id : c'est tout ce qui est de l'état. */
+  private readonly resolvedEncounters = new Set<number>();
 
   /** Les réservations des porteurs. Pas de l'état : elles se relisent dans leurs jobs. */
   private readonly jobs = new JobBoard();
@@ -1348,6 +1365,7 @@ export class World {
       names: [...this.givenNames].map(([id, name]) => ({ id, name })),
       chests: [...this.openedChests],
       spots: [...this.foundSpots],
+      encounters: [...this.resolvedEncounters],
       scheduler: this.scheduler.toJSON(this.tickCount),
     };
   }
@@ -1474,6 +1492,8 @@ export class World {
     for (const id of state.chests ?? []) this.openedChests.add(id);
     this.foundSpots.clear();
     for (const id of state.spots ?? []) this.foundSpots.add(id);
+    this.resolvedEncounters.clear();
+    for (const id of state.encounters ?? []) this.resolvedEncounters.add(id);
 
     // Une sauvegarde d'avant les bases mutantes les découvre autour de la mairie — sauf celles dont la
     // zone tient déjà du bâti, ou dont l'emprise tomberait sur Adam.
@@ -1588,6 +1608,7 @@ export class World {
     this.stepRespawn();
     this.stepWildlife();
     this.stepPigs();
+    this.stepEncounters();
     this.stepGuards();
     this.stepRegionGuardians();
     this.stepBaseFire();
@@ -2242,7 +2263,7 @@ export class World {
   /** La caravane de troc, si elle est de passage — en route, garée ou sur le départ. */
   public caravan(): Caravan | undefined {
     for (const mobile of this.mobiles.values()) {
-      if (mobile.kind === 'caravan') return mobile;
+      if (mobile.kind === 'caravan' && mobile.encounterId === undefined) return mobile;
     }
     return undefined;
   }
@@ -2311,6 +2332,14 @@ export class World {
     const stored = this.grant({ items: trade.items, bag: trade.bag });
 
     this.events.emit('traded', { id, offer: index, fromBag, stored });
+    // Le marchand de la route n'avait qu'une offre : il range sa charrette et repart.
+    if (caravan.encounterId !== undefined) {
+      caravan.state = 'leaving';
+      caravan.met = false;
+      caravan.fromX = caravan.x;
+      caravan.fromY = caravan.y - ENCOUNTERS.despawnTiles * TILE_SIZE;
+      this.resolveEncounter(caravan.encounterId, 'merchant');
+    }
   }
 
   /**
@@ -2347,7 +2376,7 @@ export class World {
         if (near && !caravan.met) this.events.emit('caravanReached', { id: caravan.id });
         caravan.met = near;
 
-        if (this.tickCount >= caravan.leaveTick) {
+        if (caravan.encounterId === undefined && this.tickCount >= caravan.leaveTick) {
           caravan.state = 'leaving';
           caravan.met = false;
           this.events.emit('caravanLeaving', { id: caravan.id });
@@ -5009,6 +5038,10 @@ export class World {
         case 'pig':
           this.stepPig(mobile);
           break;
+
+        case 'wanderer':
+          this.stepWanderer(mobile);
+          break;
       }
     }
 
@@ -5980,6 +6013,215 @@ export class World {
     this.mobiles.delete(patient.id);
     this.mobiles.set(worker.id, worker);
     this.events.emit('mutantHealed', { id: worker.id, clinicId: clinic.id, x: door.x, y: door.y });
+  }
+
+  /* ------------------------------------------------------------ rencontres */
+
+  /** La rencontre de cette sorte dans un chunk, ou `null` : celle de la seed, sauf sous une base mutante. */
+  public encounterOfChunk(kind: EncounterKind, cx: number, cy: number): Encounter | null {
+    const key = `${kind}:${coordKey(cx, cy)}`;
+    let encounter = this.encounterCache.get(key);
+
+    if (encounter === undefined) {
+      const found = encounterOfChunk(this.seed, kind, cx, cy);
+
+      encounter = found && !this.enemyBases.some((base) => onBase(base, found.tx, found.ty)) ? found : null;
+      this.encounterCache.set(key, encounter);
+    }
+    return encounter;
+  }
+
+  /** Adam a-t-il déjà résolu cette rencontre ? */
+  public isEncounterResolved(id: number): boolean {
+    return this.resolvedEncounters.has(id);
+  }
+
+  private resolveEncounter(id: number, kind: EncounterKind): void {
+    this.resolvedEncounters.add(id);
+    this.events.emit('encounterResolved', { id, kind });
+  }
+
+  /**
+   * Pose une rencontre à la tuile (tx, ty), comme si la seed l'y avait mise : le marchand sur sa
+   * charrette, le blessé ou la biche en pied. Pour les parties de test et les essais.
+   */
+  public placeEncounter(kind: EncounterKind, tx: number, ty: number): Mobile {
+    const tier = tierAt(this.seed, tx, ty);
+    const id = hash3(this.seed ^ 0x3c6ef372, ENCOUNTER_KINDS.indexOf(kind) + 1, tx * 4096 + ty);
+
+    return this.materialize({ id, kind, tx, ty, tier });
+  }
+
+  private materialize(encounter: Encounter): Mobile {
+    const x = (encounter.tx + 0.5) * TILE_SIZE;
+    const y = (encounter.ty + 0.5) * TILE_SIZE;
+    const id = this.nextMobileId++;
+    let mobile: Mobile;
+
+    if (encounter.kind === 'merchant') {
+      mobile = {
+        kind: 'caravan',
+        id,
+        x,
+        y,
+        prevX: x,
+        prevY: y,
+        facing: 'down',
+        moving: false,
+        state: 'parked',
+        day: 0,
+        parkX: x,
+        parkY: y,
+        fromX: x,
+        fromY: y,
+        leaveTick: 0,
+        offers: [waysideOffer(this.seed, encounter.id, encounter.tier)],
+        met: false,
+        encounterId: encounter.id,
+      };
+    } else {
+      mobile = {
+        kind: 'wanderer',
+        id,
+        role: encounter.kind,
+        state: 'idle',
+        sex: sexOf(this.seed, id),
+        encounterId: encounter.id,
+        x,
+        y,
+        prevX: x,
+        prevY: y,
+        facing: 'down',
+        moving: false,
+        homeX: x,
+        homeY: y,
+        dirX: 0,
+        dirY: 0,
+        wanderTicks: 0,
+        gauge: 0,
+        fleeTicks: 0,
+      };
+    }
+    this.mobiles.set(mobile.id, mobile);
+    return mobile;
+  }
+
+  /** L'id de la rencontre que ce mobile incarne, ou `undefined`. */
+  private encounterIdOf(mobile: Mobile): number | undefined {
+    return mobile.kind === 'wanderer' || mobile.kind === 'caravan' ? mobile.encounterId : undefined;
+  }
+
+  /**
+   * Les rencontres autour d'Adam, une fois par seconde : range celles qui sont trop loin (le blessé
+   * qui le suit reste), puis montre celles des chunks voisins qu'il n'a pas encore résolues. Rangée,
+   * une rencontre n'est pas perdue : elle revient au prochain passage, telle que la seed la pose.
+   */
+  private stepEncounters(): void {
+    if (this.tickCount % WILDLIFE_SPAWN.checkTicks !== 0) return;
+
+    const { player } = this;
+    const despawn = ENCOUNTERS.despawnTiles * TILE_SIZE;
+    const spawn = ENCOUNTERS.spawnTiles * TILE_SIZE;
+    const shown = new Set<number>();
+
+    for (const mobile of [...this.mobiles.values()]) {
+      const encounterId = this.encounterIdOf(mobile);
+
+      if (encounterId === undefined) continue;
+      if (mobile.kind === 'wanderer' && mobile.state === 'following') {
+        shown.add(encounterId);
+        continue;
+      }
+      // Un marchand qui repart a fini son échange : sa charrette suit sa route.
+      if (mobile.kind === 'caravan' && mobile.state === 'leaving') continue;
+      if (distanceSq(player.x, player.y, mobile.x, mobile.y) > despawn * despawn) this.mobiles.delete(mobile.id);
+      else shown.add(encounterId);
+    }
+
+    const { cx, cy } = this.playerChunk();
+
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        for (const kind of ENCOUNTER_KINDS) {
+          const encounter = this.encounterOfChunk(kind, cx + dx, cy + dy);
+
+          if (!encounter || shown.has(encounter.id) || this.resolvedEncounters.has(encounter.id)) continue;
+
+          const x = (encounter.tx + 0.5) * TILE_SIZE;
+          const y = (encounter.ty + 0.5) * TILE_SIZE;
+
+          if (distanceSq(player.x, player.y, x, y) > spawn * spawn) continue;
+          if (this.isSolid(encounter.tx, encounter.ty)) continue;
+          this.materialize(encounter);
+        }
+      }
+    }
+  }
+
+  /** Un ennemi assez près de (x, y) pour l'effrayer, ou `null`. */
+  private foeNear(x: number, y: number, tiles: number): { x: number; y: number } | null {
+    const reach = tiles * TILE_SIZE;
+
+    for (const foe of this.foes()) {
+      if (foe.kind === 'mutant' && foe.emerge > 0) continue;
+      if (distanceSq(x, y, foe.x, foe.y) <= reach * reach) return foe;
+    }
+    return null;
+  }
+
+  /** Un tick de rencontre : le blessé attend, suit Adam ou fuit ; la biche broute, fuit ou se laisse approcher. */
+  private stepWanderer(wanderer: Wanderer): void {
+    const hall = this.warehouse();
+    const context: WandererContext = {
+      player: this.player,
+      door: hall ? doorOf(hall) : null,
+      scare: wanderer.role === 'wounded' && wanderer.state === 'following' ? this.foeNear(wanderer.x, wanderer.y, ENCOUNTERS.wounded.fearTiles) : null,
+      isSolid: this.isOpenGroundSolid,
+      seed: this.seed,
+      tick: this.tickCount,
+      stepSeconds: STEP_SECONDS,
+    };
+    const result = wanderer.role === 'wounded' ? stepWounded(wanderer, context) : stepDeer(wanderer, context);
+
+    switch (result) {
+      case 'touched':
+        this.events.emit('woundedFollowing', { id: wanderer.id, x: wanderer.x, y: wanderer.y });
+        break;
+      case 'scared':
+      case 'lost':
+        this.events.emit('woundedFled', { id: wanderer.id, reason: result === 'scared' ? 'scare' : 'lost' });
+        break;
+      case 'admitted':
+        if (hall) this.joinColony(wanderer, hall);
+        break;
+      case 'caught':
+        this.mobiles.delete(wanderer.id);
+        this.resolveEncounter(wanderer.encounterId, 'deer');
+        this.events.emit('deerCaught', { id: wanderer.id, x: wanderer.x, y: wanderer.y });
+        this.findPiece('encounter', wanderer.encounterId, 1, wanderer.x, wanderer.y);
+        break;
+      case null:
+        break;
+    }
+  }
+
+  /**
+   * Le survivant est à la mairie : il devient un ouvrier libre de la colonie, sous le même id (`colonists` + 1),
+   * et flâne devant elle. Même geste que l'enfant qui a 14 ans.
+   */
+  private joinColony(survivor: Wanderer, hall: TownHall): void {
+    const { id, sex, x, y } = survivor;
+    const worker = freeWorker(
+      { id, sex, trait: traitOf(this.seed, id), x, y, prevX: x, prevY: y, facing: survivor.facing, moving: false, age: adultAge(this.seed, id), ...freshNeeds(), ...freshHousing() },
+      hall.id,
+    );
+
+    this.mobiles.set(id, worker);
+    this.colonists += 1;
+    this.rosterChanged();
+    this.restartFarms();
+    this.resolveEncounter(survivor.encounterId, 'wounded');
+    this.events.emit('survivorJoined', { id, name: this.nameFor(worker), x, y });
   }
 
   /* ------------------------------------------------------------ compagnons */
@@ -7981,7 +8223,7 @@ export class World {
   private ageInhabitants(): void {
     this.player.age += AGES.yearsPerCycle;
     for (const mobile of [...this.mobiles.values()]) {
-      if (mobile.kind === 'arrow' || mobile.kind === 'spit' || mobile.kind === 'fireball' || mobile.kind === 'pickup' || mobile.kind === 'patient' || mobile.kind === 'companion' || mobile.kind === 'caravan' || mobile.kind === 'pig') continue;
+      if (mobile.kind === 'arrow' || mobile.kind === 'spit' || mobile.kind === 'fireball' || mobile.kind === 'pickup' || mobile.kind === 'patient' || mobile.kind === 'companion' || mobile.kind === 'caravan' || mobile.kind === 'pig' || mobile.kind === 'wanderer') continue;
       // Un enfant qui a faim ou soif ne grandit pas : il attend sa prochaine aube le ventre plein.
       const stunted = mobile.kind === 'kid' ? stuntingNeed(mobile.needs) : null;
 

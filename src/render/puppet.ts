@@ -547,6 +547,7 @@ export type PuppetId = Extract<
   | 'crab'
   | 'wolf'
   | 'pig'
+  | 'deer'
   | 'guardian'
   | 'spitter'
   | 'chief'

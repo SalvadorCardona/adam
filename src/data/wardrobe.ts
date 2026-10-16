@@ -9,7 +9,7 @@
  *
  * Quelques pièces se portent dès le départ (`starter`) ; les autres se
  * **trouvent** en jouant (`WARDROBE_LOOT`) : un coffre ouvert
- * (`data/chests.ts`), un objectif réussi, une base mutante abattue — plus
+ * (`data/chests.ts`), une biche dorée attrapée (`data/encounters.ts`), un objectif réussi, une base mutante abattue — plus
  * généreuse plus elle est loin (`BASE_WARDROBE_LOOT`) —, son chef, la Reine,
  * et parfois une bête. Le tirage est un
  * hachage de la seed et de ce qui l'a donné (`sim/wardrobe.ts`), jamais le PRNG
@@ -155,7 +155,7 @@ export const PARTNER_LOOK: Look = {
 };
 
 /** Ce qui fait trouver une pièce. */
-export const LOOT_SOURCES = ['objective', 'enemyBase', 'chief', 'queen', 'beast', 'chest', 'ruin'] as const;
+export const LOOT_SOURCES = ['objective', 'enemyBase', 'chief', 'queen', 'beast', 'chest', 'ruin', 'encounter'] as const;
 
 export type LootSource = (typeof LOOT_SOURCES)[number];
 
@@ -186,6 +186,8 @@ export const WARDROBE_LOOT = {
   chest: { chance: 1, weights: { common: 3, rare: 2, epic: 1 } },
   /** Une ruine fouillée : jamais de courante, c'est un lieu rare (`DISCOVERIES.ruin`). */
   ruin: { chance: 1, weights: { rare: 2, epic: 1 } },
+  /** La biche dorée attrapée : un animal rare, une pièce rare ou épique. */
+  encounter: { chance: 1, weights: { rare: 2, epic: 1 } },
 } as const satisfies Record<FlatLootSource, WardrobeDrop>;
 
 /**

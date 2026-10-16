@@ -1206,6 +1206,7 @@ export const content: Content = {
     army: 'Barracks',
     raid: 'Mutant base',
     chest: 'Chest to open',
+    encounter: 'Encounters on the road',
     pigs: 'Pig pen',
     wardrobe: 'Wardrobe',
     regions: 'Regions',
