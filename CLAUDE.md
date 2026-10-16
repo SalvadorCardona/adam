@@ -988,6 +988,8 @@ service worker : `sw.js` les pose et ramène le jeu au premier plan au tap.
 iOS : seulement dans une PWA ajoutée à l'écran d'accueil (16.4+), et jamais
 sans que la page tourne.
 
+- **Accessibilité** (`storage/localUiScale.ts`, `storage/localContrast.ts`, `data/contrast.ts`, bloc final de `style.css`) — réglages de l'appareil, jamais de la partie : « Taille de l'interface » (100 / 115 / 130 %, `adam:ui-scale`, variable racine `--ui-scale` lue par `zoom` sur `.hud`) et « Contraste élevé » (`adam:contrast`, `data-contrast` sur `<html>` : indigo foncé, toasts blancs, voile plus sombre), appliqués à chaud par `main.ts`. Un état ne tient jamais à sa seule couleur : point d'exclamation devant un compte en alerte et sur un objet à sec, coche ou point d'exclamation dans la pastille d'un toast, flèches montante / descendante des tendances, signe +/− des soldes. Un texte tient AA (4,5:1) : `TEXT_PAIRS` de `data/contrast.ts`, testé ; la menthe n'y suffit pas, le texte « bon » est `--good-text`. `prefers-reduced-motion` coupe les boucles du HUD, les rebonds, les secousses de caméra et les confettis (`render/motion.ts`).
+
 ## Direction artistique
 
 **Vectoriel « post-apo joyeux » : la vie reprend ses droits sur la ruine.**

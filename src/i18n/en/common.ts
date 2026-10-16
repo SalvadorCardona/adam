@@ -18,6 +18,8 @@ export const settings: Messages['settings'] = {
   sound: 'Sounds',
   music: 'Music',
   signs: 'Building signs',
+  uiScale: 'Interface size',
+  contrast: 'High contrast',
   haptics: 'Vibration',
   perf: 'Performance counter',
   sfxVolume: 'Sound effects volume',

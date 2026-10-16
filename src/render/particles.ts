@@ -27,8 +27,9 @@
  */
 
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
-import { DUST, PALETTE, PARTICLE_SHADOW, STROKE, hex, type ParticleShape, type ParticleStyle } from '../data/artDirection.ts';
+import { DUST, PALETTE, PARTICLES, PARTICLE_SHADOW, STROKE, hex, type ParticleShape, type ParticleStyle } from '../data/artDirection.ts';
 import { SPRITES } from '../data/sprites.ts';
+import { reducedMotion } from './motion.ts';
 import type { SpriteLibrary } from './spriteLibrary.ts';
 
 /** Particules vivantes au plus ; la plus vieille cède sa place. */
@@ -135,6 +136,8 @@ export class ParticleLayer {
 
   /** Projette `count` particules de la famille `style` depuis (x, y). */
   public burst(x: number, y: number, style: ParticleStyle, count = 6, speed = 0.09): void {
+    // Les confettis sont coupés sous `prefers-reduced-motion` ; les éclats qui disent un coup reçu restent.
+    if (style === PARTICLES.confetti && reducedMotion()) return;
     const tints = this.tintsOf(style);
 
     for (let i = 0; i < count; i += 1) {

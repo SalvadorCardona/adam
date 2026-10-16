@@ -24,6 +24,10 @@ export const settings = {
   music: 'Musique',
   /** Les pancartes des bâtiments, sur la carte. */
   signs: 'Pancartes',
+  /** La taille de tout le HUD et des fenêtres : 100, 115 ou 130 %. */
+  uiScale: "Taille de l'interface",
+  /** Fonds de cartes opaques, texte plus foncé, toasts sur blanc. */
+  contrast: 'Contraste élevé',
   /** La vibration du téléphone aux moments clés. */
   haptics: 'Vibrations',
   /** Le compteur de FPS et de ticks, pour juger les performances sur un vrai téléphone. */

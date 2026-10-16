@@ -17,6 +17,7 @@ import { NOTIFICATION_KINDS, type NotificationKind } from '../data/notifications
 import { GAMEPAD } from '../input/gamepad.ts';
 import type { UiIcon } from '../art/ui.ts';
 import { uiIcon } from './icons.ts';
+import type { UiScale } from '../storage/localUiScale.ts';
 import type { NotifyPermission } from './notifier.ts';
 
 export interface SettingsActions {
@@ -24,6 +25,10 @@ export interface SettingsActions {
   toggleSound(): void;
   toggleMusic(): void;
   toggleSigns(): void;
+  /** La taille de l'interface passe à la suivante : 100, 115, 130 %. */
+  cycleUiScale(): void;
+  /** Le contraste élevé : fonds opaques, texte plus foncé. */
+  toggleContrast(): void;
   /** Le compteur de FPS et de ticks, au bas du HUD. */
   togglePerf(): void;
   toggleHaptics(): void;
@@ -60,6 +65,8 @@ export class SettingsPanel {
   private readonly soundButton: HTMLButtonElement;
   private readonly musicButton: HTMLButtonElement;
   private readonly signsButton: HTMLButtonElement;
+  private readonly uiScaleButton: HTMLButtonElement;
+  private readonly contrastButton: HTMLButtonElement;
   private readonly hapticsButton: HTMLButtonElement;
   private readonly perfButton: HTMLButtonElement;
   private readonly padLabel: HTMLHeadingElement;
@@ -79,6 +86,8 @@ export class SettingsPanel {
   private sound = true;
   private music = true;
   private signs = true;
+  private uiScale: UiScale = 100;
+  private contrast = false;
   private haptics = true;
   private perf = false;
 
@@ -148,6 +157,16 @@ export class SettingsPanel {
     this.signsButton.className = 'button-secondary settings-toggle';
     this.signsButton.addEventListener('click', () => actions.toggleSigns());
 
+    this.uiScaleButton = document.createElement('button');
+    this.uiScaleButton.type = 'button';
+    this.uiScaleButton.className = 'button-secondary settings-toggle';
+    this.uiScaleButton.addEventListener('click', () => actions.cycleUiScale());
+
+    this.contrastButton = document.createElement('button');
+    this.contrastButton.type = 'button';
+    this.contrastButton.className = 'button-secondary settings-toggle';
+    this.contrastButton.addEventListener('click', () => actions.toggleContrast());
+
     this.hapticsButton = document.createElement('button');
     this.hapticsButton.type = 'button';
     this.hapticsButton.className = 'button-secondary settings-toggle';
@@ -211,6 +230,8 @@ export class SettingsPanel {
       this.musicButton,
       this.musicVolume.root,
       this.signsButton,
+      this.uiScaleButton,
+      this.contrastButton,
       this.hapticsButton,
       this.perfButton,
       this.padLabel,
@@ -235,6 +256,8 @@ export class SettingsPanel {
       this.setSound(this.sound);
       this.setMusic(this.music);
       this.setSigns(this.signs);
+      this.setUiScale(this.uiScale);
+      this.setContrast(this.contrast);
       this.setHaptics(this.haptics);
       this.setPerf(this.perf);
       this.padLabel.textContent = t().gamepad.heading;
@@ -295,6 +318,19 @@ export class SettingsPanel {
   public setSigns(on: boolean): void {
     this.signs = on;
     toggleLabel(this.signsButton, on, uiIcon(on ? 'signOn' : 'signOff', 22), t().settings.signs);
+  }
+
+  public setUiScale(scale: UiScale): void {
+    this.uiScale = scale;
+    toggleLabel(this.uiScaleButton, true, uiIcon('zoomIn', 22), t().settings.uiScale);
+    // Le cran choisi à la place de « oui » : 100 %, 115 % ou 130 %.
+    this.uiScaleButton.querySelector('.settings-toggle-state')!.textContent = `${scale} %`;
+    this.uiScaleButton.removeAttribute('aria-pressed');
+  }
+
+  public setContrast(on: boolean): void {
+    this.contrast = on;
+    toggleLabel(this.contrastButton, on, uiIcon('contrast', 22), t().settings.contrast);
   }
 
   public setHaptics(on: boolean): void {
