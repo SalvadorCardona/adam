@@ -55,6 +55,8 @@ import { DEATH } from '../data/death.ts';
 import { COMPANIONS, COMPANION_CLASSES, type CompanionClassId } from '../data/companions.ts';
 import { PIGS, PIG_FARM } from '../data/pigs.ts';
 import { DAWN_REWARD, DAY_CYCLE, SURVIVORS } from '../data/dayNight.ts';
+import { BOON_OFFER, BOONS, type BoonId } from '../data/boons.ts';
+import { boonBonus, drawBoons } from './boons.ts';
 import {
   CHIEF,
   ENEMIES,
@@ -589,6 +591,10 @@ export type WorldEvents = {
    * `reward` est entré en ville ou dans le sac (`to`) ; le reste est tombé au sol en `lootDropped`.
    */
   dawnBroke: { night: number; reward: [ItemId, number][]; to: 'town' | 'bag' };
+  /** L'aube propose ses faveurs (`data/boons.ts`). */
+  boonOffered: { night: number; choices: BoonId[] };
+  /** Une faveur prise : `reward`, ce que son colis a versé (vide pour un coup de pouce). */
+  boonChosen: { boon: BoonId; reward: [ItemId, number][]; to: 'town' | 'bag' };
   /** Un mutant a fui le jour : il disparaît sans compter comme abattu. */
   mutantFled: { id: MobileId; x: number; y: number };
   /** Un arc a tiré, depuis (x, y). */
@@ -884,6 +890,10 @@ export class World {
   private nextWaveTarget: EntityId | null = null;
   /** La nuit dont la vague est dehors et paiera sa prime si on l'abat toute avant l'aube ; `null` sinon. */
   private bountyNight: number | null = null;
+  /** Les faveurs de l'aube proposées, en attente d'un choix (`data/boons.ts`). */
+  private offeredBoons: { night: number; choices: BoonId[] } | null = null;
+  /** Le coup de pouce de la journée, jusqu'au tick `until`. */
+  private dayBoon: { id: BoonId; until: number } | null = null;
 
   /** Mutants abattus depuis le début de la partie — le score de l'écran de fin. */
   public kills = 0;
@@ -1227,6 +1237,8 @@ export class World {
       cycleStartTick: this.cycleStartTick,
       ...(this.nextWaveTarget !== null && { nextWaveTarget: this.nextWaveTarget }),
       ...(this.bountyNight !== null && { bountyNight: this.bountyNight }),
+      ...(this.offeredBoons !== null && { boonOffer: { night: this.offeredBoons.night, choices: [...this.offeredBoons.choices] } }),
+      ...(this.dayBoon !== null && { boon: { ...this.dayBoon } }),
       ...(this.scared.size > 0 && { scared: [...this.scared] }),
       kills: this.kills,
       prestige: this.prestige,
@@ -1302,6 +1314,8 @@ export class World {
     this.cycleStartTick = state.cycleStartTick;
     this.nextWaveTarget = state.nextWaveTarget ?? null;
     this.bountyNight = state.bountyNight ?? null;
+    this.offeredBoons = state.boonOffer ? { night: state.boonOffer.night, choices: [...state.boonOffer.choices] } : null;
+    this.dayBoon = state.boon ? { ...state.boon } : null;
     this.scared.clear();
     for (const id of state.scared ?? []) this.scared.add(id);
     this.kills = state.kills;
@@ -1660,6 +1674,10 @@ export class World {
 
       case 'removeDecor':
         this.removeDecor(command.id);
+        break;
+
+      case 'chooseBoon':
+        this.chooseBoon(command.index);
         break;
 
       case 'trade':
@@ -2918,7 +2936,48 @@ export class World {
    * d'Adam (`sim/levels.ts`) s'y ajoutent : un seul cumul, aucun doublon.
    */
   public bonus(stat: ResearchStat): number {
-    return researchBonus(this.researchDone, stat) + levelBonus(this.level(), stat);
+    return researchBonus(this.researchDone, stat) + levelBonus(this.level(), stat) + boonBonus(this.activeBoon()?.id ?? null, stat);
+  }
+
+  /* ------------------------------------------------------ faveurs de l'aube */
+
+  /** Les faveurs proposées à la dernière aube, tant qu'aucune n'est choisie. */
+  public boonOffer(): { night: number; choices: readonly BoonId[] } | null {
+    return this.offeredBoons;
+  }
+
+  /** Le coup de pouce de la journée et les ticks qui lui restent, ou `null`. */
+  public activeBoon(): { id: BoonId; left: number } | null {
+    const boon = this.dayBoon;
+
+    return boon && this.tickCount < boon.until ? { id: boon.id, left: boon.until - this.tickCount } : null;
+  }
+
+  /** L'aube propose ses faveurs ; celles d'avant, pas choisies, s'envolent. */
+  private offerBoons(): void {
+    this.offeredBoons = { night: this.night, choices: drawBoons(this.seed, this.night) };
+    this.events.emit('boonOffered', { night: this.night, choices: [...this.offeredBoons.choices] });
+  }
+
+  /** Une carte prise : le colis en ville (ou dans le sac), ou le coup de pouce pour la journée. */
+  private chooseBoon(index: number): void {
+    const offer = this.offeredBoons;
+    const boon = offer?.choices[index];
+
+    if (!offer || boon === undefined) return;
+
+    this.offeredBoons = null;
+
+    const { effect } = BOONS[boon];
+
+    if (effect.kind === 'items') {
+      const { reward, to } = this.bestow(Object.entries(effect.items) as [ItemId, number][]);
+
+      this.events.emit('boonChosen', { boon, reward, to });
+      return;
+    }
+    this.dayBoon = { id: boon, until: this.tickCount + BOON_OFFER.durationTicks };
+    this.events.emit('boonChosen', { boon, reward: [], to: 'town' });
   }
 
   /** Le niveau d'Adam, déduit de son XP. */
@@ -7179,6 +7238,7 @@ export class World {
     // La nuit est survécue : la mairie tient encore (`stepClock` s'arrête à la défaite).
     this.stats.nightsSurvived += 1;
     this.events.emit('dawnBroke', { night: this.night, reward, to });
+    this.offerBoons();
 
     // Après le Signal, des survivants ont entendu l'antenne : ils arrivent avec le jour.
     if (this.victory) this.welcomeSurvivors();

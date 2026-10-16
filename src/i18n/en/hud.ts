@@ -219,6 +219,18 @@ export const hud: Messages['hud'] = {
     short: (day: number): string => `D${day}`,
   },
   /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
+  boon: {
+    title: 'Dawn favour',
+    lead: 'The night is held. Eve found something to help you: pick one card.',
+    later: 'Later',
+    parcel: 'Parcel',
+    forTheDay: 'For the day',
+    /** Le toast de l'aube, et son bouton. */
+    ready: 'Dawn brings a favour: pick a card.',
+    see: 'See',
+    offer: 'Dawn favour',
+    chosen: (label: string): string => `${label}!`,
+  },
   hasten: {
     idle: 'Skip the night',
     active: (left: string): string => `Dawn in ${left}`,

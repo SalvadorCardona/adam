@@ -1118,6 +1118,16 @@ export const content: Content = {
       description: 'A drill in the colony’s colours.',
     },
   },
+  boons: {
+    coffee: { label: 'Eve’s coffee', description: 'Everyone trots along: 30% faster until nightfall.' },
+    workSongs: { label: 'Work songs', description: 'Everyone works 40% faster until nightfall.' },
+    sharpAxe: { label: 'Sharp axe', description: 'Every axe stroke brings double wood until nightfall.' },
+    sneakers: { label: 'New sneakers', description: 'Adam runs faster until nightfall.' },
+    goodBreakfast: { label: 'Hearty breakfast', description: 'Hunger grows half as fast until nightfall.' },
+    scrapCrate: { label: 'Scrap crate', description: 'A crate left by the town hall: 25 wood and 15 stone.' },
+    picnic: { label: 'Picnic', description: 'A forgotten basket: 15 food and 15 water for the town.' },
+    oreCart: { label: 'Ore cart', description: 'A tipped-over cart: 10 iron ore and 8 coal.' },
+  },
   perks: {
     woodStart: {
       label: 'Starter bundle',

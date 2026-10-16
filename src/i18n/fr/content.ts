@@ -21,6 +21,7 @@ import { QUESTS, TOOLS } from '../../data/quests.ts';
 import { RECIPES } from '../../data/recipes.ts';
 import { BIOMES } from '../../data/regions.ts';
 import { COMPANION_CLASSES } from '../../data/companions.ts';
+import { BOONS } from '../../data/boons.ts';
 import { RESEARCH, RESEARCH_STATS, RESEARCH_THEMES } from '../../data/research.ts';
 import { RESOURCES } from '../../data/resources.ts';
 import { TEST_SCENARIOS } from '../../data/testScenario.ts';
@@ -116,6 +117,7 @@ export const content = {
   research: mapTable(RESEARCH, ({ label, description }): { label: string; description: string } => ({ label, description })),
   achievements: mapTable(ACHIEVEMENTS, ({ label, description }): { label: string; description: string } => ({ label, description })),
   trophies: mapTable(TROPHIES, ({ label, description }): { label: string; description: string } => ({ label, description })),
+  boons: mapTable(BOONS, ({ label, description }): { label: string; description: string } => ({ label, description })),
   perks: mapTable(PERKS, ({ label, description }): { label: string; description: string } => ({ label, description })),
   weather: mapTable(WEATHER, ({ label, advice }): { label: string; advice: string } => ({ label, advice })),
   rareOffers: mapTable(RARE_OFFERS, (offer): string => offer.label),

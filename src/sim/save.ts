@@ -15,6 +15,7 @@
  * est refusée proprement : `decodeSave` ne lève jamais.
  */
 
+import { BOONS, type BoonId } from '../data/boons.ts';
 import { CHUNK_TILES } from '../core/grid.ts';
 import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, maxLevel, type BuildingId } from '../data/buildings.ts';
 import { COMPANION_CLASSES, isCompanionClass, type CompanionClassId } from '../data/companions.ts';
@@ -138,6 +139,10 @@ export interface WorldState {
   nextWaveTarget?: EntityId;
   /** La nuit dont la vague, sortie, paiera sa prime si on l'abat toute (`WAVE_BOUNTY`). Absent : aucune en jeu. */
   bountyNight?: number;
+  /** Les faveurs de l'aube proposées et pas encore choisies (`data/boons.ts`). Absent : aucune. */
+  boonOffer?: { night: number; choices: BoonId[] };
+  /** Le coup de pouce de la journée et le tick où il s'éteint. Absent : aucun. */
+  boon?: { id: BoonId; until: number };
   /** Ceux qui ont eu peur depuis l'aube, cf. `World.scared` : leur nuit pèse sur le moral de l'aube. Absent : personne. */
   scared?: number[];
   kills: number;
@@ -530,6 +535,8 @@ function parseState(raw: unknown): WorldState {
     cycleStartTick: int(state['cycleStartTick']),
     ...(state['nextWaveTarget'] !== undefined && { nextWaveTarget: int(state['nextWaveTarget']) }),
     ...(state['bountyNight'] !== undefined && { bountyNight: int(state['bountyNight']) }),
+    ...(state['boonOffer'] !== undefined && { boonOffer: parseBoonOffer(state['boonOffer']) }),
+    ...(state['boon'] !== undefined && { boon: parseBoon(state['boon']) }),
     ...(state['scared'] !== undefined && { scared: [...new Set(array(state['scared']).map(int))] }),
     kills: int(state['kills']),
     // Absents d'une sauvegarde d'avant le Prestige : la colonie repart de zéro, ses bâtiments déjà payés.
@@ -614,6 +621,18 @@ function parseObjectives(
     stats: parseStats(state['stats']),
     chapterBase: parseStats(state['chapterBase']),
   };
+}
+
+function parseBoonOffer(raw: unknown): { night: number; choices: BoonId[] } {
+  const offer = record(raw);
+
+  return { night: int(offer['night']), choices: array(offer['choices']).map((id) => oneOf(id, BOONS) as BoonId) };
+}
+
+function parseBoon(raw: unknown): { id: BoonId; until: number } {
+  const boon = record(raw);
+
+  return { id: oneOf(boon['id'], BOONS) as BoonId, until: int(boon['until']) };
 }
 
 function parseStats(raw: unknown): WorldStats {

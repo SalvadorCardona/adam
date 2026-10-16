@@ -270,6 +270,21 @@ export const hud = {
     short: (day: number): string => `J${day}`,
   },
   /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
+  /** Les faveurs de l'aube (`ui/boonPanel.ts`) et leur capsule à côté de l'horloge. */
+  boon: {
+    title: 'Faveur de l’aube',
+    lead: 'La nuit est tenue. Ève a déniché de quoi vous aider : choisissez une carte.',
+    later: 'Plus tard',
+    parcel: 'Colis',
+    forTheDay: 'Pour la journée',
+    /** La capsule, quand une faveur attend. */
+    /** Le toast de l'aube, et son bouton. */
+    ready: 'L’aube vous fait une faveur : choisissez une carte.',
+    see: 'Voir',
+    offer: 'Faveur de l’aube',
+    /** Le toast, à la carte prise. */
+    chosen: (label: string): string => `${label} !`,
+  },
   hasten: {
     idle: 'Passer la nuit',
     active: (left: string): string => `Aube dans ${left}`,

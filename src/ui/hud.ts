@@ -67,6 +67,7 @@ import { QUESTS, type QuestReward } from '../data/quests.ts';
 import { RESEARCH, type ResearchId } from '../data/research.ts';
 import { WEATHER, WEATHER_CALENDAR } from '../data/weather.ts';
 import { dayDialSvg, type UiIcon } from '../art/ui.ts';
+import { BOONS } from '../data/boons.ts';
 import type { AtlasStats } from '../render/spriteLibrary.ts';
 import type { WaterStats } from '../render/waterLayer.ts';
 import type { Compass } from '../sim/enemies.ts';
@@ -209,6 +210,11 @@ export class Hud {
   private hastenKey = '';
   /** Le joueur a demandé de hâter l'aube ; `main.ts` le lit à chaque image. */
   public hastening = false;
+  /** La faveur de l'aube : la capsule qui l'attend, puis le coup de pouce qui court. */
+  private readonly boonButton: HTMLButtonElement;
+  private boonKey = '';
+  /** Ouvre les cartes de l'aube ; `main.ts` y branche `BoonPanel`. */
+  public onBoonOpen: () => void = () => undefined;
   private readonly dayClockDial: HTMLImageElement;
   private readonly dayClockDay: HTMLElement;
   private readonly dayClockTip: HTMLElement;
@@ -458,6 +464,12 @@ export class Hud {
       this.hastening = !this.hastening;
       this.updateHasten();
     });
+    this.boonButton = element('button', 'panel hud-wave hud-boon');
+    this.boonButton.type = 'button';
+    this.boonButton.hidden = true;
+    this.boonButton.addEventListener('click', () => {
+      if (this.world.boonOffer()) this.onBoonOpen();
+    });
     this.floats = element('div', 'hud-floats');
     this.stats = element('div', 'panel hud-stats');
     this.stats.hidden = !debug;
@@ -574,7 +586,7 @@ export class Hud {
     main.append(this.bar, this.quest);
     this.left = element('div', 'hud-left');
     // L'horloge du jour juste à droite de la population.
-    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.waveSoon, this.hunger);
+    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.boonButton, this.waveSoon, this.hunger);
     this.right = element('div', 'hud-right');
     this.right.append(this.weather);
     this.top.append(this.left, main, this.right);
@@ -1858,8 +1870,42 @@ export class Hud {
     setTip(this.hastenButton, label);
   }
 
+  /**
+   * La capsule de la faveur : « Faveur de l'aube » qui bat tant qu'une carte
+   * attend ; puis l'icône du coup de pouce et le temps qui lui reste. Un colis
+   * pris ne laisse rien : il est déjà en ville.
+   */
+  private updateBoon(): void {
+    const offer = this.world.boonOffer();
+    const active = this.world.activeBoon();
+    const visible = offer !== null || active !== null;
+
+    if (this.boonButton.hidden !== !visible) this.boonButton.hidden = !visible;
+    if (!visible) return;
+
+    const words = t().hud.boon;
+    const seconds = active ? Math.ceil(active.left / TICKS_PER_SECOND) : 0;
+    const key = offer ? `offer|${locale()}` : `active|${active!.id}|${locale()}|${seconds}`;
+
+    if (key === this.boonKey) return;
+    this.boonKey = key;
+    this.boonButton.dataset['state'] = offer ? 'offer' : 'active';
+    if (offer) {
+      this.boonButton.replaceChildren(uiIcon('gift', 18), text('hud-wave-text', words.offer));
+      setTip(this.boonButton, words.offer);
+      return;
+    }
+
+    const { icon } = BOONS[active!.id];
+    const label = t().boons[active!.id];
+
+    this.boonButton.replaceChildren('item' in icon ? itemIcon(icon.item, 18) : uiIcon(icon.ui, 18), text('hud-wave-text', clock(seconds)));
+    setTip(this.boonButton, `${label.label} — ${label.description}`);
+  }
+
   private updateClock(): void {
     this.updateHasten();
+    this.updateBoon();
     const dial = this.world.dayDial();
 
     if (this.dayClock.hidden !== !dial) this.dayClock.hidden = !dial;
