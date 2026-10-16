@@ -17,6 +17,11 @@
  * menthe pour ce qui va bien, corail foncé pour le danger, indigo pour le texte.
  */
 
+/* `hidden` masque toujours : sans cela, le `display` d'une classe (`.button-secondary`) l'écrase. */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   /* Curseurs : ceux du système, que `ui/cursors.ts` remplace par les dessinés sur un appareil à souris. */
   --cursor-arrow: default;
