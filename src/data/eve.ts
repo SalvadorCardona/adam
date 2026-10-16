@@ -59,6 +59,13 @@ export const EVE_LINES = {
      * `{building}` : son nom, sans article.
      */
     storeStuck: 'Ton {building} déborde et personne ne le vide ! Pose un poste de logistique à côté : ses gars porteront tout à la mairie.',
+    /**
+     * La nourriture fond et rien ne la refait : la ferme donne du blé, qui ne
+     * se mange pas cru ; la boulangerie en fait du pain. `farm` sans ferme,
+     * `bakery` la ferme debout mais pas de boulangerie.
+     */
+    farm: 'On va manquer de manger, Adam ! Une ferme pour le blé, puis une boulangerie pour le pain.',
+    bakery: 'Le blé ne se mange pas cru, Adam ! Une boulangerie en fera du pain pour nos gars.',
     /** Plus de pierre en ville et pas de carrière : la source qui ne s'épuise pas. */
     quarry: 'Plus de pierre en ville ? Pose une carrière : ses ouvriers la taillent dans les ruines.',
     /** Par radio, entre deux nuits, tant qu'elle n'est pas là. `{n}` : nuits restantes. */

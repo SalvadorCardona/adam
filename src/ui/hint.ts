@@ -159,6 +159,16 @@ export function tutorialAdvice(
 
   if (mutants > 0 && world.night <= 2) return say(lines.bow);
 
+  // La nourriture fond et rien ne la refait (ni boulangerie, ni élevage) : la ferme, puis la boulangerie — le blé ne se mange pas cru.
+  const baked = [...world.entities.values()].some((entity) => entity.proto === 'bakery' || entity.proto === 'pigPen');
+  const food = world.townStock()?.available('food') ?? 0;
+
+  if (mutants === 0 && !baked && (food < COLONY.startingStock.food / 2 || world.needAlert()?.need === 'hunger')) {
+    const farmed = [...world.entities.values()].some((entity) => entity.proto === 'farm');
+
+    return farmed ? viaLab(world, 'bakery', lines.bakery) : viaLab(world, 'farm', lines.farm);
+  }
+
   // Un producteur plein que personne ne vide : sans logisticiens ni porteurs, ce qu'il fait n'arrive jamais en ville.
   const stuck = mutants === 0 ? stuckProducer(world) : null;
 

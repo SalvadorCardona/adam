@@ -326,6 +326,43 @@ describe('producteur qui déborde', () => {
   });
 });
 
+describe('la nourriture qui fond', () => {
+  it('la ferme debout, sans boulangerie : Ève dit que le blé ne se mange pas cru', () => {
+    const world = new World(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    const town = world.townStock()!;
+
+    town.remove('food', town.count('food'));
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.farm);
+
+    const origin = worldToTile(world.player.x, world.player.y);
+    let id: EntityId | null = null;
+
+    world.events.on('buildingPlaced', (event) => (id = event.id));
+    for (let dy = -8; dy <= 8 && id === null; dy += 1) {
+      for (let dx = -8; dx <= 8 && id === null; dx += 1) {
+        if (world.canPlace('farm', origin.tx + dx, origin.ty + dy) !== null) continue;
+        world.push({ type: 'placeBuilding', building: 'farm', tx: origin.tx + dx, ty: origin.ty + dy });
+        world.tick();
+      }
+    }
+    for (const [item, amount] of Object.entries(BUILDINGS.farm.cost) as [ItemId, number][]) world.player.inventory.add(item, amount);
+    world.push({ type: 'transferToSite', id: id! });
+    world.tick();
+
+    expect(world.entities.get(id!)?.kind).toBe('farm');
+    // La boulangerie s'ouvre au labo : Ève y envoie d'abord.
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.bakery.label));
+    world.researchDone.push('baking');
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.bakery);
+  });
+});
+
 describe('conseil d’attente', () => {
   /** Pose une tour de guet à portée d'Adam et l'achève, sac rempli de son coût. */
   function buildTower(world: World): EntityId {
