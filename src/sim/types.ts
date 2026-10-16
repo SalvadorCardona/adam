@@ -24,6 +24,7 @@ import type { Look, PieceId } from '../data/wardrobe.ts';
 import type { NeedId } from '../data/needs.ts';
 import type { TraitId } from '../data/traits.ts';
 import type { JobPriority, WorkPriority } from '../data/workers.ts';
+import type { DoorSide } from './terrain.ts';
 import type { Housing } from './housing.ts';
 import type { Needs } from './needs.ts';
 import type { Store } from './store.ts';
@@ -39,6 +40,12 @@ interface Placed {
   ty: number;
   width: number;
   height: number;
+  /**
+   * Le côté de la porte quand le sud ne convient pas (`doorSide`, `sim/terrain.ts`) :
+   * un bâtiment de rive tourne sa porte vers la terre. Absent : le sud. Jamais lu
+   * d'une sauvegarde, refait au chargement.
+   */
+  door?: DoorSide;
 }
 
 /**

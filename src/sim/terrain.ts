@@ -136,6 +136,29 @@ export function touchesWater(seed: number, tx: number, ty: number, width: number
   return false;
 }
 
+/** Le côté d'une emprise où s'ouvre sa porte. */
+export type DoorSide = 'south' | 'east' | 'west' | 'north';
+
+/**
+ * La porte d'une emprise (`doorOf`, `sim/jobs.ts`) doit tomber sur une case où
+ * l'on marche : le sud d'abord, puis l'est, l'ouest et le nord. `null` si les
+ * quatre sont de l'eau. Sert aux bâtiments de rive (`shore`), dont l'eau borde
+ * l'emprise.
+ */
+export function doorSide(seed: number, tx: number, ty: number, width: number, height: number): DoorSide | null {
+  const midX = Math.floor(tx + width / 2);
+  const midY = Math.floor(ty + height / 2);
+  const doors: [DoorSide, number, number][] = [
+    ['south', midX, ty + height],
+    ['east', tx + width, midY],
+    ['west', tx - 1, midY],
+    ['north', midX, ty - 1],
+  ];
+
+  for (const [side, x, y] of doors) if (isWalkable(terrainAt(seed, x, y))) return side;
+  return null;
+}
+
 /** L'eau se traverse et se construit dessus : non. Le reste : oui. */
 export function isBuildable(kind: TerrainKind): boolean {
   return kind !== 'water';
