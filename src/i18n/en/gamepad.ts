@@ -19,7 +19,7 @@ export const gamepad: Messages['gamepad'] = {
     navigate: 'Jump from button to button',
     back: 'Back, close, cancel',
     bag: 'Bag: inventory and outfit',
-    build: 'Build',
+    build: 'Build (at night: cast the Volley)',
     zoomStep: 'Zoom out, in',
     zoom: 'Smooth zoom',
     recenter: 'Back to Adam',

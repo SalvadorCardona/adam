@@ -143,6 +143,14 @@ export interface WorldState {
   nextWaveTarget?: EntityId;
   /** La nuit dont la vague, sortie, paiera sa prime si on l'abat toute (`WAVE_BOUNTY`). Absent : aucune en jeu. */
   bountyNight?: number;
+  /** Le tick où la Volée d'Adam est rechargée (`World.skill`) ; absent : prête. */
+  skillReadyTick?: number;
+  /** Le combo de nuit en cours (`World.combo`) ; absent : aucun. */
+  combo?: { count: number; lastTick: number; bonus: number };
+  /** La nuit raccourcie par une vague abattue, en attente de son aube (« Nuit nette »). */
+  cleanNight?: number;
+  /** L'aube avancée de la nuit nette (`EarlyDawn`). */
+  earlyDawn?: { cycle: number; offset: number };
   /** Les faveurs de l'aube proposées et pas encore choisies (`data/boons.ts`). Absent : aucune. */
   boonOffer?: { night: number; choices: BoonId[] };
   /** Le coup de pouce de la journée et le tick où il s'éteint. Absent : aucun. */
@@ -542,6 +550,10 @@ function parseState(raw: unknown): WorldState {
     cycleStartTick: int(state['cycleStartTick']),
     ...(state['nextWaveTarget'] !== undefined && { nextWaveTarget: int(state['nextWaveTarget']) }),
     ...(state['bountyNight'] !== undefined && { bountyNight: int(state['bountyNight']) }),
+    ...(state['skillReadyTick'] !== undefined && { skillReadyTick: int(state['skillReadyTick']) }),
+    ...(state['combo'] !== undefined && { combo: parseCombo(state['combo']) }),
+    ...(state['cleanNight'] !== undefined && { cleanNight: int(state['cleanNight']) }),
+    ...(state['earlyDawn'] !== undefined && { earlyDawn: parseEarlyDawn(state['earlyDawn']) }),
     ...(state['boonOffer'] !== undefined && { boonOffer: parseBoonOffer(state['boonOffer']) }),
     ...(state['boon'] !== undefined && { boon: parseBoon(state['boon']) }),
     ...(state['challenge'] !== undefined && { challenge: parseChallenge(state['challenge']) }),
@@ -913,6 +925,18 @@ function parseQueen(raw: unknown): QueenState {
   return { phase, layTicks: int(queen['layTicks']), prey: queen['prey'] === null ? null : int(queen['prey']) };
 }
 
+function parseCombo(raw: unknown): { count: number; lastTick: number; bonus: number } {
+  const combo = record(raw);
+
+  return { count: nonNegative(int(combo['count'])), lastTick: int(combo['lastTick']), bonus: nonNegative(finite(combo['bonus'])) };
+}
+
+function parseEarlyDawn(raw: unknown): { cycle: number; offset: number } {
+  const dawn = record(raw);
+
+  return { cycle: nonNegative(int(dawn['cycle'])), offset: nonNegative(int(dawn['offset'])) };
+}
+
 function parseSlam(raw: unknown): SlamState {
   const slam = record(raw);
 
@@ -950,6 +974,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
         emerge: int(mobile['emerge']),
         // Absente d'une sauvegarde d'avant les cibles de vague : la mairie.
         ...(mobile['target'] !== undefined && { target: int(mobile['target']) }),
+        ...(mobile['hunts'] === true && { hunts: true as const }),
       };
 
       // La Reine seule retient sa phase, sa ponte et sa proie.

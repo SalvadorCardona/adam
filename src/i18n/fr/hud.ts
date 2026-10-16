@@ -299,6 +299,19 @@ export const hud = {
     idle: 'Passer la nuit',
     active: (left: string): string => `Aube dans ${left}`,
   },
+  /** La Volée d'Adam (bouton du HUD) et le combo de nuit (capsule). */
+  skill: {
+    name: 'Volée',
+    /** `keys` : « Espace » au clavier. */
+    ready: (keys: string): string => `Volée : trois flèches en éventail, vers où vous marchez (${keys})`,
+    cooling: (seconds: number): string => `Volée : prête dans ${seconds} s`,
+    combo: (count: number, multiplier: string): string => `Combo ×${multiplier} · ${count}`,
+    comboTip: 'Abattez les mutants d’affilée, sans qu’un bâtiment soit touché : le Prestige en bonus est versé à l’aube.',
+    comboBroken: (count: number): string => `Combo perdu : un bâtiment est touché (${count} d’affilée)`,
+    comboPaid: (prestige: number): string => `Combo de la nuit : +${prestige} Prestige`,
+    cleanNight: (seconds: number): string => `Nuit nette ! L’aube vient dans ${seconds} s`,
+    cleanPaid: 'Nuit nette',
+  },
   /** La météo en capsule, sous la quête. */
   weather: {
     /** `weather` : son nom, avec sa majuscule. */

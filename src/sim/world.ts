@@ -114,6 +114,7 @@ import { RECIPES, recipeOf, type RecipeId, type RecipeProto } from '../data/reci
 import { ERAS, type EraProto } from '../data/eras.ts';
 import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../data/research.ts';
 import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
+import { CLEAN_NIGHT, COMBO, HUNTERS, VOLLEY } from '../data/skills.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
 import { BUILDERS, FARMERS, FORESTERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
@@ -123,7 +124,7 @@ import { floorCost, floorMissing, floorNeeds, floorWants } from './antenna.ts';
 import { consumerRecipe, consumerRoom, consumerWants, forgeRecipe, isConsumer, isStarving } from './consumers.ts';
 import { createCompanion, stepCompanion } from './companions.ts';
 import { NO_WIND, fireball, isTargetable, nearestFoe, shoot, spit, stepArrow, stepSpit, type Wind } from './combat.ts';
-import { clockAt, CYCLE_TICKS, dayDial, nextWave, ticksToDawn, ticksToWave, waveAt, type DayClock, type DayDial } from './dayNight.ts';
+import { clockAt, CYCLE_TICKS, dayDial, nextWave, ticksToDawn, ticksToWave, waveAt, type DayClock, type DayDial, type EarlyDawn } from './dayNight.ts';
 import type {
   Command,
   CommandLogEntry,
@@ -307,6 +308,9 @@ const DEAD_COMMANDS: ReadonlySet<Command['type']> = new Set([
 
 /** Les sources de vision des deux joueurs : hors des ids des bâtiments (pairs) et des mobiles (impairs). */
 const ADAM_SIGHT = -1;
+
+/** Le sel du hachage qui désigne les traqueurs d'une vague (`HUNTERS`). */
+const HUNTER_SALT = 0x48554e54;
 const PARTNER_SIGHT = -2;
 
 /** Recette utilisée par une foreuse. Une seule pour l'instant, cf. `data/recipes.ts`. */
@@ -584,6 +588,16 @@ export type WorldEvents = {
   waveCleared: { night: number };
   /** La vague de la nuit `night`, abattue toute avant l'aube, paie sa prime (`WAVE_BOUNTY`) : en ville, ou dans le sac. */
   waveRewarded: { night: number; reward: [ItemId, number][]; to: 'town' | 'bag' };
+  /** Adam lance la Volée en (x, y), vers (dx, dy), de norme 1. */
+  skillCast: { x: number; y: number; dx: number; dy: number };
+  /** Un mutant abattu de plus : le combo de nuit est à `count`, multiplicateur `multiplier`. */
+  comboGrew: { count: number; multiplier: number };
+  /** Un bâtiment frappé : le combo de `count` mutants retombe. */
+  comboBroken: { count: number };
+  /** La vague abattue, la nuit raccourcit : l'aube viendra dans `ticks` ticks. */
+  nightShortened: { night: number; ticks: number };
+  /** À l'aube, le combo paie `prestige` ; `clean` : la nuit était nette. */
+  comboPaid: { night: number; count: number; prestige: number; clean: boolean };
   /** Un mutant abattu a lâché du butin en (x, y). */
   lootDropped: { id: MobileId; item: ItemId; x: number; y: number };
   /** Adam a ramassé `amount` exemplaires d'un tas au sol, qui sont allés dans son sac. */
@@ -906,6 +920,14 @@ export class World {
   private nextWaveTarget: EntityId | null = null;
   /** La nuit dont la vague est dehors et paiera sa prime si on l'abat toute avant l'aube ; `null` sinon. */
   private bountyNight: number | null = null;
+  /** Le tick où la Volée d'Adam est rechargée (`VOLLEY`) : 0, elle est prête. */
+  private skillReadyTick = 0;
+  /** Le combo de nuit en cours (`COMBO`) : les mutants abattus d'affilée, le tick du dernier, le Prestige mis de côté pour l'aube. */
+  private comboState: { count: number; lastTick: number; bonus: number } | null = null;
+  /** La nuit raccourcie par sa vague abattue : l'aube paie « Nuit nette ». */
+  private cleanNight: number | null = null;
+  /** L'aube avancée de cette nuit-là (`EarlyDawn`) : l'horloge la lit jusqu'au cycle suivant. */
+  private earlyDawn: EarlyDawn | null = null;
   /** Les faveurs de l'aube proposées, en attente d'un choix (`data/boons.ts`). */
   private offeredBoons: { night: number; choices: BoonId[] } | null = null;
   /** Le coup de pouce de la journée, jusqu'au tick `until`. */
@@ -1265,6 +1287,10 @@ export class World {
       cycleStartTick: this.cycleStartTick,
       ...(this.nextWaveTarget !== null && { nextWaveTarget: this.nextWaveTarget }),
       ...(this.bountyNight !== null && { bountyNight: this.bountyNight }),
+      ...(this.skillReadyTick > this.tickCount && { skillReadyTick: this.skillReadyTick }),
+      ...(this.comboState !== null && { combo: { ...this.comboState } }),
+      ...(this.cleanNight !== null && { cleanNight: this.cleanNight }),
+      ...(this.earlyDawn !== null && { earlyDawn: { ...this.earlyDawn } }),
       ...(this.offeredBoons !== null && { boonOffer: { night: this.offeredBoons.night, choices: [...this.offeredBoons.choices] } }),
       ...(this.dayBoon !== null && { boon: { ...this.dayBoon } }),
       ...(this.daily !== null && { challenge: { ...this.daily } }),
@@ -1343,6 +1369,10 @@ export class World {
     this.cycleStartTick = state.cycleStartTick;
     this.nextWaveTarget = state.nextWaveTarget ?? null;
     this.bountyNight = state.bountyNight ?? null;
+    this.skillReadyTick = state.skillReadyTick ?? 0;
+    this.comboState = state.combo ? { ...state.combo } : null;
+    this.cleanNight = state.cleanNight ?? null;
+    this.earlyDawn = state.earlyDawn ? { ...state.earlyDawn } : null;
     this.offeredBoons = state.boonOffer ? { night: state.boonOffer.night, choices: [...state.boonOffer.choices] } : null;
     this.dayBoon = state.boon ? { ...state.boon } : null;
     this.daily = state.challenge ? { ...state.challenge } : null;
@@ -1641,6 +1671,10 @@ export class World {
 
       case 'dressAdam':
         this.dressAdam(command.look);
+        break;
+
+      case 'castSkill':
+        this.castVolley(clamp(command.dx, -1, 1), clamp(command.dy, -1, 1));
         break;
 
       case 'renameInhabitant':
@@ -4779,7 +4813,9 @@ export class World {
 
           if (step.strikes && step.blockedBy !== null) {
             this.damageBuilding(step.blockedBy, ENEMIES[mobile.proto].damage);
+            this.breakCombo();
           }
+          if (mobile.hunts) this.strikeHunted(mobile);
           break;
         }
 
@@ -5454,6 +5490,7 @@ export class World {
     this.countChallenge('kills', 1);
     this.gainPrestige(KILL_PRESTIGE[mutant.proto], mutant.x, mutant.y);
     this.gainXp(killXp(mutant.proto), shooter, mutant.x, mutant.y);
+    this.growCombo(KILL_PRESTIGE[mutant.proto]);
 
     // La Reine et ses larves ne tombent jamais assommées : pas de tirage, le PRNG ne bouge pas.
     const clinic = ENEMIES[mutant.proto].stunnable ? this.freeClinic(mutant.x, mutant.y) : null;
@@ -5471,7 +5508,10 @@ export class World {
 
     if (!this.defeated && !this.hasMutants()) {
       this.events.emit('waveCleared', { night: this.night });
-      if (this.bountyNight === this.night) this.payBounty();
+      if (this.bountyNight === this.night) {
+        this.payBounty();
+        this.shortenNight();
+      }
     }
   }
 
@@ -5503,6 +5543,132 @@ export class World {
       this.events.emit('starFell', { id: pickup.id, item: loot.item, x, y });
       return;
     }
+  }
+
+  /* ------------------------------------------------- compétence, combo, aube */
+
+  /** La Volée d'Adam : prête ou en recharge (`left` ticks sur `total`), et si son niveau est atteint. */
+  public skill(): { unlocked: boolean; ready: boolean; left: number; total: number } {
+    const left = Math.max(0, this.skillReadyTick - this.tickCount);
+
+    return { unlocked: this.level() >= VOLLEY.unlockLevel, ready: left === 0, left, total: VOLLEY.cooldownTicks };
+  }
+
+  /** La Volée a son heure : du crépuscule à l'aube, ou tant qu'un mutant rôde ; Adam debout, la partie en cours. */
+  public skillOn(): boolean {
+    const phase = this.clock()?.phase;
+
+    return this.skill().unlocked && !this.defeated && !this.dead && (phase === 'dusk' || phase === 'night' || this.hasMutants());
+  }
+
+  /** La Volée : trois flèches en éventail, vers (dx, dy), sinon vers où Adam marche, l'ennemi le plus proche, ou là où il regarde. */
+  private castVolley(dx: number, dy: number): void {
+    const { player } = this;
+
+    if (!this.skillOn() || !this.skill().ready) return;
+
+    let aimX = dx || this.moveX;
+    let aimY = dy || (dx ? 0 : this.moveY);
+
+    if (aimX === 0 && aimY === 0) {
+      const foe = nearestFoe(this.foes(), player.x, player.y, WEAPONS.bow.range * this.rangeFactor());
+
+      if (foe) {
+        aimX = foe.x - player.x;
+        aimY = foe.y - player.y;
+      } else {
+        const looks = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] } as const;
+
+        [aimX, aimY] = looks[player.facing];
+      }
+    }
+
+    const length = Math.hypot(aimX, aimY) || 1;
+    const heading = Math.atan2(aimY / length, aimX / length);
+    const reach = WEAPONS.bow.range * TILE_SIZE;
+    const x = player.x;
+    const y = player.y - 8;
+
+    for (let i = 0; i < VOLLEY.arrows; i += 1) {
+      const angle = heading + (i - (VOLLEY.arrows - 1) / 2) * ((VOLLEY.spreadDegrees * Math.PI) / 180);
+      const arrow = shoot(this.nextMobileId++, 'bow', x, y, { x: x + Math.cos(angle) * reach, y: y + Math.sin(angle) * reach }, this.wind());
+
+      arrow.damage += this.bonus('bowDamage');
+      this.mobiles.set(arrow.id, arrow);
+    }
+    this.skillReadyTick = this.tickCount + VOLLEY.cooldownTicks;
+    player.calmTicks = 0;
+    if (this.moveX === 0 && this.moveY === 0) player.facing = facingOf(aimX, aimY);
+    this.events.emit('skillCast', { x, y, dx: Math.cos(heading), dy: Math.sin(heading) });
+  }
+
+  /** Le combo de nuit : son compte et son multiplicateur, ou `null` s'il est tombé, éteint ou s'il n'est pas nuit. */
+  public combo(): { count: number; multiplier: number; ticksLeft: number } | null {
+    const combo = this.comboState;
+
+    if (!combo || this.clock()?.phase !== 'night') return null;
+
+    const ticksLeft = combo.lastTick + COMBO.windowTicks - this.tickCount;
+
+    return ticksLeft > 0 ? { count: combo.count, multiplier: comboMultiplier(combo.count), ticksLeft } : null;
+  }
+
+  /** Un mutant abattu : le combo monte s'il suit le précédent de près ; au-delà de ×1, le Prestige du mutant, en plus, est mis de côté pour l'aube (il survit à l'expiration du combo, pas à un bâtiment frappé). */
+  private growCombo(prestige: number): void {
+    if (this.clock()?.phase !== 'night') return;
+
+    const live = this.combo();
+    const count = live ? live.count + 1 : 1;
+    const multiplier = comboMultiplier(count);
+
+    this.comboState = { count, lastTick: this.tickCount, bonus: (this.comboState?.bonus ?? 0) + prestige * (multiplier - 1) };
+    this.events.emit('comboGrew', { count, multiplier });
+  }
+
+  /** Un bâtiment frappé : le combo retombe, et le bonus mis de côté avec. */
+  private breakCombo(): void {
+    const live = this.combo();
+
+    if (!this.comboState) return;
+    this.comboState = null;
+    if (live) this.events.emit('comboBroken', { count: live.count });
+  }
+
+  /**
+   * La vague de la nuit est abattue toute : l'aube vient dans
+   * `CLEAN_NIGHT.remainTicks` (`EarlyDawn`). Le cycle garde sa longueur — l'aube
+   * dure d'autant plus —, si bien que le jour suivant, la météo et les nuits
+   * d'après restent à leur heure. Rien ne change tant qu'une vague de la nuit
+   * n'est pas sortie (`WAVES.perNight`).
+   */
+  private shortenNight(): void {
+    const clock = this.clock();
+
+    if (!clock || clock.phase !== 'night' || clock.elapsed < WAVES.firstAt + (WAVES.perNight - 1) * WAVES.interval) return;
+    if (clock.left <= CLEAN_NIGHT.remainTicks) return;
+
+    this.earlyDawn = { cycle: clock.cycle, offset: clock.offset + CLEAN_NIGHT.remainTicks };
+    this.cleanNight = this.night;
+    this.events.emit('nightShortened', { night: this.night, ticks: CLEAN_NIGHT.remainTicks });
+  }
+
+  /** À l'aube : le combo paie son Prestige, et une nuit nette son butin. Rend le butin de la nuit nette, à verser avec celui de l'aube. */
+  private payCombo(): [ItemId, number][] {
+    const clean = this.cleanNight === this.night;
+    const combo = this.comboState;
+    const prestige = Math.round(combo?.bonus ?? 0) + (clean ? CLEAN_NIGHT.prestige : 0);
+
+    this.comboState = null;
+    this.cleanNight = null;
+    if (prestige <= 0 && !clean) return [];
+
+    const hall = this.warehouse();
+    const x = hall ? (hall.tx + hall.width / 2) * TILE_SIZE : this.player.x;
+    const y = hall ? (hall.ty + hall.height / 2) * TILE_SIZE : this.player.y;
+
+    this.gainPrestige(prestige, x, y);
+    this.events.emit('comboPaid', { night: this.night, count: combo?.count ?? 0, prestige, clean });
+    return clean ? (Object.entries(CLEAN_NIGHT.reward) as [ItemId, number][]) : [];
   }
 
   /** La vague de la nuit est abattue toute : sa prime (`waveBounty`), en ville ou dans le sac, le surplus au sol. */
@@ -7009,7 +7175,7 @@ export class World {
 
   /** L'heure qu'il est, ou `null` tant que la mairie est en chantier : le cycle n'a pas commencé. */
   public clock(): DayClock | null {
-    return this.cycleStartTick === 0 ? null : clockAt(this.tickCount - this.cycleStartTick);
+    return this.cycleStartTick === 0 ? null : clockAt(this.tickCount - this.cycleStartTick, this.earlyDawn);
   }
 
   /** Ce que montre l'horloge du HUD — phase, aiguille, numéro du jour —, ou `null` avant la mairie. */
@@ -7145,8 +7311,24 @@ export class World {
     return best;
   }
 
+  /** Un traqueur (`HUNTERS`) voit Adam debout à `sightTiles` tuiles ou moins : il lui court après plutôt que de marcher sur sa cible. */
+  private hunting(mutant: Mutant): boolean {
+    if (this.dead || mutant.emerge > 0) return false;
+    return distanceSq(mutant.x, mutant.y, this.player.x, this.player.y) <= (HUNTERS.sightTiles * TILE_SIZE) ** 2;
+  }
+
+  /** Au contact d'Adam, un traqueur le frappe, à sa cadence. */
+  private strikeHunted(mutant: Mutant): void {
+    if (mutant.attackCooldown > 0 || !this.hunting(mutant)) return;
+    if (distanceSq(mutant.x, mutant.y, this.player.x, this.player.y) > (HUNTERS.reachTiles * TILE_SIZE) ** 2) return;
+
+    mutant.attackCooldown = HUNTERS.attackTicks;
+    this.hurtPlayer(mutant.id, HUNTERS.damage);
+  }
+
   /** Où marche un mutant : le milieu du bâtiment que vise sa vague, ou la mairie s'il est tombé. */
   private mutantGoal(mutant: Mutant): { x: number; y: number } {
+    if (mutant.hunts && this.hunting(mutant)) return this.player;
     const target = mutant.target === undefined ? undefined : this.entities.get(mutant.target);
 
     if (!target || target.kind === 'site') return this.target;
@@ -7190,7 +7372,10 @@ export class World {
       const raiders = base.raiders + (base.id === lead.id ? this.waveReinforcements() : 0);
 
       for (let i = 0; i < raiders; i += 1) {
-        this.spawnMutant(RAIDS.proto, WAVES.emergeTicks + slot * RAIDS.exitStagger, target, baseDoor(base, slot));
+        const raider = this.spawnMutant(RAIDS.proto, WAVES.emergeTicks + slot * RAIDS.exitStagger, target, baseDoor(base, slot));
+
+        // Un assaillant sur `HUNTERS.every` traque Adam : tiré de la seed, de la nuit et du rang, pas du PRNG du monde.
+        if (this.night >= HUNTERS.fromNight && hash3(this.seed ^ HUNTER_SALT, this.night * 1009 + base.id, i) % HUNTERS.every === 0) raider.hunts = true;
         slot += 1;
       }
       base.raiders = 0;
@@ -7381,7 +7566,7 @@ export class World {
     // La vague n'a pas été abattue toute : pas de prime, la nuit survécue paie son butin.
     this.bountyNight = null;
 
-    const { reward, to } = this.bestow(Object.entries(DAWN_REWARD) as [ItemId, number][]);
+    const { reward, to } = this.bestow([...(Object.entries(DAWN_REWARD) as [ItemId, number][]), ...this.payCombo()]);
 
     this.restInhabitants();
     this.scared.clear();
@@ -7732,7 +7917,7 @@ export class World {
   }
 
   /** Un mutant qui sort de terre en `point` : à la porte de sa base, ou aux pieds de sa mère pour une larve. */
-  private spawnMutant(proto: EnemyId, emerge: number, target: EntityId, point: { x: number; y: number }): void {
+  private spawnMutant(proto: EnemyId, emerge: number, target: EntityId, point: { x: number; y: number }): Mutant {
     const id = this.nextMobileId++;
     const mutant: Mutant = {
       kind: 'mutant',
@@ -7754,6 +7939,7 @@ export class World {
 
     if (proto === 'queen') mutant.queen = { phase: 1, layTicks: QUEEN.layTicks, prey: null };
     this.mobiles.set(mutant.id, mutant);
+    return mutant;
   }
 
   /* ---------------------------------------------------------------- besoins */
@@ -10744,4 +10930,9 @@ function restorePartner(saved: SavedPartner): Partner {
       inventory: Store.fromJSON(INVENTORY_CAPACITY, inventory),
     },
   };
+}
+
+/** Le multiplicateur d'un combo de `count` mutants abattus d'affilée (`COMBO`) : ×1 jusqu'au premier palier. */
+function comboMultiplier(count: number): number {
+  return Math.min(COMBO.maxMultiplier, 1 + Math.floor(count / COMBO.killsPerStep) * COMBO.stepMultiplier);
 }

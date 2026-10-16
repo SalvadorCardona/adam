@@ -381,6 +381,28 @@ quête sous les objectifs (`.hud-quest-daily`, `World.challenge`) et paie dès
 sa réussite, en objets et en Prestige (`challengeCompleted`). Sauvegardé
 sous `challenge`.
 
+**Rôle d'Adam la nuit** (`data/skills.ts`) — quatre leviers pour que la nuit
+ne soit pas un temps mort. La **Volée** (`castSkill`, `World.skill`,
+`VOLLEY`) : trois flèches en éventail vers la direction du joystick, sinon
+l'ennemi le plus proche, sinon le regard d'Adam ; recharge 8 s, sauvegardée
+(`skillReadyTick`) ; du crépuscule à l'aube (`World.skillOn`), bouton orange
+`.hud-skill` à gauche du sac (anneau de recharge, temps au centre), Espace au
+clavier et □ / X à la manette (`castVolley` de `main.ts` : le tiroir de
+construction garde Espace tiroir ouvert ou placement en cours), son `volley`.
+Les **traqueurs** (`HUNTERS`, `Mutant.hunts`, sauvegardé) : dès la nuit 2, un
+assaillant sur quatre (haché de la seed, de la nuit et du rang, jamais le PRNG)
+marche sur Adam plutôt que sur la mairie tant qu'il est à `sightTiles`, et le
+frappe au contact (`strikeHunted`). Le **combo de nuit** (`COMBO`,
+`World.combo`) : chaque mutant abattu à moins de `windowTicks` du précédent le
+fait monter, le multiplicateur gagne ½ tous les trois ; le Prestige en plus est
+mis de côté (`combo`, sauvegardé) et versé à l'aube (`comboPaid`) ; un
+bâtiment frappé (`comboBroken`) le perd. Capsule `.hud-combo` près de
+l'horloge. La **nuit nette** (`CLEAN_NIGHT`) : la vague abattue toute, l'aube
+est avancée à 20 s (`EarlyDawn` de `sim/dayNight.ts`, `earlyDawn` sauvegardé) ;
+l'aube dure alors jusqu'à l'heure normale du lever — jamais un décalage de
+`cycleStartTick`, dont la météo dépend — et l'aube paie en plus du Prestige et
+un lot (`cleanNight`). « Passer la nuit » et la Reine n'y changent rien.
+
 **Menace** — la nuit, des **mutants** sortent des bases mutantes : une
 vague par nuit (`WAVES`, `src/data/enemies.ts`), à sa tombée, faite des
 assaillants que chaque base a produits le jour (voir Bases mutantes) ; rien

@@ -612,6 +612,19 @@ export const UI_ICONS = {
     pill(4.2, 7, 1.6, 4, yellow.light),
     pill(12.2, 7, 1.6, 4, yellow.light),
   ),
+  /** La Volée : trois flèches blanches en éventail, pointes en haut. */
+  volley: svg(
+    S,
+    S,
+    ...[-30, 0, 30].map((angle) =>
+      group(
+        `rotate(${angle} 12 21)`,
+        pill(11.1, 8, 1.8, 13, paper.shade),
+        polygon([12, 2.5, 15.2, 8.5, 8.8, 8.5], paper.base),
+        pill(10.9, 17, 2.2, 3.4, yellow.base),
+      ),
+    ),
+  ),
   /** La flèche du bouton « Jouer ». */
   play: svg(S, S, polygon([8.5, 5.5, 19.5, 12.5, 8.5, 19.5], orange.shade), polygon([7.5, 4.5, 18.5, 11.5, 7.5, 18.5], paper.base)),
   /** « Recommencer », sur un bouton blanc : la flèche corail qui repart. */

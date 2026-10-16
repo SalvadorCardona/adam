@@ -78,6 +78,7 @@ import { DIAL_ARCS } from '../sim/dayNight.ts';
 import { currentQuest, questProgress } from '../sim/eve.ts';
 import { moodOf } from '../sim/housing.ts';
 import { chapterObjectives, currentChapter, firstOpenObjective, goalProgress, goalWait, openObjectives, type GoalWait } from '../sim/objectives.ts';
+import { COMBO } from '../data/skills.ts';
 import { TICKS_PER_SECOND, type Inhabitant, type Workforce, type World } from '../sim/world.ts';
 import { locale, onLocale, t } from '../i18n/locale.ts';
 import { carriesWanted, harvestRefusedText, tutorialAdvice, type Advice } from './hint.ts';
@@ -209,6 +210,12 @@ export class Hud {
   /** « Passer la nuit » : visible par nuit calme, il hâte l'aube (`HASTEN`). */
   private readonly hastenButton: HTMLButtonElement;
   private hastenKey = '';
+  /** La Volée d'Adam : un bouton du groupe `.hud-actions` (`main.ts`), recharge en anneau ; visible du crépuscule à l'aube. */
+  public readonly skillButton: HTMLButtonElement;
+  private skillKey = '';
+  /** Le combo de nuit, à côté de la capsule de vague. */
+  private readonly comboChip: HTMLElement;
+  private comboKey = '';
   /** Le joueur a demandé de hâter l'aube ; `main.ts` le lit à chaque image. */
   public hastening = false;
   /** La faveur de l'aube : la capsule qui l'attend, puis le coup de pouce qui court. */
@@ -466,6 +473,14 @@ export class Hud {
       this.hastening = !this.hastening;
       this.updateHasten();
     });
+    this.skillButton = element('button', 'hud-skill');
+    this.skillButton.type = 'button';
+    this.skillButton.hidden = true;
+    this.skillButton.setAttribute('aria-keyshortcuts', 'Space');
+    this.skillButton.addEventListener('click', () => this.world.push({ type: 'castSkill', dx: 0, dy: 0 }));
+    this.comboChip = element('div', 'panel hud-wave hud-combo');
+    this.comboChip.hidden = true;
+    this.comboChip.setAttribute('role', 'status');
     this.boonButton = element('button', 'panel hud-wave hud-boon');
     this.boonButton.type = 'button';
     this.boonButton.hidden = true;
@@ -588,7 +603,7 @@ export class Hud {
     main.append(this.bar, this.quest);
     this.left = element('div', 'hud-left');
     // L'horloge du jour juste à droite de la population.
-    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.boonButton, this.waveSoon, this.hunger);
+    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.comboChip, this.boonButton, this.waveSoon, this.hunger);
     this.right = element('div', 'hud-right');
     this.right.append(this.weather);
     this.top.append(this.left, main, this.right);
@@ -817,6 +832,11 @@ export class Hud {
     world.mine('lootPicked', ({ item, amount }) => {
       this.float(item, amount);
       this.flyToBag(item);
+    });
+    world.events.on('comboBroken', ({ count }) => this.notify(t().hud.skill.comboBroken(count), 'bad'));
+    world.events.on('nightShortened', ({ ticks }) => this.notify(t().hud.skill.cleanNight(Math.ceil(ticks / TICKS_PER_SECOND)), 'good'));
+    world.events.on('comboPaid', ({ prestige, clean }) => {
+      if (prestige > 0) this.notify(clean ? `${t().hud.skill.cleanPaid} · ${t().hud.skill.comboPaid(prestige)}` : t().hud.skill.comboPaid(prestige), 'good');
     });
     world.events.on('happinessChanged', ({ from, to }) => {
       this.moodTrend = to === from ? null : { up: to > from, until: performance.now() + MOOD_TREND_MS };
@@ -1921,7 +1941,50 @@ export class Hud {
     setTip(this.boonButton, `${label.label} — ${label.description}`);
   }
 
+  /**
+   * La Volée : visible du crépuscule à l'aube (ou tant qu'un mutant rôde), un
+   * anneau de recharge qui se vide ; le combo de nuit dans sa capsule. Le DOM
+   * n'est refait que si la clé change.
+   */
+  private updateSkill(): void {
+    const on = this.world.skillOn();
+    const skill = this.world.skill();
+
+    if (this.skillButton.hidden !== !on) this.skillButton.hidden = !on;
+    if (on) {
+      const seconds = Math.ceil(skill.left / TICKS_PER_SECOND);
+      const key = `${seconds}|${skill.ready}|${locale()}`;
+
+      this.skillButton.style.setProperty('--charge', `${Math.round((1 - skill.left / skill.total) * 100)}%`);
+      if (key !== this.skillKey) {
+        this.skillKey = key;
+        this.skillButton.dataset['ready'] = String(skill.ready);
+        this.skillButton.replaceChildren(uiIcon('volley', 28), ...(skill.ready ? [] : [text('hud-skill-left', String(seconds))]));
+        const label = skill.ready ? t().hud.skill.ready(t().menu.keys.space) : t().hud.skill.cooling(seconds);
+
+        setTip(this.skillButton, label);
+        this.skillButton.setAttribute('aria-label', label);
+      }
+    }
+
+    const combo = this.world.combo();
+
+    if (this.comboChip.hidden !== !combo) this.comboChip.hidden = !combo;
+    if (!combo) return;
+
+    const multiplier = String(combo.multiplier);
+    const key = `${combo.count}|${multiplier}|${locale()}`;
+
+    this.comboChip.style.setProperty('--fill', `${Math.round((combo.ticksLeft / COMBO.windowTicks) * 100)}%`);
+    if (key === this.comboKey) return;
+    this.comboKey = key;
+    this.comboChip.dataset['hot'] = String(combo.multiplier > 1);
+    this.comboChip.replaceChildren(uiIcon('volley', 18), text('hud-wave-text', t().hud.skill.combo(combo.count, multiplier)));
+    setTip(this.comboChip, t().hud.skill.comboTip);
+  }
+
   private updateClock(): void {
+    this.updateSkill();
     this.updateHasten();
     this.updateBoon();
     const dial = this.world.dayDial();

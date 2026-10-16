@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DAY_CYCLE, DAY_DIAL } from '../data/dayNight.ts';
 import { WAVES } from '../data/enemies.ts';
-import { CYCLE_TICKS, DIAL_ARCS, clockAt, darkness, dayDial, isWaveTick, ticksToNextWave, ticksToNight } from './dayNight.ts';
+import { CYCLE_TICKS, DIAL_ARCS, clockAt, darkness, dayDial, isWaveTick, ticksToDawn, ticksToNextWave, ticksToNight } from './dayNight.ts';
 import { World } from './world.ts';
 
 const NIGHTFALL = DAY_CYCLE.day + DAY_CYCLE.dusk;
@@ -46,6 +46,31 @@ describe('horloge du jour et de la nuit', () => {
     expect(ticksToNight(clockAt(0))).toBe(NIGHTFALL);
     expect(ticksToNight(clockAt(NIGHTFALL + 1))).toBe(0);
     expect(ticksToNight(clockAt(CYCLE_TICKS - 1))).toBe(NIGHTFALL + 1);
+  });
+});
+
+describe('aube avancée', () => {
+  const early = { cycle: 1, offset: NIGHTFALL + 400 };
+
+  it('raccourcit la nuit puis garde l’aube jusqu’au lever du jour, à l’heure', () => {
+    expect(clockAt(NIGHTFALL + 100, early)).toMatchObject({ phase: 'night', left: 300, dawnOffset: early.offset });
+    expect(clockAt(early.offset - 1, early)).toMatchObject({ phase: 'night', left: 1 });
+    expect(clockAt(early.offset, early)).toMatchObject({ phase: 'dawn', elapsed: 0, cycle: 1 });
+    expect(clockAt(NIGHTFALL + DAY_CYCLE.night + 5, early)).toMatchObject({ phase: 'dawn', elapsed: DAY_CYCLE.night + 5 - 400 });
+    expect(clockAt(CYCLE_TICKS - 1, early).phase).toBe('dawn');
+    expect(clockAt(CYCLE_TICKS, early)).toMatchObject({ phase: 'day', cycle: 2, elapsed: 0 });
+    // Une aube avancée d'un autre cycle ne change rien.
+    expect(clockAt(CYCLE_TICKS + NIGHTFALL + 100, early)).toEqual(clockAt(CYCLE_TICKS + NIGHTFALL + 100));
+  });
+
+  it('fait lire le cadran sur l’aube et le compte à rebours juste', () => {
+    const late = clockAt(NIGHTFALL + DAY_CYCLE.night + 50, early);
+
+    expect(darkness(late)).toBe(0);
+    expect(dayDial(late).day).toBe(2);
+    expect(dayDial(late).progress).toBeLessThan(DIAL_ARCS[0]!.to);
+    expect(ticksToNight(late)).toBe(CYCLE_TICKS - late.offset + NIGHTFALL);
+    expect(ticksToDawn(clockAt(NIGHTFALL + 100, early))).toBe(300);
   });
 });
 

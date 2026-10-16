@@ -243,6 +243,18 @@ export const hud: Messages['hud'] = {
     idle: 'Skip the night',
     active: (left: string): string => `Dawn in ${left}`,
   },
+  /** Adam's Volley (HUD button) and the night combo (capsule). */
+  skill: {
+    name: 'Volley',
+    ready: (keys: string): string => `Volley: three arrows in a fan, where you are walking (${keys})`,
+    cooling: (seconds: number): string => `Volley: ready in ${seconds} s`,
+    combo: (count: number, multiplier: string): string => `Combo ×${multiplier} · ${count}`,
+    comboTip: 'Take down mutants back to back without a building being hit: the bonus Prestige is paid at dawn.',
+    comboBroken: (count: number): string => `Combo lost: a building was hit (${count} in a row)`,
+    comboPaid: (prestige: number): string => `Night combo: +${prestige} Prestige`,
+    cleanNight: (seconds: number): string => `Clean night! Dawn comes in ${seconds} s`,
+    cleanPaid: 'Clean night',
+  },
   weather: {
     soon: (weather: string, seconds: number): string => `${weather} in ${seconds} s`,
   },
