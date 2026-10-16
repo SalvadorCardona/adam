@@ -148,3 +148,65 @@ describe('GuestSession', () => {
     expect(statuses.at(-1)).toEqual({ kind: 'ended' });
   });
 });
+
+describe('le vocal sur la session', () => {
+  const line = () => {
+    const calls: string[] = [];
+
+    return {
+      calls,
+      line: {
+        receive: (from: number, nickname: string, data: unknown) => calls.push(`receive ${from} ${nickname} ${JSON.stringify(data)}`),
+        peerGone: (id: number) => calls.push(`gone ${id}`),
+        allGone: () => calls.push('allGone'),
+        close: () => calls.push('close'),
+      },
+    };
+  };
+
+  it('l’hôte envoie la signalisation hors du flux de la partie, et reçoit celle de l’ami', () => {
+    const world = stageScenario(TEST_SCENARIOS.base);
+    const session = new HostSession(world, 'http://localhost:8790', 'ABCD2345', 'jeton', () => undefined, open);
+    const voice = line();
+
+    session.voice = voice.line;
+    session.start();
+    sockets[0]!.onopen?.();
+    sockets[0]!.receive({ type: 'guestIn', guest: 2, nickname: 'Lina' });
+    session.sendVoice({ k: 'join', muted: false });
+    session.sendVoice({ k: 'offer', sdp: 'v=0' }, 2);
+    sockets[0]!.receive({ type: 'voice', from: 2, nickname: 'Lina', data: { k: 'here', muted: false } });
+    sockets[0]!.receive({ type: 'guestOut', guest: 2 });
+
+    expect(sockets[0]!.sent.slice(1)).toEqual([
+      { type: 'voice', data: { k: 'join', muted: false } },
+      { type: 'voice', data: { k: 'offer', sdp: 'v=0' }, to: 2 },
+    ]);
+    expect(voice.calls).toEqual(['receive 2 Lina {"k":"here","muted":false}', 'gone 2']);
+
+    sockets[0]!.drop();
+    expect(voice.calls.at(-1)).toBe('allGone');
+    session.stop();
+    expect(voice.calls.at(-1)).toBe('close');
+  });
+
+  it('l’ami reçoit le vocal, le perd avec l’hôte, et le ferme en quittant la partie', () => {
+    const statuses: GuestStatus[] = [];
+    const session = new GuestSession('http://localhost:8790', 'ABCD2345', 'jeton', (status) => statuses.push(status), open);
+    const voice = line();
+
+    session.voice = voice.line;
+    session.start();
+    sockets[0]!.onopen?.();
+    sockets[0]!.receive({ type: 'joined', code: 'ABCD2345', host: 'Salva', hostOnline: true });
+    session.sendVoice({ k: 'mute', muted: true });
+    sockets[0]!.receive({ type: 'voice', from: 1, nickname: 'Salva', data: { k: 'join', muted: false } });
+    sockets[0]!.receive({ type: 'hostOut' });
+
+    expect(sockets[0]!.sent.at(-1)).toEqual({ type: 'voice', data: { k: 'mute', muted: true } });
+    expect(voice.calls).toEqual(['receive 1 Salva {"k":"join","muted":false}', 'allGone']);
+
+    session.stop();
+    expect(voice.calls.at(-1)).toBe('close');
+  });
+});

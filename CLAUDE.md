@@ -1380,6 +1380,26 @@ joueur invité au plus ; l'hôte en pause ou onglet caché, la partie s'arrête 
 les deux. GIF dans `docs/partie/deux-joueurs.gif` et, sans compte,
 `docs/partie/invitation-sans-compte.gif`.
 
+**Vocal** (`net/voice.ts`, `net/voiceBrowser.ts`, `net/iceServers.ts`,
+`ui/voicePanel.ts`, `i18n/*/voice.ts`) — dans une partie à deux seulement : ni
+solo ni build hors ligne n'en ont (pas de session, pas de `VoiceChat`, le micro
+n'est jamais demandé). WebRTC de navigateur à navigateur, **aucun son par le
+serveur** : il ne passe que la signalisation (`voice` de `ClientMessage` /
+`ServerMessage`, `PartyRooms.signal`, aux seuls membres de la salle, jamais à
+l'expéditeur, avec l'id et le pseudo de qui l'envoie ; budget par seconde à part,
+`VOICE_LIMITS`, pour ne jamais gêner les pas de la partie). Maillage : un
+arrivant dit `join`, ceux qui y sont répondent `here`, et l'id de compte le plus
+petit envoie l'offre (`VoiceChat`, pure, testée avec des faux `VoiceEnv`).
+Désactivé par défaut ; le **premier clic** sur « Rejoindre le vocal » demande le
+micro (écho, bruit et gain réglés). Dans le vocal : micro coupé / ouvert (V,
+L3 à la manette), quitter, volume global des autres, un indicateur « parle » par
+joueur (niveau `VOICE.speakingLevel`) ; la session (`HostSession.voice`,
+`GuestSession.voice`) le ferme en s'arrêtant. Un seul bouton HUD (`.hud-voice`)
+prend la place de « Inviter un ami » quand l'ami est là — pas de disque de plus
+en portrait —, et la pause a « Rejoindre / Quitter le vocal ». STUN public ; TURN
+facultatif au build (`VITE_TURN_*`, `docs/deploiement.md`, « Vocal »). La page de
+l'ami se rouvre sur un recalage : le vocal se rejoint alors d'un clic.
+
 **Scripts** : `npm run dev:all` lance serveur (`dev:server`, `node --watch`)
 et client branché dessus (`dev:online` = `vite --mode online`, qui lit
 `.env.online` → `http://localhost:8790`) ; `npm run dev` reste le jeu seul,

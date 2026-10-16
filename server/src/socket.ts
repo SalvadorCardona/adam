@@ -11,7 +11,7 @@
 import type { IncomingMessage, Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
-import { API_PATHS, API_VERSION, PLAY_LIMITS, parseClientMessage, type ServerMessage } from '../../shared/api.ts';
+import { API_PATHS, API_VERSION, PLAY_LIMITS, VOICE_LIMITS, parseClientMessage, type ServerMessage } from '../../shared/api.ts';
 import { originAllowed, type ServerConfig } from './config.ts';
 import type { PartyRooms } from './rooms.ts';
 
@@ -55,7 +55,11 @@ export function attachSocket(server: Server, config: ServerConfig, rooms: PartyR
       }
       if (message.type === 'ping') send(ws, { type: 'pong', t: message.t });
       else if (message.type === 'host' || message.type === 'join') rooms.enter(ws, message.type === 'host' ? 'host' : 'guest', message.code, message.token);
-      else rooms.relay(ws, message.data, message.to);
+      else if (message.type === 'voice') {
+        // Un SDP tient dans quelques Ko : une « signalisation » plus grosse n'en est pas une.
+        if (text(data).length > VOICE_LIMITS.maxSignalBytes) send(ws, { type: 'error', reason: 'badMessage' });
+        else rooms.signal(ws, message.data, message.to);
+      } else rooms.relay(ws, message.data, message.to);
     });
     ws.on('close', () => rooms.leave(ws));
     send(ws, { type: 'hello', api: API_VERSION });

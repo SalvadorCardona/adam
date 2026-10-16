@@ -250,9 +250,11 @@ export class PauseScreen {
   private readonly panel: HTMLElement;
   private readonly confirm: HTMLElement;
   private readonly collection: CollectionPanel;
+  private readonly voice: HTMLButtonElement;
+  private voiceOn = false;
 
   /** `onInvite` : `null` chez l'ami en jeu — on n'invite pas dans la partie d'un autre. */
-  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: (() => void) | null) {
+  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: (() => void) | null, onVoice: (() => void) | null = null) {
     this.root = document.createElement('div');
     this.root.className = 'overlay pause-screen';
     this.root.hidden = true;
@@ -287,6 +289,13 @@ export class PauseScreen {
     invite.hidden = onInvite === null;
     if (onInvite) invite.addEventListener('click', onInvite);
 
+    // Le vocal : caché hors d'une partie à deux (`setVoice`) ; rejoindre ou quitter, selon l'état.
+    this.voice = document.createElement('button');
+    this.voice.type = 'button';
+    this.voice.className = 'button-secondary pause-voice';
+    this.voice.hidden = true;
+    this.voice.addEventListener('click', () => onVoice?.());
+
     const showCollection = document.createElement('button');
 
     showCollection.type = 'button';
@@ -310,6 +319,7 @@ export class PauseScreen {
 
       showCollection.replaceChildren(uiIcon('trophy', 22), t().collection.title);
       invite.replaceChildren(uiIcon('invite', 22), t().party.invite);
+      this.renderVoice();
 
       title.textContent = pause.title;
       text.textContent = pause.text;
@@ -318,10 +328,21 @@ export class PauseScreen {
     });
 
     this.confirm = confirmRestart(onRestart, () => this.asking(false));
-    this.panel.append(title, text, resume, invite, showCollection, restart, seedLine(seed));
+    this.panel.append(title, text, resume, invite, this.voice, showCollection, restart, seedLine(seed));
     this.root.append(this.panel, this.confirm, this.collection.root);
     this.collection.root.hidden = true;
     this.asking(false);
+  }
+
+  /** Le bouton du vocal : caché, « Rejoindre le vocal » (`off`) ou « Quitter le vocal » (`on`). */
+  public setVoice(state: 'hidden' | 'off' | 'on'): void {
+    this.voice.hidden = state === 'hidden';
+    this.voiceOn = state === 'on';
+    this.renderVoice();
+  }
+
+  private renderVoice(): void {
+    this.voice.replaceChildren(uiIcon(this.voiceOn ? 'micOff' : 'mic', 22), this.voiceOn ? t().voice.leave : t().voice.join);
   }
 
   public set visible(visible: boolean) {

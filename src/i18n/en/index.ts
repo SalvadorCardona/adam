@@ -18,6 +18,7 @@ import { researchPanel } from './researchPanel.ts';
 import { resourcePanel } from './resourcePanel.ts';
 import { screens } from './screens.ts';
 import { trade } from './trade.ts';
+import { voice } from './voice.ts';
 import { wardrobe } from './wardrobe.ts';
 
 export const EN: Messages = {
@@ -25,6 +26,7 @@ export const EN: Messages = {
   settings,
   account,
   party,
+  voice,
   screens,
   hud,
   panel,

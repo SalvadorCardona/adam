@@ -43,6 +43,7 @@ export const PAD_BUTTONS = {
   select: 8,
   /** Options / Menu : la pause. */
   start: 9,
+  /** Clic du stick gauche : couper ou rouvrir le micro du vocal. */
   l3: 10,
   /** Clic du stick droit : revenir sur Adam. */
   r3: 11,
@@ -144,8 +145,8 @@ export const PAD_KINDS: readonly PadKind[] = ['playstation', 'xbox'];
  * Input, prend ceux de la Xbox.
  */
 export const PAD_NAMES = {
-  playstation: { l1: 'L1', r1: 'R1', l2: 'L2', r2: 'R2', r3: 'R3', start: 'Options', select: 'Share' },
-  xbox: { l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT', r3: 'R3', start: 'Menu', select: 'View' },
+  playstation: { l1: 'L1', r1: 'R1', l2: 'L2', r2: 'R2', l3: 'L3', r3: 'R3', start: 'Options', select: 'Share' },
+  xbox: { l1: 'LB', r1: 'RB', l2: 'LT', r2: 'RT', l3: 'L3', r3: 'R3', start: 'Menu', select: 'View' },
 } as const satisfies Record<PadKind, Partial<Record<PadButton, string>>>;
 
 /**

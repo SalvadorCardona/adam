@@ -11,6 +11,7 @@
  * - ○ / B : retour — ferme la fenêtre, annule un placement (Échap) ;
  * - △ / Y : le sac ; □ / X : « Bâtir » ;
  * - L1 / R1 : un cran de zoom ; L2 / R2 : zoom continu ; R3 : revenir sur Adam ;
+ * - L3 (clic du stick gauche) : couper ou rouvrir le micro du vocal ;
  * - Options / Menu : pause ; Share / View : la carte du monde.
  *
  * La bascule de mode : la manette sert, le curseur paraît (et le joystick
@@ -47,6 +48,8 @@ export interface GamepadActions {
   /** Le zoom continu des gâchettes ; `factor` > 1 avance. */
   zoomBy(factor: number): void;
   recenter(): void;
+  /** Le vocal : couper ou rouvrir le micro (L3). */
+  mic(): void;
   connected(pad: PadInfo): void;
   disconnected(pad: PadInfo): void;
   /** Le mode a basculé : les étiquettes de boutons, le joystick tactile suivent. */
@@ -176,6 +179,7 @@ export class GamepadControls {
     if (reader.pressed('l1')) this.actions.zoomStep(-1);
     if (reader.pressed('r1')) this.actions.zoomStep(1);
     if (reader.pressed('r3')) this.actions.recenter();
+    if (reader.pressed('l3')) this.actions.mic();
 
     // Les gâchettes zooment en continu, d'autant plus vite qu'on les enfonce ; les deux ensemble s'annulent.
     const pull = trigger(reader.value('r2')) - trigger(reader.value('l2'));

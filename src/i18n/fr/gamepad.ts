@@ -26,6 +26,7 @@ export const gamepad = {
     zoomStep: 'Zoom arrière, avant',
     zoom: 'Zoom continu',
     recenter: 'Revenir sur Adam',
+    mic: 'Couper ou rouvrir le micro (vocal)',
     pause: 'Pause',
     map: 'Carte du monde',
   },

@@ -111,6 +111,41 @@ l'adresse du jeu dans le README, le portfolio cardona.digital et la page
 Notion du projet. Ne pas laisser les deux versions en ligne : leurs
 sauvegardes locales (`localStorage`) sont par origine et divergeraient.
 
+## Vocal (WebRTC) : STUN, et TURN si besoin
+
+Le vocal de la partie à deux (`src/net/voice.ts`) passe de navigateur à
+navigateur : le serveur ne relaie que la **signalisation** (messages `voice` du
+WebSocket, aux seuls membres de la salle), jamais le son. **Rien à déployer
+pour qu'il marche** dans la plupart des cas : il utilise le STUN public de
+Google (`src/net/iceServers.ts`). Le micro exige une page sécurisée (HTTPS,
+ou `localhost`) — c'est le cas de `https://adam.cardona.digital/adam/`.
+
+Derrière certains réseaux (4G d'opérateur, réseaux d'entreprise, NAT
+symétrique), la connexion directe est impossible : le joueur voit « Connexion
+vocale impossible avec <pseudo> ». Il faut alors un relais **TURN**
+(coturn). Action manuelle, hors du code :
+
+1. **coturn sur Dokploy** : un service Docker `coturn/coturn`, ports `3478`
+   (UDP et TCP) et la plage UDP de relais (`49152-49252`) publiés sur l'hôte,
+   `--lt-cred-mech --user adam:<mot de passe> --realm turn.cardona.digital
+   --external-ip <IP publique>` ; DNS `A turn.cardona.digital → 148.230.109.72`
+   (à la main, comme les autres). Pare-feu : ouvrir ces ports.
+2. **Build-time Arguments** de `adam-client` (comme `VITE_API_URL`) :
+
+   ```
+   VITE_TURN_URL=turn:turn.cardona.digital:3478
+   VITE_TURN_USERNAME=adam
+   VITE_TURN_CREDENTIAL=<le mot de passe>
+   ```
+
+   Ces valeurs sont figées dans le bundle, donc lisibles par qui ouvre le
+   jeu : acceptable pour commencer, mais des identifiants éphémères
+   (`use-auth-secret`, générés par le serveur) seront préférables si le TURN
+   sert beaucoup.
+3. Redéployer `adam-client`.
+
+Sans ces trois variables, le jeu reste sur le STUN seul, sans erreur.
+
 ## 5. Vérifier
 
 ```bash
