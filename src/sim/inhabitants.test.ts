@@ -90,7 +90,11 @@ function colony(layout: Layout): World {
   // Plein jour, au début du premier cycle — 0 voudrait dire « pas de cycle ».
   state.tick = Math.max(state.tick, 1);
   state.cycleStartTick = state.tick;
-  return World.restore(state);
+  const restored = World.restore(state);
+
+  // Les ouvriers libres restent oisifs : ils ne glanent pas.
+  restored.gleaning = false;
+  return restored;
 }
 
 /** Avance l'horloge jusqu'au tick qui précède l'aube, sans traverser la nuit et ses vagues. */

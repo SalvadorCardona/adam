@@ -63,6 +63,8 @@ import type {
   FarmerState,
   ForesterState,
   Job,
+  GleanState,
+  Gleaning,
   LumberjackState,
   Born,
   Mobile,
@@ -514,6 +516,7 @@ const CARAVAN_STATES: readonly CaravanState[] = ['arriving', 'parked', 'leaving'
 const PIG_STATES: readonly PigState[] = ['wild', 'follow', 'flee'];
 
 const TRADE_KINDS: readonly TradeOffer['kind'][] = ['surplus', 'loot', 'rare'];
+const GLEAN_STATES: readonly GleanState[] = ['go', 'pick', 'back'];
 
 const LUMBERJACK_STATES: readonly LumberjackState[] = ['idle', 'toTree', 'chop', 'toCamp', 'wait'];
 
@@ -1070,6 +1073,8 @@ function parseMobile(raw: unknown, seed: number): Mobile {
         inside: bool(mobile['inside']),
         job: mobile['job'] === null ? null : parseJob(mobile['job']),
         searchTicks: int(mobile['searchTicks']),
+        // Absent des sauvegardes d'avant les glaneurs : personne ne glane.
+        ...(mobile['glean'] !== undefined && { glean: mobile['glean'] === null ? null : parseGlean(mobile['glean']) }),
         ...wandering(mobile, base),
       };
     case 'lumberjack': {
@@ -1366,6 +1371,23 @@ function parseJob(raw: unknown): Job {
     amount,
     priority: priority as JobPriority,
     carried: bool(job['carried']),
+  };
+}
+
+/** Le voyage d'un libre qui glane : la ressource visée et ce qu'il porte. */
+function parseGlean(raw: unknown): Gleaning {
+  const glean = record(raw);
+  const state = glean['state'];
+
+  if (!GLEAN_STATES.includes(state as GleanState)) throw new SaveError(`glane inconnue : ${String(state)}`);
+
+  return {
+    state: state as GleanState,
+    tx: int(glean['tx']),
+    ty: int(glean['ty']),
+    resource: oneOf(glean['resource'], RESOURCES) as ResourceId,
+    ticks: int(glean['ticks']),
+    item: glean['item'] === null ? null : (oneOf(glean['item'], ITEMS) as ItemId),
   };
 }
 

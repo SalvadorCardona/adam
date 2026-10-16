@@ -20,6 +20,7 @@ import type { Sex } from '../data/inhabitants.ts';
 import type { Shooter } from '../data/levels.ts';
 import type { ItemId } from '../data/items.ts';
 import type { ResearchId } from '../data/research.ts';
+import type { ResourceId } from '../data/resources.ts';
 import type { Look, PieceId } from '../data/wardrobe.ts';
 import type { NeedId } from '../data/needs.ts';
 import type { TraitId } from '../data/traits.ts';
@@ -744,6 +745,26 @@ export interface Worker extends Moving, Born, Wandering, Needful, Housed {
   job: Job | null;
   /** Ticks avant de chercher à nouveau du travail. */
   searchTicks: number;
+  /** Ce qu'un libre glane (`GLEANERS`), absent s'il ne glane pas — et des sauvegardes d'avant. Jamais en même temps qu'un job. */
+  glean?: Gleaning | null;
+}
+
+/**
+ * Ce que fait un glaneur : `go` marche vers la ressource qu'il a réservée,
+ * `pick` la ramasse, `back` rapporte l'unité à la mairie.
+ */
+export type GleanState = 'go' | 'pick' | 'back';
+
+/** Le voyage d'un libre qui glane : la tuile visée, et l'objet qu'il porte une fois ramassé. */
+export interface Gleaning {
+  state: GleanState;
+  tx: number;
+  ty: number;
+  resource: ResourceId;
+  /** Ticks restants à ramasser. */
+  ticks: number;
+  /** Ce qu'il porte sur la tête, `null` avant d'avoir ramassé. */
+  item: ItemId | null;
 }
 
 /**

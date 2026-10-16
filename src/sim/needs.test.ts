@@ -743,6 +743,9 @@ describe('famine', () => {
     const world = colony({ food: 50, water: 50 });
     const hall = world.warehouse()!;
 
+    // Les libres ne glanent pas : au travail, la soif les tuerait tous avant que le job soit refait.
+    world.gleaning = false;
+
     place(world, hall.tx + 6, hall.ty - 4);
     world.townStock()!.add('stone', 30);
     for (let i = 0; i < 20 * 20 && !workers(world).some((mobile) => mobile.job); i += 1) world.tick();

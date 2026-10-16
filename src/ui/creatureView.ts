@@ -186,6 +186,7 @@ function roleOf(person: Inhabitant): Role {
 /** La charge sur la tête d'un porteur, le bois d'un bûcheron qui rentre, la récolte d'un fermier. */
 function carryOf(person: Inhabitant): CreatureView['carry'] {
   if (person.kind === 'worker' && person.job?.carried) return { item: person.job.item, amount: person.job.amount };
+  if (person.kind === 'worker' && person.glean?.item) return { item: person.glean.item, amount: 1 };
   if (person.kind === 'lumberjack' && person.load > 0) return { item: 'wood', amount: person.load };
   if (person.kind === 'farmer' && person.state === 'toFarm' && person.load > 0) return { item: CROPS.item, amount: person.load };
   return null;
