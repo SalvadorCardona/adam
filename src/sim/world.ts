@@ -212,7 +212,7 @@ import { Store } from './store.ts';
 import { ProblemWatch, type ProblemFacts } from './problems.ts';
 import { transferAllPlan, transferAmount, type TransferDirection, type TransferQuantity, type TransferRules } from './transfer.ts';
 import { footingAt, type Footing } from './footing.ts';
-import { findSpawn, habitatAt, isBuildable, isWalkable, oreAt, terrainAt, touchesWater } from './terrain.ts';
+import { doorSide, findSpawn, habitatAt, isBuildable, isWalkable, oreAt, terrainAt, touchesWater } from './terrain.ts';
 import { inLogisticRange, pointInLogisticRange } from './warehouse.ts';
 import { chopSpot, isTree, pickTree, treesInRange } from './lumberjacks.ts';
 import { plantSpot, plotTiles, type PlotTile } from './forester.ts';
@@ -1438,6 +1438,8 @@ export class World {
     }
     this.hereRegion = this.regionAt(floorDiv(this.adam.x, TILE_SIZE), floorDiv(this.adam.y, TILE_SIZE));
 
+    // Une porte noyée d'une ancienne sauvegarde se retourne vers la terre.
+    for (const entity of this.entities.values()) this.faceDoor(entity);
     this.scheduler.restore(state.scheduler);
     this.restoreJobs();
     this.restoreLumberjacks();
@@ -3558,6 +3560,7 @@ export class World {
       work: 0,
     };
 
+    this.faceDoor(site);
     this.entities.set(id, site);
     this.chunks.occupy(id, tx, ty, proto.width, proto.height);
     this.events.emit('buildingPlaced', { id, tx, ty });
@@ -3579,6 +3582,21 @@ export class World {
     return id;
   }
 
+  /**
+   * Un bâtiment de rive tourne sa porte vers la terre : au sud, elle tomberait
+   * dans l'eau, où ni repas ni porteur n'arrivent (`clearLine`).
+   */
+  private faceDoor(entity: Entity): void {
+    const proto: BuildingProto = BUILDINGS[entity.proto];
+
+    if (!proto.shore) return;
+
+    const side = doorSide(this.seed, entity.tx, entity.ty, entity.width, entity.height);
+
+    if (side === null || side === 'south') delete entity.door;
+    else entity.door = side;
+  }
+
   /** Le chantier devient le bâtiment, sous le même id : le rendu n'a qu'à changer de texture. */
   private complete(site: Site): void {
     const proto = BUILDINGS[site.proto];
@@ -3595,6 +3613,7 @@ export class World {
       paused: false,
       staff: proto.workers,
       priority: WORK_PRIORITY.initial,
+      ...(site.door && { door: site.door }),
     };
     let building: Building;
 

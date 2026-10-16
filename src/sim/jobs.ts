@@ -41,6 +41,7 @@ import { labSurplus, labWants, researchCost } from './research.ts';
 import { consumerDemands, forgeOutputs, isConsumer } from './consumers.ts';
 import { priorityRank } from './staffing.ts';
 import type { Store } from './store.ts';
+import type { DoorSide } from './terrain.ts';
 import { inLogisticRange } from './warehouse.ts';
 import type { Depot, Drill, Entity, EntityId, Farm, Forge, Job, Lab, LumberCamp, Nursery, PigPen, Quarry, Site, TownHall, Yard } from './types.ts';
 
@@ -108,11 +109,24 @@ export function isProducer(entity: Entity): entity is Drill | Farm | Quarry | Pi
 }
 
 /**
- * Le seuil d'une emprise : le milieu de son bord bas, juste dehors. C'est
- * là qu'un porteur ramasse, dépose, et rentre chez lui.
+ * Le seuil d'une emprise : le milieu de son bord bas, juste dehors — ou du
+ * côté que l'emprise a tourné vers la terre (`door`). C'est là qu'un porteur
+ * ramasse, dépose, et rentre chez lui.
  */
-export function doorOf(entity: { tx: number; ty: number; width: number; height: number }): { x: number; y: number } {
-  return { x: (entity.tx + entity.width / 2) * TILE_SIZE, y: (entity.ty + entity.height) * TILE_SIZE + 6 };
+export function doorOf(entity: { tx: number; ty: number; width: number; height: number; door?: DoorSide }): { x: number; y: number } {
+  const midX = (entity.tx + entity.width / 2) * TILE_SIZE;
+  const midY = (entity.ty + entity.height / 2) * TILE_SIZE;
+
+  switch (entity.door) {
+    case 'east':
+      return { x: (entity.tx + entity.width) * TILE_SIZE + 6, y: midY };
+    case 'west':
+      return { x: entity.tx * TILE_SIZE - 6, y: midY };
+    case 'north':
+      return { x: midX, y: entity.ty * TILE_SIZE - 6 };
+    default:
+      return { x: midX, y: (entity.ty + entity.height) * TILE_SIZE + 6 };
+  }
 }
 
 export class JobBoard {
