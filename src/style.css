@@ -7656,6 +7656,27 @@ button[data-offline='true'] {
   width: 100%;
 }
 
+/* Sans compte : le pseudo, « Créer le lien », puis « J'ai un compte », sur toute la largeur. */
+.invite-panel > .account-field,
+.invite-panel > button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* « En attente de votre ami… », puis l'ami arrivé, en menthe. */
+.invite-presence {
+  margin: 0;
+  font-weight: 600;
+  text-align: center;
+}
+
+.invite-presence[data-tone='good'] {
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--good) 22%, var(--paper));
+  color: var(--good);
+}
+
 .invite-link {
   padding-right: 18px;
   font-size: 15px;

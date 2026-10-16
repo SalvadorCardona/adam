@@ -39,6 +39,8 @@ export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 /** Inscriptions par IP sur la fenêtre. */
 export const REGISTER_MAX_PER_IP = 10;
 export const REGISTER_WINDOW_MS = 60 * 60 * 1000;
+/** Invités par IP sur la même fenêtre : un salon, une soirée entre amis, pas une usine à comptes. */
+export const GUEST_MAX_PER_IP = 20;
 
 export interface AccountDeps {
   readonly db: DatabaseSync;
@@ -53,11 +55,16 @@ interface AccountRow {
   readonly nickname: string;
   readonly email: string;
   readonly password_hash: string;
+  readonly guest: number;
 }
 
 const fingerprint = (token: string): string => createHash('sha256').update(token).digest('hex');
 
-const publicUser = (row: AccountRow): AccountUser => ({ id: row.id, nickname: row.nickname, email: row.email });
+const publicUser = (row: AccountRow): AccountUser =>
+  row.guest ? { id: row.id, nickname: row.nickname, email: '', guest: true } : { id: row.id, nickname: row.nickname, email: row.email };
+
+/** L'adresse d'un invité : unique, jamais montrée, dans un domaine qui n'existe pas (`.invalid`). */
+const guestEmail = (): string => `guest-${randomBytes(12).toString('hex')}@guest.invalid`;
 
 function fail(
   c: Context,
@@ -87,7 +94,7 @@ const text = (value: unknown): string => (typeof value === 'string' ? value : ''
 /** Le compte derrière un jeton de session, ou `null` (inconnu, expiré). Le WebSocket le lit d'ici. */
 export function tokenReader(db: DatabaseSync, clock: () => number): (token: string) => AccountUser | null {
   const findBySession = db.prepare(
-    'SELECT a.id, a.nickname, a.email, a.password_hash FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ? AND s.expires_at > ?',
+    'SELECT a.id, a.nickname, a.email, a.password_hash, a.guest FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.token_hash = ? AND s.expires_at > ?',
   );
 
   return (token) => {
@@ -124,8 +131,11 @@ export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
   const loginByIp = new AttemptLimiter(LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS, clock);
   const registerByIp = new AttemptLimiter(REGISTER_MAX_PER_IP, REGISTER_WINDOW_MS, clock);
 
-  const findByEmail = db.prepare('SELECT id, nickname, email, password_hash FROM accounts WHERE email = ?');
+  const guestByIp = new AttemptLimiter(GUEST_MAX_PER_IP, REGISTER_WINDOW_MS, clock);
+
+  const findByEmail = db.prepare('SELECT id, nickname, email, password_hash, guest FROM accounts WHERE email = ?');
   const insertAccount = db.prepare('INSERT INTO accounts (nickname, email, password_hash, created_at) VALUES (?, ?, ?, ?)');
+  const insertGuest = db.prepare("INSERT INTO accounts (nickname, email, password_hash, created_at, guest) VALUES (?, ?, '', ?, 1)");
   const insertSession = db.prepare('INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)');
   const deleteSession = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
   const deleteExpired = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
@@ -176,6 +186,34 @@ export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
     }
 
     const response: SessionResponse = { ok: true, token: openSession(id), user: { id, nickname, email } };
+
+    c.header('Cache-Control', 'no-store');
+
+    return c.json(response, 201);
+  });
+
+  /*
+   * Un invité : l'ami qui ouvre le lien d'une partie entre son pseudo et joue,
+   * sans adresse ni mot de passe. Un compte temporaire, marqué `guest`, sans
+   * hachage : `verifyPassword` refuse tout, personne ne s'y connecte ; seul le
+   * jeton gardé sur son appareil le fait revenir.
+   */
+  routes.post(API_PATHS.guest, async (c) => {
+    const ip = clientIp(c);
+    const wait = guestByIp.retryAfter(ip);
+
+    if (wait > 0) return fail(c, 429, 'tooManyAttempts', { retryAfter: wait });
+
+    const body = await readJson(c);
+    const nickname = cleanNickname(text(body?.['nickname']));
+    const problem = nicknameProblem(nickname);
+
+    if (!body || problem) return fail(c, 400, 'invalid', { fields: [{ field: 'nickname', problem: problem ?? 'empty' }] });
+
+    guestByIp.hit(ip);
+
+    const id = Number(insertGuest.run(nickname, guestEmail(), new Date(clock()).toISOString()).lastInsertRowid);
+    const response: SessionResponse = { ok: true, token: openSession(id), user: { id, nickname, email: '', guest: true } };
 
     c.header('Cache-Control', 'no-store');
 

@@ -22,6 +22,7 @@ export const account: Messages['account'] = {
   working: 'One moment…',
   signedIn: (nickname) => `Signed in as ${nickname}`,
   signedInEmail: (email) => email,
+  guestProfile: 'Guest, no account: this nickname only lives on this device.',
   welcome: (nickname) => `Welcome, ${nickname}!`,
   signedOutDone: 'You are signed out.',
   field: {

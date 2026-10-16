@@ -172,6 +172,20 @@ describe('POST /parties/:code/join', () => {
     expect(hostView.guests).toEqual(['Eve']);
   });
 
+  it('laisse entrer un ami sans compte, avec son seul pseudo (`/auth/guest`)', async () => {
+    const { send, signUp } = setup();
+    const adam = await signUp('Adam');
+    const { code } = await party(await send('POST', '/parties', adam));
+    const guest: unknown = await (await send('POST', '/auth/guest', undefined, { nickname: 'Lina' })).json();
+
+    if (!isSessionResponse(guest)) throw new Error('session d’invité attendue');
+
+    const joined = await party(await send('POST', `/parties/${code}/join`, guest.token));
+
+    expect(joined.role).toBe('guest');
+    expect((await party(await send('GET', `/parties/${code}`, adam))).guests).toEqual(['Lina']);
+  });
+
   it('est sans effet la deuxième fois', async () => {
     const { send, signUp } = setup();
     const adam = await signUp('Adam');

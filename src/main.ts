@@ -312,7 +312,20 @@ async function main(): Promise<void> {
     if (code === null || connection.baseUrl === null || token === null) return;
 
     const session = new HostSession(world, connection.baseUrl, code, token, (event) => {
-      if (event.kind !== 'ended' || hosting !== session) return;
+      if (hosting !== session) return;
+      /*
+       * L'ami est dans la salle : la fenêtre le dit un instant, puis se retire
+       * et la partie reprend — l'hôte, venu de la pause, n'a rien à faire, et
+       * l'ami n'attend pas « qu'il reprenne le jeu ».
+       */
+      if (event.kind === 'guestIn') {
+        setTimeout(() => {
+          invitePanel.close();
+          if (!document.hidden) setPaused(false);
+        }, WELCOME_MS);
+        return;
+      }
+      if (event.kind !== 'ended') return;
       hosting = null;
       hud.notify(t().party.play.sessionEnded, 'good');
     });
@@ -506,6 +519,8 @@ async function main(): Promise<void> {
 
   // La rangée du haut à droite : la carte du monde, le zoom, puis Pause et Réglages (en dernier).
   zoom.root.prepend(worldMap.button);
+  // Inviter un ami, sans passer par la pause : seulement si le jeu a un serveur, et pas chez l'ami déjà invité.
+  if (connection.enabled && !guest) zoom.root.prepend(hud.inviteButton);
   zoom.root.append(hud.pauseButton, hud.settingsButton);
   hud.mountControls(zoom.root);
   // Les deux boutons du joueur, en bas à droite : le sac (inventaire et habillement), « Bâtir ».
@@ -742,6 +757,7 @@ async function main(): Promise<void> {
   hud.root.append(recap.root);
 
   hud.pauseButton.addEventListener('click', () => setPaused(!paused));
+  hud.inviteButton.addEventListener('click', () => invitePanel.show());
   hud.settingsButton.addEventListener('click', () => settings.toggle());
   hud.root.append(pause.root);
 
@@ -1818,6 +1834,9 @@ const MAX_RESYNCS = 3;
 const RECONNECT_MS = 2000;
 /** Le temps de jeu après lequel les recalages passés sont oubliés. */
 const RESYNC_FORGET_MS = 30_000;
+
+/** L'ami entré, la fenêtre d'invitation le montre ce temps-là avant de rendre la partie à l'hôte. */
+const WELCOME_MS = 1500;
 
 /**
  * L'ami entre dans la partie de l'hôte : l'écran de connexion d'abord, puis,

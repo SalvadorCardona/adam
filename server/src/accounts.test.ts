@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isAccountError, isMeResponse, isSessionResponse } from '../../shared/api.ts';
-import { LOGIN_MAX_PER_EMAIL, LOGIN_WINDOW_MS, SESSION_MS } from './accounts.ts';
+import { GUEST_MAX_PER_IP, LOGIN_MAX_PER_EMAIL, LOGIN_WINDOW_MS, SESSION_MS } from './accounts.ts';
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { migrate, openDatabase, readMigrations } from './db.ts';
@@ -184,5 +184,56 @@ describe('sessions', () => {
 
     expect(isMeResponse(body)).toBe(false);
     expect(isAccountError(body)).toBe(true);
+  });
+});
+
+describe('POST /auth/guest', () => {
+  it('ouvre une session d’invité avec un simple pseudo, sans adresse ni mot de passe', async () => {
+    const { post, me, db } = setup();
+    const response = await post('/auth/guest', { nickname: '  Ève  ' });
+    const body = await json(response);
+
+    expect(response.status).toBe(201);
+    expect(isSessionResponse(body)).toBe(true);
+    if (!isSessionResponse(body)) return;
+    expect(body.user).toMatchObject({ nickname: 'Ève', email: '', guest: true });
+
+    const seen = await json(await me(body.token));
+
+    expect(isMeResponse(seen) && seen.user.guest).toBe(true);
+
+    const row = db.prepare('SELECT guest, password_hash FROM accounts').get() as { guest: number; password_hash: string };
+
+    expect(row).toEqual({ guest: 1, password_hash: '' });
+  });
+
+  it('refuse un pseudo vide ou illisible', async () => {
+    const { post } = setup();
+
+    for (const nickname of ['', 'x', '<script>']) {
+      const response = await post('/auth/guest', { nickname });
+      const body = await json(response);
+
+      expect(response.status).toBe(400);
+      expect(isAccountError(body) && body.fields?.[0]?.field).toBe('nickname');
+    }
+  });
+
+  it('ne laisse pas se connecter à un compte d’invité', async () => {
+    const { post, db } = setup();
+
+    await post('/auth/guest', { nickname: 'Ève' });
+
+    const { email } = db.prepare('SELECT email FROM accounts').get() as { email: string };
+
+    expect((await post('/auth/login', { email, password: '' })).status).toBe(400);
+    expect((await post('/auth/login', { email, password: 'nimporte-quoi' })).status).toBe(401);
+  });
+
+  it('limite les invités par IP', async () => {
+    const { post } = setup();
+
+    for (let i = 0; i < GUEST_MAX_PER_IP; i += 1) expect((await post('/auth/guest', { nickname: `Ami ${i}` })).status).toBe(201);
+    expect((await post('/auth/guest', { nickname: 'Encore' })).status).toBe(429);
   });
 });

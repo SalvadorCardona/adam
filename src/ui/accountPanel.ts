@@ -249,7 +249,7 @@ export class AccountPanel {
 
     if (user) {
       this.profileName.textContent = text.signedIn(user.nickname);
-      this.profileEmail.textContent = text.signedInEmail(user.email);
+      this.profileEmail.textContent = user.guest ? text.guestProfile : text.signedInEmail(user.email);
       this.signOut.replaceChildren(text.signOut);
     } else {
       const labels = { nickname: text.nickname, email: text.email, password: text.password } as const;
@@ -269,7 +269,7 @@ export class AccountPanel {
         const found = this.problems.find((problem) => problem.field === key);
         const field = this.fields[key];
 
-        field.error.textContent = found ? describe(key, found.problem) : '';
+        field.error.textContent = found ? describeProblem(key, found.problem) : '';
         if (found) field.input.setAttribute('aria-invalid', 'true');
         else field.input.removeAttribute('aria-invalid');
       }
@@ -370,7 +370,8 @@ function failureText(failure: AccountFailure): string {
   }
 }
 
-function describe(field: AccountField, problem: FieldProblem): string {
+/** Pourquoi un champ est refusé, en mots ; le pseudo d'un invité le dit pareil (`nicknameField.ts`). */
+export function describeProblem(field: AccountField, problem: FieldProblem): string {
   const { field: text } = t().account;
 
   switch (problem) {

@@ -25,6 +25,8 @@ export const account = {
   working: 'Un instant…',
   signedIn: (nickname: string): string => `Connecté en tant que ${nickname}`,
   signedInEmail: (email: string): string => email,
+  /** À la place de l'adresse : un invité n'a qu'un pseudo (`POST /auth/guest`). */
+  guestProfile: 'Invité, sans compte : ce pseudo ne vaut que sur cet appareil.',
   welcome: (nickname: string): string => `Bienvenue, ${nickname} !`,
   signedOutDone: 'Vous êtes déconnecté.',
   /** Pourquoi un champ est refusé. */

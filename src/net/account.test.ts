@@ -28,6 +28,23 @@ describe('AccountClient', () => {
     expect(new AccountClient('http://x', new LocalAccount(storage), down).user).toEqual(USER);
   });
 
+  it('ouvre une session d’invité avec un simple pseudo, gardée au rechargement', async () => {
+    const storage = memory();
+    const guest = { id: 7, nickname: 'Lina', email: '', guest: true };
+    const sent: { url: string; body: unknown }[] = [];
+    const fetcher = ((url: string, init: RequestInit) => {
+      sent.push({ url, body: JSON.parse(init.body as string) });
+
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, token: 'g', user: guest }), { status: 201 }));
+    }) as unknown as typeof fetch;
+    const client = new AccountClient('http://x', new LocalAccount(storage), fetcher);
+
+    expect(await client.guest('Lina')).toEqual({ ok: true, user: guest });
+    expect(sent).toEqual([{ url: 'http://x/auth/guest', body: { nickname: 'Lina' } }]);
+    expect(client.token).toBe('g');
+    expect(new AccountClient('http://x', new LocalAccount(storage), down).user).toEqual(guest);
+  });
+
   it('dit « hors ligne » sans toucher à la session', async () => {
     const storage = memory();
 

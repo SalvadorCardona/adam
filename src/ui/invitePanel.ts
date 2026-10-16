@@ -1,16 +1,17 @@
 /**
  * « Inviter un ami » : l'hôte ouvre une session de sa partie en cours, le
- * serveur lui donne un lien et le jeu en dessine le QR code. La fenêtre
- * montre aussi la salle d'attente (qui a rejoint, relue toutes les
- * `POLL_MS`) et ferme la session à la demande. Ouverte depuis la pause ;
- * fermée par sa croix, un tap sur le voile ou Échap (`main.ts`).
+ * serveur lui donne un lien et le jeu en dessine le QR code. Sans compte, un
+ * pseudo suffit (`PartyClient.hostAs`) ; qui en a un peut s'y connecter. La
+ * fenêtre montre aussi la salle d'attente (qui a rejoint, relue toutes les
+ * `POLL_MS`) et ferme la session à la demande. Ouverte depuis la pause ou le
+ * bouton du HUD ; fermée par sa croix, un tap sur le voile ou Échap (`main.ts`).
  *
  * L'invitation ouverte, l'hôte s'annonce au serveur (`onSession`, `net/play.ts`) :
  * l'ami qui entre dans la salle entre aussi dans la partie. Fermer la
  * fenêtre ne l'arrête pas ; fermer la session, si.
  *
- * Elle ne touche pas à la partie, et rien n'y est obligatoire : sans compte
- * ou sans serveur elle le dit, et le jeu se joue comme avant. Boutons et
+ * Elle ne touche pas à la partie, et rien n'y est obligatoire : sans serveur
+ * elle le dit, et le jeu se joue comme avant. Boutons et
  * champ sont de vrais éléments focalisables — doigt, clavier et manette
  * (la croix passe de l'un à l'autre, ✕ clique) n'ont rien de plus à savoir.
  */
@@ -22,6 +23,7 @@ import type { Connection } from '../net/connection.ts';
 import { inviteUrl } from '../net/invite.ts';
 import type { PartyClient, PartyFailure } from '../net/party.ts';
 import { uiIcon } from './icons.ts';
+import { NicknameField } from './nicknameField.ts';
 import { createRoom, fillRoom } from './partyRoom.ts';
 import { qrSvg } from './qrCode.ts';
 
@@ -43,6 +45,8 @@ export class InvitePanel {
   private readonly title: HTMLHeadingElement;
   private readonly status: HTMLParagraphElement;
   private readonly signIn: HTMLButtonElement;
+  private readonly nickname: NicknameField;
+  private readonly createButton: HTMLButtonElement;
   private readonly retry: HTMLButtonElement;
   private readonly invite: HTMLElement;
   private readonly qr: HTMLImageElement;
@@ -53,6 +57,8 @@ export class InvitePanel {
   private readonly shareButton: HTMLButtonElement;
   private readonly copyButton: HTMLButtonElement;
   private readonly expiry: HTMLParagraphElement;
+  /** « En attente de votre ami… », puis « Lina a rejoint la partie ». */
+  private readonly presence: HTMLParagraphElement;
   private readonly roomTitle: HTMLHeadingElement;
   private readonly room: HTMLUListElement;
   private readonly endButton: HTMLButtonElement;
@@ -108,7 +114,9 @@ export class InvitePanel {
     this.status = document.createElement('p');
     this.status.className = 'settings-note account-status';
     this.status.setAttribute('role', 'status');
-    this.signIn = button('button-primary', () => this.openAccount());
+    this.signIn = button('button-secondary', () => this.openAccount());
+    this.nickname = new NicknameField(() => void this.create(this.nickname.value));
+    this.createButton = button('button-primary', () => void this.create(this.nickname.value));
     this.retry = button('button-secondary', () => void this.create());
 
     this.invite = document.createElement('div');
@@ -134,6 +142,9 @@ export class InvitePanel {
     this.copyButton = button('button-secondary', () => void this.copy());
     this.expiry = document.createElement('p');
     this.expiry.className = 'settings-note';
+    this.presence = document.createElement('p');
+    this.presence.className = 'settings-note account-status invite-presence';
+    this.presence.setAttribute('role', 'status');
     this.roomTitle = document.createElement('h3');
     this.roomTitle.className = 'invite-room-title';
     this.room = createRoom();
@@ -143,8 +154,8 @@ export class InvitePanel {
 
     actions.className = 'invite-actions';
     actions.append(this.shareButton, this.copyButton);
-    this.invite.append(this.qr, this.codeLabel, this.code, this.linkLabel, actions, this.expiry, this.roomTitle, this.room, this.endButton);
-    panel.append(head, this.status, this.signIn, this.retry, this.invite);
+    this.invite.append(this.qr, this.codeLabel, this.code, this.linkLabel, actions, this.expiry, this.presence, this.roomTitle, this.room, this.endButton);
+    panel.append(head, this.status, this.nickname.root, this.createButton, this.signIn, this.retry, this.invite);
     this.root.append(panel);
 
     this.owner = accounts.user?.id ?? null;
@@ -198,8 +209,8 @@ export class InvitePanel {
   }
 
   private focusFirst(): void {
-    const target = [this.signIn, this.retry, this.shareButton.hidden ? this.copyButton : this.shareButton].find(
-      (candidate) => !candidate.hidden,
+    const target = [this.nickname.input, this.retry, this.shareButton.hidden ? this.copyButton : this.shareButton].find(
+      (candidate) => !candidate.hidden && candidate.closest('[hidden]') === null,
     );
 
     (target ?? this.closeButton).focus({ preventScroll: true });
@@ -215,15 +226,26 @@ export class InvitePanel {
     this.timer = null;
   }
 
-  private async create(): Promise<void> {
-    if (this.busy || !this.ready) return;
+  /** `nickname` : sans compte, le pseudo avec lequel on héberge (une session d'invité s'ouvre d'abord). */
+  private async create(nickname?: string): Promise<void> {
+    const reachable = this.connection.enabled && this.connection.online;
+
+    if (this.busy || !reachable || (nickname === undefined && this.accounts.user === null)) return;
     this.busy = true;
     this.state = 'creating';
     this.render();
 
-    const result = await this.party.host();
+    const result = nickname === undefined || this.accounts.user ? await this.party.host() : await this.party.hostAs(nickname);
 
     this.busy = false;
+    if (!result.ok && result.reason === 'nickname') {
+      this.state = 'idle';
+      this.nickname.show(result.problem);
+      this.render();
+      this.nickname.input.focus({ preventScroll: true });
+
+      return;
+    }
     if (result.ok) {
       this.info = result.party;
       this.state = 'open';
@@ -326,8 +348,16 @@ export class InvitePanel {
     this.closeButton.setAttribute('aria-label', t().common.close);
     this.status.textContent = this.statusText(signedIn);
     this.status.dataset['tone'] = !reachable || this.state === 'failed' || this.state === 'ended' ? 'offline' : 'info';
-    this.signIn.hidden = !(reachable && !signedIn);
-    this.signIn.replaceChildren(text.signInButton);
+    const asGuest = reachable && !signedIn;
+
+    this.nickname.root.hidden = !asGuest;
+    this.nickname.input.disabled = this.busy;
+    this.nickname.render();
+    this.createButton.hidden = !asGuest;
+    this.createButton.disabled = this.busy;
+    this.createButton.replaceChildren(uiIcon('invite', 22), text.createLink);
+    this.signIn.hidden = !asGuest;
+    this.signIn.replaceChildren(text.haveAccount);
     this.retry.hidden = !(reachable && signedIn && (this.state === 'failed' || this.state === 'ended'));
     this.retry.replaceChildren(this.state === 'ended' ? text.newInvite : text.retry);
     this.retry.disabled = this.busy;
@@ -343,6 +373,8 @@ export class InvitePanel {
     this.shareButton.replaceChildren(uiIcon('invite', 22), text.share);
     this.copyButton.replaceChildren(text.copy);
     this.expiry.textContent = text.validFor(info.expiresAt - this.now());
+    this.presence.textContent = info.guests[0] === undefined ? text.waitingForYourFriend : text.joined(info.guests[0]);
+    this.presence.dataset['tone'] = info.guests[0] === undefined ? 'info' : 'good';
     this.roomTitle.textContent = text.room;
     fillRoom(this.room, info.host, info.guests);
     this.endButton.replaceChildren(text.closeSession);
@@ -355,7 +387,7 @@ export class InvitePanel {
 
     if (!this.connection.enabled) return text.notConfigured;
     if (!this.connection.online) return text.offline;
-    if (!signedIn) return text.signInFirst;
+    if (!signedIn) return this.state === 'creating' ? text.creating : text.guestIntro;
     if (this.state === 'creating') return text.creating;
     if (this.state === 'failed' && this.failure) return failureText({ ok: false, reason: this.failure, retryAfter: this.retryAfter });
     if (this.state === 'ended') return text.ended[this.failure === 'closed' ? 'closed' : 'expired'];

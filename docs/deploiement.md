@@ -119,10 +119,11 @@ npx wscat -c wss://adam-api.cardona.digital/ws -H "Origin: https://adam.cardona.
 curl -I https://adam.cardona.digital/
 ```
 
-Parcours à deux, en production : A crée un compte, lance une partie, pause →
-« Inviter un ami » (URL et QR code sur le nouveau domaine) ; B, dans un autre
-navigateur (idéalement un téléphone), ouvre le lien, crée un compte ou se
-connecte, rejoint. Vérifier que les deux personnages se voient, que ce que bâtit
+Parcours à deux, en production : A lance une partie, touche « Inviter un ami »
+(le premier disque en haut à droite, ou la pause), entre un pseudo — aucun
+compte n'est exigé — et obtient l'URL et le QR code sur le nouveau domaine ; B,
+dans un autre navigateur (idéalement un téléphone), ouvre le lien, entre un
+pseudo, « Rejoindre ». Vérifier que les deux personnages se voient, que ce que bâtit
 l'un apparaît chez l'autre, que la déconnexion de B ne casse pas la partie de A.
 Hors ligne et sans compte, le jeu se joue comme avant.
 

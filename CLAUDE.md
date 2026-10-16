@@ -1295,8 +1295,17 @@ ne change. Captures dans `docs/comptes/`.
 
 **Parties hébergées** (facultatif ; `shared/api.ts` : `/parties`, `PARTY_LIMITS`,
 `cleanPartyCode` ; `server/src/parties.ts`, migration `0003_parties.sql`) — un
-joueur connecté héberge sa partie (pause → « Inviter un ami »,
-`ui/invitePanel.ts`) : le serveur ouvre une session avec un **code de 8
+joueur héberge sa partie (« Inviter un ami » : le premier disque de `.hud-zoom`,
+`Hud.inviteButton`, posé seulement avec un serveur, ou la pause ;
+`ui/invitePanel.ts`). **Aucun compte n'est exigé** : sans compte, l'hôte comme
+l'ami n'entrent qu'un pseudo (`ui/nicknameField.ts`, `PartyClient.hostAs` /
+`joinAs`) et le serveur leur ouvre une session d'**invité** (`POST /auth/guest`,
+migration `0004_guests.sql` : compte `guest`, adresse tirée au hasard, sans
+hachage — personne ne s'y connecte ; `GUEST_MAX_PER_IP`), gardée sous
+`adam:account` comme une autre ; « J'ai un compte » ouvre la fenêtre Compte.
+La fenêtre dit « En attente de votre ami… » puis « Lina a rejoint la partie » ;
+l'ami entré (`guestIn`), elle se retire après `WELCOME_MS` et la partie reprend
+si l'hôte invitait depuis la pause : le serveur ouvre une session avec un **code de 8
 caractères** (`PARTY_ALPHABET`, sans I L O 0 1, tiré de `randomBytes`), qui
 expire après `INVITE_TTL_MINUTES` (60 par défaut, `ServerConfig.inviteTtlMs`) ou
 quand l'hôte la ferme (`DELETE /parties/:code`) ; une seule invitation ouverte par
@@ -1304,9 +1313,8 @@ hôte, un seul ami (`maxGuests`). Chercher des codes inconnus est limité par IP
 (429). Le lien est `…/adam/?join=CODE` (`net/invite.ts` : un paramètre,
 GitHub Pages n'a pas de page de repli), son QR code un SVG de la palette
 (`ui/qrCode.ts`, `qrcode-generator`) ; partage natif (`navigator.share`) ou copie.
-L'ami arrive sur `ui/joinPanel.ts` (« Rejoindre la partie de <pseudo> ») : sans
-compte, la fenêtre Compte s'ouvre et se retire à la connexion, on retrouve
-l'invitation, « Rejoindre » le met dans la salle d'attente, que l'hôte et lui
+L'ami arrive sur `ui/joinPanel.ts` (« Rejoindre la partie de <pseudo> ») : un
+pseudo et « Rejoindre » le mettent dans la salle d'attente, que l'hôte et lui
 relisent toutes les 3 s (`POLL_MS`). Lien expiré, fermé, invalide ou partie pleine :
 message clair et « Retour à l'écran titre ». Une fois dans la salle, l'ami entre
 dans la partie (`?play=CODE`, voir Jouer à deux). Captures dans `docs/partie/`.
@@ -1335,7 +1343,8 @@ part après `graceMs` (son sac reste au sol) ; il revient tant que la session es
 ouverte. L'hôte parti : l'ami le voit (`PlayScreen`) et revient à l'écran titre —
 sa propre partie intacte, rien de celle de l'hôte n'est sauvegardé chez lui. Un
 joueur invité au plus ; l'hôte en pause ou onglet caché, la partie s'arrête pour
-les deux. GIF dans `docs/partie/deux-joueurs.gif`.
+les deux. GIF dans `docs/partie/deux-joueurs.gif` et, sans compte,
+`docs/partie/invitation-sans-compte.gif`.
 
 **Scripts** : `npm run dev:all` lance serveur (`dev:server`, `node --watch`)
 et client branché dessus (`dev:online` = `vite --mode online`, qui lit

@@ -24,6 +24,8 @@ export const API_PATHS = {
   socket: '/ws',
   register: '/auth/register',
   login: '/auth/login',
+  /** Un invité : un pseudo seul, pour rejoindre (ou héberger) une partie sans créer de compte. */
+  guest: '/auth/guest',
   logout: '/auth/logout',
   me: '/auth/me',
   parties: '/parties',
@@ -239,11 +241,16 @@ export function passwordProblem(password: string): FieldProblem | null {
   return null;
 }
 
-/** L'identité publique d'un compte : jamais de hachage, jamais de mot de passe. */
+/**
+ * L'identité publique d'un compte : jamais de hachage, jamais de mot de passe.
+ * `guest` : un invité (`POST /auth/guest`), venu avec son seul pseudo — son
+ * adresse est vide, et personne ne peut s'y reconnecter.
+ */
 export interface AccountUser {
   readonly id: number;
   readonly nickname: string;
   readonly email: string;
+  readonly guest?: boolean;
 }
 
 /** `POST /auth/register`. */
@@ -259,7 +266,12 @@ export interface LoginRequest {
   readonly password: string;
 }
 
-/** La réponse d'une inscription (201) ou d'une connexion (200). */
+/** `POST /auth/guest` : jouer à deux sans compte, avec un pseudo. */
+export interface GuestRequest {
+  readonly nickname: string;
+}
+
+/** La réponse d'une inscription (201), d'un invité (201) ou d'une connexion (200). */
 export interface SessionResponse {
   readonly ok: true;
   readonly token: string;
@@ -289,7 +301,12 @@ export function isAccountUser(value: unknown): value is AccountUser {
 
   const user = value as Record<string, unknown>;
 
-  return typeof user['id'] === 'number' && typeof user['nickname'] === 'string' && typeof user['email'] === 'string';
+  return (
+    typeof user['id'] === 'number' &&
+    typeof user['nickname'] === 'string' &&
+    typeof user['email'] === 'string' &&
+    (user['guest'] === undefined || typeof user['guest'] === 'boolean')
+  );
 }
 
 export function isSessionResponse(value: unknown): value is SessionResponse {
@@ -321,7 +338,8 @@ export function isAccountError(value: unknown): value is AccountErrorResponse {
 /**
  * Les parties hébergées. Un joueur connecté héberge sa partie : le serveur
  * ouvre une session avec un code d'invitation court, difficile à deviner,
- * qui expire. L'ami qui ouvre le lien se connecte, rejoint la salle, puis
+ * qui expire. L'ami qui ouvre le lien se connecte — ou entre son seul pseudo,
+ * en invité (`API_PATHS.guest`) —, rejoint la salle, puis
  * entre dans la partie par le WebSocket (`?play=CODE`).
  */
 
