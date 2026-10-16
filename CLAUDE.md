@@ -1137,8 +1137,8 @@ Les règles, en résumé :
   marqueurs, le cadre de la caméra ; glisser, molette et pinch (`MapView`),
   un tap y pose la caméra (`Camera.lookAt`, jusqu'au prochain pas d'Adam).
   Le jeu tourne derrière, scène masquée. Elle ne montre que ce que
-  `MapSight` permet (inexploré / exploré / visible) — pour l'instant la zone
-  que la caméra a montrée (`SeenArea`, pas sauvegardée).
+  `MapSight` permet (inexploré / exploré / visible) : le brouillard de
+  guerre de la partie (`FogSight`, sur `World.sightAt`).
   `render/indicatorLayer.ts` dessine les repères de bord (mutants, mairie,
   gisement que réclame le conseil — `sim/deposits.ts`), jamais sous le HUD ;
   taper celui de la mairie y jette un coup d'œil (`Camera.peek`).
