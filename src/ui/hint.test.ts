@@ -5,7 +5,7 @@ import { DAY_CYCLE } from '../data/dayNight.ts';
 import { EVE, EVE_LINES } from '../data/eve.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
 import { OBJECTIVES } from '../data/objectives.ts';
-import { chapterObjectives } from '../sim/objectives.ts';
+import { chapterObjectives, firstOpenObjective } from '../sim/objectives.ts';
 import type { EntityId } from '../sim/types.ts';
 import { World } from '../sim/world.ts';
 import { setLocale } from '../i18n/locale.ts';
@@ -50,7 +50,7 @@ describe('tutorialHint', () => {
     expect(tutorialHint(new World(1), FRESH, false, 0)).toBe(EVE_LINES.hints.wood);
   });
 
-  it('passe à la tour de guet une fois la mairie bâtie, sans autre action que la livraison', () => {
+  it('une fois la mairie bâtie, Ève suit l’objectif du chapitre, pas la tour de guet', () => {
     const world = new World(1);
 
     world.player.inventory.add('wood', 25);
@@ -59,10 +59,10 @@ describe('tutorialHint', () => {
     world.tick();
 
     expect(world.entities.get(world.townHallId)?.kind).toBe('townHall');
-    expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.tower);
+    expect(tutorialHint(world, FRESH, false, 0)).toBe(hintOf(firstOpenObjective(world)!));
   });
 
-  it('dans une colonie neuve, la tour passe par le labo : le bâtir, puis y lancer le Guet', () => {
+  it('dans une colonie neuve, la cabane passe par le labo : le bâtir, puis y lancer le Bûcheronnage, puis l’approvisionner', () => {
     const world = World.newColony(1);
 
     world.player.inventory.add('wood', 25);
@@ -70,9 +70,9 @@ describe('tutorialHint', () => {
     world.push({ type: 'transferToSite', id: world.townHallId });
     world.tick();
 
-    const tower = BUILDINGS.watchtower.label;
+    const camp = BUILDINGS.lumberCamp.label;
 
-    expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.labOpen.replace('{building}', tower));
+    expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.labOpen.replace('{building}', camp));
 
     const { tx, ty } = worldToTile(world.player.x, world.player.y);
     let id: EntityId | null = null;
@@ -89,10 +89,23 @@ describe('tutorialHint', () => {
     world.push({ type: 'transferToSite', id: id! });
     world.tick();
     expect(world.labs()).toHaveLength(1);
-    expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.labResearch.replace('{research}', 'Guet').replace('{building}', tower));
+    const advice = tutorialAdvice(world, FRESH, false, 0)!;
+
+    expect(advice.text).toBe(EVE_LINES.hints.labResearch.replace('{research}', 'Bûcheronnage').replace('{building}', camp));
+    expect(advice.research).toBe('woodcraft');
+
+    // Le labo lance la recherche : Ève dit d'apporter son coût, puis d'attendre.
+    const lab = world.labs()[0]!;
+
+    world.push({ type: 'startResearch', lab: lab.id, research: 'woodcraft' });
+    world.tick();
+    const supply = tutorialAdvice(world, FRESH, false, 0)!;
+
+    expect(supply.research).toBe('woodcraft');
+    expect(supply.wants === null ? world.labLedger(lab).length === 0 : supply.text.includes('Bûcheronnage')).toBe(true);
   });
 
-  it('un objectif touché passe devant la tour : Ève aide à faire ce que le joueur a choisi', () => {
+  it('l’objectif choisi parle seul : pas de tour de guet, avec ou sans choix du joueur', () => {
     const world = World.newColony(1);
 
     world.player.inventory.add('wood', 25);
@@ -101,11 +114,10 @@ describe('tutorialHint', () => {
     world.tick();
 
     const cabin = OBJECTIVES.find((objective) => objective.goals.some((goal) => goal.type === 'build' && goal.building === 'lumberCamp'))!;
-    const advice = tutorialAdvice(world, FRESH, false, 0, cabin.id, true);
+    const camp = EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.lumberCamp.label);
 
-    expect(advice?.text).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.lumberCamp.label));
-    // Sans choix du joueur, la tour reste le conseil d'avant la première nuit.
-    expect(tutorialAdvice(world, FRESH, false, 0, cabin.id)?.text).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.watchtower.label));
+    expect(tutorialAdvice(world, FRESH, false, 0, cabin.id)?.text).toBe(camp);
+    expect(tutorialAdvice(world, FRESH, false, 0)?.text).toBe(camp);
   });
 
   it('dix ouvriers qui glandent, la tour posée : Ève les envoie travailler, et loger si les lits manquent', () => {
@@ -119,8 +131,8 @@ describe('tutorialHint', () => {
     const { idle } = world.census();
 
     expect(idle).toBeGreaterThanOrEqual(3);
-    // Les urgences d'abord (tour, puits) : on les écarte pour ne lire que le conseil des oisifs.
-    const text = tutorialAdvice(world, FRESH, true, 0)?.text ?? '';
+    // Sans objectif à suivre (partie sans fin), Ève revient à ses conseils de jeu : ici, les oisifs.
+    const text = tutorialAdvice(world, FRESH, true, 0, null)?.text ?? '';
 
     expect(text).toBe(EVE_LINES.hints.idleHousing.replace('{n}', String(idle)));
   });
@@ -152,9 +164,11 @@ describe('tutorialHint', () => {
     const world = builtWorld();
 
     expect(world.townStock()!.available('stone')).toBe(0);
-    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.quarry);
+    expect(tutorialAdvice(world, FRESH, true, 0, null)?.text).toBe(EVE_LINES.hints.quarry);
+    // L'objectif choisi passe devant : la pierre manquante n'est pas une urgence.
+    expect(tutorialHint(world, FRESH, true, 0)).toMatch(WAITING_DAWN);
     // Pendant une vague, l'arc d'abord.
-    expect(tutorialHint(world, FRESH, true, 1)).not.toBe(EVE_LINES.hints.quarry);
+    expect(tutorialAdvice(world, FRESH, true, 1, null)?.text).toBe(EVE_LINES.hints.bow);
 
     world.townStock()!.add('stone', 1);
     expect(tutorialHint(world, FRESH, true, 0)).toMatch(WAITING_DAWN);
@@ -166,19 +180,22 @@ describe('tutorialHint', () => {
 
     if (hall?.kind !== 'townHall') throw new Error('la mairie devrait être bâtie');
     world.townStock()!.add('stone', 1);
-    hall.hp -= REPAIR.hp;
+    const max = hall.hp;
+
+    hall.hp = Math.floor(max / 2) - 1;
 
     // Pas de bois sous la main : Ève envoie en chercher.
     world.player.inventory.remove('wood', world.player.inventory.count('wood'));
     world.townStock()!.remove('wood', world.townStock()!.available('wood'));
-    expect(tutorialAdvice(world, FRESH, true, 0)).toEqual({ text: EVE_LINES.hints.repairFetch, wants: REPAIR.item });
+    expect(tutorialAdvice(world, FRESH, true, 0)).toEqual({ text: EVE_LINES.hints.repairFetch, wants: REPAIR.item, urgent: true });
 
     world.player.inventory.add(REPAIR.item, 1);
-    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.repair);
-    // Pendant la vague, l'arc d'abord ; une fois qu'Adam sait réparer, elle se tait
-    // et c'est l'objectif en cours qui parle.
+    expect(tutorialAdvice(world, FRESH, true, 0)).toEqual({ text: EVE_LINES.hints.repair, wants: null, urgent: true });
+    // Pendant la vague, l'arc d'abord ; la mairie à plus de la moitié, c'est l'objectif en cours qui parle.
     expect(tutorialHint(world, FRESH, true, 1)).not.toBe(EVE_LINES.hints.repair);
-    expect(tutorialHint(world, { ...FRESH, repaired: true }, true, 0)).toMatch(WAITING_DAWN);
+    hall.hp = max - REPAIR.hp;
+    expect(tutorialAdvice(world, FRESH, true, 0)?.urgent).toBeUndefined();
+    expect(tutorialHint(world, FRESH, true, 0)).toMatch(WAITING_DAWN);
   });
 
   it('annonce la forge une fois débloquée, et envoie chercher du charbon', () => {
@@ -190,12 +207,13 @@ describe('tutorialHint', () => {
     expect(tutorialHint(world, FRESH, true, 0)).toMatch(WAITING_DAWN);
 
     // Tant qu'Ève annonce son arrivée par radio, c'est elle qui parle d'abord ; puis elle envoie au labo.
+    // Sans objectif à suivre, elle revient à ses conseils de jeu.
     world.night = EVE.arrivalNight;
-    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.labForge);
+    expect(tutorialAdvice(world, FRESH, true, 0, null)?.text).toBe(EVE_LINES.hints.labForge);
     world.researchDone.push('metalworking');
-    expect(tutorialAdvice(world, FRESH, true, 0)?.wants).toBe('coal');
+    expect(tutorialAdvice(world, FRESH, true, 0, null)?.wants).toBe('coal');
     // Pendant une vague, l'arc d'abord.
-    expect(tutorialAdvice(world, FRESH, true, 3)?.wants).not.toBe('coal');
+    expect(tutorialAdvice(world, FRESH, true, 3, null)?.wants).not.toBe('coal');
   });
 });
 
@@ -322,7 +340,7 @@ describe('producteur qui déborde', () => {
     for (let i = 0; i < 20 * 120 && world.problem(quarry) !== 'storeFull'; i += 1) world.tick();
 
     expect(world.problem(quarry)).toBe('storeFull');
-    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.storeStuck.replace('{building}', 'carrière'));
+    expect(tutorialAdvice(world, FRESH, true, 0, null)?.text).toBe(EVE_LINES.hints.storeStuck.replace('{building}', 'carrière'));
   });
 });
 
@@ -338,7 +356,7 @@ describe('la nourriture qui fond', () => {
     const town = world.townStock()!;
 
     town.remove('food', town.count('food'));
-    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.farm);
+    expect(tutorialAdvice(world, FRESH, true, 0, null)?.text).toBe(EVE_LINES.hints.farm);
 
     const origin = worldToTile(world.player.x, world.player.y);
     let id: EntityId | null = null;
@@ -357,9 +375,9 @@ describe('la nourriture qui fond', () => {
 
     expect(world.entities.get(id!)?.kind).toBe('farm');
     // La boulangerie s'ouvre au labo : Ève y envoie d'abord.
-    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.bakery.label));
+    expect(tutorialAdvice(world, FRESH, true, 0, null)?.text).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.bakery.label));
     world.researchDone.push('baking');
-    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.bakery);
+    expect(tutorialAdvice(world, FRESH, true, 0, null)?.text).toBe(EVE_LINES.hints.bakery);
   });
 });
 
@@ -461,5 +479,115 @@ describe('conseil d’attente', () => {
     expect(world.chapter).toBe(1);
     // La maison est au menu de départ : sa réplique telle quelle.
     expect(tutorialHint(world, FRESH, true, 0, 'home')).toBe(hintOf('home'));
+  });
+});
+
+describe('fil rouge : une seule voix', () => {
+  /** La mairie bâtie dans une colonie neuve, puis `chapters` chapitres cochés d'office. */
+  function colonyAt(chapters: number): World {
+    const world = World.newColony(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+    for (let i = 1; i < chapters; i += 1) {
+      for (const { id } of chapterObjectives(world)) world.objectivesDone.add(id);
+      world.tick();
+    }
+    for (const [item, count] of world.player.inventory.entries()) world.player.inventory.remove(item, count);
+    return world;
+  }
+
+  /** Les bâtiments et recherches que l'objectif `id` demande, ou ouvre. */
+  function topics(id: (typeof OBJECTIVES)[number]['id']): string[] {
+    const objective = OBJECTIVES.find((candidate) => candidate.id === id)!;
+    const out: string[] = [objective.hint];
+
+    for (const goal of objective.goals) {
+      if (goal.type !== 'build') continue;
+      out.push(BUILDINGS[goal.building].label);
+    }
+    return out;
+  }
+
+  it.each([1, 2, 3])('chapitre %i : le conseil cite l’objectif choisi, jamais un autre bâtiment', (chapter) => {
+    const world = colonyAt(chapter);
+
+    expect(world.chapter).toBe(chapter);
+    world.townStock()!.add('stone', 1);
+
+    for (const { id } of chapterObjectives(world)) {
+      const advice = tutorialAdvice(world, FRESH, false, 0, id);
+
+      expect(advice, id).not.toBeNull();
+      expect(advice!.urgent, id).toBeUndefined();
+      expect(topics(id).some((topic) => advice!.text.includes(topic)) || WAITING_DAWN.test(advice!.text), id).toBe(true);
+    }
+  });
+
+  it('graine neuve, mairie bâtie : Ève parle du labo ou du Bûcheronnage, pas de la tour de guet', () => {
+    const world = colonyAt(1);
+    const advice = tutorialAdvice(world, FRESH, false, 0)!;
+
+    expect(advice.text).not.toContain(BUILDINGS.watchtower.label);
+    expect(advice.text).toMatch(/labo|Bûcheronnage/);
+  });
+
+  it('ville à sec sans puits au menu : le chemin du labo d’abord, en alerte, jamais « pose un puits »', () => {
+    const world = colonyAt(1);
+    const town = world.townStock()!;
+
+    town.remove('water', town.available('water'));
+    expect(world.inMenu('well')).toBe(false);
+
+    const advice = tutorialAdvice(world, FRESH, false, 0)!;
+
+    expect(advice.urgent).toBe(true);
+    expect(advice.text).not.toBe(EVE_LINES.hints.well);
+    expect(advice.text).toContain(BUILDINGS.well.label);
+    expect(advice.pointTo).toBe('water');
+  });
+
+  it('une vague sans grâce dans la minute et pas de tour : la tour passe devant, en alerte', () => {
+    const world = builtWorld();
+    const cycle = DAY_CYCLE.day + DAY_CYCLE.dusk + DAY_CYCLE.night + DAY_CYCLE.dawn;
+
+    // Quatrième nuit : plus de grâce. On avance l'horloge jusqu'à la minute qui précède la vague.
+    world.cycleStartTick -= 3 * cycle;
+    for (let i = 0; i < cycle && !((world.waveForecast()?.ticks ?? Infinity) <= 60 * 20); i += 1) world.cycleStartTick -= 20;
+
+    const forecast = world.waveForecast();
+
+    expect(forecast?.night).toBeGreaterThan(3);
+    expect(forecast!.ticks).toBeLessThanOrEqual(60 * 20);
+
+    const advice = tutorialAdvice(world, FRESH, false, 0)!;
+
+    expect(advice.urgent).toBe(true);
+    expect(advice.text).toBe(EVE_LINES.hints.tower);
+    // Une tour debout, l'urgence tombe : l'objectif reprend la parole.
+    expect(tutorialAdvice(world, FRESH, true, 0)?.urgent).toBeUndefined();
+  });
+
+  it('jamais de « pose X » quand X n’est pas au menu', () => {
+    for (const chapter of [1, 2, 3]) {
+      const world = colonyAt(chapter);
+
+      world.townStock()!.add('stone', 1);
+      for (const { id } of chapterObjectives(world)) {
+        const advice = tutorialAdvice(world, FRESH, false, 0, id);
+
+        for (const [name, proto] of Object.entries(BUILDINGS)) {
+          const building = name as keyof typeof BUILDINGS;
+
+          if (world.inMenu(building) || !advice) continue;
+          // Nommé seulement dans une phrase du labo, jamais dans une consigne de pose.
+          if (advice.text.includes(proto.label)) {
+            expect(advice.text, `${id} / ${name}`).toMatch(/labo|« /);
+          }
+        }
+      }
+    }
   });
 });

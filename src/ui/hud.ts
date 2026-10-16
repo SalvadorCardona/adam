@@ -2074,7 +2074,6 @@ export class Hud {
       towers,
       this.mutantCount(),
       this.selectedObjective(),
-      this.chosenObjective !== null && this.selectedObjective() === this.chosenObjective,
     );
   }
 
@@ -2085,6 +2084,7 @@ export class Hud {
     this.wanted = advice?.wants ?? null;
     this.pointed = advice?.pointTo ?? this.wanted;
     this.advisedResearch = advice?.research ?? null;
+    this.hint.dataset['urgent'] = String(advice?.urgent === true);
 
     // La langue vient de changer : le même conseil, dans l'autre langue, sans le relancer ni le déplier.
     if (hint !== this.lastHint && this.hintLocale !== locale()) {

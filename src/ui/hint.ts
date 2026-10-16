@@ -20,6 +20,7 @@ import { COLONY } from '../data/inhabitants.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
 import { objectiveProto, type Goal, type ObjectiveId } from '../data/objectives.ts';
 import { RECIPES, type RecipeProto } from '../data/recipes.ts';
+import { WAVE_STRENGTH } from '../data/enemies.ts';
 import { RESEARCH_IDS, type ResearchId } from '../data/research.ts';
 import { RESOURCES } from '../data/resources.ts';
 import { firstOpenObjective, goalProgress, objectiveWait, type GoalWait } from '../sim/objectives.ts';
@@ -50,7 +51,12 @@ export interface Advice {
   research?: ResearchId | null;
   /** Ce vers quoi le repère de bord pointe, quand ce n'est pas ce qu'on récolte (`wants`) : l'eau du puits. */
   pointTo?: ItemId | null;
+  /** Une urgence hors chapitre (vague proche, ville à sec, mairie qui faiblit) : le HUD la marque en corail, comme une alerte. */
+  urgent?: boolean;
 }
+
+/** Une vague sans grâce qui sort dans moins de ce temps rend la défense urgente. */
+const WAVE_URGENT_SECONDS = 60;
 
 /** Le sac contient-il au moins un objet qu'on attend quelque part — chantier, recette ou ville ? */
 export function carriesWanted(world: World): boolean {
@@ -90,22 +96,37 @@ export function uselessBagHint(world: World): string | null {
 
 /**
  * Le conseil de bâtir `building`, s'il est au menu ; sinon, le chemin du labo
- * qui l'ouvre : le bâtir d'abord, puis y lancer la recherche.
+ * qui l'ouvre, pas à pas : bâtir le labo, y lancer la recherche, lui apporter
+ * son coût, attendre qu'elle finisse. `null` quand rien ne l'ouvre encore :
+ * Ève ne demande jamais de poser ce qui n'est pas dans « Bâtir ».
  */
-function viaLab(world: World, building: BuildingId, line: string): Advice {
+function viaLab(world: World, building: BuildingId, line: string): Advice | null {
+  if (world.inMenu(building)) return { text: line, wants: null };
+
   const research = openingResearch(building) ?? unlockingResearch(building);
 
-  if (world.isUnlocked(building) || research === null) return { text: line, wants: null };
+  if (research === null || !world.researchOpen(research)) return null;
 
   const lines = t().eve.hints;
   const name = t().buildings[building].label;
-  const labs = world.labs().length > 0;
+  const label = t().research[research].label;
+  const labs = world.labs();
 
-  return {
-    text: (labs ? lines.labResearch.replace('{research}', t().research[research].label) : lines.labOpen).replace('{building}', name),
-    wants: null,
-    research: labs ? research : null,
-  };
+  if (labs.length === 0) return { text: lines.labOpen.replace('{building}', name), wants: null };
+
+  const running = labs.find((lab) => lab.research === research);
+
+  if (running) {
+    const missing = world.labLedger(running).find((entry) => entry.missing > 0);
+
+    if (missing) {
+      const text = lines.labSupply.replace('{research}', label).replace('{item}', t().hud.hint.inSentence(t().items[missing.item]));
+
+      return { text, wants: missing.item, research };
+    }
+    return { text: lines.labRunning.replace('{research}', label), wants: null, research };
+  }
+  return { text: lines.labResearch.replace('{research}', label).replace('{building}', name), wants: null, research };
 }
 
 export function tutorialHint(world: World, progress: HintProgress, towers: boolean, mutants: number, selected?: ObjectiveId | null): string | null {
@@ -114,7 +135,7 @@ export function tutorialHint(world: World, progress: HintProgress, towers: boole
 
 /**
  * `selected` : l'objectif choisi dans le panneau ; absent, le premier du chapitre qui reste.
- * `chosen` : le joueur l'a touché lui-même — son conseil passe alors devant tout ce qui ne presse pas.
+ * Le conseil est son prochain pas, sauf une urgence (`Advice.urgent`).
  */
 export function tutorialAdvice(
   world: World,
@@ -122,7 +143,6 @@ export function tutorialAdvice(
   towers: boolean,
   mutants: number,
   selected: ObjectiveId | null = firstOpenObjective(world),
-  chosen = false,
 ): Advice | null {
   const say = (text: string, wants: ItemId | null = null): Advice => ({ text, wants });
   const hall = world.entities.get(world.townHallId);
@@ -148,95 +168,135 @@ export function tutorialAdvice(
     return null;
   }
 
-  // L'eau de départ fond et rien n'en tire : sans puits, les ouvriers s'arrêteront, tour ou pas.
+  // Les urgences, seules à passer devant l'objectif choisi : une vague, la soif, la mairie qui lâche.
+  const urgent = urgentAdvice(world, hall, towers, mutants);
+
+  if (urgent) return { ...urgent, urgent: true };
+
+  // Le fil rouge : le prochain pas de l'objectif choisi, et rien d'autre.
+  if (selected) return selectedAdvice(world, selected, mutants);
+
+  return fallbackAdvice(world, towers, mutants);
+}
+
+/**
+ * Ce qui presse assez pour couper l'objectif choisi : l'arc pendant une vague
+ * des premières nuits, la ville à sec, une vague sans grâce dans la minute
+ * sans tour, la mairie sous la moitié de ses points de vie.
+ */
+function urgentAdvice(world: World, hall: Entity, towers: boolean, mutants: number): Advice | null {
+  const lines = t().eve.hints;
+
+  if (mutants > 0 && world.night <= 2) return { text: lines.bow, wants: null };
+  if (mutants > 0) return null;
+
+  // L'eau de départ est épuisée et rien n'en tire : sans puits, les ouvriers s'arrêteront.
   const welled = [...world.entities.values()].some((entity) => entity.proto === 'well');
   const water = world.townStock()?.available('water') ?? 0;
 
-  if (mutants === 0 && !welled && (water < COLONY.startingStock.water / 2 || world.needAlert()?.need === 'thirst')) {
+  if (!welled && (water === 0 || world.needAlert()?.need === 'thirst')) {
+    const well = viaLab(world, 'well', lines.well);
+
     // Le repère de bord montre la rive la plus proche : le puits s'y pose.
-    return { ...viaLab(world, 'well', lines.well), pointTo: 'water' };
+    if (well) return { ...well, pointTo: 'water' };
   }
 
-  if (mutants > 0 && world.night <= 2) return say(lines.bow);
+  // Une vague sans grâce sort dans la minute et aucune tour ne garde la mairie.
+  const forecast = world.waveForecast();
+
+  if (forecast && !towers && forecast.night > WAVE_STRENGTH.earlyCaps.length && forecast.ticks <= WAVE_URGENT_SECONDS * TICKS_PER_SECOND) {
+    const tower = viaLab(world, 'watchtower', lines.tower);
+
+    if (tower) return tower;
+  }
+
+  // La mairie est sous la moitié de ses PV, et Ève pas encore là pour la réparer : à Adam de le faire.
+  if (hall.kind !== 'site' && !world.eve() && hall.hp * 2 < buildingLevel(hall.proto, hall.level).hp) {
+    return world.repairStock(hall) > 0 ? { text: lines.repair, wants: null } : { text: lines.repairFetch, wants: REPAIR.item };
+  }
+  return null;
+}
+
+/**
+ * Sans objectif à suivre (la partie sans fin), Ève revient à ses conseils de
+ * jeu : de quoi tenir la colonie, du plus pressé au moins pressé.
+ */
+function fallbackAdvice(world: World, towers: boolean, mutants: number): Advice | null {
+  const lines = t().eve.hints;
+  const entities = [...world.entities.values()];
+  const has = (...protos: string[]): boolean => entities.some((entity) => protos.includes(entity.proto));
+
+  if (mutants > 0) return null;
 
   // La nourriture fond et rien ne la refait (ni boulangerie, ni élevage) : la ferme, puis la boulangerie — le blé ne se mange pas cru.
-  const baked = [...world.entities.values()].some((entity) => entity.proto === 'bakery' || entity.proto === 'pigPen');
   const food = world.townStock()?.available('food') ?? 0;
 
-  if (mutants === 0 && !baked && (food < COLONY.startingStock.food / 2 || world.needAlert()?.need === 'hunger')) {
-    const farmed = [...world.entities.values()].some((entity) => entity.proto === 'farm');
+  if (!has('bakery', 'pigPen') && (food < COLONY.startingStock.food / 2 || world.needAlert()?.need === 'hunger')) {
+    const food = has('farm') ? viaLab(world, 'bakery', lines.bakery) : viaLab(world, 'farm', lines.farm);
 
-    return farmed ? viaLab(world, 'bakery', lines.bakery) : viaLab(world, 'farm', lines.farm);
+    if (food) return food;
   }
 
   // Un producteur plein que personne ne vide : sans logisticiens ni porteurs, ce qu'il fait n'arrive jamais en ville.
-  const stuck = mutants === 0 ? stuckProducer(world) : null;
+  const stuck = stuckProducer(world);
 
   if (stuck && world.isUnlocked('logisticsPost')) {
-    return say(lines.storeStuck.replace('{building}', t().hud.hint.inSentence(t().buildings[stuck.proto].label)));
+    return { text: lines.storeStuck.replace('{building}', t().hud.hint.inSentence(t().buildings[stuck.proto].label)), wants: null };
   }
 
   // Un chantier ou un labo hors du rayon de la mairie, à sec : la ville ne le livrera pas, Ève ne dit pas qu'elle couvre.
-  const stranded = mutants === 0 ? strandedBuilding(world) : null;
+  const stranded = strandedBuilding(world);
 
-  if (stranded) return say(lines.outOfRange.replace('{building}', t().hud.hint.inSentence(t().buildings[stranded.proto].label)));
+  if (stranded) {
+    return { text: lines.outOfRange.replace('{building}', t().hud.hint.inSentence(t().buildings[stranded.proto].label)), wants: null };
+  }
 
-  // L'objectif que le joueur a touché : c'est ce qu'il veut faire, Ève l'y aide plutôt que de parler d'autre chose.
-  if (chosen && selected && mutants === 0) return selectedAdvice(world, selected, mutants);
+  if (!towers) {
+    const tower = viaLab(world, 'watchtower', lines.tower);
 
-  if (world.night === 0 && !towers) return viaLab(world, 'watchtower', lines.tower);
-
-  // Entre deux vagues, la mairie entamée d'au moins un bois, et Ève pas encore là pour la réparer : à Adam de le faire.
-  if (mutants === 0 && !progress.repaired && !world.eve() && hall.hp <= buildingLevel(hall.proto, hall.level).hp - REPAIR.hp) {
-    return world.repairStock(hall) > 0 ? say(lines.repair) : say(lines.repairFetch, REPAIR.item);
+    if (tower) return tower;
   }
 
   // Des ouvriers qui glandent, sans urgence : une maison pour les loger, un bâtiment qui les emploie.
-  if (mutants === 0 && world.census().idle >= IDLE_HINT_MIN) {
+  if (world.census().idle >= IDLE_HINT_MIN) {
     const { housed, population } = world.housing();
 
-    return say((housed < population ? lines.idleHousing : lines.idle).replace('{n}', String(world.census().idle)));
+    return { text: (housed < population ? lines.idleHousing : lines.idle).replace('{n}', String(world.census().idle)), wants: null };
   }
 
   // La pierre manque en ville, et rien n'en produit : la carrière, avant que les rochers ne soient vidés.
-  const quarried = [...world.entities.values()].some((entity) => entity.proto === 'quarry');
+  if (!has('quarry') && (world.townStock()?.available('stone') ?? 0) === 0) {
+    const quarry = viaLab(world, 'quarry', lines.quarry);
 
-  if (mutants === 0 && !quarried && (world.townStock()?.available('stone') ?? 0) === 0) return viaLab(world, 'quarry', lines.quarry);
+    if (quarry) return quarry;
+  }
 
-  // L'ère suivante est à portée : rien d'autre ne presse autant, hors des nuits.
+  // L'ère suivante est à portée.
   const next = nextEra(world.era);
 
-  if (mutants === 0 && next !== null && eraReady(world)) return say(lines.eraReady.replace('{era}', t().eras[next]!.label));
+  if (next !== null && eraReady(world)) return { text: lines.eraReady.replace('{era}', t().eras[next]!.label), wants: null };
 
   // Entre deux nuits, tant qu'elle n'est pas là : elle annonce son arrivée.
-  if (mutants === 0 && world.night > 0 && world.night < EVE.arrivalNight && !world.eve()) {
+  if (world.night > 0 && world.night < EVE.arrivalNight && !world.eve()) {
     const left = EVE.arrivalNight - world.night;
 
-    return say(lines.coming.replace('{n}', String(left)).replace('{s}', t().common.plural(left)));
+    return { text: lines.coming.replace('{n}', String(left)).replace('{s}', t().common.plural(left)), wants: null };
   }
 
   // Les plaques de fer passent par la forge, et la forge par le labo : après la première nuit, Ève y envoie.
-  if (mutants === 0 && world.night > 0 && !world.isUnlocked('forge')) {
-    const lab = [...world.entities.values()].some((entity) => entity.proto === 'lab');
-
-    return say(lab ? lines.foundry : lines.labForge);
-  }
+  if (world.night > 0 && !world.isUnlocked('forge')) return { text: has('lab') ? lines.foundry : lines.labForge, wants: null };
 
   // La forge débloquée au labo : le charbon, jusque-là sans usage, devient un objectif.
-  const forged = [...world.entities.values()].some((entity) => entity.proto === 'forge');
+  const forged = has('forge');
 
-  if (mutants === 0 && world.isUnlocked('forge') && !forged) return say(lines.forge, 'coal');
+  if (world.isUnlocked('forge') && !forged) return { text: lines.forge, wants: 'coal' };
+  if (forged && !has('charcoalKiln') && (world.townStock()?.available('coal') ?? 0) === 0) return { text: lines.kiln, wants: null };
 
-  // La forge debout, la ville sans charbon, et rien pour en cuire : le four à charbon.
-  const kiln = [...world.entities.values()].some((entity) => entity.proto === 'charcoalKiln');
-
-  if (mutants === 0 && forged && !kiln && (world.townStock()?.available('coal') ?? 0) === 0) return say(lines.kiln);
-
-  return selected ? selectedAdvice(world, selected, mutants) : null;
+  return null;
 }
 
 /** Le conseil de l'objectif choisi : son attente, s'il n'attend qu'une horloge, sinon sa réplique. */
-function selectedAdvice(world: World, selected: ObjectiveId, mutants: number): Advice {
+function selectedAdvice(world: World, selected: ObjectiveId, mutants: number): Advice | null {
   // L'objectif n'attend plus qu'une horloge qui court : le temps qu'il reste, et de quoi s'occuper d'ici là.
   // Une nuit à tenir n'est une attente que de jour : le soir, le conseil de l'objectif dit comment la tenir.
   const wait = mutants === 0 ? objectiveWait(world, selected) : null;
@@ -285,7 +345,7 @@ function stuckProducer(world: World): Building | null {
  * ou qui produit ce qu'il demande — n'est pas encore au menu, le chemin du
  * labo qui l'ouvre, tant que la recherche est de l'ère atteinte.
  */
-function objectiveAdvice(world: World, id: ObjectiveId): Advice {
+function objectiveAdvice(world: World, id: ObjectiveId): Advice | null {
   const line = t().objectives[id].hint;
   const goal = objectiveProto(id).goals.find((condition) => {
     const { have, need } = goalProgress(world, condition);
@@ -297,10 +357,11 @@ function objectiveAdvice(world: World, id: ObjectiveId): Advice {
   // Le puits se pose au bord de l'eau : le repère montre la rive la plus proche.
   const pointTo = building === 'well' ? 'water' : null;
 
-  if (building && !world.isUnlocked(building)) {
-    const research = openingResearch(building) ?? unlockingResearch(building);
+  if (building && !world.inMenu(building)) {
+    const way = viaLab(world, building, line);
 
-    if (research !== null && world.researchOpen(research)) return { ...viaLab(world, building, line), pointTo };
+    // Ni au menu ni ouvrable : Ève se tait plutôt que de demander de poser ce qui n'y est pas.
+    return way ? { ...way, pointTo } : null;
   }
   return { text: line, wants: null, pointTo };
 }
@@ -359,7 +420,7 @@ function meanwhile(world: World): Advice | null {
   // Les chantiers comptent : une tour posée n'est plus à conseiller.
   const towers = entities.filter((entity) => BUILDINGS[entity.proto].kind === 'tower').length;
 
-  if (towers < 2 && world.isUnlocked('watchtower')) {
+  if (towers < 2 && world.inMenu('watchtower')) {
     return { text: towers === 0 ? lines.meanwhileTower : lines.meanwhileSecondTower, wants: null };
   }
 
