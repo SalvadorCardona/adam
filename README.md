@@ -206,7 +206,8 @@ src/
   input/    joystick, keyboard, pointer, placement, inspect
   ui/       hud, buildMenu, buildingPanel
   audio/    engine, synth, music       — Web Audio, sons procéduraux
-  tools/    artSheet, brand            — planche de relecture, icône, bannière
+  tools/    artSheet, brand, playtest  — planche de relecture, icône, bannière,
+            joueur simulé (`src/tools/README.md`)
   main.ts   câblage uniquement
 ```
 

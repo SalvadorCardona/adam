@@ -26,7 +26,8 @@
     "test:watch": "vitest",
     "art:sheet": "node src/tools/artSheet.ts",
     "art:brand": "node src/tools/brand.ts",
-    "music:night": "node src/tools/music.ts"
+    "music:night": "node src/tools/music.ts",
+    "playtest": "node src/tools/playtest.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
