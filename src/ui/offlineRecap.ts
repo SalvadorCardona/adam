@@ -67,7 +67,6 @@ export class OfflineRecap {
 
     onLocale(() => {
       this.title.textContent = t().offline.title;
-      this.collect.textContent = t().offline.collect;
       if (this.report) this.render(this.report);
     });
   }
@@ -113,6 +112,8 @@ export class OfflineRecap {
       parts.push(line('overlay-text', text.nothing));
     }
     this.body.replaceChildren(...parts);
+    // Rien de produit : il n'y a rien à « récupérer », on reprend la partie.
+    this.collect.textContent = gained.length > 0 ? text.collect : text.resume;
   }
 
   /**
