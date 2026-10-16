@@ -113,7 +113,7 @@ import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../d
 import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
-import { BUILDERS, FARMERS, FORESTERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
+import { BUILDERS, FARMERS, FORESTERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherId } from '../data/weather.ts';
 import { ChunkIndex } from './chunk.ts';
 import { floorCost, floorMissing, floorNeeds, floorWants } from './antenna.ts';
@@ -172,6 +172,7 @@ import {
 import {
   JobBoard,
   PORTER_CREW,
+  VOLUNTEER_CREW,
   doorOf,
   inDepotRange,
   inYardRange,
@@ -4572,7 +4573,7 @@ export class World {
     if (mobile.kind === 'kid') return { kind: 'child', days: yearsToWork(mobile.age) };
     if (mobile.inside) return { kind: 'home' };
     if (mobile.sleepingOut) return { kind: 'outside' };
-    if (this.isIdle(mobile) || (mobile.kind === 'worker' && mobile.free)) return { kind: 'idle' };
+    if (this.isIdle(mobile) || (mobile.kind === 'worker' && mobile.free && !mobile.job)) return { kind: 'idle' };
 
     const place =
       mobile.kind === 'worker'
@@ -8066,10 +8067,25 @@ export class World {
       return;
     }
 
-    // Libre, il flâne devant la mairie en attendant qu'un bâtiment le prenne.
+    // Libre, il donne un coup de main aux chantiers de la mairie (`VOLUNTEERS`), sinon il flâne devant elle.
     if (worker.free) {
-      if (homeDoor) this.idle(worker, homeDoor, bedtime);
-      else this.mobiles.delete(worker.id);
+      if (!homeDoor) {
+        this.mobiles.delete(worker.id);
+        return;
+      }
+      if (!worker.job && !bedtime) {
+        worker.searchTicks -= 1;
+        if (worker.searchTicks <= 0) {
+          worker.searchTicks = PORTERS.retryTicks;
+          worker.job = this.jobs.assign(this.entities, this.townHallId, worker, homeDoor, this.lineIsClear, VOLUNTEERS.carry, VOLUNTEER_CREW);
+          if (worker.job) worker.inside = false;
+        }
+      }
+      if (!worker.job) {
+        this.idle(worker, homeDoor, bedtime);
+        return;
+      }
+      this.followJob(worker, worker.job);
       return;
     }
 
@@ -8126,6 +8142,11 @@ export class World {
       return;
     }
 
+    this.followJob(worker, job);
+  }
+
+  /** Un pas sur son job : jusqu'à la source, puis jusqu'à la destination. */
+  private followJob(worker: Worker, job: Job): void {
     worker.inside = false;
 
     const stop = this.entities.get(job.carried ? job.to : job.from);
@@ -8267,7 +8288,24 @@ export class World {
         bestSq = d;
       }
     }
+    // Il donnait un coup de main : le poste passe avant, sa charge retourne à la mairie.
+    if (best?.job) this.dropVolunteerJob(best, best.job);
     return best;
+  }
+
+  /**
+   * Un ouvrier libre embauché pendant un coup de main : rien à porter, son
+   * job s'annule des deux côtés ; chargé, sa place réservée à destination est
+   * rendue et sa charge rentre au coffre de la mairie. Rien ne se perd.
+   */
+  private dropVolunteerJob(worker: Worker, job: Job): void {
+    worker.job = null;
+    if (!job.carried) {
+      this.jobs.cancel(this.entities, job);
+      return;
+    }
+    this.jobs.releaseIn(this.entities, job);
+    this.townStock()?.add(job.item, job.amount);
   }
 
   private goHome(worker: Laborer, door: { x: number; y: number }): void {

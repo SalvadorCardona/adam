@@ -194,6 +194,11 @@ function workers(world: World): Worker[] {
   return [...world.mobiles.values()].filter((mobile): mobile is Worker => mobile.kind === 'worker' && !mobile.free);
 }
 
+/** Tous ceux qui portent : les porteurs, et les ouvriers libres qui donnent un coup de main (`VOLUNTEERS`). */
+function carriers(world: World): Worker[] {
+  return [...world.mobiles.values()].filter((mobile): mobile is Worker => mobile.kind === 'worker' && (!mobile.free || mobile.job !== null));
+}
+
 /** Où se trouve chaque objet : mairie, foreuses, mains des porteurs, chantiers. Rien d'autre n'en crée ni n'en détruit ici. */
 function census(world: World, built: ReadonlySet<EntityId> = new Set()): Record<ItemId, number> {
   const total = Object.fromEntries(ITEM_IDS.map((item) => [item, 0])) as Record<ItemId, number>;
@@ -208,7 +213,7 @@ function census(world: World, built: ReadonlySet<EntityId> = new Set()): Record<
       for (const [item, amount] of entity.store.entries()) total[item] += amount;
     }
   }
-  for (const worker of workers(world)) {
+  for (const worker of carriers(world)) {
     if (worker.job?.carried) total[worker.job.item] += worker.job.amount;
   }
   return total;
@@ -219,7 +224,7 @@ function expectCoveredPromises(world: World): void {
   const hall = hallOf(world);
   const promisedOut = new Map<ItemId, number>();
 
-  for (const worker of workers(world)) {
+  for (const worker of carriers(world)) {
     const job = worker.job;
 
     if (job && !job.carried && job.from === hall.id) promisedOut.set(job.item, (promisedOut.get(job.item) ?? 0) + job.amount);
@@ -459,7 +464,8 @@ describe('porteurs', () => {
   it('une sauvegarde en plein transport se recharge avec ses réservations', () => {
     const world = colony({ hall: { wood: 30, stone: 20 }, houses: 2, sites: ['farm', 'nursery', 'watchtower'] });
 
-    run(world, 150);
+    // En plein transport : on recharge dès qu'un porteur a une charge en route.
+    for (let i = 0; i < 400 && !workers(world).some((worker) => worker.job !== null); i += 1) run(world, 1);
     expect(workers(world).some((worker) => worker.job !== null)).toBe(true);
 
     const reloaded = decodeSave(encodeSave(world, 1));
