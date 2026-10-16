@@ -134,7 +134,10 @@ entrent (`World.hosted`, non sauvegardé, refait de la répartition au
 chargement). Un ouvrier retiré, ou dont le bâtiment tombe, redevient libre
 sur place ; une ancienne sauvegarde garde ses équipes et pose les libres
 qui manquent devant la mairie (`settleColonists`). Le HUD compte
-« libres/total ». Ceux de la maison sont des **porteurs** (mobile
+« libres/total ». Le jour, un libre donne un **coup de main** (`VOLUNTEERS`,
+équipe `volunteer` de `JobBoard.assign`) : il porte de la mairie aux
+chantiers et aux labos de son rayon, en petites charges ; embauché chargé,
+sa charge retourne à la mairie (`dropVolunteerJob`). Ceux de la maison sont des **porteurs** (mobile
 `worker`, `src/sim/workers.ts`, `PORTERS` dans `src/data/workers.ts`) : ils
 vident foreuses, fermes et cabanes de bûcheron dans la mairie et livrent les chantiers,
 la forge et la nurserie depuis la mairie (`sim/consumers.ts` ; une machine en
