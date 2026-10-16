@@ -546,8 +546,8 @@ async function main(): Promise<void> {
 
   zoom.root.append(hud.pauseButton, hud.settingsButton);
   hud.mountControls(zoom.root);
-  // Les deux boutons du joueur, en bas à droite : le sac (inventaire et habillement), « Bâtir ».
-  hud.actions.append(hud.bag, buildMenu.buildButton);
+  // Les boutons du joueur, en bas à droite : la Volée (la nuit), le sac (inventaire et habillement), « Bâtir ».
+  hud.actions.append(hud.skillButton, hud.bag, buildMenu.buildButton);
   hud.root.append(worldMap.root, stick.root, buildMenu.root, panel.root, resources.root, trade.root);
   stick.avoid(buildMenu.bottomParts, hud.root);
   hud.bag.addEventListener('click', () => inventory.toggle());
@@ -826,6 +826,17 @@ async function main(): Promise<void> {
   hud.root.append(voicePanel.strip, voicePanel.root, settings.root, invitePanel.root, ...(joinPanel ? [joinPanel.root] : []), accountPanel.root, padHelp.root);
   mount.append(hud.root);
 
+  /**
+   * La nuit, Espace et □ lancent la Volée plutôt que d'ouvrir le tiroir de
+   * construction ; tiroir ouvert ou placement en cours, ils gardent leur rôle.
+   * Une touche tenue ne relance rien : la recharge, de toute façon.
+   */
+  const castVolley = (canOpen: boolean): boolean => {
+    if (!canOpen || buildMenu.isOpen || placement.mode !== 'idle' || !world.skillOn()) return false;
+    world.push({ type: 'castSkill', dx: 0, dy: 0 });
+    return true;
+  };
+
   /*
    * Le menu de construction au clavier : Espace, flèches, Entrée, Échap.
    * Écouté en phase de capture, donc avant les autres écouteurs de `window` :
@@ -839,6 +850,11 @@ async function main(): Promise<void> {
 
       const canOpen = started && !paused && !settings.open && !inventory.open && !world.defeated && !worldMap.open;
 
+      if (event.code === 'Space' && castVolley(canOpen)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (buildMenu.handleKey(event.code, event.repeat, canOpen)) {
         event.preventDefault();
         event.stopPropagation();
@@ -971,7 +987,7 @@ async function main(): Promise<void> {
       else runShortcut('pause');
     },
     inventory: () => runShortcut('inventory'),
-    build: () => buildMenu.handleKey('Space', false, canOpenMenu()),
+    build: () => castVolley(canOpenMenu()) || buildMenu.handleKey('Space', false, canOpenMenu()),
     map: () => runShortcut('map'),
     mic: () => runShortcut('mic'),
     zoomStep: (direction) => (worldMap.open ? worldMap.stepZoom(direction) : renderer.stepZoom(direction)),
@@ -1012,6 +1028,7 @@ async function main(): Promise<void> {
   // Les étiquettes de la manette sur le sac (△ / Y) et « Bâtir » (□ / X) : visibles seulement en mode manette.
   const padHints = new PadHints([
     [hud.bag, 'north'],
+    [hud.skillButton, 'west'],
     [buildMenu.buildButton, 'west'],
   ]);
 
@@ -1277,6 +1294,8 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('buildingCompleted', () => audio.play('build'));
   world.events.on('buildingUpgraded', () => audio.play('upgrade'));
   world.events.on('arrowShot', () => audio.play('arrow'));
+  world.events.on('skillCast', () => audio.play('volley'));
+  world.events.on('comboBroken', () => audio.play('deny'));
   world.events.on('mutantHit', () => audio.play('hit'));
   world.events.on('mutantDied', () => audio.play('die'));
   world.events.on('mutantStunned', () => audio.play('dizzy'));

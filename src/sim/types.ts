@@ -437,6 +437,8 @@ export interface Mutant extends Moving {
    * entre-temps — : la mairie.
    */
   target?: EntityId;
+  /** Un traqueur (`HUNTERS`) : il marche sur Adam tant qu'il est à portée de vue, sinon sur sa cible. */
+  hunts?: true;
   /** Ce que seule la Reine des flaques retient (`QUEEN`) ; absent pour tout autre mutant. */
   queen?: QueenState;
 }

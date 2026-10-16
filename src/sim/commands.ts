@@ -126,6 +126,13 @@ export type Command =
    */
   | { type: 'dressAdam'; look: Look }
   /**
+   * Lance la Volée d'Adam (`VOLLEY`, `data/skills.ts`) : trois flèches en
+   * éventail vers (dx, dy) — le joystick —, ou, sans direction, vers
+   * l'ennemi le plus proche, sinon là où il regarde. Ignorée pendant la
+   * recharge. Le bouton de la Volée, Espace la nuit, le carré à la manette.
+   */
+  | { type: 'castSkill'; dx: number; dy: number }
+  /**
    * Renomme un habitant (ouvrier ou enfant) : le champ de sa fiche. Le nom est
    * nettoyé et coupé à `NAME_MAX` ; vide, il rend le prénom tiré de la seed.
    */

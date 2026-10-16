@@ -1788,6 +1788,94 @@ button:disabled,
 }
 
 /*
+ * Le combo de nuit : la capsule d'encre de la vague, orange dès ×1,5 ; son
+ * liseré bas se vide avec la fenêtre qui reste pour abattre le suivant.
+ */
+.hud .hud-combo {
+  position: relative;
+  cursor: var(--cursor-arrow);
+}
+
+.hud .hud-combo[data-hot='true'] {
+  background: var(--orange);
+  box-shadow: 0 3px 0 var(--orange-shade);
+}
+
+.hud .hud-combo::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  bottom: 3px;
+  left: 12px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--yellow-light) var(--fill, 0%), transparent var(--fill, 0%));
+  pointer-events: none;
+}
+
+/*
+ * La Volée d'Adam : le premier bouton du groupe `.hud-actions`, de crépuscule
+ * à l'aube. Face orange comme le sac est violet ; en recharge, la face s'éteint
+ * et un anneau de `--charge` se remplit autour du pictogramme, le temps restant
+ * au centre. Prête, elle bat doucement.
+ */
+.hud .hud-skill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--orange);
+  box-shadow: 0 5px 0 var(--orange-shade);
+  font: inherit;
+  color: var(--paper);
+  cursor: var(--cursor-hand);
+}
+
+.hud .hud-skill::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  width: 20px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--yellow-light);
+  pointer-events: none;
+}
+
+.hud .hud-skill:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 var(--orange-shade);
+}
+
+.hud .hud-skill[data-ready='true'] {
+  animation: hunger-pulse 1.6s ease-in-out infinite;
+}
+
+.hud .hud-skill[data-ready='false'] {
+  background: conic-gradient(var(--yellow) var(--charge, 0%), var(--ink-light) var(--charge, 0%));
+  box-shadow: 0 5px 0 var(--ink-shade);
+  cursor: var(--cursor-arrow);
+}
+
+.hud .hud-skill[data-ready='false']::before {
+  display: none;
+}
+
+.hud .hud-skill[data-ready='false'] .icon {
+  opacity: 0.55;
+}
+
+.hud-skill-left {
+  position: absolute;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 0 var(--ink-shade);
+}
+
+/*
  * La faveur de l'aube : une capsule violette, paquet jaune, qui bat tant qu'une carte attend,
  * puis, menthe, le coup de pouce de la journée et son temps.
  */
@@ -1929,6 +2017,7 @@ button:disabled,
 
 @media (prefers-reduced-motion: reduce) {
   .hud .hud-wave[data-urgent='true'],
+  .hud .hud-skill[data-ready='true'],
   .hud .hud-hasten[data-active='true'] .icon {
     animation: none;
   }

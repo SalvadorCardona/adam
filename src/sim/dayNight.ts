@@ -22,6 +22,9 @@ export const CYCLE_TICKS = DAY_PHASES.reduce((total, phase) => total + DAY_CYCLE
 /** Début de la nuit dans le cycle, en ticks. */
 const NIGHT_OFFSET = DAY_CYCLE.day + DAY_CYCLE.dusk;
 
+/** Début de l'aube dans le cycle, en ticks : c'est là qu'une nuit compte pour survécue. */
+const DAWN_OFFSET = NIGHT_OFFSET + DAY_CYCLE.night;
+
 export interface DayClock {
   phase: DayPhase;
   /** Numéro du cycle, 1 pour le premier : la journée 1 précède la nuit 1. */
@@ -32,10 +35,45 @@ export interface DayClock {
   left: number;
   /** Ticks écoulés depuis le début du cycle. */
   offset: number;
+  /** Le tick du cycle où l'aube commence, si une aube anticipée l'a avancé (`EarlyDawn`) ; absent : `DAWN_OFFSET`. */
+  dawnOffset?: number;
+  /** Où l'aiguille du cadran se lit, si l'aube anticipée l'a retenue sur l'aube ; absent : `offset`. */
+  dialOffset?: number;
+}
+
+/**
+ * Une aube anticipée (« Nuit nette ») : la nuit du cycle `cycle` finit au
+ * tick `offset` du cycle, au lieu de `DAWN_OFFSET`. L'aube dure alors
+ * jusqu'à la fin du cycle — le jour suivant se lève à l'heure : les cycles,
+ * donc la météo, qui se cale sur eux, ne bougent pas.
+ */
+export interface EarlyDawn {
+  cycle: number;
+  offset: number;
 }
 
 /** L'heure qu'il est, `ticks` ticks après le lever du premier jour. */
-export function clockAt(ticks: number): DayClock {
+export function clockAt(ticks: number, early: EarlyDawn | null = null): DayClock {
+  const base = plainClockAt(ticks);
+
+  if (!early || early.cycle !== base.cycle || early.offset >= DAWN_OFFSET || early.offset <= NIGHT_OFFSET) return base;
+  if (base.offset < early.offset) return base.phase === 'night' ? { ...base, left: early.offset - base.offset, dawnOffset: early.offset } : base;
+
+  // L'aube avancée : elle dure jusqu'au lever du jour, l'aiguille s'arrête au bout de l'arc de l'aube.
+  const elapsed = base.offset - early.offset;
+
+  return {
+    phase: 'dawn',
+    cycle: base.cycle,
+    elapsed,
+    left: CYCLE_TICKS - base.offset,
+    offset: base.offset,
+    dawnOffset: early.offset,
+    dialOffset: DAWN_OFFSET + Math.min(elapsed, DAY_CYCLE.dawn - 1),
+  };
+}
+
+function plainClockAt(ticks: number): DayClock {
   const offset = ((ticks % CYCLE_TICKS) + CYCLE_TICKS) % CYCLE_TICKS;
   const cycle = Math.floor(ticks / CYCLE_TICKS) + 1;
   let start = 0;
@@ -64,7 +102,7 @@ export function darkness(clock: DayClock): number {
     case 'night':
       return 1;
     case 'dawn':
-      return 1 - clock.elapsed / DAY_CYCLE.dawn;
+      return Math.max(0, 1 - clock.elapsed / DAY_CYCLE.dawn);
   }
 }
 
@@ -123,12 +161,11 @@ export function ticksToNight(clock: DayClock): number {
   return CYCLE_TICKS - clock.offset + NIGHT_OFFSET;
 }
 
-/** Début de l'aube dans le cycle, en ticks : c'est là qu'une nuit compte pour survécue. */
-const DAWN_OFFSET = NIGHT_OFFSET + DAY_CYCLE.night;
-
 /** Ticks avant la prochaine aube ; un cycle entier au premier tick de l'aube, qui vient de passer. */
 export function ticksToDawn(clock: DayClock): number {
-  if (clock.offset < DAWN_OFFSET) return DAWN_OFFSET - clock.offset;
+  const dawn = clock.dawnOffset ?? DAWN_OFFSET;
+
+  if (clock.offset < dawn) return dawn - clock.offset;
   return CYCLE_TICKS - clock.offset + DAWN_OFFSET;
 }
 
@@ -168,7 +205,7 @@ export function dayDial(clock: DayClock): DayDial {
     phase: clock.phase,
     day: clock.cycle + (clock.phase === 'dawn' ? 1 : 0),
     night,
-    progress: ((clock.offset + DAY_CYCLE.dawn) % CYCLE_TICKS) / CYCLE_TICKS,
+    progress: (((clock.dialOffset ?? clock.offset) + DAY_CYCLE.dawn) % CYCLE_TICKS) / CYCLE_TICKS,
     left,
     warning: !night && left <= DAY_DIAL.nightWarning,
   };

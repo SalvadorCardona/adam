@@ -26,6 +26,7 @@ export type SoundName =
   | 'build'
   | 'upgrade'
   | 'arrow'
+  | 'volley'
   | 'hit'
   | 'die'
   | 'dizzy'
@@ -226,6 +227,14 @@ export const SOUNDS: Record<SoundName, (ctx: AudioContext, out: AudioNode, at: n
   /** Une flèche qui siffle. */
   arrow(ctx, out, at) {
     burst(ctx, out, at, 'bandpass', 2400 * vary(0.1), 700, { attack: 0.01, decay: 0.12, peak: 0.45 });
+  },
+
+  /** La Volée : trois sifflements qui s'étagent. */
+  volley(ctx, out, at) {
+    for (let i = 0; i < 3; i += 1) {
+      burst(ctx, out, at + i * 0.045, 'bandpass', (1800 + i * 500) * vary(0.05), 600, { attack: 0.01, decay: 0.14, peak: 0.4 });
+    }
+    tone(ctx, out, at, 'triangle', 392, 784, { attack: 0.01, decay: 0.18, peak: 0.18 });
   },
 
   /** Flèche dans un mutant. */

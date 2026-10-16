@@ -45,6 +45,8 @@ export const SAMPLES = {
   tap: { files: ['tap'], gain: 0.35, spread: 0.05 },
   deny: { files: ['deny'], gain: 0.55 },
   arrow: { files: ['arrow_1', 'arrow_2', 'arrow_3'], gain: 0.4, spread: 0.08 },
+  // Pas d'échantillon : la Volée se joue à la synthèse (`synth.ts`) jusqu'à ce qu'on lui en donne un.
+  volley: { files: [], gain: 0.55 },
   hit: { files: ['hit_1', 'hit_2', 'hit_3'], gain: 0.55, spread: 0.08 },
   die: { files: ['die'], gain: 0.5, spread: 0.06 },
   dizzy: { files: ['dizzy'], gain: 0.5 },

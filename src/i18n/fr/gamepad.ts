@@ -22,7 +22,7 @@ export const gamepad = {
     navigate: 'Passer d’un bouton à l’autre',
     back: 'Retour, fermer, annuler',
     bag: 'Sac : inventaire et habillement',
-    build: 'Bâtir',
+    build: 'Bâtir (la nuit : lancer la Volée)',
     zoomStep: 'Zoom arrière, avant',
     zoom: 'Zoom continu',
     recenter: 'Revenir sur Adam',
