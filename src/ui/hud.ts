@@ -361,7 +361,8 @@ export class Hud {
     this.objective.type = 'button';
     this.objective.setAttribute('aria-haspopup', 'true');
     this.objective.setAttribute('aria-expanded', 'false');
-    this.objective.append(this.questStrip);
+    this.objective.append(this.questStrip, element('span', 'hud-objective-chevron'));
+    this.objective.lastElementChild?.append(uiIcon('chevron', 16));
     this.objective.addEventListener('click', () => this.toggleQuest());
 
     // La quête est une fenêtre sous la barre : son objectif la rouvre, sa tête la referme.

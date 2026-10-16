@@ -345,6 +345,8 @@ export const UI_ICONS = {
     pill(15.8, 14.6, 4.8, 1.2, paper.base),
     pill(17.6, 12.8, 1.2, 4.8, paper.base),
   ),
+  /** Un chevron vers le bas : le rappel d'un volet qui s'ouvre (retourné en CSS une fois ouvert). */
+  chevron: svg(S, S, polyline([6, 9, 12, 15, 18, 9], violet.shade)),
   /** L'ampoule du conseil. */
   hint: svg(
     S,
