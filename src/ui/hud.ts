@@ -713,6 +713,9 @@ export class Hud {
       if (plan) this.notify(t().hud.discovery.plan(t().buildings[plan].label), 'good');
       this.flyFindsToBag(items, x, y);
     });
+    // Le colis d'une faveur de l'aube, la récompense d'un défi du jour : ils volent d'Adam jusqu'à la ville (ou au sac).
+    world.events.on('boonChosen', ({ reward, to }) => this.flyFindsToBag(reward, world.player.x, world.player.y, to));
+    world.events.on('challengeCompleted', ({ reward, to }) => this.flyFindsToBag(reward, world.player.x, world.player.y, to));
     world.events.on('prestigeGained', ({ amount, x, y }) => this.floatPrestige(amount, x, y));
     world.events.on('xpGained', ({ amount, x, y }) => this.floatXp(amount, x, y));
     world.events.on('levelUp', ({ level, maxHp, bowDamage }) => {
@@ -1497,11 +1500,12 @@ export class Hud {
    * bouton du sac, qui rebondit à chaque arrivée. Sous `prefers-reduced-motion`, il monte sur place
    * comme un gain ordinaire.
    */
-  private flyFindsToBag(items: readonly [ItemId, number][], worldX: number, worldY: number): void {
+  private flyFindsToBag(items: readonly [ItemId, number][], worldX: number, worldY: number, to: 'bag' | 'town' = 'bag'): void {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const origin = this.project(worldX, worldY - 16);
     const field = this.floats.getBoundingClientRect();
-    const target = this.bag.getBoundingClientRect();
+    const goal = to === 'bag' ? this.bag : this.town;
+    const target = goal.getBoundingClientRect();
     const dx = target.left + target.width / 2 - field.left - origin.x;
     const dy = target.top + target.height / 2 - field.top - origin.y;
 
@@ -1531,6 +1535,10 @@ export class Hud {
 
       flight.onfinish = () => {
         flier.remove();
+        if (to === 'town') {
+          goal.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)', offset: 0.4 }, { transform: 'scale(1)' }], { duration: 240, easing: 'ease-out' });
+          return;
+        }
         this.bag.dataset['bump'] = 'true';
         window.setTimeout(() => delete this.bag.dataset['bump'], 260);
       };
