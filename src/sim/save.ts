@@ -649,6 +649,7 @@ function parseChallenge(raw: unknown): DailyChallenge {
     progress: int(daily['progress']),
     base: int(daily['base']),
     done: bool(daily['done']),
+    streak: daily['streak'] === undefined ? 0 : int(daily['streak']),
   };
 }
 

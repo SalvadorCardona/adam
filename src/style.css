@@ -928,6 +928,16 @@ button:disabled,
   color: var(--yellow-shade);
 }
 
+.hud-quest-daily-streak {
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: var(--paper);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .hud-quest-daily-label {
   min-width: 0;
   font-size: 14px;

@@ -57,7 +57,7 @@ import { PIGS, PIG_FARM } from '../data/pigs.ts';
 import { DAWN_REWARD, DAY_CYCLE, SURVIVORS } from '../data/dayNight.ts';
 import { BOON_OFFER, BOONS, type BoonId } from '../data/boons.ts';
 import { boonBonus, drawBoons } from './boons.ts';
-import { CHALLENGES, type ChallengeId, type ChallengeStat } from '../data/challenges.ts';
+import { CHALLENGE_STREAK, CHALLENGES, type ChallengeId, type ChallengeStat } from '../data/challenges.ts';
 import { drawChallenge, type DailyChallenge } from './challenges.ts';
 import {
   CHIEF,
@@ -598,7 +598,7 @@ export type WorldEvents = {
   /** Le défi d'un nouveau jour (`data/challenges.ts`). */
   challengeStarted: { id: ChallengeId; day: number };
   /** Le défi du jour réussi : ce que sa récompense a versé. */
-  challengeCompleted: { id: ChallengeId; reward: [ItemId, number][]; to: 'town' | 'bag'; prestige: number };
+  challengeCompleted: { id: ChallengeId; reward: [ItemId, number][]; to: 'town' | 'bag'; prestige: number; streak: number };
   /** L'aube propose ses faveurs (`data/boons.ts`). */
   boonOffered: { night: number; choices: BoonId[] };
   /** Une faveur prise : `reward`, ce que son colis a versé (vide pour un coup de pouce). */
@@ -3001,14 +3001,14 @@ export class World {
   /* ------------------------------------------------------- défi du jour */
 
   /** Le défi du jour, son avancement et son but ; `null` avant le premier jour. */
-  public challenge(): { id: ChallengeId; have: number; need: number; done: boolean } | null {
+  public challenge(): { id: ChallengeId; have: number; need: number; done: boolean; streak: number } | null {
     const daily = this.daily;
 
     if (!daily) return null;
 
     const need = CHALLENGES[daily.id].goal.count;
 
-    return { id: daily.id, have: Math.min(need, this.challengeProgress(daily)), need, done: daily.done };
+    return { id: daily.id, have: Math.min(need, this.challengeProgress(daily)), need, done: daily.done, streak: daily.streak };
   }
 
   private challengeProgress(daily: DailyChallenge): number {
@@ -3018,7 +3018,11 @@ export class World {
   private startChallenge(day: number): void {
     const id = drawChallenge(this.seed, day);
 
-    this.daily = { day, id, progress: 0, base: this.fog.exploredCount(), done: false };
+    const before = this.daily;
+    // Hier réussi, la série continue ; raté (ou sauté), elle repart de zéro.
+    const streak = before?.done && before.day === day - 1 ? before.streak + 1 : 0;
+
+    this.daily = { day, id, progress: 0, base: this.fog.exploredCount(), done: false, streak };
     this.events.emit('challengeStarted', { id, day });
   }
 
@@ -3037,9 +3041,10 @@ export class World {
     daily.done = true;
 
     const paid = this.bestow(Object.entries(reward) as [ItemId, number][]);
+    const total = prestige + CHALLENGE_STREAK.prestigePerDay * Math.min(daily.streak, CHALLENGE_STREAK.max);
 
-    this.gainPrestige(prestige, this.player.x, this.player.y);
-    this.events.emit('challengeCompleted', { id: daily.id, reward: paid.reward, to: paid.to, prestige });
+    this.gainPrestige(total, this.player.x, this.player.y);
+    this.events.emit('challengeCompleted', { id: daily.id, reward: paid.reward, to: paid.to, prestige: total, streak: daily.streak + 1 });
   }
 
   /** Le niveau d'Adam, déduit de son XP. */

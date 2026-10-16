@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHALLENGE_IDS, CHALLENGES } from '../data/challenges.ts';
+import { CHALLENGE_IDS, CHALLENGE_STREAK, CHALLENGES } from '../data/challenges.ts';
 import { drawChallenge } from './challenges.ts';
 import { deserialize, serialize } from './save.ts';
 import { World } from './world.ts';
@@ -105,5 +105,46 @@ describe('défi du jour', () => {
     expect(paid).toBe(1);
     expect(town.count('food')).toBeGreaterThan(food);
     expect(world.prestige).toBe(prestige + CHALLENGES.woodcutter.prestige);
+  });
+});
+
+describe('série de défis', () => {
+  it('réussi la veille, le défi du jour paie la série ; raté, elle repart de zéro', () => {
+    const world = builtHall(4);
+    const paid: number[] = [];
+    const nextDay = (): void => {
+      const day = world.dayDial()!.day;
+
+      while (world.dayDial()!.day === day) world.tick();
+      world.tick();
+    };
+
+    world.events.on('challengeCompleted', ({ prestige }) => paid.push(prestige));
+
+    // On force la réussite en cochant le compte : seul l'enchaînement des jours nous intéresse.
+    const succeed = (): void => {
+      const today = world.challenge()!;
+      const before = world.prestige;
+
+      (world as unknown as { daily: { progress: number; base: number } }).daily.progress = today.need;
+      (world as unknown as { daily: { base: number } }).daily.base = -1e9;
+      (world as unknown as { countChallenge: (stat: string, amount: number, item?: string) => void }).countChallenge(
+        CHALLENGES[today.id].goal.stat,
+        0,
+        'item' in CHALLENGES[today.id].goal ? (CHALLENGES[today.id].goal as { item: string }).item : undefined,
+      );
+      expect(world.prestige).toBeGreaterThan(before);
+    };
+
+    succeed();
+    nextDay();
+    expect(world.challenge()!.streak).toBe(1);
+    succeed();
+    nextDay();
+    expect(world.challenge()!.streak).toBe(2);
+    // Raté : le jour suivant repart de zéro.
+    nextDay();
+    expect(world.challenge()!.streak).toBe(0);
+    expect(paid[1]! - CHALLENGES[drawChallenge(world.seed, 2)].prestige).toBe(CHALLENGE_STREAK.prestigePerDay);
   });
 });

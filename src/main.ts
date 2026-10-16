@@ -755,7 +755,7 @@ async function main(): Promise<void> {
     boons.show();
     audio.play('open');
   };
-  world.events.on('challengeCompleted', ({ id, prestige }) => hud.notify(t().hud.daily.done(t().challenges[id], prestige), 'good'));
+  world.events.on('challengeCompleted', ({ id, prestige, streak }) => hud.notify(t().hud.daily.done(t().challenges[id], prestige, streak), 'good'));
   world.events.on('boonOffered', () => hud.notify(t().hud.boon.ready, 'good', { label: t().hud.boon.see, run: () => hud.onBoonOpen() }));
   hud.root.append(boons.root);
 

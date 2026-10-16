@@ -221,7 +221,9 @@ export const hud: Messages['hud'] = {
   /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
   daily: {
     title: 'Daily challenge',
-    done: (label: string, prestige: number): string => `Daily challenge done: ${label}! +${prestige} Prestige`,
+    done: (label: string, prestige: number, streak: number): string =>
+      `Daily challenge done: ${label}! +${prestige} Prestige${streak > 1 ? ` · ${streak} days in a row` : ''}`,
+    streak: (days: number): string => `${days} in a row`,
   },
   boon: {
     title: 'Dawn favour',

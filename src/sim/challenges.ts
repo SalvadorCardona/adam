@@ -16,6 +16,8 @@ export interface DailyChallenge {
   /** Cases explorées à son départ, pour `explore`. */
   base: number;
   done: boolean;
+  /** Les défis réussis d'affilée juste avant celui-ci (`CHALLENGE_STREAK`). */
+  streak: number;
 }
 
 const CHALLENGE_SALT = 0x5d1a;

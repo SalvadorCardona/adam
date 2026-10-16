@@ -1757,7 +1757,7 @@ export class Hud {
 
     const daily = world.challenge();
 
-    key = `hall:${world.chapter}:${progressKey}:${detailKey}:${selected}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}:${daily && `${daily.id}:${daily.have}:${daily.done}`}`;
+    key = `hall:${world.chapter}:${progressKey}:${detailKey}:${selected}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}:${daily && `${daily.id}:${daily.have}:${daily.done}:${daily.streak}`}`;
     if (key === this.lastQuest) return;
     this.lastQuest = key;
 
@@ -2740,14 +2740,19 @@ export function clock(seconds: number): string {
 }
 
 /** Le défi du jour, sous les objectifs : son icône, son intitulé, sa jauge — cochée une fois réussi. */
-function dailyRow(daily: { id: ChallengeId; have: number; need: number; done: boolean }): HTMLElement {
+function dailyRow(daily: { id: ChallengeId; have: number; need: number; done: boolean; streak: number }): HTMLElement {
   const row = element('div', 'hud-quest-daily');
   const { icon } = CHALLENGES[daily.id];
   const label = text('hud-quest-daily-label', t().challenges[daily.id]);
 
+  // La série : les jours réussis d'affilée, aujourd'hui compris une fois réussi.
+  const days = daily.streak + (daily.done ? 1 : 0);
+  const title = text('hud-quest-daily-title', t().hud.daily.title);
+
+  if (days > 1) title.append(text('hud-quest-daily-streak', t().hud.daily.streak(days)));
   row.dataset['done'] = String(daily.done);
   row.append(
-    text('hud-quest-daily-title', t().hud.daily.title),
+    title,
     daily.done ? uiIcon('check', 18) : 'item' in icon ? itemIcon(icon.item, 18) : uiIcon(icon.ui, 18),
     label,
     bar(daily.have / daily.need),

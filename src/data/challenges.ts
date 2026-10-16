@@ -95,3 +95,13 @@ export const CHALLENGES = {
 export type ChallengeId = keyof typeof CHALLENGES;
 
 export const CHALLENGE_IDS = Object.keys(CHALLENGES) as ChallengeId[];
+
+/**
+ * La série : chaque défi réussi au lendemain d'un autre rapporte
+ * `prestigePerDay` de Prestige de plus par jour d'affilée, jusqu'à `max`
+ * jours. Un jour raté la remet à zéro.
+ */
+export const CHALLENGE_STREAK = {
+  prestigePerDay: 2,
+  max: 5,
+} as const;

@@ -274,7 +274,10 @@ export const hud = {
   /** Le défi du jour, dans la quête, et son toast. */
   daily: {
     title: 'Défi du jour',
-    done: (label: string, prestige: number): string => `Défi du jour réussi : ${label} ! +${prestige} Prestige`,
+    done: (label: string, prestige: number, streak: number): string =>
+      `Défi du jour réussi : ${label} ! +${prestige} Prestige${streak > 1 ? ` · ${streak} jours d’affilée` : ''}`,
+    /** La série en cours, à côté du titre. */
+    streak: (days: number): string => `${days} d’affilée`,
   },
   boon: {
     title: 'Faveur de l’aube',
