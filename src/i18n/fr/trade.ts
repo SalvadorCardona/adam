@@ -15,9 +15,12 @@ export const trade = {
   kinds: {
     surplus: 'Surplus contre manque',
     loot: 'Butin contre métal',
+    wayside: 'Offre du marchand ambulant',
   },
   /** Le titre d'une offre rare, d'après son libellé (`rareOffers`). */
   rare: (offer: string): string => `Rare : ${lower(offer)}`,
+  wayside: 'Un marchand ambulant : une seule offre, rare.',
+  waysideOnce: 'Un seul échange, et il repart',
   exchange: 'Échanger',
   done: 'Échangé',
   /** Places de sac gagnées. */

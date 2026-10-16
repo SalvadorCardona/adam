@@ -15,8 +15,11 @@ export const trade: Messages['trade'] = {
   kinds: {
     surplus: 'Surplus for shortfall',
     loot: 'Loot for metal',
+    wayside: 'The traveling trader’s offer',
   },
   rare: (offer) => `Rare: ${lower(offer)}`,
+  wayside: 'A traveling trader: a single, rare offer.',
+  waysideOnce: 'One trade, then they move on',
   exchange: 'Trade',
   done: 'Traded',
   bagSlots: (n) => `+${n} slot${n === 1 ? '' : 's'}`,

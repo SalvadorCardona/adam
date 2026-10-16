@@ -106,7 +106,7 @@ export class CaravanPanel {
 
     setText(
       this.timer,
-      seconds === null ? text.settling : text.leavesIn(seconds),
+      caravan.encounterId !== undefined ? text.wayside : seconds === null ? text.settling : text.leavesIn(seconds),
     );
     setText(
       this.where,
@@ -176,7 +176,7 @@ export class CaravanPanel {
 
       state.textContent = text.rareLeft(left);
     } else {
-      state.textContent = text.oncePerCaravan;
+      state.textContent = caravan.encounterId !== undefined ? text.waysideOnce : text.oncePerCaravan;
     }
 
     row.append(head, deal, state);

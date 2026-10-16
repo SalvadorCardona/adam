@@ -57,6 +57,8 @@ import type {
   SlamState,
   EnemyBase,
   PigState,
+  WandererRole,
+  WandererState,
   CaravanState,
   Entity,
   EntityId,
@@ -248,6 +250,8 @@ export interface WorldState {
   chests?: number[];
   /** Les ruines fouillées et les secrets trouvés, par id (`sim/discoveries.ts`). Absent d'avant eux : aucun. */
   spots?: number[];
+  /** Les rencontres de la route résolues (`data/encounters.ts`), par id ; les autres se relisent dans la seed. Absent d'avant elles : aucune. */
+  encounters?: number[];
   /** Le prénom que chaque habitant porte, par id (`World.nameFor`). Absent d'avant eux : on les retrouve par `nameOf`. */
   names?: SavedName[];
   scheduler: SchedulerSnapshot;
@@ -526,8 +530,10 @@ const PATIENT_STATES: readonly PatientState[] = ['stunned', 'following', 'care']
 
 const CARAVAN_STATES: readonly CaravanState[] = ['arriving', 'parked', 'leaving'];
 const PIG_STATES: readonly PigState[] = ['wild', 'follow', 'flee'];
+const WANDERER_STATES: readonly WandererState[] = ['idle', 'following', 'fleeing'];
+const WANDERER_ROLES: readonly WandererRole[] = ['wounded', 'deer'];
 
-const TRADE_KINDS: readonly TradeOffer['kind'][] = ['surplus', 'loot', 'rare'];
+const TRADE_KINDS: readonly TradeOffer['kind'][] = ['surplus', 'loot', 'rare', 'wayside'];
 const GLEAN_STATES: readonly GleanState[] = ['go', 'pick', 'back'];
 
 const LUMBERJACK_STATES: readonly LumberjackState[] = ['idle', 'toTree', 'chop', 'toCamp', 'wait'];
@@ -600,6 +606,7 @@ function parseState(raw: unknown): WorldState {
     dens: unique(array(state['dens']).map(parseDen)),
     chests: [...new Set(array(state['chests'] ?? []).map(int))],
     spots: [...new Set(array(state['spots'] ?? []).map(int))],
+    encounters: [...new Set(array(state['encounters'] ?? []).map(int))],
     ...(state['names'] !== undefined && { names: unique(array(state['names']).map(parseName)) }),
     scheduler: parseScheduler(state['scheduler']),
   };
@@ -1239,6 +1246,22 @@ function parseMobile(raw: unknown, seed: number): Mobile {
         fleeTicks: int(mobile['fleeTicks']),
       };
     }
+    case 'wanderer':
+      return {
+        ...base,
+        kind: 'wanderer',
+        role: oneOfList(mobile['role'], WANDERER_ROLES),
+        state: oneOfList(mobile['state'], WANDERER_STATES),
+        sex: oneOfList(mobile['sex'], SEXES),
+        encounterId: int(mobile['encounterId']),
+        homeX: finite(mobile['homeX']),
+        homeY: finite(mobile['homeY']),
+        dirX: finite(mobile['dirX']),
+        dirY: finite(mobile['dirY']),
+        wanderTicks: int(mobile['wanderTicks']),
+        gauge: finite(mobile['gauge']),
+        fleeTicks: int(mobile['fleeTicks']),
+      };
     case 'caravan': {
       const state = mobile['state'];
 
@@ -1255,6 +1278,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
         leaveTick: int(mobile['leaveTick']),
         offers: array(mobile['offers']).map(parseTrade),
         met: bool(mobile['met']),
+        ...(mobile['encounterId'] !== undefined && { encounterId: int(mobile['encounterId']) }),
       };
     }
     default:

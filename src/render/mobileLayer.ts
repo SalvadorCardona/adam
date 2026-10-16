@@ -85,7 +85,7 @@ import type { SpriteLibrary } from './spriteLibrary.ts';
 import type { TerrainTiles } from './terrainTiles.ts';
 
 /** Ce que le brouillard de guerre cache hors des cases vues : tout ce qui n'est pas de la colonie. */
-const FOGGED: ReadonlySet<Mobile['kind']> = new Set(['mutant', 'beast', 'pig', 'arrow', 'pickup', 'patient', 'caravan']);
+const FOGGED: ReadonlySet<Mobile['kind']> = new Set(['mutant', 'beast', 'pig', 'wanderer', 'arrow', 'pickup', 'patient', 'caravan']);
 
 const HP_TRACK = hex(PALETTE.paper.base);
 const HP_FG = hex(PALETTE.coral.base);
@@ -474,6 +474,7 @@ export class MobileLayer {
         case 'mutant':
         case 'beast':
         case 'pig':
+        case 'wanderer':
         case 'kid':
         case 'worker': {
           const puppet = view.puppet!;

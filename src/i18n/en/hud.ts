@@ -72,6 +72,14 @@ export const hud: Messages['hud'] = {
     penned: (pigs: number): string => `A pig joins the pen (${pigs})`,
     escaped: (count: number): string => (count > 1 ? `${count} pigs got away!` : 'A pig got away!'),
   },
+  /** The road encounters (`data/encounters.ts`): wounded survivor, trader, golden doe. */
+  encounters: {
+    following: 'The survivor limps after you — lead them to the town hall!',
+    fledScare: 'The survivor got scared and ran off…',
+    fledLost: 'The survivor lost you: they wait where they are.',
+    joined: (name: string): string => `${name} joins the colony: one more worker!`,
+    deerCaught: 'The golden doe lets you come close!',
+  },
   toast: {
     objectiveDone: (title: string, celebration: string): string => `Goal complete: ${title}. ${celebration}`,
     saveFailed: 'Saving failed — browser storage is full or blocked',

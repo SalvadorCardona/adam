@@ -78,6 +78,14 @@ export interface TestScenarioProto {
    */
   nearPig?: number;
   /**
+   * Adam se tient à tant de tuiles à gauche d'un survivant blessé posé
+   * d'emblée à une quinzaine de tuiles de la mairie (`data/encounters.ts`),
+   * avec un marchand ambulant au-dessus de lui et une biche dorée plus bas ;
+   * ses abords explorés, plutôt qu'à `adam`. Le chemin du survivant jusqu'à
+   * la mairie est en ligne droite.
+   */
+  nearEncounter?: number;
+  /**
    * Une colonie qui ne tient que la prairie de départ (`data/regions.ts`),
    * Adam à tant de tuiles du repaire du gardien de la première région, ses
    * abords explorés, plutôt qu'à `adam`.
@@ -287,6 +295,21 @@ export const TEST_SCENARIOS = {
     bag: {},
     adam: { dx: 1, dy: 4 },
     nearPig: 3,
+  },
+  /**
+   * Les rencontres de la route : un survivant blessé à trois pas d'Adam, qu'on
+   * touche pour qu'il le suive jusqu'à la mairie, un marchand ambulant et sa
+   * charrette au nord, une biche dorée au sud qui fuit quand on s'approche.
+   */
+  encounter: {
+    label: 'Rencontres sur la route',
+    seed: 100,
+    buildings: [],
+    town: { wood: 40, stone: 30, food: 12, water: 12 },
+    // De quoi payer l'une ou l'autre offre du marchand du premier palier.
+    bag: { wood: 20, food: 10, stone: 20, water: 10 },
+    adam: { dx: 1, dy: 4 },
+    nearEncounter: 3,
   },
   /**
    * L'éditeur de personnage ouvert devant la mairie : Adam a déjà trouvé

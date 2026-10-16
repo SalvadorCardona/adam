@@ -58,6 +58,7 @@ import {
   type WardrobeDrop,
 } from './wardrobe.ts';
 import { CHESTS } from './chests.ts';
+import { ENCOUNTERS, ENCOUNTER_KINDS, type WaysideOffer } from './encounters.ts';
 import { DISCOVERIES, DISCOVERY_TIERS, RUIN_REWARDS, type DiscoveryLoot } from './discoveries.ts';
 import { PIECE_ART, adamLookParts, isFootPiece } from '../art/adamLook.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherProto } from './weather.ts';
@@ -1096,6 +1097,32 @@ function validateDiscoveries(errors: string[]): void {
   for (const [tier, weights] of DISCOVERIES.ruin.weights.entries()) {
     if (RUIN_REWARDS.every((reward) => !(weights[reward] > 0))) errors.push(`DISCOVERIES.ruin.weights[${tier}] : aucune récompense`);
   }
+  // Les rencontres de la route : trois sortes, une densité par palier qui croît avec la distance, des échanges qui portent sur des objets.
+  for (const kind of ENCOUNTER_KINDS) {
+    const { chance } = ENCOUNTERS[kind];
+
+    if (chance.length !== DISCOVERY_TIERS.length || chance.some((value) => !(value > 0 && value <= 1))) errors.push(`ENCOUNTERS.${kind}.chance : un nombre de ]0, 1] par palier`);
+    if (chance.some((value, index) => index > 0 && value < chance[index - 1]!)) errors.push(`ENCOUNTERS.${kind}.chance : décroît avec la distance`);
+  }
+  if (ENCOUNTERS.merchant.offers.length !== DISCOVERY_TIERS.length) errors.push('ENCOUNTERS.merchant.offers : une liste par palier');
+  for (const [tier, offers] of (ENCOUNTERS.merchant.offers as readonly (readonly WaysideOffer[])[]).entries()) {
+    if (offers.length === 0) errors.push(`ENCOUNTERS.merchant.offers[${tier}] : aucune offre`);
+    for (const { cost, items } of offers) {
+      for (const [side, amounts] of [['cost', cost], ['items', items]] as const) {
+        const entries = Object.entries(amounts);
+
+        if (entries.length === 0) errors.push(`ENCOUNTERS.merchant.offers[${tier}].${side} : vide`);
+        for (const [item, amount] of entries) {
+          if (!(item in ITEMS)) errors.push(`ENCOUNTERS.merchant.offers[${tier}].${side} : objet inconnu « ${item} »`);
+          if (!(Number.isInteger(amount) && amount > 0)) errors.push(`ENCOUNTERS.merchant.offers[${tier}].${side} : quantité de « ${item} » invalide`);
+        }
+      }
+    }
+  }
+  if (!(ENCOUNTERS.deer.catchTicks > 0) || !(ENCOUNTERS.deer.flinchTiles < ENCOUNTERS.deer.catchTiles) || !(ENCOUNTERS.deer.catchTiles < ENCOUNTERS.deer.calmTiles)) {
+    errors.push('ENCOUNTERS.deer : il faut fuir (flinchTiles) < portée (catchTiles) < calme (calmTiles)');
+  }
+  if (!(ENCOUNTERS.wounded.limpSpeed > 0) || !(ENCOUNTERS.wounded.touchTiles > 0) || !(ENCOUNTERS.spawnTiles < ENCOUNTERS.despawnTiles)) errors.push('ENCOUNTERS : réglages du survivant ou de la distance invalides');
   for (const [tier, plans] of DISCOVERIES.ruin.plans.entries()) {
     for (const id of plans) {
       const proto: BuildingProto = BUILDINGS[id];

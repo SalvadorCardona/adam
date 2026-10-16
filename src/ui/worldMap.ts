@@ -38,6 +38,7 @@
  */
 
 import { CHUNK_TILES, TILE_SIZE, floorDiv } from '../core/grid.ts';
+import { ENCOUNTER_KINDS } from '../data/encounters.ts';
 import { GROUND, PALETTE, type Color } from '../data/artDirection.ts';
 import type { ContaminationKind } from '../data/contamination.ts';
 import type { ItemId } from '../data/items.ts';
@@ -472,6 +473,7 @@ export class WorldMap {
     this.drawBuildings();
     this.drawLairs();
     this.drawSpots();
+    this.drawEncounters();
     this.drawWave();
     this.drawMobiles();
     this.drawPlayer();
@@ -511,6 +513,32 @@ export class WorldMap {
         for (const spot of [this.world.chestOfChunk(cx, cy), this.world.spotOfChunk('ruin', cx, cy)]) {
           if (!spot || this.world.isFound(spot.id) || this.sightOf(spot.tx + 0.5, spot.ty + 0.5) === 'unexplored') continue;
           this.footprint(spot.tx, spot.ty, 1, 1, 'spot');
+        }
+      }
+    }
+  }
+
+  /** Les rencontres vues et pas résolues : un disque violet marqué d'un « ? ». */
+  private drawEncounters(): void {
+    const tiles = this.view.visibleTiles();
+    const { context, view } = this;
+    const radius = Math.max(5, view.scale * 0.9);
+
+    context.font = `700 ${Math.round(radius * 1.5)}px Fredoka, sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    for (let cy = floorDiv(tiles.minTy, CHUNK_TILES); cy <= floorDiv(tiles.maxTy, CHUNK_TILES); cy += 1) {
+      for (let cx = floorDiv(tiles.minTx, CHUNK_TILES); cx <= floorDiv(tiles.maxTx, CHUNK_TILES); cx += 1) {
+        for (const kind of ENCOUNTER_KINDS) {
+          const encounter = this.world.encounterOfChunk(kind, cx, cy);
+
+          if (!encounter || this.world.isEncounterResolved(encounter.id) || this.sightOf(encounter.tx + 0.5, encounter.ty + 0.5) === 'unexplored') continue;
+          this.dot(encounter.tx + 0.5, encounter.ty + 0.5, radius, PALETTE.violet.base);
+
+          const at = view.toScreen(encounter.tx + 0.5, encounter.ty + 0.5);
+
+          context.fillStyle = PALETTE.paper.base;
+          context.fillText('?', at.x, at.y + 0.5);
         }
       }
     }
@@ -729,6 +757,8 @@ function mobileColor(mobile: Mobile): Color | null {
       return PALETTE.yellow.shade;
     case 'pig':
       return PALETTE.skin.shade;
+    case 'wanderer':
+      return PALETTE.violet.base;
     case 'arrow':
     case 'pickup':
       return null;

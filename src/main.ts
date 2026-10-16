@@ -1331,6 +1331,9 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('patientAdmitted', () => audio.play('open'));
   world.events.on('mutantHealed', () => audio.play('baby'));
   world.events.on('kidGrewUp', () => audio.play('baby'));
+  world.events.on('survivorJoined', () => audio.play('baby'));
+  world.events.on('woundedFollowing', () => audio.play('pickup'));
+  world.events.on('deerCaught', () => audio.play('eureka'));
   world.events.on('beastHit', () => audio.play('hit'));
   world.events.on('beastDied', () => audio.play('die'));
   world.events.on('playerHurt', ({ hp }) => {
@@ -1865,6 +1868,8 @@ function wireParticles(world: World, renderer: GameRenderer): void {
   world.events.on('mutantStunned', ({ x, y }) => particles.burst(x, y - 16, PARTICLES.star, 6, 0.1));
   world.events.on('mutantHealed', ({ x, y }) => particles.burst(x, y - 12, PARTICLES.confetti, 10, 0.14));
   world.events.on('kidGrewUp', ({ x, y }) => particles.burst(x, y - 12, PARTICLES.confetti, 10, 0.14));
+  world.events.on('survivorJoined', ({ x, y }) => particles.burst(x, y - 12, PARTICLES.confetti, 10, 0.14));
+  world.events.on('deerCaught', ({ x, y }) => particles.burst(x, y - 12, PARTICLES.confetti, 12, 0.14));
   world.events.on('lootPicked', ({ item, x, y }) => particles.burst(x, y - 6, ITEM_PARTICLES[item], 6, 0.1));
   world.events.on('waveCleared', () => {
     const hall = world.entities.get(world.townHallId);

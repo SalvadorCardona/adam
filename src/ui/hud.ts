@@ -722,6 +722,11 @@ export class Hud {
 
       if (pen) this.celebrate(pen, t().hud.pigs.penned(pigs));
     });
+    // Les rencontres de la route : le blessé qui suit, qui fuit, qui arrive ; la biche qui se laisse approcher.
+    world.events.on('woundedFollowing', () => this.notify(t().hud.encounters.following, 'good'));
+    world.events.on('woundedFled', ({ reason }) => this.notify(reason === 'scare' ? t().hud.encounters.fledScare : t().hud.encounters.fledLost, 'bad'));
+    world.events.on('survivorJoined', ({ name }) => this.notify(t().hud.encounters.joined(name), 'good'));
+    world.events.on('deerCaught', () => this.notify(t().hud.encounters.deerCaught, 'good'));
     world.events.on('pigsEscaped', ({ count }) => this.notify(t().hud.pigs.escaped(count), 'bad'));
     // Un coffre ouvert : « Coffre ouvert ! » monte au-dessus de lui.
     world.events.on('chestOpened', ({ tx, ty }) => this.celebrate({ tx, ty, width: 1, height: 1 }, t().wardrobe.chestOpened));
