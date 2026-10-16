@@ -52,6 +52,8 @@ export const FOG_VISION = {
  * Le voile, tiré de la palette — jamais de noir ni de gris : l'indigo.
  *
  * - `unexplored` : la teinte pleine de l'inconnu ;
+ * - `cloud` : le ton clair des nappes de brume qui y dérivent
+ *   (`render/fogShader.ts`) — deux tons de l'indigo, jamais un aplat ;
  * - `explored` : le voile d'une case explorée hors de vue, à `exploredAlpha` —
  *   la carte se lit dessous, assombrie et bleutée, figée.
  *
@@ -60,6 +62,7 @@ export const FOG_VISION = {
  */
 export const FOG_TINT = {
   unexplored: PALETTE.ink.shade,
+  cloud: PALETTE.ink.base,
   explored: PALETTE.ink.base,
   exploredAlpha: 0.42,
   /** Le voile, plus léger, d'une région pas encore conquise (`data/regions.ts`), même vue. */

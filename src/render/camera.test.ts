@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TILE_SIZE } from '../core/grid.ts';
-import { Camera, ZOOM, clampZoom, stepZoom } from './camera.ts';
+import { Camera, FIT_COVER, ZOOM, clampZoom, fitZoom, knownSpan, stepZoom } from './camera.ts';
 
 /** Une caméra posée sur le joueur immobile en (0, 0), écran de téléphone. */
 function still(): Camera {
@@ -193,5 +193,56 @@ describe('Camera.lookAt', () => {
     run(camera, 1500);
     expect(Math.abs(camera.centerX)).toBeLessThan(1);
     expect(camera.atHome).toBe(true);
+  });
+});
+
+describe('cadrage de la zone explorée', () => {
+  it('avance sur un grand écran pour que la clairière le remplisse', () => {
+    const level = fitZoom(1440, 900, 33, 33);
+
+    expect(level).toBeGreaterThan(ZOOM.default);
+    // La clairière couvre au moins la moitié de la hauteur — en fait, toute.
+    expect((33 * TILE_SIZE * level) / 900).toBeGreaterThanOrEqual(0.5);
+    expect((33 * TILE_SIZE * level) / 1440).toBeCloseTo(FIT_COVER, 5);
+  });
+
+  it('reste dans les bornes, et ne recule jamais sous le zoom par défaut', () => {
+    expect(fitZoom(3840, 2160, 33, 33)).toBe(ZOOM.max);
+    expect(fitZoom(390, 844, 33, 33)).toBe(ZOOM.default);
+    expect(fitZoom(1440, 900, 0, 0)).toBe(ZOOM.default);
+  });
+
+  it('mesure la boîte des cases connues autour du point', () => {
+    const disc = (tx: number, ty: number): boolean => (tx - 2) ** 2 + ty ** 2 <= 16 * 16;
+
+    expect(knownSpan(disc, 0, 0, 40)).toEqual({ width: 33, height: 33 });
+    expect(knownSpan(() => false, 0, 0, 10)).toEqual({ width: 0, height: 0 });
+  });
+
+  it("cadre tant que le joueur n'a pas zoomé, puis son choix l'emporte", () => {
+    const camera = still();
+
+    camera.fit(1.3);
+    expect(camera.level).toBeCloseTo(1.3);
+    expect(camera.zoom).toBeCloseTo(1.3);
+    expect(camera.levelChosen).toBe(false);
+    expect(camera.atHome).toBe(true);
+
+    camera.zoomTo(0.8);
+    expect(camera.levelChosen).toBe(true);
+    camera.fit(1.4);
+    expect(camera.level).toBeCloseTo(0.8);
+
+    // « Revenir sur Adam » ramène au cadrage.
+    camera.resetZoom();
+    expect(camera.level).toBeCloseTo(1.4);
+  });
+
+  it('un niveau mémorisé est un choix : le cadrage ne le touche pas', () => {
+    const camera = still();
+
+    camera.restoreLevel(0.7);
+    camera.fit(1.3);
+    expect(camera.level).toBeCloseTo(0.7);
   });
 });

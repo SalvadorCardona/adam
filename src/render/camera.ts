@@ -39,6 +39,12 @@
  * Ce décalage n'emmène jamais Adam hors de l'écran, et se résorbe quand il
  * marche. Le recul d'une vague est un zoom absolu : il ne s'applique que
  * s'il montre plus large que le niveau choisi.
+ *
+ * Tant que le joueur n'a pas choisi de niveau (ni zoom ni niveau mémorisé),
+ * la caméra **cadre** ce qu'il connaît (`fit`, `fitZoom`) : sur un grand
+ * écran, elle avance pour que la clairière explorée le remplisse plutôt
+ * qu'un disque au milieu de l'indigo. Ce niveau est aussi celui où « Revenir
+ * sur Adam » ramène. Au premier zoom du joueur, son choix l'emporte.
  */
 
 import { CHUNK_SIZE, TILE_SIZE, floorDiv } from '../core/grid.ts';
@@ -85,6 +91,16 @@ const PAN_RELAX_MS = 900;
 /** Adam marche au-delà de cette vitesse, en pixels monde par ms. */
 const WALKING = 0.01;
 
+/**
+ * Part de l'écran que la zone explorée doit couvrir quand la caméra la
+ * cadre : un peu moins que tout, pour qu'un liseré de brume dise qu'il reste
+ * à découvrir.
+ */
+export const FIT_COVER = 0.9;
+
+/** Autour d'Adam, en tuiles, la fenêtre où se mesure la zone explorée à cadrer. */
+export const FIT_REACH = 40;
+
 /** Le zoom `level` ramené dans les bornes. */
 export function clampZoom(level: number): number {
   return Math.min(ZOOM.max, Math.max(ZOOM.min, level));
@@ -100,6 +116,48 @@ export function stepZoom(level: number, direction: 1 | -1): number {
   const next = direction > 0 ? Math.floor(index + 1e-6) + 1 : Math.ceil(index - 1e-6) - 1;
 
   return clampZoom(ZOOM.step ** next);
+}
+
+/**
+ * Le niveau qui cadre une zone explorée de `spanWidth` × `spanHeight`
+ * tuiles sur un écran de `viewWidth` × `viewHeight` pixels : elle en couvre
+ * `FIT_COVER` sur le côté où elle est la plus courte. Jamais en deçà du zoom
+ * par défaut — un téléphone, déjà rempli, ne recule pas —, jamais au-delà de
+ * `ZOOM.max`.
+ */
+export function fitZoom(viewWidth: number, viewHeight: number, spanWidth: number, spanHeight: number): number {
+  if (spanWidth <= 0 || spanHeight <= 0) return ZOOM.default;
+
+  const cover = Math.max(viewWidth / (spanWidth * TILE_SIZE), viewHeight / (spanHeight * TILE_SIZE)) * FIT_COVER;
+
+  return clampZoom(Math.max(ZOOM.default, cover));
+}
+
+/**
+ * La boîte, en tuiles, des cases connues (`known`) à `reach` tuiles au plus
+ * de (tx, ty) : ce que la caméra cadre. Rien de connu : une boîte vide.
+ */
+export function knownSpan(
+  known: (tx: number, ty: number) => boolean,
+  tx: number,
+  ty: number,
+  reach: number,
+): { width: number; height: number } {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (let y = ty - reach; y <= ty + reach; y += 1) {
+    for (let x = tx - reach; x <= tx + reach; x += 1) {
+      if (!known(x, y)) continue;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  return minX > maxX ? { width: 0, height: 0 } : { width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
 /** Pendant un recul, part du chemin entre le joueur et le point à montrer que la caméra parcourt. */
@@ -158,6 +216,10 @@ export class Camera {
 
   /** Le niveau de zoom choisi par le joueur, vers lequel `zoom` glisse. */
   private levelTarget: number = ZOOM.default;
+  /** Le niveau de départ : le zoom par défaut, ou celui qui cadre la zone explorée (`fit`). */
+  private home: number = ZOOM.default;
+  /** Le joueur a-t-il choisi son niveau — un zoom, ou un niveau mémorisé ? Alors `fit` ne le touche plus. */
+  private chosen = false;
   /** Un zoom du joueur est en route : il glisse à son rythme, et ce n'est pas une dérive. */
   private levelEasing = false;
   /** Le point de l'écran, en pixels CSS, qui reste immobile pendant le zoom du joueur ; `null` : le centre. */
@@ -318,10 +380,15 @@ export class Camera {
     return this.levelTarget;
   }
 
-  /** La caméra est-elle au zoom par défaut, centrée sur Adam ? */
+  /** Le joueur a-t-il choisi son niveau ? Seul ce niveau-là se mémorise. */
+  public get levelChosen(): boolean {
+    return this.chosen;
+  }
+
+  /** La caméra est-elle à son niveau de départ, centrée sur Adam ? */
   public get atHome(): boolean {
     return (
-      Math.abs(this.levelTarget - ZOOM.default) < 1e-3 &&
+      Math.abs(this.levelTarget - this.home) < 1e-3 &&
       Math.hypot(this.panX, this.panY) < 1 &&
       !this.looking &&
       this.lookWeight === 0
@@ -335,6 +402,7 @@ export class Camera {
    * suit déjà le doigt).
    */
   public zoomTo(level: number, anchor: { x: number; y: number } | null = null, immediate = false): void {
+    this.chosen = true;
     this.levelTarget = clampZoom(level);
     this.anchor = anchor;
     this.panHome = false;
@@ -357,17 +425,31 @@ export class Camera {
     this.zoomTo(this.levelTarget * factor, anchor, immediate);
   }
 
-  /** Revient en glissant au zoom par défaut, centré sur Adam. */
+  /** Revient en glissant au niveau de départ, centré sur Adam. */
   public resetZoom(): void {
     this.looking = false;
-    this.zoomTo(ZOOM.default);
+    this.zoomTo(this.home);
     this.panHome = true;
   }
 
-  /** Reprend un niveau mémorisé, sans glisser : au chargement. */
+  /** Reprend un niveau mémorisé, sans glisser : au chargement. C'est un choix du joueur. */
   public restoreLevel(level: number): void {
+    this.chosen = true;
     this.levelTarget = clampZoom(level);
     this.zoom = this.goal();
+  }
+
+  /**
+   * Le niveau qui cadre la zone explorée (`fitZoom`) devient le niveau de
+   * départ ; tant que le joueur n'a pas choisi le sien, la caméra s'y pose,
+   * sans glisser.
+   */
+  public fit(level: number): void {
+    this.home = clampZoom(level);
+    if (this.chosen) return;
+    this.levelTarget = this.home;
+    this.zoom = this.goal();
+    this.clampPan();
   }
 
   /** Le zoom vers lequel glisser : le niveau du joueur, ou le recul s'il montre plus large. */

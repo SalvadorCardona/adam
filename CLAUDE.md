@@ -889,14 +889,18 @@ conquérir (repaire en point corail), voile les verrouillées, borde chaque
 région d'un liseré, et sa légende le rappelle. Partie de test `/test/regions`.
 
 **Brouillard de guerre** (`data/fog.ts`, `sim/fog.ts`, `render/fogLayer.ts`)
-— trois états par case, comme Age of Empires : inexplorée (indigo plein),
+— trois états par case, comme Age of Empires : inexplorée (brume indigo),
 explorée hors de vue (voile indigo, capture figée), visible. Sources de
 vision, en disques qui s'additionnent (`FOG_VISION`) : Adam (7), les
 habitants dehors (3), chaque bâtiment, chantier compris (3 depuis le bord de
 son emprise), la tour de guet finie (13). Calcul incrémental : un compteur
 par case, une source ne repeint que si elle change de tuile
 (`World.watchSight`, en fin de tick) ; le rendu est une texture d'un texel
-par tuile, adoucie et agrandie, refaite à chaque `FogOfWar.revision`. La
+par tuile, adoucie et agrandie, refaite à chaque `FogOfWar.revision`, que
+peint un shader (`render/fogShader.ts`) : l'inexploré en nappes de deux tons
+de l'indigo (`FOG_TINT.unexplored`, `cloud`) qui dérivent, au bord gonflé en
+nuages ; ce bruit (`fogClouds`) ne dépend que de la seed — rien de la carte
+ne fuit (`fogShader.test.ts`). La
 capture est en copie sur écriture : une ressource qui change hors de vue
 range son état d'avant (`ResourceIndex.watch`, `World.lookAt`) ; une base
 mutante sortie de la vue est copiée (`World.knownEnemyBases`) — jamais vue,
@@ -1200,7 +1204,12 @@ Les règles, en résumé :
   revenir sur Adam, reculer ; Pause, Réglages et la carte du monde au-dessus), à la molette sous le curseur et au pinch
   (`input/zoom.ts`, le geste à deux doigts de `PointerDispatch`, qui ne
   prend que des doigts libres ou de tap) ; mémorisé sous
-  `adam:zoom` (`storage/localZoom.ts`), jamais dans la partie.
+  `adam:zoom` (`storage/localZoom.ts`), jamais dans la partie. Tant que le
+  joueur n'a pas zoomé (rien sous `adam:zoom`), la caméra **cadre** la zone
+  explorée autour d'Adam (`fitZoom`, `knownSpan`, `Camera.fit`, à chaque
+  taille d'écran) : un grand écran avance jusqu'à ce qu'elle le remplisse,
+  un téléphone garde le zoom par défaut ; ce cadrage n'est pas mémorisé, et
+  « revenir sur Adam » y ramène.
   La **carte du monde** (`ui/worldMap.ts`) s'ouvre au bouton en tête de
   cette colonne ou à la touche M (Échap la ferme) : un canvas 2D plein
   écran, le fond peint par blocs de 16 × 16 tuiles en basse résolution
