@@ -10,6 +10,7 @@
 
 import type { BuildingId } from '../data/buildings.ts';
 import type { CompanionClassId } from '../data/companions.ts';
+import type { ToolSlot } from '../data/gear.ts';
 import type { ItemId } from '../data/items.ts';
 import type { PerkId } from '../data/perks.ts';
 import type { ResearchId } from '../data/research.ts';
@@ -119,6 +120,11 @@ export type Command =
    * si la forge est dans son rayon. Adam doit être à portée de la forge.
    */
   | { type: 'craftGear'; forge: EntityId }
+  /**
+   * Forge le niveau suivant de la hache ou de la pioche d'Adam (`TOOL_GEAR`),
+   * à la forge, comme l'arc : payé d'un coup, le sac d'abord, puis la ville.
+   */
+  | { type: 'craftTool'; forge: EntityId; slot: ToolSlot }
   /**
    * Change l'apparence d'Adam (`data/wardrobe.ts`) : le bouton « Valider »
    * de l'éditeur de personnage. Refusée si une pièce n'est pas encore

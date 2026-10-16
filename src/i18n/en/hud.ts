@@ -151,6 +151,7 @@ export const hud: Messages['hud'] = {
     companionTraining: (label: string, seconds: number): string => `${label} in training — ${seconds} s`,
     companionJoined: (label: string): string => `${label} joins Adam!`,
     companionDied: (label: string): string => `${label} has fallen — recruit another at the barracks`,
+    toolCrafted: (tool: string): string => `${tool} forged: each hit now yields one more unit`,
     gearCrafted: (gear: string, level: number): string => `${gear} forged: you can now damage level ${level} bases`,
     survivors: (count: number): string =>
       count > 1
@@ -297,6 +298,7 @@ export const hud: Messages['hud'] = {
     townTotal: (total: number): string => `Town — ${total} item${total === 1 ? '' : 's'} in stock`,
     inBag: (item: string, amount: number): string => `${item} — ${amount} in the bag`,
     inTown: (item: string, amount: number): string => `${item} — ${amount} in town`,
+    inTownPlenty: (item: string, amount: number): string => `${item} — ${amount} in town, plenty: Adam stops picking it up`,
     inTownUp: (item: string, amount: number): string => `${item} — ${amount} in town, rising`,
     inTownDown: (item: string, amount: number): string => `${item} — ${amount} in town, falling`,
     wanted: (item: string, amount: number): string => `${item} — Eve needs it, ${amount} in the bag`,

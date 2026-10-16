@@ -68,6 +68,8 @@ export type ResearchStat =
   | 'thirstResist'
   /** Part de bois en plus à chaque passage de récolte sur un arbre. */
   | 'woodYield'
+  /** Part de pierre, de fer et de charbon en plus à chaque passage de récolte sur un rocher. */
+  | 'oreYield'
   /** Ticks entre deux minerais d'une foreuse (négatif : elle va plus vite). */
   | 'drillTicks'
   /** Ticks entre deux cases nettoyées par une station de dépollution (négatif : elle va plus vite). */
@@ -101,6 +103,7 @@ export const RESEARCH_STATS = {
   hungerResist: { label: 'Faim en moins', unit: '', ticks: false, percent: true },
   thirstResist: { label: 'Soif en moins', unit: '', ticks: false, percent: true },
   woodYield: { label: 'Bois récolté en plus', unit: '', ticks: false, percent: true },
+  oreYield: { label: 'Minerai récolté en plus', unit: '', ticks: false, percent: true },
   drillTicks: { label: 'Temps d’extraction', unit: ' s', ticks: true, percent: false, buildings: ['drill', 'quarry'] },
   purifyTicks: { label: 'Temps par case dépolluée', unit: ' s', ticks: true, percent: false, buildings: ['purifier'] },
   farmYield: { label: 'Blé par récolte', unit: '', ticks: false, percent: false, buildings: ['farm'] },

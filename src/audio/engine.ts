@@ -185,7 +185,8 @@ export class AudioEngine {
     this.music?.setDucked(paused);
   }
 
-  public play(name: SoundName): void {
+  /** `pitch` : un facteur de vitesse de lecture (1 = la hauteur de l'échantillon) ; la synthèse de repli l'ignore. */
+  public play(name: SoundName, pitch = 1): void {
     if (!this.ctx || !this.sfx || this.mutedFlag || this.ctx.state !== 'running') return;
 
     const now = performance.now();
@@ -194,7 +195,7 @@ export class AudioEngine {
     if (now - last < DEDUPE_MS) return;
     this.lastPlayed.set(name, now);
 
-    this.emit(name, this.sfx);
+    this.emit(name, this.sfx, pitch);
   }
 
   /** Un habitant qu'on tape répond : sa voix coupe celle d'avant. */
@@ -208,23 +209,23 @@ export class AudioEngine {
   }
 
   /** L'échantillon du son vers `out`, ou sa synthèse s'il n'est pas décodé. */
-  private emit(name: SoundName, out: AudioNode): void {
+  private emit(name: SoundName, out: AudioNode, pitch = 1): void {
     if (!this.ctx) return;
 
     const sample = this.samples?.pick(name);
 
-    if (sample) this.playSample(sample, out);
+    if (sample) this.playSample(sample, out, pitch);
     else SOUNDS[name](this.ctx, out, this.ctx.currentTime);
   }
 
-  private playSample({ buffer, gain, rate }: PickedSample, out: AudioNode): void {
+  private playSample({ buffer, gain, rate }: PickedSample, out: AudioNode, pitch = 1): void {
     if (!this.ctx) return;
 
     const source = this.ctx.createBufferSource();
     const level = this.ctx.createGain();
 
     source.buffer = buffer;
-    source.playbackRate.value = rate;
+    source.playbackRate.value = rate * pitch;
     level.gain.value = gain;
     source.connect(level).connect(out);
     source.start(this.ctx.currentTime);

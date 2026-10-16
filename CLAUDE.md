@@ -15,7 +15,7 @@ mutants radioactifs** rôdent. La partie commence sur le chantier de la
 **mairie**, qu'Adam doit remplir de bois et de pierre.
 
 **Mécanique centrale** — Adam n'a pas de bouton d'action. Il récolte **de
-proximité** : toutes les 10 ticks, les arbres et rochers à portée (quatre au
+proximité** : toutes les 10 ticks, les arbres et rochers à portée (`HARVEST_REACH_TILES`, 1,75 tuile ; un cercle menthe discret se dessine au sol sous lui pendant qu'il récolte ; quatre au
 plus, du plus proche au plus loin) lâchent une unité (bois, fer, charbon,
 pierre), qu'il marche ou non. Il **heurte** le reste : un chantier heurté
 reçoit ce qu'il attend ; une foreuse ou une ferme heurtée vide son coffre
@@ -101,11 +101,12 @@ sorties et solde par minute (écart tick à tick du stock), mini-courbe
 `/test/trends`. Loin de
 la mairie, « Jeter » pose le sac au sol en tas (le mobile `pickup` du
 butin, avec `amount`), qu'Adam reprend après s'en être éloigné.
+**Outils d'Adam** (`TOOL_GEAR` de `data/gear.ts`, `Player.axe` / `Player.pickaxe`, sauvegardés, absents d'une ancienne sauvegarde : les mains nues) — hache et pioche en trois niveaux, forgées dans la fenêtre de la forge comme l'arc (`craftTool`, `ui/toolForge.ts`, payé sac puis ville). Chaque niveau : +1 unité par coup sur sa famille (arbres ; fer, charbon, pierre), lu dans l'unique `World.bonus` (`woodYield`, `oreYield`, via `toolBonus`). **Combo de récolte** (`ui/harvestCombo.ts`, du ressenti, pas de l'état) : récolter sans s'arrêter plus de 1,4 s fait monter la hauteur du son (`AudioEngine.play(name, pitch)`) et grossir le chiffre qui vole, qui porte « ×N » dès le rang 3.
 Tant que la mairie n'est pas debout, Adam ne récolte d'un objet que ce
 qu'on en attend (`World.wanted` : chantiers, recettes) plus une réserve
 (`SPARE_CARRY`) ; au-delà, il n'en prend plus (`harvestRefused`,
 signalé). Ensuite la ville prend tout, sauf ce dont elle a déjà assez
-(`TOWN_PLENTY`, `data/items.ts`) : cet objet-là, il n'en ramasse plus en
+(`TOWN_PLENTY`, 150, `data/items.ts`, et de quoi couvrir les besoins posés — chantiers, améliorations ouvertes, recherches en attente : `World.placedNeed` ; une petite coche dans le bandeau de la ville) : cet objet-là, il n'en ramasse plus en
 passant que pour un chantier ou une recette. Le conseil ne dit de livrer que si le sac contient ce qu'on attend.
 
 **Chemins** — décoratifs, jamais de l'état : une allée de terre battue

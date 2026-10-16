@@ -250,6 +250,7 @@ describe('parsePartnerCommand', () => {
       { type: 'catchUp', awayMs: 1e9 },
       { type: 'applyPerks', perks: [] },
       { type: 'craftGear', forge: 1 },
+      { type: 'craftTool', forge: 1, slot: 'axe' },
       { type: 'dressAdam', look: PARTNER_LOOK },
       { type: 'partnerLeave' },
       { type: 'asPartner', command: { type: 'setMoveAxis', x: 0, y: 0 } },

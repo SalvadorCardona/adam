@@ -66,6 +66,8 @@ export function createPlayer(x: number, y: number, age: number = AGES.adultMin):
     calmTicks: 0,
     xp: 0,
     gear: 0,
+    axe: 0,
+    pickaxe: 0,
     age,
     look: copyLook(DEFAULT_LOOK),
     wardrobe: [],

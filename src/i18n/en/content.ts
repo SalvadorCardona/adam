@@ -465,6 +465,10 @@ export const content: Content = {
     description: 'A camp of ruins and glowing puddles. While it stands, nobody builds or harvests in its zone.',
   },
   gear: ['Makeshift bow', 'Iron-bound bow', 'Composite bow', 'Radioactive bow'],
+  toolGear: {
+    axe: ['Stone axe', 'Iron axe', 'Steel axe'],
+    pickaxe: ['Stone pickaxe', 'Iron pickaxe', 'Steel pickaxe'],
+  },
   pieces: {
     hairShort: 'Rebel cowlick',
     hairBuzz: 'Buzz cut',
@@ -792,6 +796,7 @@ export const content: Content = {
     hungerResist: { label: 'Less hunger', unit: '' },
     thirstResist: { label: 'Less thirst', unit: '' },
     woodYield: { label: 'Extra wood harvested', unit: '' },
+    oreYield: { label: 'Extra ore harvested', unit: '' },
     drillTicks: { label: 'Mining time', unit: ' s' },
     purifyTicks: { label: 'Time per cleaned tile', unit: ' s' },
     farmYield: { label: 'Wheat per harvest', unit: '' },

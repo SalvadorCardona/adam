@@ -28,7 +28,7 @@ import { RARE_OFFERS, type RareOfferId } from '../data/caravan.ts';
 import { ENEMY_BASE_LEVELS, RAIDS, enemyBaseLevel } from '../data/enemyBases.ts';
 import { ENEMIES, WILDLIFE, type EnemyId, type WildlifeId } from '../data/enemies.ts';
 import { LAST_ERA } from '../data/eras.ts';
-import { MAX_GEAR } from '../data/gear.ts';
+import { MAX_GEAR, MAX_TOOL } from '../data/gear.ts';
 import { XP_SHARE, type Shooter } from '../data/levels.ts';
 import { HAPPINESS } from '../data/housing.ts';
 import { COLONY, SEXES, type Sex } from '../data/inhabitants.ts';
@@ -695,6 +695,9 @@ function parsePlayer(raw: unknown): SavedPlayer {
     xp: player['xp'] === undefined ? 0 : int(player['xp']),
     // Absent d'avant l'équipement : l'arc de fortune.
     gear: player['gear'] === undefined ? 0 : Math.min(MAX_GEAR, Math.max(0, int(player['gear']))),
+    // Absents d'avant les outils : les mains nues.
+    axe: player['axe'] === undefined ? 0 : Math.min(MAX_TOOL, Math.max(0, int(player['axe']))),
+    pickaxe: player['pickaxe'] === undefined ? 0 : Math.min(MAX_TOOL, Math.max(0, int(player['pickaxe']))),
     // Absentes d'avant la garde-robe : l'apparence par défaut, rien de trouvé.
     look: readLook(player['look'], wardrobe),
     wardrobe,

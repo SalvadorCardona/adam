@@ -85,6 +85,7 @@ import { locale, onLocale, t } from '../i18n/locale.ts';
 import { carriesWanted, harvestRefusedText, tutorialAdvice, type Advice } from './hint.ts';
 import { MAX_LEVEL } from '../data/levels.ts';
 import { levelProgress } from '../sim/levels.ts';
+import { COMBO_SHOWN, HarvestCombo } from './harvestCombo.ts';
 import { buildingIcon, dayDialUrl, itemAmount, itemIcon, prestigeIcon, uiIcon } from './icons.ts';
 import { effectLine } from './researchText.ts';
 import { moodMeter } from './moodMeter.ts';
@@ -315,6 +316,7 @@ export class Hud {
   public readonly inviteButton: HTMLButtonElement;
   private lastBag = '';
   private lastTown = '';
+  private readonly harvestCombo = new HarvestCombo();
   private lastQuest = '';
   /** Le détail des ouvriers, déplié d'un tap sur leur compteur. */
   private crewOpen = false;
@@ -666,7 +668,7 @@ export class Hud {
     world.mine('resourceHarvested', ({ item, amount }) => {
       if (item === 'wood') this.harvestedWood = true;
       if (item === 'stone') this.harvestedStone = true;
-      this.float(item, amount);
+      this.float(item, amount, this.harvestCombo.hit(performance.now()));
       this.flyToBag(item);
     });
     world.mine('siteDelivered', ({ item, amount, source }) => {
@@ -765,6 +767,10 @@ export class Hud {
     world.events.on('gearCrafted', ({ level, fromBag }) => {
       for (const [item, amount] of fromBag) this.float(item, -amount);
       this.notify(t().hud.toast.gearCrafted(t().gear[level] ?? '', level), 'good');
+    });
+    world.events.on('toolCrafted', ({ slot, level, fromBag }) => {
+      for (const [item, amount] of fromBag) this.float(item, -amount);
+      this.notify(t().hud.toast.toolCrafted(t().toolGear[slot][level - 1] ?? ''), 'good');
     });
     world.events.on('companionTraining', ({ role, endTick, fromBag }) => {
       for (const [item, amount] of fromBag) this.float(item, -amount);
@@ -1567,7 +1573,7 @@ export class Hud {
   }
 
   /** Une icône et un delta qui montent de la tête d'Adam et s'effacent. */
-  private float(item: ItemId, delta: number): void {
+  private float(item: ItemId, delta: number, streak = 0): void {
     const { player } = this.world;
     const { x, y } = this.project(player.x, player.y - 44);
     const floater = element('span', 'hud-float');
@@ -1576,6 +1582,12 @@ export class Hud {
     floater.style.left = `${Math.round(x + (Math.random() - 0.5) * 18)}px`;
     floater.style.top = `${Math.round(y)}px`;
     floater.append(`${delta > 0 ? '+' : '−'}${Math.abs(delta)}`, itemIcon(item, 18));
+    // Le combo de récolte : le chiffre grossit avec la série, qui s'écrit au bout.
+    if (streak >= COMBO_SHOWN) {
+      floater.dataset['combo'] = 'true';
+      floater.style.setProperty('--combo', String(Math.min(1.5, 1 + (streak - COMBO_SHOWN) * 0.05)));
+      floater.append(text('hud-float-combo', `×${streak}`));
+    }
     this.floats.append(floater);
     window.setTimeout(() => floater.remove(), FLOAT_MS);
   }
@@ -2209,7 +2221,7 @@ export class Hud {
     const stock = this.world.townStock();
     const entries = stock ? withVitals(stock.entries()) : [];
     const { flows } = this.world;
-    const key = stock ? entries.map(([item, amount]) => `${item}:${amount}:${flows.trend(item)}`).join(',') : 'none';
+    const key = stock ? entries.map(([item, amount]) => `${item}:${amount}:${flows.trend(item)}:${this.world.townHasPlenty(item)}`).join(',') : 'none';
 
     if (key === this.lastTown) return;
     this.lastTown = key;
@@ -2224,7 +2236,7 @@ export class Hud {
 
     const items = element('div', 'hud-stock-items');
 
-    items.append(...entries.map(([item, amount]) => townEntry(item, amount, flows.trend(item))));
+    items.append(...entries.map(([item, amount]) => townEntry(item, amount, flows.trend(item), this.world.townHasPlenty(item))));
     this.town.dataset['empty'] = String(entries.length === 0);
     this.resourcesButton.hidden = !stock;
     const scroll = this.townItems()?.scrollLeft ?? 0;
@@ -2533,20 +2545,28 @@ function withVitals(entries: [ItemId, number][]): [ItemId, number][] {
 }
 
 /** Un objet du bandeau de la ville : son icône, sa quantité, et sa flèche s'il monte ou baisse. */
-function townEntry(item: ItemId, amount: number, trend: Trend): HTMLElement {
+function townEntry(item: ItemId, amount: number, trend: Trend, plenty: boolean): HTMLElement {
   const label = t().hud.stock;
   const name = t().items[item];
   const entry = itemAmount(item, amount);
 
   if (amount === 0) entry.dataset['empty'] = 'true';
-  if (trend === 'flat') return tipped(entry, label.inTown(name, amount));
+  // La coche : la ville en a assez, Adam n'en ramasse plus en passant.
+  if (plenty) {
+    const tick = uiIcon('check', 12);
+
+    tick.classList.add('hud-plenty');
+    entry.append(tick);
+    entry.dataset['plenty'] = 'true';
+  }
+  if (trend === 'flat') return tipped(entry, plenty ? label.inTownPlenty(name, amount) : label.inTown(name, amount));
 
   const arrow = uiIcon(trend === 'up' ? 'trendUp' : 'trendDown', 12);
 
   arrow.classList.add('hud-trend');
   entry.dataset['trend'] = trend;
   entry.append(arrow);
-  return tipped(entry, trend === 'up' ? label.inTownUp(name, amount) : label.inTownDown(name, amount));
+  return tipped(entry, plenty ? label.inTownPlenty(name, amount) : trend === 'up' ? label.inTownUp(name, amount) : label.inTownDown(name, amount));
 }
 
 function tipped(node: HTMLElement, label: string): HTMLElement {
