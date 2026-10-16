@@ -396,7 +396,7 @@ du monde, un toast et la notification « Vague annoncée » (type `attack` des
 Notifications, `waveAnnounced`) si la fenêtre n'a pas le focus.
 L'effectif annoncé est exact : la production des bases se déroule d'avance
 (`projectedRaiders`). Pas de vague hors ligne : onglet caché, le jeu est en pause.
-Grâce des trois premières nuits (`WAVE_STRENGTH.earlyCaps`, `earlyCap`) : la réserve commune des bases est plafonnée à 2, 3, 4 assaillants, quel que soit le nombre de bases du premier anneau, et la prévision suit. Force (`WAVE_STRENGTH`) : la cadence des bases (le temps), plus des renforts
+Grâce des trois premières nuits (`WAVE_STRENGTH.earlyCaps`, `earlyCap`) : la réserve commune des bases est plafonnée à 2, 3, 4 assaillants, quel que soit le nombre de bases du premier anneau, et la prévision suit. Ces nuits-là, la mairie ne descend pas sous `WAVE_STRENGTH.graceHallFloor` de ses PV : elle sort abîmée, jamais à terre. Force (`WAVE_STRENGTH`) : la cadence des bases (le temps), plus des renforts
 de la base de tête — `perEra` par ère (`waveEraOf` : fin de l’acte I, Signal) et
 un par `buildingsPerRaider` bâtiments au-delà de `freeBuildings`, palissades
 exclues (`World.townSize`). Abattue toute avant l'aube, une vague paie sa

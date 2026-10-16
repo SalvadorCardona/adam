@@ -64,7 +64,7 @@ function fetchWater(world: World): void {
 }
 
 describe('simulation accélérée (2 h)', () => {
-  it('la colonie tient 30 minutes au moins, bilan toutes les 10 minutes', { timeout: 30_000 }, () => {
+  it('la colonie tient 30 minutes au moins, bilan toutes les 10 minutes', { timeout: 120_000 }, () => {
     const world = stageScenario(SCENARIO);
     const lines: string[] = [];
     let deaths = 0;

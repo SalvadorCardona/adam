@@ -66,6 +66,7 @@ import {
   LOOT_DROPS,
   QUEEN,
   WAVES,
+  WAVE_STRENGTH,
   WAVE_WARNING,
   WILDLIFE,
   WILDLIFE_SPAWN,
@@ -9618,11 +9619,19 @@ export class World {
 
     if (!entity || entity.kind === 'site') return;
 
-    entity.hp = Math.max(0, entity.hp - amount);
+    // Les nuits de grâce, la mairie plie sans tomber (`WAVE_STRENGTH.graceHallFloor`).
+    const floor = id === this.townHallId && this.graceNight() ? Math.ceil(buildingLevel(entity.proto, entity.level).hp * WAVE_STRENGTH.graceHallFloor) : 0;
+
+    entity.hp = Math.max(Math.min(floor, entity.hp), entity.hp - amount);
     this.events.emit('buildingDamaged', { id, hp: entity.hp });
 
     if (entity.hp === 0 && entity.kind === 'antenna' && entity.level > 1) this.dropFloor(entity);
     else if (entity.hp === 0) this.destroyBuilding(entity);
+  }
+
+  /** Une des premières nuits (`WAVE_STRENGTH.earlyCaps`) : la grâce d'une colonie neuve. */
+  private graceNight(): boolean {
+    return this.night >= 1 && this.night <= WAVE_STRENGTH.earlyCaps.length;
   }
 
   private destroyBuilding(building: Building): void {
