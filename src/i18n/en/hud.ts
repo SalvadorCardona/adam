@@ -219,6 +219,8 @@ export const hud: Messages['hud'] = {
     short: (day: number): string => `D${day}`,
   },
   /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
+  /** Au crépuscule d'une nuit d'étoiles filantes (`data/starfall.ts`). */
+  starfall: 'Eve: “Stars will fall tonight. The shards are worth a detour!”',
   daily: {
     title: 'Daily challenge',
     done: (label: string, prestige: number, streak: number): string =>

@@ -366,6 +366,14 @@ s'arrête), « Plus tard » les garde jusqu'à l'aube suivante. Une carte prise
 statistique de la recherche jusqu'au crépuscule (`World.activeBoon`, lu par
 `World.bonus` ; capsule menthe et son temps). Sauvegardés sous `boonOffer` et
 `boon`.
+**Étoiles filantes** (`data/starfall.ts`, `sim/starfall.ts`) — dès la nuit 2,
+une nuit sur trois environ (hachée de la seed, jamais le PRNG du monde), Ève
+l'annonce au crépuscule (`starfallAnnounced`) et des étoiles tombent toutes
+les 7 s autour de la mairie, à 5–15 tuiles, sur une case explorée où l'on
+marche : chacune laisse un éclat au sol (le `pickup` du butin, `star: true`,
+sauvegardé) — minerai, charbon, pierre, parfois une plaque — qui luit la nuit
+(lampe de `render/nightLayer.ts`) et éclaire le brouillard (`FOG_VISION.star`).
+Une raison de sortir, la vague abattue, plutôt que d'attendre l'aube.
 **Défi du jour** (`data/challenges.ts`, `sim/challenges.ts`) — chaque jour,
 de l'aube à l'aube, un petit but tiré de la seed (jamais deux fois de suite
 le même) : récolter, livrer, bâtir, abattre, explorer. Il se lit dans la

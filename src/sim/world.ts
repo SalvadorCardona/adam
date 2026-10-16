@@ -59,6 +59,8 @@ import { BOON_OFFER, BOONS, type BoonId } from '../data/boons.ts';
 import { boonBonus, drawBoons } from './boons.ts';
 import { CHALLENGE_STREAK, CHALLENGES, type ChallengeId, type ChallengeStat } from '../data/challenges.ts';
 import { drawChallenge, type DailyChallenge } from './challenges.ts';
+import { STARFALL } from '../data/starfall.ts';
+import { isStarNight, starDrop } from './starfall.ts';
 import {
   CHIEF,
   ENEMIES,
@@ -595,6 +597,10 @@ export type WorldEvents = {
    * `reward` est entré en ville ou dans le sac (`to`) ; le reste est tombé au sol en `lootDropped`.
    */
   dawnBroke: { night: number; reward: [ItemId, number][]; to: 'town' | 'bag' };
+  /** Au crépuscule : la nuit qui tombe sera une nuit d'étoiles filantes (`data/starfall.ts`). */
+  starfallAnnounced: { night: number };
+  /** Une étoile est tombée : son éclat attend au sol. */
+  starFell: { id: MobileId; item: ItemId; x: number; y: number };
   /** Le défi d'un nouveau jour (`data/challenges.ts`). */
   challengeStarted: { id: ChallengeId; day: number };
   /** Le défi du jour réussi : ce que sa récompense a versé. */
@@ -5441,6 +5447,36 @@ export class World {
     }
   }
 
+  /**
+   * L'étoile `index` de la nuit tombe : sur une case explorée où l'on marche,
+   * dans l'anneau autour de la mairie (huit essais), elle laisse un éclat au
+   * sol, ramassé comme un butin.
+   */
+  private dropStar(night: number, index: number): void {
+    const hall = this.warehouse();
+
+    if (!hall) return;
+
+    const center = { x: hall.tx + hall.width / 2, y: hall.ty + hall.height / 2 };
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const { dx, dy, loot } = starDrop(this.seed, night, index, attempt);
+      const tx = Math.floor(center.x + dx);
+      const ty = Math.floor(center.y + dy);
+
+      if (!isWalkable(terrainAt(this.seed, tx, ty)) || this.chunks.occupantAt(tx, ty) !== undefined || this.resources.isSolid(tx, ty)) continue;
+      if (this.sightAt(tx, ty) === 'unexplored') continue;
+
+      const x = (tx + 0.5) * TILE_SIZE;
+      const y = (ty + 0.5) * TILE_SIZE;
+      const pickup = this.spawnPickup(loot.item, loot.amount, x, y, false);
+
+      pickup.star = true;
+      this.events.emit('starFell', { id: pickup.id, item: loot.item, x, y });
+      return;
+    }
+  }
+
   /** La vague de la nuit est abattue toute : sa prime (`waveBounty`), en ville ou dans le sac, le surplus au sol. */
   private payBounty(): void {
     const night = this.night;
@@ -6969,10 +7005,22 @@ export class World {
 
     if (clock.elapsed === 0) {
       if (clock.phase === 'dusk') this.events.emit('duskFell', { night: clock.cycle });
+      // Au crépuscule, Ève voit venir la pluie d'étoiles de la nuit.
+      if (clock.phase === 'dusk' && isStarNight(this.seed, clock.cycle)) this.events.emit('starfallAnnounced', { night: clock.cycle });
       // La veille au soir, Ève prévient : la Reine sort demain.
       if (clock.phase === 'dusk' && queenWave(clock.cycle + 1) !== null) this.events.emit('queenAnnounced', { night: clock.cycle + 1 });
       if (clock.phase === 'night') this.night = clock.cycle;
       if (clock.phase === 'dawn') this.dawn();
+    }
+
+    // Une nuit d'étoiles filantes : un éclat tombe de temps en temps autour de la mairie.
+    if (
+      clock.phase === 'night' &&
+      clock.elapsed >= STARFALL.delayTicks &&
+      (clock.elapsed - STARFALL.delayTicks) % STARFALL.everyTicks === 0 &&
+      isStarNight(this.seed, clock.cycle)
+    ) {
+      this.dropStar(clock.cycle, (clock.elapsed - STARFALL.delayTicks) / STARFALL.everyTicks);
     }
 
     // Un jour sur deux, une caravane de troc, une fois le matin bien levé.
@@ -10186,6 +10234,8 @@ export class World {
       fog.source(entity.id * 2, tx, ty, (entity.kind === 'site' ? FOG_VISION.building : reach) + Math.max(entity.width, entity.height) / 2);
     }
     for (const mobile of this.mobiles.values()) {
+      // Un éclat d'étoile éclaire la nuit autour de lui, jusqu'à ce qu'on le ramasse.
+      if (mobile.kind === 'pickup' && mobile.star) fog.source(mobile.id * 2 + 1, floorDiv(mobile.x, TILE_SIZE), floorDiv(mobile.y, TILE_SIZE), FOG_VISION.star);
       if (!seesAround(mobile)) continue;
       fog.source(mobile.id * 2 + 1, floorDiv(mobile.x, TILE_SIZE), floorDiv(mobile.y, TILE_SIZE), FOG_VISION.people);
     }

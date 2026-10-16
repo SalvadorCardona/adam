@@ -858,6 +858,8 @@ export interface Pickup extends Moving {
   waitForLeave: boolean;
   /** Ticks avant qu'il ne disparaisse, oublié. */
   ttl: number;
+  /** Un éclat d'étoile filante (`data/starfall.ts`) : il éclaire la nuit autour de lui (`FOG_VISION.star`). */
+  star?: true;
 }
 
 /**

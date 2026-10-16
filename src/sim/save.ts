@@ -1148,6 +1148,7 @@ function parseMobile(raw: unknown, seed: number): Mobile {
         amount: mobile['amount'] === undefined ? 1 : int(mobile['amount']),
         waitForLeave: mobile['waitForLeave'] === undefined ? false : bool(mobile['waitForLeave']),
         ttl: int(mobile['ttl']),
+        ...(mobile['star'] === true && { star: true }),
       };
     case 'patient': {
       const state = mobile['state'];

@@ -272,6 +272,8 @@ export const hud = {
   /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
   /** Les faveurs de l'aube (`ui/boonPanel.ts`) et leur capsule à côté de l'horloge. */
   /** Le défi du jour, dans la quête, et son toast. */
+  /** Au crépuscule d'une nuit d'étoiles filantes (`data/starfall.ts`). */
+  starfall: 'Ève : « Ce soir, il va pleuvoir des étoiles. Les éclats valent le détour ! »',
   daily: {
     title: 'Défi du jour',
     done: (label: string, prestige: number, streak: number): string =>

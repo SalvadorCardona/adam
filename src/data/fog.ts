@@ -28,6 +28,8 @@ export const FOG_VISION = {
   people: 3,
   /** Un bâtiment du joueur, chantier compris, depuis le bord de son emprise. */
   building: 3,
+  /** Un éclat d'étoile filante tombé au sol (`data/starfall.ts`) : il brille. */
+  star: 2,
   /**
    * Les bâtiments qui voient plus loin. La tour de guet surveille ce que son
    * arc (8, puis 10 renforcée) ne touche pas encore : on voit venir la vague.

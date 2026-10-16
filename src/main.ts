@@ -755,6 +755,7 @@ async function main(): Promise<void> {
     boons.show();
     audio.play('open');
   };
+  world.events.on('starfallAnnounced', () => hud.notify(t().hud.starfall, 'good'));
   world.events.on('challengeCompleted', ({ id, prestige, streak }) => hud.notify(t().hud.daily.done(t().challenges[id], prestige, streak), 'good'));
   world.events.on('boonOffered', () => hud.notify(t().hud.boon.ready, 'good', { label: t().hud.boon.see, run: () => hud.onBoonOpen() }));
   hud.root.append(boons.root);
@@ -1222,6 +1223,7 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('labSupplied', () => audio.play('deliver'));
   world.events.on('researchCompleted', () => audio.play('eureka'));
   world.events.on('boonChosen', () => audio.play('eureka'));
+  world.events.on('starFell', () => audio.play('pickup'));
   world.events.on('challengeCompleted', () => audio.play('objective'));
   world.events.on('townDeposited', () => audio.play('deliver'));
   world.events.on('itemDropped', () => audio.play('pickup'));
@@ -1625,6 +1627,11 @@ function wireParticles(world: World, renderer: GameRenderer): void {
     particles.burst(x, y - 12, PARTICLES.mutant, 12, 0.12);
   });
   world.events.on('mutantFled', ({ x, y }) => particles.burst(x, y - 12, PARTICLES.mutant, 6, 0.1));
+  // Une étoile filante touche le sol : une gerbe dorée, et son anneau.
+  world.events.on('starFell', ({ x, y }) => {
+    particles.ring(x, y);
+    particles.burst(x, y - 6, PARTICLES.star, 16, 0.14);
+  });
   world.events.on('beastHit', ({ proto, x, y }) => {
     particles.ring(x, y - 8);
     particles.burst(x, y - 8, BEAST_PARTICLES[proto], 4);

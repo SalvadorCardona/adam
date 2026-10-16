@@ -49,6 +49,9 @@ const LIGHT_RINGS = 3;
 /** Rayon, en pixels de texture, d'une lumière bakée : assez pour garder ses anneaux nets. */
 const LIGHT_PIXELS = 32;
 
+/** La lueur d'un éclat d'étoile filante, en tuiles. */
+const STAR_GLOW_TILES = 1.4;
+
 /** Le halo d'un mutant est centré sur son corps, pas sur ses pieds. */
 const HALO_RISE = 12;
 
@@ -131,6 +134,12 @@ export class NightLayer {
         ((entity.ty + entity.height / 2) * TILE_SIZE - top) / TEXEL,
         radius / TEXEL,
       );
+    }
+
+    // Un éclat d'étoile filante tombé au sol : une petite lampe jaune, jusqu'à ce qu'on le ramasse.
+    for (const mobile of this.world.mobiles.values()) {
+      if (mobile.kind !== 'pickup' || !mobile.star) continue;
+      place(this.lamps, this.lampTexture, lamps++, (mobile.x - left) / TEXEL, (mobile.y - top) / TEXEL, (STAR_GLOW_TILES * TILE_SIZE) / TEXEL);
     }
 
     let halos = 0;
