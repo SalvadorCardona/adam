@@ -437,6 +437,14 @@ export const UI_ICONS = {
     line(12, 13, 15.5, 9.5, ink.base),
     circle(12, 13, 1.8, ink.base),
   ),
+  /** Un disque mi-blanc mi-indigo : le contraste élevé. */
+  contrast: svg(
+    S,
+    S,
+    circle(12, 12, 9.5, ink.base),
+    circle(12, 12, 7, paper.base),
+    pill(12, 5, 7, 14, ink.base),
+  ),
   /** Une cloche : le corps jaune, le battant corail — l'autorisation de notifier. */
   bell: svg(
     S,

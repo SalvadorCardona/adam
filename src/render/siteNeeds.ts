@@ -94,7 +94,8 @@ export class SiteNeeds {
 
       cell.icon.alpha = line.done ? DONE_ALPHA : 1;
       cell.count.visible = !line.done;
-      cell.count.text = `${line.delivered}/${line.needed}`;
+      // À sec : un point d’exclamation devant le compte, pour qu’un daltonien ne dépende pas du corail.
+      cell.count.text = `${line.dry ? '!' : ''}${line.delivered}/${line.needed}`;
       cell.count.style.fill = line.dry ? ALERT : INK;
 
       cell.badge.clear();

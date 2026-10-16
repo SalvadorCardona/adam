@@ -48,6 +48,7 @@
  */
 
 import { CHUNK_SIZE, TILE_SIZE, floorDiv } from '../core/grid.ts';
+import { reducedMotion } from './motion.ts';
 
 /** Constante de temps du rattrapage, en ms : ~95 % du chemin en trois fois cette durée. */
 const FOLLOW_MS = 90;
@@ -483,6 +484,8 @@ export class Camera {
 
   /** Ajoute du trauma : 0.2 pour un coup, 0.6 pour un effondrement. */
   public shake(amount: number): void {
+    // Les secousses sont coupées sous `prefers-reduced-motion`.
+    if (reducedMotion()) return;
     this.trauma = Math.min(1, this.trauma + amount);
   }
 

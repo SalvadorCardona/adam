@@ -60,7 +60,9 @@ import { LocalGamepad, type GamepadPrefs } from './storage/localGamepad.ts';
 import { LocalHaptics } from './storage/localHaptics.ts';
 import { LocalNotifications } from './storage/localNotifications.ts';
 import { LocalPerf } from './storage/localPerf.ts';
+import { LocalContrast } from './storage/localContrast.ts';
 import { LocalSigns } from './storage/localSigns.ts';
+import { LocalUiScale, nextUiScale } from './storage/localUiScale.ts';
 import { LocalZoom } from './storage/localZoom.ts';
 import { TILE_SIZE } from './core/grid.ts';
 import { nextWave } from './sim/dayNight.ts';
@@ -591,6 +593,24 @@ async function main(): Promise<void> {
     settings.setSigns(on);
   };
 
+  // La taille de l'interface et le contraste élevé : des variables CSS racine, appliquées à chaud.
+  const uiScalePrefs = scenario ? new LocalUiScale(null) : LocalUiScale.browser();
+  let uiScale = uiScalePrefs.load();
+  const showUiScale = (scale: typeof uiScale): void => {
+    uiScale = scale;
+    uiScalePrefs.save(scale);
+    document.documentElement.style.setProperty('--ui-scale', String(scale / 100));
+    settings.setUiScale(scale);
+  };
+  const contrastPrefs = scenario ? new LocalContrast(null) : LocalContrast.browser();
+  let contrastOn = contrastPrefs.load();
+  const showContrast = (on: boolean): void => {
+    contrastOn = on;
+    contrastPrefs.save(on);
+    document.documentElement.dataset['contrast'] = on ? 'high' : 'normal';
+    settings.setContrast(on);
+  };
+
   // Le compteur de performances : même principe, caché tant qu'on ne l'a pas demandé.
   const perfPrefs = scenario ? new LocalPerf(null) : LocalPerf.browser();
   const perfSampler = new PerfSampler();
@@ -615,6 +635,8 @@ async function main(): Promise<void> {
     toggleSound: () => settings.setSound(!audio.toggleMuted()),
     toggleMusic: () => settings.setMusic(audio.toggleMusic()),
     toggleSigns: () => showSigns(!signsOn),
+    cycleUiScale: () => showUiScale(nextUiScale(uiScale)),
+    toggleContrast: () => showContrast(!contrastOn),
     togglePerf: () => showPerf(!perfOn),
     toggleHaptics: () => showHaptics(!haptics.enabled),
     toggleNotification: (kind) => {
@@ -639,6 +661,8 @@ async function main(): Promise<void> {
 
   renderer.setSigns(signsOn);
   settings.setSigns(signsOn);
+  showUiScale(uiScale);
+  showContrast(contrastOn);
   hud.setPerf(perfOn);
   settings.setPerf(perfOn);
 
