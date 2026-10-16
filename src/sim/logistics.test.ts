@@ -103,7 +103,11 @@ function colony(hall: Stock, placements: Placement[]): World {
   state.entities = entities;
   state.nextId = nextId;
   state.mobiles = [];
-  return World.restore(state);
+  const restored = World.restore(state);
+
+  // Bilans exacts des stocks : les libres ne glanent pas.
+  restored.gleaning = false;
+  return restored;
 }
 
 function hallOf(world: World): TownHall {
@@ -406,6 +410,8 @@ describe('poste de logistique', () => {
 
     const copy = reloaded.world;
 
+    copy.gleaning = false;
+
     expect(logisticians(copy)).toHaveLength(4);
     expectCoveredPromises(copy);
     expect(census(copy)).toEqual(census(world));
@@ -611,6 +617,7 @@ describe('la nurserie, destination de livraison', () => {
     if (!old.ok) throw new Error(`vieille sauvegarde refusée : ${old.reason}`);
 
     run(world, 1200);
+    reloaded.world.gleaning = false;
     run(reloaded.world, 1200, every5(() => expectCoveredPromises(reloaded.world)));
     run(old.world, 1200);
     expect(reloaded.world.snapshot()).toEqual(world.snapshot());

@@ -176,6 +176,8 @@ function colony(layout: Layout): World {
 
   // Pas un arbre à sa portée : il ne récolte rien en restant là.
   for (let y = -6; y <= 6; y += 1) for (let x = -6; x <= 6; x += 1) restored.resources.clear(Math.floor(restored.player.x / TILE_SIZE) + x, Math.floor(restored.player.y / TILE_SIZE) + y);
+  // Bilans exacts des stocks : les libres ne glanent pas.
+  restored.gleaning = false;
   return restored;
 }
 
@@ -474,6 +476,7 @@ describe('porteurs', () => {
 
     const copy = reloaded.world;
 
+    copy.gleaning = false;
     expectCoveredPromises(copy);
     expect(census(copy)).toEqual(census(world));
 

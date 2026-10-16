@@ -329,6 +329,9 @@ describe('vagues', () => {
     const { inventory } = world.player;
     const town = world.townStock()!;
     const before = town.count('wood');
+
+    // Le bois de la ville ne doit venir que de l'aube : les libres ne glanent pas.
+    world.gleaning = false;
     let dawn: { reward: [ItemId, number][]; to: string } | null = null;
 
     sturdy(world);

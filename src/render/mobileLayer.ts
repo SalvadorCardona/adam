@@ -483,7 +483,7 @@ export class MobileLayer {
 
           if (mobile.kind === 'worker') {
             view.root.visible = !mobile.inside;
-            puppet.carry(mobile.job?.carried ? mobile.job.item : null);
+            puppet.carry(mobile.job?.carried ? mobile.job.item : (mobile.glean?.item ?? null));
             this.loiter(view, mobile, deltaMs);
           }
           if (mobile.kind === 'kid' || mobile.kind === 'worker') this.starve(view, mobile);

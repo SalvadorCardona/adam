@@ -558,6 +558,8 @@ function withPorters(): { world: World; lab: Lab } {
 
   const world = World.restore(state);
 
+  // Les libres ne glanent pas : le coût du labo ne vient que des porteurs et de la ville.
+  world.gleaning = false;
   // Adam s'éloigne : ce sont les porteurs qu'on regarde.
   world.player.x -= 12 * TILE_SIZE;
   return { world, lab: labOf(world) };

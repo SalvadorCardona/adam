@@ -8,6 +8,8 @@
  * et la distance à parcourir.
  */
 
+import type { ResourceId } from './resources.ts';
+
 export const PORTERS = {
   /** Vitesse de marche, en tuiles par seconde — plus lent qu'Adam (4,5). */
   speed: 2.4,
@@ -28,6 +30,23 @@ export const VOLUNTEERS = {
   /** Objets portés en un voyage : moins qu'un porteur, il n'a pas de hotte. */
   carry: 3,
 } as const;
+
+/**
+ * Les **glaneurs** : faute de mieux à porter, un ouvrier libre va ramasser à
+ * la main une unité de bois ou de pierre dans le rayon de la mairie et la lui
+ * rapporte — de quoi faire vivre la colonie avant la première cabane, sans
+ * jamais valoir un bûcheron. Il ne glane que ce qu'on attend (chantiers,
+ * labos, recettes) plus la réserve de sac : pas de stock à l'infini. Jamais de
+ * fer ni de charbon, que les foreuses gardent. Le jour seulement.
+ */
+export const GLEANERS = {
+  /** Glaneurs au travail en même temps : les autres libres flânent. */
+  max: 5,
+  /** Ticks à ramasser l'unité sur place : trois secondes, marche en plus, ~8 s par unité. */
+  pickTicks: 60,
+  /** Ressources qu'on ramasse à mains nues. */
+  resources: ['tree', 'stoneRock'],
+} as const satisfies { resources: readonly ResourceId[] } & Record<string, unknown>;
 
 /**
  * Un ex-mutant, sorti guéri de la clinique, porte comme un ouvrier — mais

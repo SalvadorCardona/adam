@@ -87,7 +87,12 @@ function colony(hall: Stock, placements: Placement[]): World {
   state.mobiles = [];
   // Ni bases ni gardiens : Adam, à l'écart, pourrait en croiser, et son arc mêlerait leur butin au compte.
   state.enemyBases = [];
-  return World.restore(state);
+
+  const restored = World.restore(state);
+
+  // Bilans exacts des stocks : les libres ne glanent pas.
+  restored.gleaning = false;
+  return restored;
 }
 
 function hallOf(world: World): TownHall {
@@ -558,6 +563,8 @@ describe('poste de construction', () => {
     if (!reloaded.ok) throw new Error(`sauvegarde refusée : ${reloaded.reason}`);
 
     const copy = reloaded.world;
+
+    copy.gleaning = false;
     const sites = sitesOf(world);
 
     expect(builders(copy)).toHaveLength(4);

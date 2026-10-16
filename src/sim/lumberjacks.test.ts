@@ -140,7 +140,11 @@ function colony(layout: Layout = {}): World {
   state.entities = entities;
   state.nextId = nextId;
   state.mobiles = [];
-  return World.restore(state);
+  const restored = World.restore(state);
+
+  // Bilans exacts du bois : les libres ne glanent pas.
+  restored.gleaning = false;
+  return restored;
 }
 
 function campOf(world: World): LumberCamp {
@@ -441,6 +445,8 @@ describe('bûcherons', () => {
     if (!reloaded.ok) throw new Error(`sauvegarde refusée : ${reloaded.reason}`);
 
     const copy = reloaded.world;
+
+    copy.gleaning = false;
 
     expect(woodCensus(copy)).toBe(woodCensus(world));
     expect(campOf(copy).store.freeSpace()).toBe(campOf(world).store.freeSpace());

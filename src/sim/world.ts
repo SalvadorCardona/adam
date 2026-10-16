@@ -116,7 +116,7 @@ import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../d
 import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
-import { BUILDERS, FARMERS, FORESTERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
+import { BUILDERS, FARMERS, FORESTERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherId } from '../data/weather.ts';
 import { ChunkIndex } from './chunk.ts';
 import { floorCost, floorMissing, floorNeeds, floorWants } from './antenna.ts';
@@ -214,6 +214,7 @@ import { transferAllPlan, transferAmount, type TransferDirection, type TransferQ
 import { footingAt, type Footing } from './footing.ts';
 import { doorSide, findSpawn, habitatAt, isBuildable, isWalkable, oreAt, terrainAt, touchesWater } from './terrain.ts';
 import { inLogisticRange, pointInLogisticRange } from './warehouse.ts';
+import { gleanNodes } from './gleaners.ts';
 import { chopSpot, isTree, pickTree, treesInRange } from './lumberjacks.ts';
 import { plantSpot, plotTiles, type PlotTile } from './forester.ts';
 import { fieldTiles, type FieldState, type FieldTile } from './farmer.ts';
@@ -249,6 +250,7 @@ import type {
   Kid,
   Lab,
   LumberCamp,
+  Gleaning,
   Lumberjack,
   Mobile,
   MobileId,
@@ -1067,6 +1069,13 @@ export class World {
 
   /** Les réservations des porteurs. Pas de l'état : elles se relisent dans leurs jobs. */
   private readonly jobs = new JobBoard();
+
+  /**
+   * Les ouvriers libres glanent-ils ? Toujours, en jeu : les tests de bilan
+   * exact (un stock au bois près) le coupent pour ne pas compter leurs prises.
+   * Pas de l'état.
+   */
+  public gleaning = true;
 
   /** Les arbres qu'un bûcheron vise : aucun autre ne les voit. Pas sauvegardé — rejoué depuis les bûcherons. */
   private readonly claimedTrees = new Set<string>();
@@ -4604,7 +4613,7 @@ export class World {
     if (mobile.kind === 'kid') return { kind: 'child', days: yearsToWork(mobile.age) };
     if (mobile.inside) return { kind: 'home' };
     if (mobile.sleepingOut) return { kind: 'outside' };
-    if (this.isIdle(mobile) || (mobile.kind === 'worker' && mobile.free && !mobile.job)) return { kind: 'idle' };
+    if (this.isIdle(mobile) || (mobile.kind === 'worker' && mobile.free && !mobile.job && !mobile.glean)) return { kind: 'idle' };
 
     const place =
       mobile.kind === 'worker'
@@ -4617,7 +4626,7 @@ export class World {
 
   /** Tient le compte de qui glande depuis quand : rien de tout ça n'est sauvegardé. */
   private noteIdle(mobile: Laborer): void {
-    const busy = mobile.meal !== null || (mobile.kind === 'worker' ? mobile.job !== null || mobile.build !== null : mobile.state !== 'idle');
+    const busy = mobile.meal !== null || (mobile.kind === 'worker' ? mobile.job !== null || mobile.build !== null || !!mobile.glean : mobile.state !== 'idle');
 
     if (busy || mobile.inside || mobile.sleepingOut || !this.mobiles.has(mobile.id) || !this.entities.has(mobile.homeId)) {
       this.idleSince.delete(mobile.id);
@@ -8155,6 +8164,8 @@ export class World {
     const homeDoor = home ? doorOf(home) : null;
 
     if (alarm && homeDoor) {
+      // Il n'avait encore rien ramassé : la ressource est lâchée, il la reprendra après la vague s'il en reste besoin.
+      if (worker.glean && !worker.glean.item) worker.glean = null;
       this.goHome(worker, homeDoor);
       return;
     }
@@ -8171,7 +8182,14 @@ export class World {
           worker.searchTicks = PORTERS.retryTicks;
           worker.job = this.jobs.assign(this.entities, this.townHallId, worker, homeDoor, this.lineIsClear, VOLUNTEERS.carry, VOLUNTEER_CREW);
           if (worker.job) worker.inside = false;
+          else if (!bedtime) this.startGlean(worker, homeDoor);
         }
+      }
+      // La nuit tombe : il ne repart plus, mais rapporte ce qu'il a déjà ramassé.
+      if (worker.glean && bedtime && !worker.glean.item) worker.glean = null;
+      if (!worker.job && worker.glean) {
+        this.stepGlean(worker, homeDoor);
+        return;
       }
       if (!worker.job) {
         this.idle(worker, homeDoor, bedtime);
@@ -8382,6 +8400,7 @@ export class World {
     }
     // Il donnait un coup de main : le poste passe avant, sa charge retourne à la mairie.
     if (best?.job) this.dropVolunteerJob(best, best.job);
+    if (best?.glean) this.dropGlean(best, best.glean);
     return best;
   }
 
@@ -8398,6 +8417,147 @@ export class World {
     }
     this.jobs.releaseIn(this.entities, job);
     this.townStock()?.add(job.item, job.amount);
+  }
+
+  /** Un libre embauché en glanant : la ressource est lâchée, ce qu'il portait retourne à la mairie. */
+  private dropGlean(worker: Worker, glean: Gleaning): void {
+    worker.glean = null;
+    if (glean.item) this.townStock()?.add(glean.item, 1);
+  }
+
+  /**
+   * Les tuiles que plus personne ne doit viser : les arbres réservés des
+   * bûcherons et les ressources des glaneurs. Relues sur les glaneurs à
+   * chaque recherche — rien à rejouer au chargement, rien qui fuie.
+   */
+  private claimedNodes(): Set<string> {
+    const claimed = new Set(this.claimedTrees);
+
+    for (const worker of this.workers()) {
+      if (worker.glean && !worker.glean.item) claimed.add(coordKey(worker.glean.tx, worker.glean.ty));
+    }
+    return claimed;
+  }
+
+  /**
+   * Ce que la ville gagnerait à recevoir de cet objet : ce qu'attendent
+   * chantiers, labos et recettes, plus la réserve (`SPARE_CARRY`), moins ce
+   * qu'elle a déjà et ce que les glaneurs en route lui rapportent. Zéro ou
+   * moins : rien n'attend l'objet, on ne le glane plus.
+   */
+  private gleanDeficit(item: ItemId): number {
+    const town = this.townStock();
+
+    if (!town) return 0;
+
+    let wanted = this.awaited(item) + SPARE_CARRY;
+    let carried = 0;
+
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'lab') wanted += labNeeds(entity, item);
+    }
+    for (const worker of this.workers()) {
+      if (worker.glean && RESOURCES[worker.glean.resource].item === item) carried += 1;
+    }
+    return wanted - town.available(item) - carried;
+  }
+
+  /**
+   * Un libre sans rien à porter, le jour, va glaner : la ressource de bois
+   * ou de pierre la plus proche de la mairie, dans son rayon, que personne
+   * n'a réservée, que la ville attend, et qu'il atteint en ligne droite. Au
+   * plus `GLEANERS.max` glaneurs à la fois.
+   */
+  private startGlean(worker: Worker, door: { x: number; y: number }): void {
+    const hall = this.entities.get(this.townHallId);
+
+    if (!this.gleaning || !hall || !this.townStock()) return;
+
+    let busy = 0;
+
+    for (const other of this.workers()) {
+      if (other.glean) busy += 1;
+    }
+    if (busy >= GLEANERS.max) return;
+
+    // Rien n'attend ni le bois ni la pierre : pas la peine de parcourir le rayon.
+    const open = new Map<ItemId, boolean>();
+
+    for (const id of GLEANERS.resources) {
+      const { item } = RESOURCES[id];
+
+      open.set(item, this.gleanDeficit(item) > 0);
+    }
+    if (![...open.values()].some(Boolean)) return;
+
+    const claimed = this.claimedNodes();
+
+    for (const node of gleanNodes(hall, door, this.resources, this.harvestable)) {
+      if (claimed.has(coordKey(node.tx, node.ty)) || !open.get(RESOURCES[node.resource].item)) continue;
+
+      const spot = chopSpot(node);
+
+      if (!this.lineIsClear(worker.x, worker.y, spot.x, spot.y)) continue;
+      worker.glean = { state: 'go', tx: node.tx, ty: node.ty, resource: node.resource, ticks: GLEANERS.pickTicks, item: null };
+      worker.inside = false;
+      return;
+    }
+  }
+
+  /** Un tick de glane : marcher jusqu'à la ressource, la ramasser, rapporter l'unité à la mairie. */
+  private stepGlean(worker: Worker, door: { x: number; y: number }): void {
+    const glean = worker.glean!;
+
+    worker.inside = false;
+
+    switch (glean.state) {
+      case 'go': {
+        // Adam l'a prise avant lui, ou un bûcheron : il repart en chercher une autre.
+        if (this.resources.at(glean.tx, glean.ty)?.id !== glean.resource) {
+          worker.glean = null;
+          worker.searchTicks = 0;
+          standStill(worker);
+          break;
+        }
+
+        const spot = chopSpot(glean);
+
+        if (walkToward(worker, spot.x, spot.y, this.walkStep())) {
+          glean.state = 'pick';
+          glean.ticks = GLEANERS.pickTicks;
+          worker.facing = 'right';
+        }
+        break;
+      }
+
+      case 'pick':
+        standStill(worker);
+        // Affamé, il ne ramasse qu'un tick sur deux.
+        glean.ticks -= this.toil(worker.needs);
+        if (glean.ticks <= 0) this.pickGlean(worker, glean);
+        break;
+
+      case 'back':
+        if (!walkToward(worker, door.x, door.y, this.walkStep())) break;
+        this.townStock()?.add(glean.item!, 1);
+        worker.glean = null;
+        worker.searchTicks = 0;
+        break;
+    }
+  }
+
+  /** Une unité arrachée à la ressource, à mains nues : la même prise qu'un coup de hache. */
+  private pickGlean(worker: Worker, glean: Gleaning): void {
+    const taken = this.resources.take(glean.tx, glean.ty);
+
+    if (!taken || taken.resource.id !== glean.resource) {
+      worker.glean = null;
+      worker.searchTicks = 0;
+      return;
+    }
+    if (taken.stageChanged) this.dirtyTile(glean.tx, glean.ty);
+    glean.item = RESOURCES[taken.resource.id].item;
+    glean.state = 'back';
   }
 
   private goHome(worker: Laborer, door: { x: number; y: number }): void {
@@ -8894,7 +9054,7 @@ export class World {
       return;
     }
 
-    const tree = pickTree(camp, door, this.resources, this.claimedTrees, this.lineIsClear, this.harvestable);
+    const tree = pickTree(camp, door, this.resources, this.claimedNodes(), this.lineIsClear, this.harvestable);
 
     if (!tree) {
       camp.store.releaseIn('wood', LUMBERJACKS.carry);
@@ -10392,7 +10552,7 @@ function saveEntity(entity: Entity): SavedEntity {
 
 /** Un mobile copié : un ouvrier emporte son job, qui ne doit pas être partagé entre deux mondes. */
 function copyMobile(mobile: Mobile): Mobile {
-  if (mobile.kind === 'worker') return { ...mobile, needs: { ...mobile.needs }, job: mobile.job && { ...mobile.job } };
+  if (mobile.kind === 'worker') return { ...mobile, needs: { ...mobile.needs }, job: mobile.job && { ...mobile.job }, ...(mobile.glean !== undefined && { glean: mobile.glean && { ...mobile.glean } }) };
   if (mobile.kind === 'lumberjack') return { ...mobile, needs: { ...mobile.needs }, tree: mobile.tree && { ...mobile.tree } };
   if (mobile.kind === 'forester') return { ...mobile, needs: { ...mobile.needs }, plot: mobile.plot && { ...mobile.plot } };
   if (mobile.kind === 'farmer') return { ...mobile, needs: { ...mobile.needs }, plot: mobile.plot && { ...mobile.plot } };
