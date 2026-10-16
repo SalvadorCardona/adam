@@ -1134,7 +1134,7 @@ pas décodé, le son retombe sur sa synthèse Web Audio (`synth.ts`). La
 musique de fond, ce sont trois boucles (`public/audio/music/`, crédits dans
 son `CREDITS.md` ; Ogg Vorbis puis repli `.m4a` pour Safari ;
 `audio/music.ts`) : le thème du jour, préchargé sans retarder l'écran titre ;
-la nuit calme et le combat, composés par `npm run music:night`
+la nuit calme et le combat, orchestraux, composés par `npm run music:night`
 (`tools/music.ts`, même tempo et même longueur, le combat calé sur la nuit),
 téléchargés à la première nuit seulement. `musicState` (`audio/nightMood.ts`)
 tire le morceau des moments de la nuit — crépuscule → nuit, vague → combat,

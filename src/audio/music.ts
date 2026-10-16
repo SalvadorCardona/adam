@@ -2,9 +2,11 @@
  * Musique de fond : trois boucles servies depuis `public/audio/music/`.
  *
  * - le jour, le thème orchestral mélancolique (violoncelle, harpe, cordes) ;
- * - la nuit calme, dès le crépuscule : nappe, kalimba, cœur sourd ;
- * - le combat, tant que des mutants sont dehors : la même nuit, batterie,
- *   basse en croches et ostinato en plus.
+ * - la nuit calme, dès le crépuscule : cordes en sourdine, violoncelle seul,
+ *   harpe, dans la relative mineure du thème du jour ;
+ * - le combat, tant que des mutants sont dehors : la même nuit jouée par
+ *   l'orchestre entier — ostinato des violoncelles et contrebasses, cordes
+ *   en trémolo, timbales, cuivres graves, la même harpe.
  *
  * Nuit et combat sont composés ensemble (`src/tools/music.ts`) : même tempo,
  * même grille, même longueur. Le combat part calé sur la position de la
@@ -49,15 +51,16 @@ const AAC = 'audio/mp4; codecs="mp4a.40.2"';
  * Vorbis décodé compte quelques échantillons de plus, et un décodeur AAC
  * peut ajouter son rembourrage — boucler sur la longueur du buffer ferait
  * entendre ce petit trou à chaque tour. Le thème du jour fait 4 811 751
- * échantillons à 44,1 kHz, nuit et combat 2 116 800 (48 s à 80 BPM).
+ * échantillons à 44,1 kHz, nuit et combat 2 565 818 (16 mesures à 66 BPM).
  *
  * Les niveaux égalisent les morceaux à l'oreille, sous les bruitages : le
- * thème du jour est mixé plus fort que les deux autres.
+ * thème du jour (−11,3 LUFS) est mixé plus fort que la nuit (−17,3) et le
+ * combat (−15,6) ; une fois baissés, les trois tournent autour de −17 LUFS.
  */
 const SONGS: Record<MusicState, { readonly file: string; readonly loopEndS: number; readonly level: number }> = {
   day: { file: 'adam-melancolique-loop', loopEndS: 4_811_751 / 44_100, level: MUSIC_DAY.volume },
-  night: { file: 'adam-night-loop', loopEndS: 2_116_800 / 44_100, level: 0.7 },
-  combat: { file: 'adam-combat-loop', loopEndS: 2_116_800 / 44_100, level: 0.75 },
+  night: { file: 'adam-night-loop', loopEndS: 2_565_818 / 44_100, level: 1 },
+  combat: { file: 'adam-combat-loop', loopEndS: 2_565_818 / 44_100, level: 0.85 },
 };
 
 const MUSIC_STATES = ['day', 'night', 'combat'] as const satisfies readonly MusicState[];
