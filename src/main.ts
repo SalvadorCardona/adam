@@ -701,7 +701,7 @@ async function main(): Promise<void> {
   // Jouer à deux : chacun voit l'autre arriver et partir.
   world.events.on('partnerJoined', ({ name }) => hud.notify(t().party.play.partnerJoined(name), 'good'));
   world.events.on('partnerLeft', ({ name }) => hud.notify(t().party.play.partnerLeft(name), 'bad'));
-  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest ? null : () => invitePanel.show(), () => voicePanel.toggleMembership());
+  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest || !connection.enabled ? null : () => invitePanel.show(), () => voicePanel.toggleMembership());
   // Chez l'ami, l'hôte est là d'emblée : le vocal est à portée dès l'arrivée.
   if (guest) {
     attachVoice(guest.session);

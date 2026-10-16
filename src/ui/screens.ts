@@ -253,7 +253,7 @@ export class PauseScreen {
   private readonly voice: HTMLButtonElement;
   private voiceOn = false;
 
-  /** `onInvite` : `null` chez l'ami en jeu — on n'invite pas dans la partie d'un autre. */
+  /** `onInvite` : `null` chez l’ami en jeu et sans serveur — le bouton n’existe alors pas. */
   public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: (() => void) | null, onVoice: (() => void) | null = null) {
     this.root = document.createElement('div');
     this.root.className = 'overlay pause-screen';
@@ -286,7 +286,6 @@ export class PauseScreen {
 
     invite.type = 'button';
     invite.className = 'button-secondary';
-    invite.hidden = onInvite === null;
     if (onInvite) invite.addEventListener('click', onInvite);
 
     // Le vocal : caché hors d'une partie à deux (`setVoice`) ; rejoindre ou quitter, selon l'état.
@@ -328,7 +327,7 @@ export class PauseScreen {
     });
 
     this.confirm = confirmRestart(onRestart, () => this.asking(false));
-    this.panel.append(title, text, resume, invite, this.voice, showCollection, restart, seedLine(seed));
+    this.panel.append(title, text, resume, ...(onInvite ? [invite] : []), this.voice, showCollection, restart, seedLine(seed));
     this.root.append(this.panel, this.confirm, this.collection.root);
     this.collection.root.hidden = true;
     this.asking(false);
