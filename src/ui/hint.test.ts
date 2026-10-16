@@ -92,6 +92,22 @@ describe('tutorialHint', () => {
     expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.labResearch.replace('{research}', 'Guet').replace('{building}', tower));
   });
 
+  it('un objectif touché passe devant la tour : Ève aide à faire ce que le joueur a choisi', () => {
+    const world = World.newColony(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    const cabin = OBJECTIVES.find((objective) => objective.goals.some((goal) => goal.type === 'build' && goal.building === 'lumberCamp'))!;
+    const advice = tutorialAdvice(world, FRESH, false, 0, cabin.id, true);
+
+    expect(advice?.text).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.lumberCamp.label));
+    // Sans choix du joueur, la tour reste le conseil d'avant la première nuit.
+    expect(tutorialAdvice(world, FRESH, false, 0, cabin.id)?.text).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.watchtower.label));
+  });
+
   it('dix ouvriers qui glandent, la tour posée : Ève les envoie travailler, et loger si les lits manquent', () => {
     const world = World.newColony(1);
 

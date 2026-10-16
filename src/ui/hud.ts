@@ -1909,6 +1909,7 @@ export class Hud {
       towers,
       this.mutantCount(),
       this.selectedObjective(),
+      this.chosenObjective !== null && this.selectedObjective() === this.chosenObjective,
     );
   }
 

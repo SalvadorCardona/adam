@@ -109,13 +109,17 @@ export function tutorialHint(world: World, progress: HintProgress, towers: boole
   return tutorialAdvice(world, progress, towers, mutants, selected)?.text ?? null;
 }
 
-/** `selected` : l'objectif choisi dans le panneau ; absent, le premier du chapitre qui reste. */
+/**
+ * `selected` : l'objectif choisi dans le panneau ; absent, le premier du chapitre qui reste.
+ * `chosen` : le joueur l'a touché lui-même — son conseil passe alors devant tout ce qui ne presse pas.
+ */
 export function tutorialAdvice(
   world: World,
   progress: HintProgress,
   towers: boolean,
   mutants: number,
   selected: ObjectiveId | null = firstOpenObjective(world),
+  chosen = false,
 ): Advice | null {
   const say = (text: string, wants: ItemId | null = null): Advice => ({ text, wants });
   const hall = world.entities.get(world.townHallId);
@@ -147,8 +151,12 @@ export function tutorialAdvice(
 
   if (mutants === 0 && !welled && (water < COLONY.startingStock.water / 2 || world.needAlert()?.need === 'thirst')) return viaLab(world, 'well', lines.well);
 
-  if (world.night === 0 && !towers) return viaLab(world, 'watchtower', lines.tower);
   if (mutants > 0 && world.night <= 2) return say(lines.bow);
+
+  // L'objectif que le joueur a touché : c'est ce qu'il veut faire, Ève l'y aide plutôt que de parler d'autre chose.
+  if (chosen && selected && mutants === 0) return selectedAdvice(world, selected, mutants);
+
+  if (world.night === 0 && !towers) return viaLab(world, 'watchtower', lines.tower);
 
   // Entre deux vagues, la mairie entamée d'au moins un bois, et Ève pas encore là pour la réparer : à Adam de le faire.
   if (mutants === 0 && !progress.repaired && !world.eve() && hall.hp <= buildingLevel(hall.proto, hall.level).hp - REPAIR.hp) {
@@ -196,15 +204,20 @@ export function tutorialAdvice(
 
   if (mutants === 0 && forged && !kiln && (world.townStock()?.available('coal') ?? 0) === 0) return say(lines.kiln);
 
+  return selected ? selectedAdvice(world, selected, mutants) : null;
+}
+
+/** Le conseil de l'objectif choisi : son attente, s'il n'attend qu'une horloge, sinon sa réplique. */
+function selectedAdvice(world: World, selected: ObjectiveId, mutants: number): Advice {
   // L'objectif n'attend plus qu'une horloge qui court : le temps qu'il reste, et de quoi s'occuper d'ici là.
   // Une nuit à tenir n'est une attente que de jour : le soir, le conseil de l'objectif dit comment la tenir.
-  const wait = mutants === 0 && selected ? objectiveWait(world, selected) : null;
+  const wait = mutants === 0 ? objectiveWait(world, selected) : null;
 
   if (wait && wait.blockedBy === null && (wait.goal.type !== 'nights' || world.clock()?.phase === 'day')) {
     return waitingAdvice(world, wait);
   }
 
-  return selected ? objectiveAdvice(world, selected) : null;
+  return objectiveAdvice(world, selected);
 }
 
 /**
