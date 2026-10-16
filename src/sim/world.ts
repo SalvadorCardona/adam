@@ -1123,6 +1123,8 @@ export class World {
     world.openBuildings = new Set(START_BUILDINGS);
     // Une seule région : la prairie de départ. Le reste se conquiert.
     world.conquered = new Set([HOME_REGION_ID]);
+    // La clairière est connue d'avance : le premier écran montre où l'on vit.
+    world.fog.reveal(floorDiv(world.target.x, TILE_SIZE), floorDiv(world.target.y, TILE_SIZE), FOG_VISION.home);
 
     return world;
   }

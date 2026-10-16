@@ -173,6 +173,15 @@ describe('brouillard de guerre', () => {
     expect(world.fog.exploredCount()).toBeLessThan(500);
   });
 
+  it('une colonie neuve connaît sa clairière, sous le voile ; au-delà, l’inconnu', () => {
+    const world = World.newColony(7);
+    const hall = world.entities.get(world.townHallId)!;
+
+    expect(world.sightAt(hall.tx + 1 - FOG_VISION.home + 2, hall.ty + 1)).toBe('explored');
+    expect(world.sightAt(hall.tx + 1 + FOG_VISION.home + 6, hall.ty + 1)).toBe('unexplored');
+    expect(world.isUnlocked('fountain')).toBe(false);
+  });
+
   it('Adam révèle en marchant ; la zone quittée reste explorée, plus vue', () => {
     const world = new World(7);
     const start = adamTile(world);

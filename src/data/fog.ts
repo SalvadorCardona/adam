@@ -38,6 +38,12 @@ export const FOG_VISION = {
    * alentours de ce qu'elle a bâti, à ce rayon autour de chaque bâtiment et d'Adam.
    */
   legacy: 12,
+  /**
+   * Une colonie neuve connaît sa clairière : explorée à ce rayon autour de la
+   * mairie, sous le voile, pour que le premier écran ne soit pas qu'indigo.
+   * Les premières bases (34 tuiles) restent loin dehors.
+   */
+  home: 13,
 } as const;
 
 /**
