@@ -243,6 +243,19 @@ export const panel = {
     comeCloser: ' — rapprochez-vous.',
   },
 
+  /** La hache et la pioche d'Adam, dans la fenêtre de la forge. */
+  tools: {
+    names: { axe: 'hache', pickaxe: 'pioche' },
+    families: { axe: 'les arbres', pickaxe: 'les rochers' },
+    bare: 'Mains nues',
+    /** `name` : « hache » ou « pioche ». */
+    current: (name: string, label: string, level: number): string => `Votre ${name} : ${label} (niveau ${level})`,
+    next: (label: string, family: string): string => `Forger : ${label} — +1 unité par coup sur ${family}`,
+    button: (name: string): string => `Forger la ${name}`,
+    best: 'Niveau maximal.',
+    comeCloser: ' — rapprochez-vous.',
+  },
+
   barracks: {
     /** `n` compagnons sur `max`, formations comprises. */
     army: (n: number, max: number): string => `Troupe : ${n}/${max}`,

@@ -14,6 +14,7 @@ import '@fontsource/fredoka/latin-500.css';
 import '@fontsource/fredoka/latin-600.css';
 import '@fontsource/fredoka/latin-700.css';
 import './style.css';
+import { HarvestCombo, comboPitch } from './ui/harvestCombo.ts';
 import { rewardOf } from './data/achievements.ts';
 import { HASTEN } from './data/dayNight.ts';
 import { AudioEngine } from './audio/engine.ts';
@@ -1297,7 +1298,10 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   if (phase === 'dusk' || phase === 'night') audio.night('dusk');
   if ([...world.mobiles.values()].some((mobile) => mobile.kind === 'mutant')) audio.night('wave');
 
-  world.events.on('resourceHarvested', ({ item }) => audio.play(item === 'wood' ? 'chop' : 'rock'));
+  // Récolter sans s'arrêter fait monter le son en hauteur (`ui/harvestCombo.ts`).
+  const combo = new HarvestCombo();
+
+  world.events.on('resourceHarvested', ({ item }) => audio.play(item === 'wood' ? 'chop' : 'rock', comboPitch(combo.hit(performance.now()))));
   // Une hache de bûcheron ne s'entend qu'à côté d'Adam : dix cabanes au loin ne font pas un vacarme.
   world.events.on('treeChopped', ({ tx, ty }) => {
     const dx = (tx + 0.5) * TILE_SIZE - world.player.x;

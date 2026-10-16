@@ -12,7 +12,7 @@ import { ENEMY_BASE } from '../../data/enemyBases.ts';
 import { ENEMIES, WILDLIFE } from '../../data/enemies.ts';
 import { ERAS, type EraProto } from '../../data/eras.ts';
 import { EVE_LINES } from '../../data/eve.ts';
-import { GEAR } from '../../data/gear.ts';
+import { GEAR, TOOL_GEAR } from '../../data/gear.ts';
 import { ITEMS } from '../../data/items.ts';
 import { LORE } from '../../data/lore.ts';
 import { CHAPTERS, OBJECTIVES, type ChapterProto, type ObjectiveId } from '../../data/objectives.ts';
@@ -98,6 +98,8 @@ export const content = {
   enemyBase: { label: ENEMY_BASE.label, description: ENEMY_BASE.description },
   /** Les arcs d'Adam, du niveau 0 au dernier. */
   gear: GEAR.map(({ label }): string => label),
+  /** La hache et la pioche d'Adam, du niveau 1 au dernier. */
+  toolGear: mapTable(TOOL_GEAR, (levels): string[] => levels.map(({ label }): string => label)),
   /** Les pièces de la garde-robe d'Adam. */
   pieces: mapTable(PIECES, (piece): string => piece.label),
   tools: mapTable(TOOLS, (tool): string => tool.label),

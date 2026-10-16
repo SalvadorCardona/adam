@@ -211,6 +211,17 @@ export const panel: Messages['panel'] = {
     comeCloser: ' — get closer.',
   },
 
+  tools: {
+    names: { axe: 'axe', pickaxe: 'pickaxe' },
+    families: { axe: 'trees', pickaxe: 'rocks' },
+    bare: 'Bare hands',
+    current: (name: string, label: string, level: number): string => `Your ${name}: ${label} (level ${level})`,
+    next: (label: string, family: string): string => `Forge: ${label} — +1 unit per hit on ${family}`,
+    button: (name: string): string => `Forge the ${name}`,
+    best: 'Maximum level.',
+    comeCloser: ' — get closer.',
+  },
+
   barracks: {
     army: (n: number, max: number): string => `Troop: ${n}/${max}`,
     recruitTitle: 'Recruit',

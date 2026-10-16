@@ -1459,6 +1459,13 @@ button:disabled,
  * La tendance d'un objet de la ville, sur la dernière minute de jeu : une
  * petite flèche menthe s'il monte, corail s'il baisse, rien s'il stagne.
  */
+/* La petite coche : la ville a assez de cet objet, Adam n'en ramasse plus en passant. */
+.hud-town .hud-stock-items .icon.hud-plenty {
+  width: 12px;
+  height: 12px;
+  margin-left: -3px;
+}
+
 .hud-town .hud-stock-items .icon.hud-trend {
   width: 12px;
   height: 12px;
@@ -3399,6 +3406,16 @@ button:disabled,
   font-weight: 700;
   color: var(--mint-shade);
   animation: hud-float-up 1000ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+/* Le combo de récolte : le chiffre grossit avec la série, qui s'écrit au bout. */
+.hud-float[data-combo='true'] {
+  font-size: calc(17px * var(--combo, 1));
+}
+
+.hud-float-combo {
+  font-size: 0.75em;
+  color: var(--accent);
 }
 
 .hud-float[data-out='true'] {

@@ -60,7 +60,7 @@ import { isCollecting, labMissing, researchCost } from '../sim/research.ts';
 import type { SiteLine } from '../sim/siteLedger.ts';
 import { canPause, employs } from '../sim/staffing.ts';
 import type { WorkPriority } from '../data/workers.ts';
-import { siteMissing, timerText, type World } from '../sim/world.ts';
+import { HARVEST_REACH_TILES, siteMissing, timerText, type World } from '../sim/world.ts';
 import { ZOOM, type ChunkBounds } from './camera.ts';
 import { inSight } from './sight.ts';
 import { MobileLayer, drawHp } from './mobileLayer.ts';
@@ -112,6 +112,8 @@ const HIT_TINT = hex(PALETTE.coral.light);
 
 /** Le recul d'une tour qui tire : elle s'enfonce de `SINK_PX` pendant `SINK_MS`. */
 const SINK_MS = 90;
+/** Le cercle de récolte paraît ou s'efface en ce temps. */
+const RING_FADE_MS = 250;
 const SINK_PX = 1;
 
 /** La fissure, sur la façade : à cette part de la largeur, son pied à autant de px au-dessus du pied de l'emprise. */
@@ -199,6 +201,9 @@ export class EntityLayer {
   private partnerNameShown = '';
   /** Sa barre de vie, au-dessus de la tête, dès qu'une bête l'a entamé. */
   private readonly adamHp = new Graphics();
+  /** Le cercle discret au sol sous Adam quand il récolte : la portée de la récolte de proximité. */
+  private readonly reachRing = new Graphics();
+  private reachAlpha = 0;
   private adamHpShown = -1;
   private readonly mobiles: MobileLayer;
   private readonly shadows: Container;
@@ -228,6 +233,11 @@ export class EntityLayer {
     this.adamHp.visible = false;
     this.adam.root.addChild(this.adamHp);
     this.container.addChild(this.adam.root);
+    this.reachRing
+      .circle(0, 0, HARVEST_REACH_TILES * TILE_SIZE)
+      .stroke({ width: 2, color: hex(PALETTE.mint.base), alpha: 0.5 });
+    this.reachRing.visible = false;
+    shadows.addChild(this.reachRing);
 
     this.partner = new Puppet(library, 'partner', tiles.shadow('grass'), { shadowWidth: 22, stride: 4 });
     this.partnerName = new Text({
@@ -654,6 +664,7 @@ export class EntityLayer {
     // La récolte se fait en marchant : on ne frappe qu'à l'arrêt.
     this.adam.update(ticker.deltaMS, player.facing, player.moving ? 'walk' : player.harvesting ? 'act' : 'idle');
     this.updateShadow(x, y);
+    this.updateReachRing(x, y, ticker.deltaMS);
 
     if (player.hp !== this.adamHpShown) {
       this.adamHpShown = player.hp;
@@ -757,6 +768,18 @@ export class EntityLayer {
   }
 
   /** L'ombre d'Adam prend la teinte du sol sous ses pieds. */
+  /** Le cercle de récolte paraît en fondu pendant que la récolte se fait, et s'efface après. */
+  private updateReachRing(x: number, y: number, deltaMS: number): void {
+    const target = this.world.adam.harvesting ? 1 : 0;
+    const step = Math.min(1, deltaMS / RING_FADE_MS);
+
+    this.reachAlpha += Math.sign(target - this.reachAlpha) * Math.min(Math.abs(target - this.reachAlpha), step);
+    this.reachRing.visible = this.reachAlpha > 0;
+    if (!this.reachRing.visible) return;
+    this.reachRing.alpha = this.reachAlpha;
+    this.reachRing.position.set(x, y);
+  }
+
   private updateShadow(x: number, y: number): void {
     const tx = floorDiv(x, TILE_SIZE);
     const ty = floorDiv(y, TILE_SIZE);

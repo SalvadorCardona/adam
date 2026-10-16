@@ -88,6 +88,7 @@ import { NAME_MAX } from '../sim/inhabitants.ts';
 import { consumerTarget, forgeRecipe } from '../sim/consumers.ts';
 import { canDamage, isShielded, isStanding, raidCapacity } from '../sim/enemyBases.ts';
 import { KILL_PRESTIGE } from '../data/prestige.ts';
+import { ToolForge } from './toolForge.ts';
 import { countField, type FieldCount } from '../sim/farmer.ts';
 import { countPlot, type PlotCount } from '../sim/forester.ts';
 import { eraReady } from '../sim/eras.ts';
@@ -206,6 +207,7 @@ export class BuildingPanel {
   private readonly gearCost: HTMLElement;
   private readonly gearButton: HTMLButtonElement;
   private lastGear = '';
+  private readonly tools: ToolForge;
 
   private entityId: EntityId | null = null;
   /** La base mutante affichée, si c'est elle qu'on a tapée. */
@@ -498,6 +500,7 @@ export class BuildingPanel {
     });
     gearActions.append(this.gearButton);
     this.gear.append(this.gearText, this.gearCost, gearActions);
+    this.tools = new ToolForge(world, () => this.entityId);
 
     this.tabs = new PanelTabs<BuildingTab>(
       [
@@ -522,6 +525,7 @@ export class BuildingPanel {
         this.actions,
         this.upgrade,
         this.gear,
+        this.tools.root,
         this.research.root,
         this.barracks.root,
       );
@@ -553,6 +557,7 @@ export class BuildingPanel {
       this.lastItems = '';
       this.lastUpgrade = '';
       this.lastGear = '';
+      this.tools.reset();
       this.lastCrew = '';
       this.lastNeeds = '';
       this.update();
@@ -635,6 +640,7 @@ export class BuildingPanel {
     this.lastItems = '';
     this.lastUpgrade = '';
     this.lastGear = '';
+    this.tools.reset();
     this.lastCrew = '';
     this.lastNeeds = '';
     // Les jauges de faim et de soif ne sont qu'à un habitant, la fiche qu'à une créature : `refreshCreature` les montre.
@@ -784,6 +790,7 @@ export class BuildingPanel {
       this.crew.hidden = true;
       this.upgrade.hidden = true;
       this.gear.hidden = true;
+      this.tools.hide();
       this.stock.hidden = true;
     } else {
       const level = buildingLevel(entity.proto, entity.level);
@@ -1121,6 +1128,7 @@ export class BuildingPanel {
       }
       this.refreshUpgrade(entity, inReach);
       this.refreshGear(entity, inReach);
+      this.tools.refresh(entity, inReach);
     }
 
     this.finish(stats, lines, ratio, barClass, meterValue, meterLabel);
@@ -1147,6 +1155,7 @@ export class BuildingPanel {
     this.research.root.hidden = true;
     this.barracks.root.hidden = true;
     for (const part of [this.crew, this.upgrade, this.gear, this.stock]) part.hidden = true;
+    this.tools.hide();
     this.exchange.show(null);
     this.tabs.setAvailable('inventory', false);
     for (const button of [this.pauseButton, this.repairButton, this.transferButton, this.cancelButton, this.eraButton]) button.hidden = true;
@@ -1213,6 +1222,7 @@ export class BuildingPanel {
     this.exchange.show(null);
     this.tabs.setAvailable('inventory', false);
     for (const part of [this.crew, this.upgrade, this.gear, this.stock]) part.hidden = true;
+    this.tools.hide();
     for (const button of this.actions.children) (button as HTMLElement).hidden = true;
     this.actions.hidden = true;
 

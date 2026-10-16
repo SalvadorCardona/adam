@@ -83,7 +83,7 @@ import {
 import { ENEMY_BASE, FIREBALL, GUARD_RANGE, RAIDS, enemyBaseLevel } from '../data/enemyBases.ts';
 import { EVE } from '../data/eve.ts';
 import { FOG_VISION } from '../data/fog.ts';
-import { GEAR_WORKSHOP, MAX_GEAR, gearOf } from '../data/gear.ts';
+import { GEAR_WORKSHOP, MAX_GEAR, MAX_TOOL, toolBonus, toolOf, type ToolSlot, gearOf } from '../data/gear.ts';
 import { PIECES, WARDROBE_SPARE, copyLook, isStarter, sameLook, wardrobeDrop, type Look, type LootSource, type PieceId } from '../data/wardrobe.ts';
 import { drawPieces, lookRejection, type LookRejection } from './wardrobe.ts';
 import { CHESTS } from '../data/chests.ts';
@@ -329,7 +329,7 @@ export const DELIVER_TICKS = 2;
  * unité chacune, quatre au plus.
  */
 export const HARVEST_PASS_TICKS = 10;
-export const HARVEST_REACH_TILES = 1.25;
+export const HARVEST_REACH_TILES = 1.75;
 export const HARVEST_MAX_NODES = 4;
 
 /**
@@ -826,6 +826,8 @@ export type WorldEvents = {
   /** Un arc forgé : `level` est le nouveau niveau d'équipement. */
   gearCrafted: { level: number; fromBag: [ItemId, number][] };
   gearRejected: { reason: GearRejection };
+  /** La hache ou la pioche d'Adam passe au niveau `level` (`TOOL_GEAR`). */
+  toolCrafted: { slot: ToolSlot; level: number; fromBag: [ItemId, number][] };
   /** Adam a changé d'apparence : le rendu recompose ses calques. */
   lookChanged: { look: Look };
   /** L'apparence demandée a été refusée. */
@@ -1680,6 +1682,10 @@ export class World {
 
       case 'craftGear':
         this.craftGear(command.forge);
+        break;
+
+      case 'craftTool':
+        this.craftTool(command.forge, command.slot);
         break;
 
       case 'dressAdam':
@@ -2635,8 +2641,9 @@ export class World {
       // Hache ou pioche reçues d'Ève : un nœud donne plus d'une unité par passage.
       const pass = this.tickCount / HARVEST_PASS_TICKS;
       const base = harvestYieldWith(this.perks, node.id, harvestYieldWithTools(node.id, this.questsDone), pass);
-      // Haches affûtées (labo) : une part de bois en plus, répartie sur les passages.
-      const units = item === 'wood' ? base + extraUnits(base, this.bonus('woodYield'), pass) : base;
+      // Haches affûtées, hache et pioche forgées : une part en plus, répartie sur les passages.
+      const stat = item === 'wood' ? 'woodYield' : 'oreYield';
+      const units = base + extraUnits(base, this.bonus(stat), pass);
 
       for (let i = 0; i < units; i += 1) {
         if (player.inventory.freeSpace() <= 0) {
@@ -2725,7 +2732,32 @@ export class World {
 
   /** La ville a-t-elle assez de cet objet pour qu'Adam ne le ramasse plus en passant ? */
   public townHasPlenty(item: ItemId): boolean {
-    return (this.townStock()?.available(item) ?? 0) >= TOWN_PLENTY;
+    const stock = this.townStock()?.available(item) ?? 0;
+
+    return stock >= TOWN_PLENTY && stock >= this.placedNeed(item);
+  }
+
+  /**
+   * Ce que les besoins déjà posés attendent encore de cet objet : les
+   * chantiers, les améliorations ouvertes à leur niveau suivant, le coût des
+   * recherches en attente au labo. Tant que la ville ne couvre pas leur somme,
+   * elle n'a jamais « assez » : on peut faire la réserve d'une grosse construction.
+   */
+  public placedNeed(item: ItemId): number {
+    let need = 0;
+
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'site') {
+        need += this.siteNeeds(entity, item, 'bag');
+        continue;
+      }
+      if (entity.kind === 'lab' && entity.research !== null) need += labNeeds(entity, item);
+
+      const upgrade = entity.kind === 'antenna' ? null : nextUpgrade(entity.proto, entity.level);
+
+      if (upgrade && this.upgradeLocked(entity) === null) need += (upgrade.cost)[item] ?? 0;
+    }
+    return need;
   }
 
   /** Pose un objet du sac sur le chantier — le premier qui manque et qu'Adam possède. Au contact, le chantier se remplit à vue. */
@@ -3018,7 +3050,13 @@ export class World {
    * d'Adam (`sim/levels.ts`) s'y ajoutent : un seul cumul, aucun doublon.
    */
   public bonus(stat: ResearchStat): number {
-    return researchBonus(this.researchDone, stat) + levelBonus(this.level(), stat) + boonBonus(this.activeBoon()?.id ?? null, stat) + this.dailyBonus(stat);
+    return (
+      researchBonus(this.researchDone, stat) +
+      levelBonus(this.level(), stat) +
+      boonBonus(this.activeBoon()?.id ?? null, stat) +
+      toolBonus(this.player.axe, this.player.pickaxe, stat) +
+      this.dailyBonus(stat)
+    );
   }
 
   /** Ce que le modificateur de la carte du jour ajoute à une statistique. */
@@ -5490,6 +5528,52 @@ export class World {
     }
     this.player.gear += 1;
     this.events.emit('gearCrafted', { level: this.player.gear, fromBag });
+  }
+
+  /** Ce qui manque pour forger le niveau suivant de cet outil, ou `null` s'il est au plus haut. */
+  public toolMissing(forge: Building, slot: ToolSlot): Partial<Record<ItemId, number>> | null {
+    const level = this.player[slot];
+
+    if (level >= MAX_TOOL) return null;
+
+    const town = this.townStockFor(forge);
+    const missing: Partial<Record<ItemId, number>> = {};
+
+    for (const [item, needed] of Object.entries(toolOf(slot, level + 1).cost) as [ItemId, number][]) {
+      const short = needed - this.player.inventory.available(item) - (town?.available(item) ?? 0);
+
+      if (short > 0) missing[item] = short;
+    }
+    return missing;
+  }
+
+  /** « Forger » la hache ou la pioche suivante : payée d'un coup, le sac d'abord, puis la ville. */
+  private craftTool(id: EntityId, slot: ToolSlot): void {
+    const forge = this.entities.get(id);
+    const reject = (reason: GearRejection): void => this.events.emit('gearRejected', { reason });
+
+    if (!forge || forge.kind === 'site' || forge.proto !== GEAR_WORKSHOP) return reject('missing');
+    if (!this.inReach(forge)) return reject('outOfReach');
+
+    const missing = this.toolMissing(forge, slot);
+
+    if (!missing) return reject('maxLevel');
+    if (Object.keys(missing).length > 0) return reject('missingItems');
+
+    const town = this.townStockFor(forge);
+    const fromBag: [ItemId, number][] = [];
+
+    for (const [item, needed] of Object.entries(toolOf(slot, this.player[slot] + 1).cost) as [ItemId, number][]) {
+      const bag = Math.min(needed, this.player.inventory.available(item));
+
+      if (bag > 0) {
+        this.player.inventory.remove(item, bag);
+        fromBag.push([item, bag]);
+      }
+      if (needed > bag) town?.remove(item, needed - bag);
+    }
+    this.player[slot] += 1;
+    this.events.emit('toolCrafted', { slot, level: this.player[slot], fromBag });
   }
 
   /** `extraDamage` : ce que la recherche ajoute aux dégâts de l'arme. */

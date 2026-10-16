@@ -183,6 +183,8 @@ export const hud = {
     companionTraining: (label: string, seconds: number): string => `${label} en formation — ${seconds} s`,
     companionJoined: (label: string): string => `${label} rejoint Adam !`,
     companionDied: (label: string): string => `${label} est tombé — recrutez-en un autre à la caserne`,
+    /** `tool` : la hache ou la pioche forgée, avec sa majuscule. */
+    toolCrafted: (tool: string): string => `${tool} forgée : un coup rapporte une unité de plus`,
     gearCrafted: (gear: string, level: number): string => `${gear} forgé : vous entamez les bases de niveau ${level}`,
     survivors: (count: number): string =>
       count > 1
@@ -369,6 +371,8 @@ export const hud = {
     inBag: (item: string, amount: number): string => `${item} — ${amount} dans le sac`,
     inTown: (item: string, amount: number): string => `${item} — ${amount} en ville`,
     /** La même, quand l'objet monte ou baisse sur la dernière minute. */
+    /** La ville en a assez : Adam n'en ramasse plus en passant. */
+    inTownPlenty: (item: string, amount: number): string => `${item} — ${amount} en ville, assez : Adam n’en ramasse plus en passant`,
     inTownUp: (item: string, amount: number): string => `${item} — ${amount} en ville, en hausse`,
     inTownDown: (item: string, amount: number): string => `${item} — ${amount} en ville, en baisse`,
     wanted: (item: string, amount: number): string => `${item} — Ève en demande, ${amount} dans le sac`,

@@ -39,3 +39,42 @@ export const MAX_GEAR = GEAR.length - 1;
 export function gearOf(level: number): GearProto {
   return GEAR[Math.max(0, Math.min(MAX_GEAR, level))]!;
 }
+
+/** Les outils d'Adam, forgés comme l'arc : la hache pour les arbres, la pioche pour les rochers. */
+export type ToolSlot = 'axe' | 'pickaxe';
+
+export const TOOL_SLOTS = ['axe', 'pickaxe'] as const satisfies readonly ToolSlot[];
+
+/**
+ * Par outil, les niveaux 1 à 3 (le niveau 0, les mains nues, n'a pas de
+ * fiche). Chaque niveau forgé donne +1 unité par coup sur sa famille — les
+ * arbres pour la hache, le fer, le charbon et la pierre pour la pioche —,
+ * lue dans `World.bonus` (`woodYield`, `oreYield`).
+ */
+export const TOOL_GEAR = {
+  axe: [
+    { label: 'Hache de pierre', cost: { wood: 10, stone: 8 } },
+    { label: 'Hache de fer', cost: { ironPlate: 4, wood: 10 } },
+    { label: 'Hache d’acier', cost: { ironPlate: 10, coal: 10, wood: 15 } },
+  ],
+  pickaxe: [
+    { label: 'Pioche de pierre', cost: { wood: 10, stone: 10 } },
+    { label: 'Pioche de fer', cost: { ironPlate: 4, wood: 10 } },
+    { label: 'Pioche d’acier', cost: { ironPlate: 10, coal: 10, wood: 15 } },
+  ],
+} as const satisfies Record<ToolSlot, readonly GearProto[]>;
+
+/** Le niveau le plus haut d'un outil. */
+export const MAX_TOOL = 3;
+
+/** Ce que coûte le niveau `level` (1 à 3) d'un outil. */
+export function toolOf(slot: ToolSlot, level: number): GearProto {
+  return TOOL_GEAR[slot][Math.max(1, Math.min(MAX_TOOL, level)) - 1]!;
+}
+
+/** Les unités par coup que les outils ajoutent à cette statistique de récolte : un par niveau. */
+export function toolBonus(axe: number, pickaxe: number, stat: string): number {
+  if (stat === 'woodYield') return axe;
+  if (stat === 'oreYield') return pickaxe;
+  return 0;
+}

@@ -380,6 +380,9 @@ export interface Player {
   hp: number;
   /** Niveau de son équipement (`data/gear.ts`) : 0, l'arc de fortune. Il dit quelles bases mutantes il entame. */
   gear: number;
+  /** Niveau de sa hache et de sa pioche (`TOOL_GEAR`) : 0, les mains nues. Chaque niveau : +1 unité par coup sur sa famille (`World.bonus`). */
+  axe: number;
+  pickaxe: number;
   /** Ticks depuis le dernier coup reçu : Adam ne récupère qu'au calme. */
   calmTicks: number;
   /** Son expérience totale (`data/levels.ts`) : son niveau et sa barre s'en déduisent. */

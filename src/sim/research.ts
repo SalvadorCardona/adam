@@ -39,6 +39,7 @@ export const STAT_BASE: Readonly<Record<ResearchStat, number>> = {
   hungerResist: 0,
   thirstResist: 0,
   woodYield: 0,
+  oreYield: 0,
   drillTicks: RECIPES.mineOre.duration,
   purifyTicks: PURIFIER.intervalTicks,
   farmYield: CROPS.yield,
