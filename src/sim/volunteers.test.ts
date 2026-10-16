@@ -125,3 +125,26 @@ describe('coups de main des ouvriers libres', () => {
     expect(stock.available('wood') + [...world.mobiles.values()].reduce((sum, m) => sum + (m.kind === 'worker' && m.job && !m.job.carried && m.job.item === 'wood' ? m.job.amount : 0), 0)).toBe(stock.count('wood'));
   });
 });
+
+describe('coups de main — l’eau d’un puits hors du rayon de la mairie', () => {
+  it('puits à 16 tuiles, sans poste ni dortoir : un ouvrier libre rapporte l’eau en ville', () => {
+    const base = town();
+    const state = base.snapshot();
+    const hall = base.warehouse()!;
+    const { width, height } = BUILDINGS.well;
+
+    state.entities = [
+      ...state.entities,
+      { kind: 'quarry', id: state.nextId, proto: 'well', tx: hall.tx + 16, ty: hall.ty, width, height, store: { water: 20 }, hp: 100, level: 1, paused: false, staff: 0, blocked: false },
+    ];
+    state.nextId += 1;
+
+    const world = World.restore(state);
+    const stock = world.townStock()!;
+
+    stock.remove('water', stock.count('water'));
+    expect(stock.count('water')).toBe(0);
+    for (let i = 0; i < 20 * 120 && stock.count('water') === 0; i += 1) world.tick();
+    expect(stock.count('water')).toBeGreaterThan(0);
+  });
+});

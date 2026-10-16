@@ -29,6 +29,13 @@ export const PORTERS = {
 export const VOLUNTEERS = {
   /** Objets portés en un voyage : moins qu'un porteur, il n'a pas de hotte. */
   carry: 3,
+  /**
+   * Distance maximale, en tuiles de centre à centre, d'un producteur que le
+   * volontaire vide dans la mairie — eau, nourriture seulement. La première
+   * rive peut être hors du rayon logistique : sans porteurs ni poste, l'eau du
+   * puits n'arriverait jamais en ville.
+   */
+  fetchReach: 30,
 } as const;
 
 /**
