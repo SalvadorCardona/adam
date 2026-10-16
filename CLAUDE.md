@@ -381,6 +381,20 @@ quête sous les objectifs (`.hud-quest-daily`, `World.challenge`) et paie dès
 sa réussite, en objets et en Prestige (`challengeCompleted`). Sauvegardé
 sous `challenge`.
 
+**Carte du jour** (`data/dailyMods.ts`, `sim/daily.ts`, `ui/dailyMap.ts`) — le
+bouton « Carte du jour » de l'écran titre ouvre `?daily=AAAA-MM-JJ` (date UTC) :
+la graine (`dailySeed`) et le modificateur (`dailyMod`, même hachage) ne
+dépendent que de la date, donc sont les mêmes pour tous. Le modificateur
+(`World.dailyMap`, sauvegardé) est une donnée lue en un point : `World.bonus`
+(`bonuses`), `dailyCycle` (puits), le pas des mutants (`foeSpeed`), le départ
+de la colonie (`startingWorkers`). Pas de bonus du jardin. Sauvegarde à part
+(`DAILY_SAVE_KEY`, `adam:daily-save`) : la partie principale n'est ni lue ni
+écrite ; une partie d'un autre jour est effacée à l'ouverture. Score = graines
+du `ColonyScore` (`seedsFor`), mesuré à l'aube, à la chute et au Signal ; le
+meilleur du jour vit sous `adam:daily` (`storage/localDaily.ts`) et s'affiche à
+l'écran titre. Avec un serveur : `GET|POST /daily/:date` (`server/src/daily.ts`,
+migration `0005`), le meilleur score de chaque compte ; sans, rien ne change.
+
 **Rôle d'Adam la nuit** (`data/skills.ts`) — quatre leviers pour que la nuit
 ne soit pas un temps mort. La **Volée** (`castSkill`, `World.skill`,
 `VOLLEY`) : trois flèches en éventail vers la direction du joystick, sinon

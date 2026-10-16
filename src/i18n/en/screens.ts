@@ -20,6 +20,19 @@ export const screens: Messages['screens'] = {
     corruptSave: 'Unreadable save: starting a new game.',
     linkedMap: (seed) => `This link leads to map #${seed}: tap “New game” to play it.`,
   },
+  daily: {
+    button: 'Daily map',
+    back: 'Main game',
+    today: (date) => `Daily map · ${date}`,
+    best: (score) => `Best score today: ${score}`,
+    mods: {
+      drought: { name: 'Drought', text: 'Wells give half as much water.' },
+      scarceWood: { name: 'Scarce wood', text: 'Trees give half as much wood.' },
+      fastMutants: { name: 'Fast mutants', text: 'Mutants walk a third faster.' },
+      smallColony: { name: 'Colony of 6', text: 'Six workers to start with, not ten.' },
+      slowDrills: { name: 'Slow drills', text: 'Each ore takes half as long again.' },
+    },
+  },
   pause: {
     title: 'Paused',
     text: 'The mutants are waiting too.',

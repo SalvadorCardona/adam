@@ -17,6 +17,8 @@
 
 import { BOONS, type BoonId } from '../data/boons.ts';
 import { CHALLENGES, type ChallengeId } from '../data/challenges.ts';
+import { DAILY_MODS, type DailyGame, type DailyModId } from '../data/dailyMods.ts';
+import { isDailyDate } from './daily.ts';
 import type { DailyChallenge } from './challenges.ts';
 import { CHUNK_TILES } from '../core/grid.ts';
 import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, maxLevel, type BuildingId } from '../data/buildings.ts';
@@ -197,6 +199,8 @@ export interface WorldState {
   lureNight?: number;
   /** Les ouvriers adultes de la colonie. Absent d'avant eux : ceux qu'employaient les bâtiments finis. */
   colonists?: number;
+  /** La carte du jour : sa date et son modificateur. Absent d'une partie ordinaire. */
+  dailyMap?: DailyGame;
   /**
    * La répartition des ouvriers entre les bâtiments qui emploient
    * (`allocateStaff`) : postes occupés, et dernier gain. Absente d'avant les
@@ -576,6 +580,7 @@ function parseState(raw: unknown): WorldState {
     ...(state['era'] !== undefined && { era: Math.min(LAST_ERA, int(state['era'])) }),
     rareTrades: parseRareTrades(state['rareTrades'] ?? {}),
     ...(state['colonists'] !== undefined && { colonists: int(state['colonists']) }),
+    ...(state['dailyMap'] !== undefined && { dailyMap: parseDaily(state['dailyMap']) }),
     ...(state['staffPosts'] !== undefined && { staffPosts: unique(array(state['staffPosts']).map(parseStaffPost)) }),
     ...parseObjectives(state),
     ...(state['enemyBases'] !== undefined && { enemyBases: unique(array(state['enemyBases']).map(parseEnemyBase)) }),
@@ -760,6 +765,14 @@ function parseTileSets(raw: unknown): Record<string, number[]> {
     });
   }
   return roads;
+}
+
+function parseDaily(raw: unknown): DailyGame {
+  const daily = record(raw);
+  const date = daily['date'];
+
+  if (typeof date !== 'string' || !isDailyDate(date)) throw new SaveError('date de la carte du jour illisible');
+  return { date, mod: oneOf(daily['mod'], DAILY_MODS) as DailyModId };
 }
 
 function parseStaffPost(raw: unknown): SavedStaffPost {

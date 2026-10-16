@@ -14,6 +14,9 @@ import type { World } from '../sim/world.ts';
 /** La clé de la partie en cours. */
 export const SAVE_KEY = 'adam:save';
 
+/** La clé de la partie du jour : un emplacement à part, la partie principale n'y est jamais touchée. */
+export const DAILY_SAVE_KEY = 'adam:daily-save';
+
 /** Où part une sauvegarde illisible avant qu'une nouvelle partie n'écrase la clé principale. */
 export const CORRUPT_SAVE_KEY = 'adam:save:corrupt';
 
@@ -29,20 +32,23 @@ export type LoadResult =
 
 export class LocalSave {
   private readonly storage: SaveStorage | null;
+  private readonly key: string;
 
-  public constructor(storage: SaveStorage | null) {
+  /** `key` : l'emplacement — la partie principale par défaut, `DAILY_SAVE_KEY` pour la carte du jour. */
+  public constructor(storage: SaveStorage | null, key: string = SAVE_KEY) {
     this.storage = storage;
+    this.key = key;
   }
 
   /**
    * Le `localStorage` du navigateur, s'il est joignable. Sa simple lecture
    * peut lever (cookies bloqués sous Safari, iframe isolée) : d'où le try.
    */
-  public static browser(): LocalSave {
+  public static browser(key: string = SAVE_KEY): LocalSave {
     try {
-      return new LocalSave(globalThis.localStorage ?? null);
+      return new LocalSave(globalThis.localStorage ?? null, key);
     } catch {
-      return new LocalSave(null);
+      return new LocalSave(null, key);
     }
   }
 
@@ -50,7 +56,7 @@ export class LocalSave {
     let text: string | null;
 
     try {
-      text = this.storage?.getItem(SAVE_KEY) ?? null;
+      text = this.storage?.getItem(this.key) ?? null;
     } catch {
       return { status: 'none' };
     }
@@ -69,7 +75,7 @@ export class LocalSave {
   /** Garde une copie de ce qu'on ne sait pas relire : la prochaine autosave écrasera la clé principale. */
   private keepUnreadable(text: string): void {
     try {
-      this.storage?.setItem(CORRUPT_SAVE_KEY, text);
+      this.storage?.setItem(this.key === SAVE_KEY ? CORRUPT_SAVE_KEY : `${this.key}:corrupt`, text);
     } catch {
       // Quota plein : la copie est un filet, elle ne doit pas empêcher de jouer.
     }
@@ -80,7 +86,7 @@ export class LocalSave {
     if (!this.storage) return false;
 
     try {
-      this.storage.setItem(SAVE_KEY, encodeSave(world, Date.now()));
+      this.storage.setItem(this.key, encodeSave(world, Date.now()));
       return true;
     } catch {
       return false;
@@ -90,7 +96,7 @@ export class LocalSave {
   /** Efface la partie : « Recommencer », ou la mairie tombée. */
   public clear(): void {
     try {
-      this.storage?.removeItem(SAVE_KEY);
+      this.storage?.removeItem(this.key);
     } catch {
       // Rien à faire : une sauvegarde qu'on ne peut pas effacer, on ne pouvait pas la lire non plus.
     }

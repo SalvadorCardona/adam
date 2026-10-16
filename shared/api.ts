@@ -457,3 +457,68 @@ export function isPartyError(value: unknown): value is PartyErrorResponse {
 
   return body['ok'] === false && typeof body['error'] === 'string' && PARTY_ERRORS.includes(body['error']);
 }
+
+/*
+ * Le classement de la carte du jour (facultatif). Une graine et un modificateur
+ * par date UTC, les mêmes pour tous (`sim/daily.ts`) ; le serveur ne garde que
+ * le meilleur score de chaque compte, par date. Sans serveur, le meilleur
+ * score reste sur l'appareil (`adam:daily`) et rien d'autre ne change.
+ */
+
+export const DAILY_LIMITS = {
+  /** Le classement montre les meilleurs, pas tout le monde. */
+  top: 20,
+  /** Un score plausible : le bilan en graines d'une colonie ne s'approche pas de cette borne. */
+  maxScore: 100_000,
+  /** Un score ne se dépose que pour la date du serveur, la veille ou le lendemain (les fuseaux se rattrapent). */
+  daysAround: 1,
+} as const;
+
+/** Le chemin du classement d'un jour (`GET` pour le lire, `POST` pour y déposer son score). */
+export const dailyPath = (date: string): string => `/daily/${date}`;
+
+/** `AAAA-MM-JJ`, une date de calendrier réelle (`2026-02-30` non). */
+export function isDailyDate(date: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(date);
+
+  if (!match) return false;
+
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const real = new Date(Date.UTC(year, month - 1, day));
+
+  return real.getUTCFullYear() === year && real.getUTCMonth() === month - 1 && real.getUTCDate() === day;
+}
+
+export interface DailyEntry {
+  readonly nickname: string;
+  readonly score: number;
+}
+
+export interface DailyResponse {
+  readonly ok: true;
+  readonly date: string;
+  /** Les meilleurs, du premier au dernier. */
+  readonly entries: readonly DailyEntry[];
+}
+
+export interface DailyErrorResponse {
+  readonly ok: false;
+  readonly error: 'unauthorized' | 'badDate' | 'badScore' | 'outOfRange';
+}
+
+export function isDailyResponse(value: unknown): value is DailyResponse {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const body = value as Record<string, unknown>;
+
+  return (
+    body['ok'] === true &&
+    typeof body['date'] === 'string' &&
+    Array.isArray(body['entries']) &&
+    body['entries'].every((entry: unknown) => {
+      const row = entry as Record<string, unknown> | null;
+
+      return typeof row === 'object' && row !== null && typeof row['nickname'] === 'string' && typeof row['score'] === 'number';
+    })
+  );
+}
