@@ -56,6 +56,9 @@
 
 import { TILE_SIZE } from '../core/grid.ts';
 import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
+import { NIGHT_STAKES } from '../data/dayNight.ts';
+import { hallDanger } from '../render/hallDanger.ts';
+import { reducedMotion } from '../render/motion.ts';
 import { COMPANIONS, COMPANION_CLASSES } from '../data/companions.ts';
 import type { ItemId } from '../data/items.ts';
 import { NEEDS, NEED_IDS, type NeedId } from '../data/needs.ts';
@@ -178,6 +181,18 @@ const CONFETTI_MS = 3200;
 
 /** Le bandeau d'une vague reste le temps de l'annonce, et s'efface quand les flaques bouillonnent ; celui de la victoire, un peu moins. */
 const BANNER_WAVE_MS = 4200;
+
+/** Où le bord pulse, en % de l'écran, pour chaque point de la boussole : du côté de la base de tête. */
+const EDGE_SPOTS: Readonly<Record<Compass, readonly [number, number]>> = {
+  east: [100, 50],
+  southEast: [100, 100],
+  south: [50, 100],
+  southWest: [0, 100],
+  west: [0, 50],
+  northWest: [0, 0],
+  north: [50, 0],
+  northEast: [100, 0],
+};
 const BANNER_CLEARED_MS = 3200;
 
 type ToastTone = 'info' | 'good' | 'bad';
@@ -261,6 +276,16 @@ export class Hud {
   private readonly hunger: HTMLButtonElement;
   /** « Vague dans 2:30 » : l'annonce de la prochaine vague (`World.waveForecast`). */
   private readonly waveSoon: HTMLButtonElement;
+  /** Les mutants abattus sur les mutants sortis cette nuit, à côté de la capsule de vague. */
+  private readonly tally: HTMLElement;
+  /** Le bord de l'écran qui pulse en corail du côté de la base de tête, puis la vignette de la mairie en danger. */
+  private readonly edge: HTMLElement;
+  private readonly vignette: HTMLElement;
+  private edgeTimer = 0;
+  private sent = 0;
+  private downed = 0;
+  private lastDanger = -1;
+
   private lastWave = '';
   private waveOrigin: { x: number; y: number } | null = null;
   private lastHunger = '';
@@ -469,6 +494,10 @@ export class Hud {
     this.waveSoon.addEventListener('click', () => {
       if (this.waveOrigin) this.onFocus(this.waveOrigin.x, this.waveOrigin.y);
     });
+    this.tally = element('div', 'panel hud-wave hud-tally');
+    this.tally.hidden = true;
+    this.edge = element('div', 'hud-edge');
+    this.vignette = element('div', 'hud-vignette');
     this.hastenButton = element('button', 'panel hud-wave hud-hasten');
     this.hastenButton.type = 'button';
     this.hastenButton.hidden = true;
@@ -606,7 +635,7 @@ export class Hud {
     main.append(this.bar, this.quest);
     this.left = element('div', 'hud-left');
     // L'horloge du jour juste à droite de la population.
-    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.comboChip, this.boonButton, this.waveSoon, this.hunger);
+    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.comboChip, this.boonButton, this.waveSoon, this.tally, this.hunger);
     this.right = element('div', 'hud-right');
     this.right.append(this.weather);
     this.top.append(this.left, main, this.right);
@@ -614,6 +643,8 @@ export class Hud {
     this.root.append(
       // Les confettis d'abord : ils tombent derrière les cartes du HUD et les fenêtres.
       this.confetti,
+      this.vignette,
+      this.edge,
       this.top,
       this.actions,
       this.countdown,
@@ -830,9 +861,36 @@ export class Hud {
       if (low && !this.hallLow) this.unfoldQuest(QUEST_ALERT_TICKS);
       this.hallLow = low;
     });
-    world.events.on('waveCleared', ({ night }) =>
-      this.showBanner('cleared', t().hud.wave.cleared(night), t().hud.wave.clearedText, null, BANNER_CLEARED_MS),
-    );
+    world.events.on('waveStarted', ({ wave, count, from }) => {
+      if (wave === 1) {
+        this.sent = 0;
+        this.downed = 0;
+      }
+      this.sent += count;
+      this.updateTally();
+      this.pulseEdge(from);
+    });
+    for (const kill of ['mutantDied', 'mutantStunned'] as const) {
+      world.events.on(kill, () => {
+        if (this.sent === 0) return;
+        this.downed += 1;
+        // Les larves de la Reine ne sont pas annoncées : le compteur ne reste jamais en retard.
+        this.sent = Math.max(this.sent, this.downed);
+        this.updateTally();
+      });
+    }
+    world.events.on('dawnBroke', () => {
+      this.sent = 0;
+      this.downed = 0;
+      this.updateTally();
+    });
+    // Le dernier mutant tombe : le ralenti court d'abord, le grand bandeau suit.
+    world.events.on('waveCleared', ({ night }) => {
+      window.setTimeout(
+        () => this.showBanner('cleared', t().hud.wave.cleared(night), t().hud.wave.clearedText, null, BANNER_CLEARED_MS),
+        reducedMotion() ? 0 : NIGHT_STAKES.slowMoMs,
+      );
+    });
     world.events.on('waveAnnounced', ({ ticks, count, from }) =>
       this.notify(t().hud.wave.announced(clock(Math.ceil(ticks / TICKS_PER_SECOND)), count, t().hud.from[from]), 'bad'),
     );
@@ -1234,6 +1292,43 @@ export class Hud {
       text('hud-wave-text', words.soonShort(time)),
       text('hud-wave-count', `×${forecast.count}`),
     );
+  }
+
+  private updateTally(): void {
+    this.tally.hidden = this.sent === 0;
+    if (this.sent === 0) return;
+
+    const label = t().hud.wave.tally(this.downed, this.sent);
+
+    this.tally.setAttribute('aria-label', label);
+    setTip(this.tally, label);
+    this.tally.replaceChildren(uiIcon('mutant', 18), text('hud-wave-text', `${this.downed}/${this.sent}`));
+  }
+
+  /** Le bord de l'écran pulse en corail du côté d'où la vague arrive, `edgePulseMs`. */
+  private pulseEdge(from: Compass): void {
+    if (reducedMotion()) return;
+
+    const [x, y] = EDGE_SPOTS[from];
+
+    this.edge.style.setProperty('--edge-x', `${x}%`);
+    this.edge.style.setProperty('--edge-y', `${y}%`);
+    this.edge.dataset['on'] = 'true';
+    window.clearTimeout(this.edgeTimer);
+    this.edgeTimer = window.setTimeout(() => {
+      this.edge.dataset['on'] = 'false';
+    }, NIGHT_STAKES.edgePulseMs);
+  }
+
+  /** La mairie sous la moitié de ses PV : la vignette corail bat, d'autant plus vite que les PV baissent. */
+  private updateVignette(): void {
+    const danger = Math.round(hallDanger(this.world) * 20) / 20;
+
+    if (danger === this.lastDanger) return;
+    this.lastDanger = danger;
+    this.vignette.dataset['on'] = String(danger > 0);
+    this.vignette.style.setProperty('--hall-danger', String(danger));
+    this.vignette.style.setProperty('--beat', `${(NIGHT_STAKES.beatSlowS - (NIGHT_STAKES.beatSlowS - NIGHT_STAKES.beatFastS) * danger).toFixed(2)}s`);
   }
 
   /** Centre la caméra sur un habitant qui a faim (ou soif) — au tap suivant, sur le suivant — et dit qui il est. */
@@ -1709,6 +1804,7 @@ export class Hud {
     this.updatePeople();
     this.updateHunger();
     this.updateWave();
+    this.updateVignette();
     this.updateSpeech();
     this.updatePerson();
     this.updateWeather();

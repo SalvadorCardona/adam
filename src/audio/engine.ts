@@ -70,6 +70,8 @@ export class AudioEngine {
   private music: Music | null = null;
   private samples: SampleBank | null = null;
   private mood = DAY_MOOD;
+  /** La mairie en danger, de 0 à 1 : le battement sourd de la nuit s'en nourrit. */
+  private danger = 0;
   /** La couche de tension : elle n'existe que la nuit, son activé. */
   private tension: NightLayer | null = null;
   private readonly lastPlayed = new Map<SoundName, number>();
@@ -236,6 +238,10 @@ export class AudioEngine {
    * morceau suit (jour, nuit, combat), en fondu ; un moment qui ne change
    * pas de morceau ne relance rien.
    */
+  public setDanger(danger: number): void {
+    this.danger = danger;
+  }
+
   public night(moment: NightMoment): void {
     const wasNight = this.mood.night;
 
@@ -269,7 +275,7 @@ export class AudioEngine {
     const wanted = this.mood.night && !this.mutedFlag && !this.musicFlag && this.ctx !== null && this.master !== null;
 
     if (wanted && !this.tension && this.ctx && this.master) {
-      this.tension = new NightLayer(this.ctx, this.master, (now) => nightLevels(this.mood, now));
+      this.tension = new NightLayer(this.ctx, this.master, (now) => nightLevels(this.mood, now, this.danger));
       this.tension.start(fadeS);
     } else if (!wanted && this.tension) {
       this.tension.stop(fadeS);

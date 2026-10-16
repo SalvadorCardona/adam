@@ -40,6 +40,8 @@
  * disques, pas de quoi justifier un pool.
  */
 
+import { NIGHT_STAKES } from '../data/dayNight.ts';
+import { hallDanger } from './hallDanger.ts';
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import { CHUNK_SIZE, TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { FAMILY_TONES, PALETTE, hex, type Tone } from '../data/artDirection.ts';
@@ -324,7 +326,8 @@ export class IndicatorLayer {
       const y = (hall.ty + hall.height / 2) * TILE_SIZE;
       const pulse = hall.kind === 'site' ? 1 + Math.sin(this.elapsed / 180) * 0.12 : 1;
       const blink = this.alarmMs > 0 && Math.floor(this.alarmMs / ALARM_BLINK_MS) % 2 === 0;
-      const scale = this.alarmMs > 0 ? 1.3 + Math.sin(this.elapsed / 90) * 0.1 : pulse;
+      const danger = hallDanger(this.world);
+      const scale = (this.alarmMs > 0 ? 1.3 + Math.sin(this.elapsed / 90) * 0.1 : pulse) * (1 + danger * NIGHT_STAKES.hallArrowGrow);
       const center = this.arrow(camera, zone, x, y, blink ? 'coral' : 'yellow', 1, scale, 'home');
       const tiles = Math.hypot(x - px, y - py) / TILE_SIZE;
 

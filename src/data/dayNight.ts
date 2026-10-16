@@ -47,19 +47,45 @@ export const NIGHT_TINT = {
   lamp: PALETTE.yellow.light,
   halo: PALETTE.toxic.base,
   /** Force du voile au cœur de la nuit (0 à 1) : la part d'indigo mêlée au blanc. */
-  veilStrength: 0.55,
+  veilStrength: 0.77,
   /** Rayon de la vision d'Adam, en tuiles. */
   visionRadius: 5,
   /** Rayon de la lueur d'un bâtiment, en tuiles, au-delà de son emprise. */
-  lampRadius: 2,
+  lampRadius: 2.5,
   /** Rayon du halo d'un mutant, en tuiles. */
   haloRadius: 1.2,
   /**
    * Plafond des lueurs (0 à 1) : au cœur d'une lampe, le voile glisse d'autant
    * vers sa couleur. Deux lueurs qui se recouvrent ne dépassent jamais ce plafond.
    */
-  lampCeiling: 0.45,
-  haloCeiling: 0.6,
+  lampCeiling: 0.6,
+  haloCeiling: 0.75,
+} as const;
+
+/**
+ * L'enjeu de la nuit à l'écran : des minuteurs de vue, la simulation n'en sait
+ * rien. Tout se coupe sous `prefers-reduced-motion`.
+ */
+export const NIGHT_STAKES = {
+  /** Secousse de caméra au cor, quand la vague s'annonce. */
+  hornShake: 0.35,
+  /** Le bord de l'écran pulse en corail du côté de la base de tête, en ms. */
+  edgePulseMs: 2000,
+  /** Arrêt sur image à chaque mise à mort, en ms ; au plus un par `hitStopGapMs`. */
+  hitStopMs: 40,
+  hitStopGapMs: 250,
+  /** Ralenti sur le dernier mutant : durée en ms, vitesse du temps. */
+  slowMoMs: 400,
+  slowMoScale: 0.3,
+  /** Sous cette part de PV, la mairie fait battre la vignette corail et le cœur sourd. */
+  hallLowRatio: 0.5,
+  /** La vignette bat entre ces durées (s) : lentement à 50 %, vite près de zéro. */
+  beatSlowS: 1.6,
+  beatFastS: 0.6,
+  /** Le tampon du repère de la mairie grossit jusqu'à ce facteur en plus à zéro PV. */
+  hallArrowGrow: 0.5,
+  /** Le battement sourd de la couche de tension monte jusqu'à ce facteur en plus. */
+  heartGain: 2,
 } as const;
 
 /** Le butin de l'aube quand la mairie a tenu la nuit : en ville, sinon dans le sac, le surplus au sol. */

@@ -9,6 +9,8 @@
  * peut le vérifier sans attendre.
  */
 
+import { NIGHT_STAKES } from '../data/dayNight.ts';
+
 /** Le tempo de la pulsation de nuit. */
 export const NIGHT_BPM = 78;
 
@@ -74,7 +76,8 @@ export function nightMood(mood: NightMood, moment: NightMoment, now: number): Ni
   }
 }
 
-export function nightLevels(mood: NightMood, now: number): NightLevels {
+/** `danger` (0 à 1) : la mairie sous la moitié de ses PV, le battement sourd de la grosse caisse monte d'autant. */
+export function nightLevels(mood: NightMood, now: number, danger = 0): NightLevels {
   if (!mood.night) {
     return { cutoff: MUSIC_DAY.cutoff, music: MUSIC_DAY.volume, drone: 0, pulse: 0, stepsPerBeat: 1 };
   }
@@ -85,7 +88,7 @@ export function nightLevels(mood: NightMood, now: number): NightLevels {
     cutoff: MUSIC_NIGHT.cutoff,
     music: MUSIC_NIGHT.volume,
     drone: DRONE.gain,
-    pulse: PULSE_GAIN,
+    pulse: PULSE_GAIN * (1 + danger * NIGHT_STAKES.heartGain),
     stepsPerBeat: fast ? 4 : 1,
   };
 }

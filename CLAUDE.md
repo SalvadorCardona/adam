@@ -354,6 +354,8 @@ leurs vraies durées ; cadran `dayDialSvg` de `art/ui.ts`) : l'aiguille porte
 le soleil, la lune la nuit, « J2 » à côté (un de plus à chaque aube) ; à
 `DAY_DIAL.nightWarning` de la nuit, elle bat en corail ; un tap dit « Jour 2 ·
 nuit dans 1:31 » (c'est aussi son `aria-label`).
+**Enjeu de la nuit à l'écran** (`NIGHT_STAKES`, `data/dayNight.ts` ; minuteurs de vue, la simulation n'en sait rien, tout coupé par `prefers-reduced-motion`) — voile plus profond (`veilStrength`) et lueurs plus fortes ; au cor, secousse de caméra, puis à la sortie le bord de l'écran pulse en corail 2 s du côté de la base de tête ; chaque mise à mort fige le temps 40 ms (`render/timeDilation.ts`), le dernier mutant le ralentit 0,4 s avant le grand bandeau « vague repoussée » ; compteur « abattus/sortis » à côté de la capsule de vague (`.hud-tally`) ; mairie sous 50 % de PV (`render/hallDanger.ts`) : vignette corail qui bat, repère de bord qui grossit, grosse caisse de la nuit plus sourde et plus forte (`AudioEngine.setDanger`).
+
 **Passer la nuit** — une nuit calme (`World.calmNight` : vague abattue ou
 jamais sortie, Adam debout, pas d'ami) montre à côté de l'horloge un bouton
 « Passer la nuit » (`.hud-hasten`, pictogramme `hasten`) ; actif, la boucle
