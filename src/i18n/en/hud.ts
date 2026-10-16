@@ -218,6 +218,11 @@ export const hud: Messages['hud'] = {
     day: (day: number, left: string): string => `Day ${day} · night in ${left}`,
     short: (day: number): string => `D${day}`,
   },
+  /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
+  hasten: {
+    idle: 'Skip the night',
+    active: (left: string): string => `Dawn in ${left}`,
+  },
   weather: {
     soon: (weather: string, seconds: number): string => `${weather} in ${seconds} s`,
   },

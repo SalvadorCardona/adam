@@ -4332,6 +4332,15 @@ export class World {
     return false;
   }
 
+  /**
+   * Une nuit calme : la vague de la nuit est abattue (ou n'est jamais sortie),
+   * Adam est debout, personne ne joue avec lui. Le joueur peut alors hâter
+   * l'aube (`HASTEN`) : le temps de jeu ne change pas, il passe plus vite.
+   */
+  public calmNight(): boolean {
+    return this.clock()?.phase === 'night' && !this.defeated && !this.dead && this.partner === null && !this.hasMutants();
+  }
+
   /** Ève, si elle a rejoint la colonie — en route ou arrivée. */
   public eve(): Eve | undefined {
     for (const mobile of this.mobiles.values()) {

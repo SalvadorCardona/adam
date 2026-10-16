@@ -1738,8 +1738,34 @@ button:disabled,
   font-size: 13px;
 }
 
+/*
+ * « Passer la nuit » : par nuit calme, à côté de l'horloge. Actif, il passe au
+ * jaune de la colonie et ses flèches filent vers l'aube.
+ */
+.hud .hud-hasten {
+  background: var(--violet);
+  box-shadow: 0 3px 0 var(--violet-shade);
+}
+
+.hud .hud-hasten[data-active='true'] {
+  background: var(--yellow);
+  box-shadow: 0 3px 0 var(--yellow-shade);
+  color: var(--ink);
+}
+
+.hud .hud-hasten[data-active='true'] .icon {
+  animation: hasten-run 600ms ease-in-out infinite;
+}
+
+@keyframes hasten-run {
+  50% {
+    transform: translateX(3px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .hud .hud-wave[data-urgent='true'] {
+  .hud .hud-wave[data-urgent='true'],
+  .hud .hud-hasten[data-active='true'] .icon {
     animation: none;
   }
 }

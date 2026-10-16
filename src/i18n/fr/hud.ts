@@ -269,6 +269,11 @@ export const hud = {
     /** Le numéro du jour, à côté du cadran. */
     short: (day: number): string => `J${day}`,
   },
+  /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
+  hasten: {
+    idle: 'Passer la nuit',
+    active: (left: string): string => `Aube dans ${left}`,
+  },
   /** La météo en capsule, sous la quête. */
   weather: {
     /** `weather` : son nom, avec sa majuscule. */

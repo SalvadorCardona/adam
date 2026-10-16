@@ -204,6 +204,11 @@ export class Hud {
   private readonly hintBulb: HTMLButtonElement;
   /** L'horloge du jour et de la nuit, dans la tête de la quête : cadran, numéro du jour, détail au tap. */
   private readonly dayClock: HTMLButtonElement;
+  /** « Passer la nuit » : visible par nuit calme, il hâte l'aube (`HASTEN`). */
+  private readonly hastenButton: HTMLButtonElement;
+  private hastenKey = '';
+  /** Le joueur a demandé de hâter l'aube ; `main.ts` le lit à chaque image. */
+  public hastening = false;
   private readonly dayClockDial: HTMLImageElement;
   private readonly dayClockDay: HTMLElement;
   private readonly dayClockTip: HTMLElement;
@@ -446,6 +451,13 @@ export class Hud {
     this.waveSoon.addEventListener('click', () => {
       if (this.waveOrigin) this.onFocus(this.waveOrigin.x, this.waveOrigin.y);
     });
+    this.hastenButton = element('button', 'panel hud-wave hud-hasten');
+    this.hastenButton.type = 'button';
+    this.hastenButton.hidden = true;
+    this.hastenButton.addEventListener('click', () => {
+      this.hastening = !this.hastening;
+      this.updateHasten();
+    });
     this.floats = element('div', 'hud-floats');
     this.stats = element('div', 'panel hud-stats');
     this.stats.hidden = !debug;
@@ -562,7 +574,7 @@ export class Hud {
     main.append(this.bar, this.quest);
     this.left = element('div', 'hud-left');
     // L'horloge du jour juste à droite de la population.
-    this.left.append(this.town, this.people, this.dayClock, this.waveSoon, this.hunger);
+    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.waveSoon, this.hunger);
     this.right = element('div', 'hud-right');
     this.right.append(this.weather);
     this.top.append(this.left, main, this.right);
@@ -1821,7 +1833,33 @@ export class Hud {
    * détail en toutes lettres au tap et pour les lecteurs d'écran. Cachée tant
    * que la mairie est en chantier — le cycle n'a pas commencé.
    */
+  /**
+   * « Passer la nuit » : le bouton n'existe que par nuit calme ; actif, il dit
+   * le temps jusqu'à l'aube. Un mutant qui reparaît, l'aube, la défaite : le
+   * bouton disparaît et le temps reprend son pas.
+   */
+  private updateHasten(): void {
+    const calm = this.world.calmNight();
+
+    if (!calm) this.hastening = false;
+    if (this.hastenButton.hidden !== !calm) this.hastenButton.hidden = !calm;
+    if (!calm) return;
+
+    const dial = this.world.dayDial();
+    const words = t().hud.hasten;
+    const label = this.hastening && dial ? words.active(clock(Math.ceil(dial.left / TICKS_PER_SECOND))) : words.idle;
+    const key = `${locale()}|${label}`;
+
+    if (key === this.hastenKey) return;
+    this.hastenKey = key;
+    this.hastenButton.dataset['active'] = String(this.hastening);
+    this.hastenButton.setAttribute('aria-pressed', String(this.hastening));
+    this.hastenButton.replaceChildren(uiIcon('hasten', 18), text('hud-wave-text', label));
+    setTip(this.hastenButton, label);
+  }
+
   private updateClock(): void {
+    this.updateHasten();
     const dial = this.world.dayDial();
 
     if (this.dayClock.hidden !== !dial) this.dayClock.hidden = !dial;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DAY_CYCLE, DAY_DIAL } from '../data/dayNight.ts';
 import { WAVES } from '../data/enemies.ts';
 import { CYCLE_TICKS, DIAL_ARCS, clockAt, darkness, dayDial, isWaveTick, ticksToNextWave, ticksToNight } from './dayNight.ts';
+import { World } from './world.ts';
 
 const NIGHTFALL = DAY_CYCLE.day + DAY_CYCLE.dusk;
 
@@ -93,5 +94,29 @@ describe('cadran de l’horloge du HUD', () => {
     expect(dayDial(clockAt(DAY_CYCLE.day))).toMatchObject({ phase: 'dusk', night: false, warning: true });
     expect(dayDial(clockAt(NIGHTFALL + 20))).toMatchObject({ night: true, left: DAY_CYCLE.night - 20, warning: false });
     expect(dayDial(clockAt(DAWN))).toMatchObject({ night: false, left: DAY_CYCLE.dawn + NIGHTFALL });
+  });
+});
+
+describe('nuit calme (« Passer la nuit »)', () => {
+  it('ni le jour, ni tant qu’un mutant rôde ; oui une fois la vague abattue', () => {
+    const world = new World(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+    expect(world.calmNight()).toBe(false);
+
+    while (world.clock()?.phase !== 'night') world.tick();
+    world.tick();
+
+    const mutants = [...world.mobiles.values()].filter((mobile) => mobile.kind === 'mutant');
+
+    expect(world.calmNight()).toBe(mutants.length === 0);
+    for (const mutant of mutants) world.mobiles.delete(mutant.id);
+    expect(world.calmNight()).toBe(true);
+
+    while (world.clock()?.phase === 'night') world.tick();
+    expect(world.calmNight()).toBe(false);
   });
 });

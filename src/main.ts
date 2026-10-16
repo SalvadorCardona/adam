@@ -15,6 +15,7 @@ import '@fontsource/fredoka/latin-600.css';
 import '@fontsource/fredoka/latin-700.css';
 import './style.css';
 import { rewardOf } from './data/achievements.ts';
+import { HASTEN } from './data/dayNight.ts';
 import { AudioEngine } from './audio/engine.ts';
 import { prefetchMusic } from './audio/music.ts';
 import { VOICES } from './audio/synth.ts';
@@ -1050,7 +1051,8 @@ async function main(): Promise<void> {
       guest.session.sync?.advance(ticker.deltaMS);
       accumulator = (guest.session.sync?.alpha ?? 0) * STEP_MS;
     } else if (running && !celebrating) {
-      accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS);
+      // Une nuit calme que le joueur fait passer : plus de ticks par image, la simulation n'en sait rien.
+      accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS) * (hud.hastening && world.calmNight() ? HASTEN.speed : 1);
     }
 
     while (!guest && accumulator >= STEP_MS && !celebrating) {

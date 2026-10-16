@@ -563,6 +563,17 @@ export const UI_ICONS = {
   ),
   /** Le joystick : un disque et son bouton, pour « glissez le pouce ». */
   move: svg(S, S, circle(12, 12, 10, cyan.light), circle(12.8, 12.8, 5.5, cyan.shade), circle(12, 12, 5, cyan.base)),
+  /** « Passer la nuit » : l'avance rapide, deux flèches jaunes vers l'aube. */
+  hasten: svg(
+    S,
+    S,
+    polygon([3.5, 6, 12.5, 12.5, 3.5, 19], yellow.shade),
+    polygon([11.5, 6, 20.5, 12.5, 11.5, 19], yellow.shade),
+    polygon([3, 5, 12, 11.5, 3, 18], yellow.base),
+    polygon([11, 5, 20, 11.5, 11, 18], yellow.base),
+    pill(4.2, 7, 1.6, 4, yellow.light),
+    pill(12.2, 7, 1.6, 4, yellow.light),
+  ),
   /** La flèche du bouton « Jouer ». */
   play: svg(S, S, polygon([8.5, 5.5, 19.5, 12.5, 8.5, 19.5], orange.shade), polygon([7.5, 4.5, 18.5, 11.5, 7.5, 18.5], paper.base)),
   /** « Recommencer », sur un bouton blanc : la flèche corail qui repart. */
