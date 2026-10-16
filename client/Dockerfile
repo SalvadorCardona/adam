@@ -21,6 +21,13 @@ COPY . .
 # Une variable `VITE_*` est figée dans le bundle : elle doit exister au build.
 ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
+# Le vocal : un relais TURN, facultatif (sans lui, STUN public seul). Voir docs/deploiement.md, « Vocal ».
+ARG VITE_TURN_URL=
+ARG VITE_TURN_USERNAME=
+ARG VITE_TURN_CREDENTIAL=
+ENV VITE_TURN_URL=$VITE_TURN_URL \
+    VITE_TURN_USERNAME=$VITE_TURN_USERNAME \
+    VITE_TURN_CREDENTIAL=$VITE_TURN_CREDENTIAL
 RUN npm run build
 
 FROM nginx:1.27-alpine

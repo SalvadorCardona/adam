@@ -88,14 +88,22 @@ export type ServerMessage =
   /** La session est fermée par l'hôte : plus personne n'y joue. */
   | { readonly type: 'ended' }
   /** Un message du jeu, tel que l'autre l'a envoyé ; `from` : l'ami qui l'envoie, pour l'hôte. */
-  | { readonly type: 'relay'; readonly data: unknown; readonly from?: number };
+  | { readonly type: 'relay'; readonly data: unknown; readonly from?: number }
+  /**
+   * La signalisation du vocal (WebRTC) d'un autre membre de la salle : le
+   * serveur ne la lit pas, il la passe avec l'id et le pseudo de l'expéditeur.
+   * Le son, lui, ne passe jamais par ici.
+   */
+  | { readonly type: 'voice'; readonly from: number; readonly nickname: string; readonly data: unknown };
 
 export type ClientMessage =
   | { readonly type: 'ping'; readonly t: number }
   | { readonly type: 'host'; readonly code: string; readonly token: string }
   | { readonly type: 'join'; readonly code: string; readonly token: string }
   /** Un message du jeu : de l'hôte à ses amis (`to` : un seul), ou de l'ami à l'hôte. */
-  | { readonly type: 'relay'; readonly data: unknown; readonly to?: number };
+  | { readonly type: 'relay'; readonly data: unknown; readonly to?: number }
+  /** Signalisation du vocal : à tous les autres membres de la salle, ou à `to` (l'id d'un compte) seulement. */
+  | { readonly type: 'voice'; readonly data: unknown; readonly to?: number };
 
 /**
  * Ce qu'un message refusé reçoit en retour : illisible, jeton inconnu, code
@@ -113,6 +121,14 @@ export const PLAY_LIMITS = {
   maxMessageBytes: 4 * 1024 * 1024,
   /** Messages relayés par seconde au plus, par connexion : au-delà, ils sont jetés. */
   relaysPerSecond: 60,
+} as const;
+
+/** Le vocal : sa signalisation a son propre budget, pour ne jamais gêner les pas de la partie. */
+export const VOICE_LIMITS = {
+  /** Une offre ou une réponse SDP tient dans quelques Ko ; au-delà, ce n'est pas du vocal. */
+  maxSignalBytes: 16 * 1024,
+  /** Messages de signalisation par seconde au plus, par connexion : une rafale de candidats ICE passe, le reste est jeté. */
+  signalsPerSecond: 40,
 } as const;
 
 /** Un message reçu par le serveur est-il l'un de ceux qu'il connaît ? */
@@ -133,6 +149,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   if ((type === 'host' || type === 'join') && typeof code === 'string' && typeof token === 'string') return { type, code, token };
   if (type === 'relay' && 'data' in message && (to === undefined || (typeof to === 'number' && Number.isSafeInteger(to)))) {
     return { type: 'relay', data: message['data'], ...(to !== undefined && { to }) };
+  }
+
+  if (type === 'voice' && 'data' in message && (to === undefined || (typeof to === 'number' && Number.isSafeInteger(to)))) {
+    return { type: 'voice', data: message['data'], ...(to !== undefined && { to }) };
   }
 
   return null;
@@ -167,6 +187,8 @@ export function parseServerMessage(raw: string): ServerMessage | null {
       return typeof message['guest'] === 'number' && typeof message['nickname'] === 'string' ? (value as ServerMessage) : null;
     case 'relay':
       return 'data' in message ? (value as ServerMessage) : null;
+    case 'voice':
+      return 'data' in message && typeof message['from'] === 'number' && typeof message['nickname'] === 'string' ? (value as ServerMessage) : null;
     default:
       return null;
   }

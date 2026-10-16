@@ -18,6 +18,7 @@ import { SAVE_VERSION, deserialize } from '../sim/save.ts';
 import type { World } from '../sim/world.ts';
 import { socketUrl } from './api.ts';
 import { GuestSync, HostSync, parseHostMessage, type HostMessage } from './lockstep.ts';
+import type { VoiceSignal } from './voice.ts';
 
 /** Ce dont on se sert d'un WebSocket : de quoi en brancher un faux dans les tests. */
 export interface SocketLike {
@@ -46,6 +47,18 @@ function send(socket: SocketLike | null, message: ClientMessage): void {
   }
 }
 
+/**
+ * Ce que le vocal (`voice.ts`) attend de la session : recevoir la signalisation
+ * de la salle, et savoir qui part. Il envoie par `sendVoice`. La session
+ * le ferme avec elle.
+ */
+export interface VoiceLine {
+  receive(from: number, nickname: string, data: unknown): void;
+  peerGone(id: number): void;
+  allGone(): void;
+  close(): void;
+}
+
 function read(event: { data: unknown }): ServerMessage | null {
   return typeof event.data === 'string' ? parseServerMessage(event.data) : null;
 }
@@ -71,6 +84,8 @@ export class HostSession {
   private stopped = false;
   private readonly nicknames = new Map<number, string>();
   private guest: number | null = null;
+  /** Le vocal de cette session, s'il y en a un (`main.ts` le branche). */
+  public voice: VoiceLine | null = null;
 
   public constructor(world: World, base: string, code: string, token: string, onEvent: (event: HostEvent) => void, open: OpenSocket = browserSocket) {
     this.code = code;
@@ -95,6 +110,7 @@ export class HostSession {
     if (this.stopped) return;
     this.stopped = true;
     this.sync.stop();
+    this.voice?.close();
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
 
@@ -106,6 +122,11 @@ export class HostSession {
 
   private relay(message: HostMessage, to?: number): void {
     send(this.socket, { type: 'relay', data: message, ...(to !== undefined && { to }) });
+  }
+
+  /** Un signal du vocal, à tous les membres de la salle ou à `to` seulement. */
+  public sendVoice(data: VoiceSignal, to?: number): void {
+    send(this.socket, { type: 'voice', data, ...(to !== undefined && { to }) });
   }
 
   private connect(): void {
@@ -131,6 +152,7 @@ export class HostSession {
       this.socket = null;
       // Le serveur ne relaie plus : l'ami, s'il était là, s'arrête et part s'il ne revient pas à temps.
       if (this.guest !== null) this.sync.guestOut(this.guest);
+      this.voice?.allGone();
       this.retry();
     };
   }
@@ -161,10 +183,14 @@ export class HostSession {
       case 'guestOut':
         if (this.guest === message.guest) this.guest = null;
         this.sync.guestOut(message.guest);
+        this.voice?.peerGone(message.guest);
         this.onEvent({ kind: 'guestOut', nickname: this.nicknames.get(message.guest) ?? '' });
         break;
       case 'relay':
         this.sync.receive(message.data, message.from);
+        break;
+      case 'voice':
+        this.voice?.receive(message.from, message.nickname, message.data);
         break;
       case 'ended':
         this.stop();
@@ -214,6 +240,8 @@ export class GuestSession {
   private socket: SocketLike | null = null;
   private host = '';
   private done = false;
+  /** Le vocal de cette session, s'il y en a un (`main.ts` le branche). */
+  public voice: VoiceLine | null = null;
 
   public constructor(base: string, code: string, token: string, onStatus: (status: GuestStatus) => void, open: OpenSocket = browserSocket) {
     this.url = socketUrl(base);
@@ -250,11 +278,17 @@ export class GuestSession {
   /** On quitte la partie : le socket se ferme, plus rien n'arrive. */
   public stop(): void {
     this.done = true;
+    this.voice?.close();
 
     const socket = this.socket;
 
     this.socket = null;
     socket?.close(1000, 'leave');
+  }
+
+  /** Un signal du vocal, à tous les membres de la salle ou à `to` seulement. */
+  public sendVoice(data: VoiceSignal, to?: number): void {
+    send(this.socket, { type: 'voice', data, ...(to !== undefined && { to }) });
   }
 
   private finish(status: GuestStatus): void {
@@ -275,6 +309,7 @@ export class GuestSession {
         else this.onStatus({ kind: 'waiting', host: this.host, hostOnline: true });
         break;
       case 'hostOut':
+        this.voice?.allGone();
         if (this.world) this.onStatus({ kind: 'hostLeft', host: this.host });
         else this.onStatus({ kind: 'waiting', host: this.host, hostOnline: false });
         break;
@@ -286,6 +321,9 @@ export class GuestSession {
         break;
       case 'relay':
         this.receive(message.data);
+        break;
+      case 'voice':
+        this.voice?.receive(message.from, message.nickname, message.data);
         break;
       default:
         break;

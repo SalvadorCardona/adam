@@ -23,6 +23,7 @@ export const gamepad: Messages['gamepad'] = {
     zoomStep: 'Zoom out, in',
     zoom: 'Smooth zoom',
     recenter: 'Back to Adam',
+    mic: 'Mute or unmute the microphone (voice chat)',
     pause: 'Pause',
     map: 'World map',
   },

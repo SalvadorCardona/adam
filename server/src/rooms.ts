@@ -17,7 +17,7 @@
  *   connexion, qui reçoit `replaced` et se ferme.
  */
 
-import { PLAY_LIMITS, type AccountUser, type ServerMessage } from '../../shared/api.ts';
+import { PLAY_LIMITS, VOICE_LIMITS, type AccountUser, type ServerMessage } from '../../shared/api.ts';
 import type { PartyDirectory } from './parties.ts';
 
 /** Une connexion, vue de la salle : on lui écrit, on la ferme. `ws` en est une. */
@@ -33,6 +33,8 @@ interface Seat {
   /** Les relais de la seconde en cours, pour la limite. */
   second: number;
   relays: number;
+  /** Les signaux du vocal de la seconde en cours : un budget à part, pour ne jamais gêner la partie. */
+  signals: number;
 }
 
 interface Room {
@@ -84,7 +86,7 @@ export class PartyRooms {
       room = { code, hostId: party.hostId, hostName: party.host, host: null, guests: new Map() };
       this.rooms.set(code, room);
     }
-    this.seats.set(peer, { code, role, user, second: 0, relays: 0 });
+    this.seats.set(peer, { code, role, user, second: 0, relays: 0, signals: 0 });
 
     if (role === 'host') {
       if (room.host && room.host !== peer) this.replace(room.host);
@@ -134,6 +136,35 @@ export class PartyRooms {
 
     for (const [id, guest] of room.guests) {
       if (to === undefined || to === id) guest.peer.send(text);
+    }
+  }
+
+  /**
+   * La signalisation du vocal : de tout membre de la salle aux autres, ou à
+   * `to` seulement (l'id de son compte, l'hôte compris). Le serveur ne la lit
+   * pas ; seuls les membres de la salle la reçoivent, jamais l'expéditeur.
+   */
+  public signal(peer: Peer, data: unknown, to?: number): void {
+    const seat = this.seats.get(peer);
+    const room = seat ? this.rooms.get(seat.code) : undefined;
+
+    if (!seat || !room) return send(peer, { type: 'error', reason: 'notInRoom' });
+
+    const second = Math.floor(this.clock() / 1000);
+
+    if (second !== seat.second) {
+      seat.second = second;
+      seat.relays = 0;
+      seat.signals = 0;
+    }
+    seat.signals += 1;
+    if (seat.signals > VOICE_LIMITS.signalsPerSecond) return;
+
+    const text = JSON.stringify({ type: 'voice', from: seat.user.id, nickname: seat.user.nickname, data } satisfies ServerMessage);
+
+    if (room.host && room.hostId !== seat.user.id && (to === undefined || to === room.hostId)) room.host.send(text);
+    for (const [id, guest] of room.guests) {
+      if (id !== seat.user.id && (to === undefined || to === id)) guest.peer.send(text);
     }
   }
 

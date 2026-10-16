@@ -9,6 +9,12 @@ describe('shortcutOf', () => {
     expect(shortcutOf({ code: 'Backquote', key: '²' })).toBe('debug');
   });
 
+  it('V coupe ou rouvre le micro du vocal', () => {
+    expect(shortcutOf({ code: 'KeyV', key: 'v' })).toBe('mic');
+    expect(shortcutOf({ code: 'KeyV', key: 'v', typing: true })).toBeNull();
+    expect(shortcutOf({ code: 'KeyV', key: 'v', ctrlKey: true })).toBeNull();
+  });
+
   it('M ouvre la carte, lu par caractère : le M d’un AZERTY comme celui d’un QWERTY', () => {
     expect(shortcutOf({ code: 'KeyM', key: 'm' })).toBe('map');
     expect(shortcutOf({ code: 'Semicolon', key: 'm' })).toBe('map');

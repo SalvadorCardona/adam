@@ -7954,3 +7954,211 @@ button[data-offline='true'] {
   width: 100%;
   color: var(--danger);
 }
+
+/* ------------------------------------------------------------------ vocal */
+
+/*
+ * Le bouton du vocal prend la place de « Inviter un ami » quand l'ami est là :
+ * la rangée ne compte pas un disque de plus. Micro coupé : corail ; quelqu'un
+ * parle : un anneau menthe qui bat.
+ */
+.hud-button[hidden] {
+  display: none;
+}
+
+.hud-voice[data-voice='on'] {
+  box-shadow: var(--face), 0 0 0 3px var(--good);
+}
+
+.hud-voice[data-voice='muted'] {
+  box-shadow: var(--face), 0 0 0 3px var(--danger);
+}
+
+.hud-voice[data-busy='true'] {
+  opacity: 0.6;
+}
+
+.hud-voice[data-speaking='true'] {
+  animation: voice-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  50% {
+    box-shadow: var(--face), 0 0 0 6px color-mix(in srgb, var(--good) 45%, transparent);
+  }
+}
+
+/* La fenêtre, sans voile : la partie tourne pour l'autre, elle ne s'arrête pas. */
+.voice-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(var(--safe-top) + 8px + var(--btn) + 12px);
+  right: calc(var(--safe-right) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(340px, calc(100% - 2 * 8px));
+  max-height: calc(100% - 140px);
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.voice-panel[hidden] {
+  display: none;
+}
+
+@media (max-width: 599px) {
+  .voice-panel {
+    right: calc(var(--safe-right) + 8px + var(--btn) + 12px);
+    width: min(340px, calc(100% - var(--btn) - 3 * 8px - 12px));
+  }
+}
+
+.voice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.voice-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.voice-status {
+  margin: 0;
+  font-weight: 600;
+  color: var(--good);
+}
+
+.voice-status[data-muted='true'] {
+  color: var(--danger);
+}
+
+.voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voice-actions > button {
+  flex: 1 1 130px;
+}
+
+.voice-leave {
+  color: var(--danger);
+}
+
+.voice-mute[aria-pressed='true'] {
+  color: var(--danger);
+}
+
+.voice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Un joueur : sa capsule creuse, qui s'allume en menthe quand il parle. */
+.voice-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--paper-shade);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.voice-member[data-speaking='true'] {
+  background: color-mix(in srgb, var(--good) 30%, var(--paper));
+}
+
+.voice-member[data-state='failed'] .voice-member-state {
+  color: var(--danger);
+}
+
+.voice-member-state {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.voice-empty {
+  justify-content: center;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.voice-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Les pseudos du vocal, en bas à gauche, sans prendre le doigt : ils s'allument quand on parle. */
+.voice-strip {
+  position: absolute;
+  z-index: 5;
+  left: calc(var(--safe-left) + 8px);
+  bottom: calc(var(--safe-bottom) + 76px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 45%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.voice-strip[hidden] {
+  display: none;
+}
+
+.voice-chip {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: var(--face);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+  transition: background 0.12s, color 0.12s;
+}
+
+.voice-chip[data-speaking='true'] {
+  background: var(--good);
+  color: var(--paper);
+  opacity: 1;
+}
+
+.voice-chip[data-muted='true'] {
+  text-decoration: line-through;
+}
+
+.voice-chip[data-state='failed'] {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-voice[data-speaking='true'] {
+    animation: none;
+  }
+}

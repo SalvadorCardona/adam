@@ -345,6 +345,29 @@ export const UI_ICONS = {
     pill(15.8, 14.6, 4.8, 1.2, paper.base),
     pill(17.6, 12.8, 1.2, 4.8, paper.base),
   ),
+  /** Le vocal : un micro indigo — capsule, pied en U, socle — et une onde menthe. */
+  mic: svg(
+    S,
+    S,
+    pill(8.5, 3.5, 7, 11.5, ink.shade),
+    pill(8, 3, 7, 11.5, ink.base),
+    pill(10, 4.6, 1.6, 4, ink.light),
+    polyline([5.5, 11.5, 5.5, 13, 8.5, 16.5, 12, 17, 15.5, 16.5, 18.5, 13, 18.5, 11.5], mint.shade),
+    line(12, 17, 12, 20.5, mint.shade),
+    pill(8, 20, 8, 2, mint.shade),
+  ),
+  /** Le micro coupé : le même, barré de corail. */
+  micOff: svg(
+    S,
+    S,
+    pill(8.5, 3.5, 7, 11.5, ink.shade),
+    pill(8, 3, 7, 11.5, ink.base),
+    pill(10, 4.6, 1.6, 4, ink.light),
+    polyline([5.5, 11.5, 5.5, 13, 8.5, 16.5, 12, 17, 15.5, 16.5, 18.5, 13, 18.5, 11.5], mint.shade),
+    line(12, 17, 12, 20.5, mint.shade),
+    pill(8, 20, 8, 2, mint.shade),
+    line(3.5, 3.5, 20.5, 20.5, coral.shade),
+  ),
   /** Un chevron vers le bas : le rappel d'un volet qui s'ouvre (retourné en CSS une fois ouvert). */
   chevron: svg(S, S, polyline([6, 9, 12, 15, 18, 9], violet.shade)),
   /** L'ampoule du conseil. */

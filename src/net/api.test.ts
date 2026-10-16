@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { API_SERVICE, API_VERSION } from '../../shared/api.ts';
+import { API_SERVICE, API_VERSION, parseClientMessage, parseServerMessage } from '../../shared/api.ts';
 import { apiBaseUrl, probeHealth, socketUrl } from './api.ts';
 
 const healthy = { ok: true, service: API_SERVICE, api: API_VERSION, schema: 1, uptime: 3 };
@@ -47,5 +47,21 @@ describe('probeHealth', () => {
       new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted'))));
 
     expect(await probeHealth('http://x', hanging, 10)).toBe(false);
+  });
+});
+
+describe('les messages du vocal', () => {
+  it('le serveur lit une signalisation, avec ou sans destinataire', () => {
+    expect(parseClientMessage('{"type":"voice","data":{"k":"join"}}')).toEqual({ type: 'voice', data: { k: 'join' } });
+    expect(parseClientMessage('{"type":"voice","data":1,"to":2}')).toEqual({ type: 'voice', data: 1, to: 2 });
+    expect(parseClientMessage('{"type":"voice"}')).toBeNull();
+    expect(parseClientMessage('{"type":"voice","data":1,"to":"2"}')).toBeNull();
+  });
+
+  it('le client lit une signalisation relayée, de qui l’a envoyée', () => {
+    const raw = '{"type":"voice","from":2,"nickname":"Lina","data":{"k":"leave"}}';
+
+    expect(parseServerMessage(raw)).toEqual({ type: 'voice', from: 2, nickname: 'Lina', data: { k: 'leave' } });
+    expect(parseServerMessage('{"type":"voice","data":{}}')).toBeNull();
   });
 });

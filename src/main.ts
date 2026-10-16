@@ -101,6 +101,9 @@ import { AccountPanel } from './ui/accountPanel.ts';
 import { InvitePanel } from './ui/invitePanel.ts';
 import { JoinPanel } from './ui/joinPanel.ts';
 import { PlayScreen } from './ui/playScreen.ts';
+import { VoiceChat } from './net/voice.ts';
+import { BrowserVoiceEnv } from './net/voiceBrowser.ts';
+import { VoicePanel } from './ui/voicePanel.ts';
 
 /**
  * Clamp anti-spirale de la mort.
@@ -298,10 +301,35 @@ async function main(): Promise<void> {
    * sauvegarder ici, comme en solo.
    */
   let hosting: HostSession | null = null;
+  /*
+   * Le vocal (`net/voice.ts`) : seulement dans une partie à deux, jamais en solo
+   * ni hors ligne — sans session, il n'y a pas de `VoiceChat`, et le micro
+   * n'est demandé qu'au clic « Rejoindre le vocal ». Le bouton prend la place
+   * de « Inviter un ami » quand l'ami est là.
+   */
+  const voicePanel = new VoicePanel(
+    (message, tone) => hud.notify(message, tone),
+    (state) => {
+      pause.setVoice(state);
+      hud.inviteButton.hidden = state !== 'hidden';
+    },
+  );
+  const attachVoice = (session: HostSession | GuestSession): void => {
+    const id = accounts.user?.id;
+
+    if (id === undefined) return;
+
+    const chat = new VoiceChat(id, new BrowserVoiceEnv(), (data, to) => session.sendVoice(data, to));
+
+    session.voice = chat;
+    voicePanel.bind(chat);
+  };
   const hostParty = (code: string | null): void => {
     if (guest || hosting?.code === code) return;
     hosting?.stop();
     hosting = null;
+    voicePanel.bind(null);
+    voicePanel.setPartner(false);
 
     const token = accounts.token;
 
@@ -314,6 +342,8 @@ async function main(): Promise<void> {
        * et la partie reprend — l'hôte, venu de la pause, n'a rien à faire, et
        * l'ami n'attend pas « qu'il reprenne le jeu ».
        */
+      if (event.kind === 'guestIn') voicePanel.setPartner(true);
+      if (event.kind === 'guestOut') voicePanel.setPartner(false);
       if (event.kind === 'guestIn') {
         setTimeout(() => {
           invitePanel.close();
@@ -323,10 +353,13 @@ async function main(): Promise<void> {
       }
       if (event.kind !== 'ended') return;
       hosting = null;
+      voicePanel.bind(null);
+      voicePanel.setPartner(false);
       hud.notify(t().party.play.sessionEnded, 'good');
     });
 
     hosting = session;
+    attachVoice(session);
     session.start();
   };
   const invitePanel = new InvitePanel(parties, accounts, connection, () => accountPanel.show(), hostParty);
@@ -508,6 +541,9 @@ async function main(): Promise<void> {
   zoom.root.prepend(worldMap.button);
   // Inviter un ami, sans passer par la pause : seulement si le jeu a un serveur, et pas chez l'ami déjà invité.
   if (connection.enabled && !guest) zoom.root.prepend(hud.inviteButton);
+  // Le vocal partage cette place : une session à deux seulement (l'ami arrivé, ou chez l'ami lui-même).
+  if (connection.enabled) zoom.root.prepend(voicePanel.button);
+
   zoom.root.append(hud.pauseButton, hud.settingsButton);
   hud.mountControls(zoom.root);
   // Les deux boutons du joueur, en bas à droite : le sac (inventaire et habillement), « Bâtir ».
@@ -665,7 +701,12 @@ async function main(): Promise<void> {
   // Jouer à deux : chacun voit l'autre arriver et partir.
   world.events.on('partnerJoined', ({ name }) => hud.notify(t().party.play.partnerJoined(name), 'good'));
   world.events.on('partnerLeft', ({ name }) => hud.notify(t().party.play.partnerLeft(name), 'bad'));
-  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest ? null : () => invitePanel.show());
+  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest ? null : () => invitePanel.show(), () => voicePanel.toggleMembership());
+  // Chez l'ami, l'hôte est là d'emblée : le vocal est à portée dès l'arrivée.
+  if (guest) {
+    attachVoice(guest.session);
+    voicePanel.setPartner(true);
+  }
   const title = new TitleScreen({
     resume: loaded.status === 'ok',
     notice: LOAD_NOTICES[loaded.status] ?? linkNotice(world),
@@ -782,7 +823,7 @@ async function main(): Promise<void> {
   hud.root.append(eras.root, eras.screen);
   // Par-dessus tout, écran titre compris : la langue se choisit avant même de jouer.
   settings.addAccountButton(accountPanel.button('button-secondary settings-toggle'));
-  hud.root.append(settings.root, invitePanel.root, ...(joinPanel ? [joinPanel.root] : []), accountPanel.root, padHelp.root);
+  hud.root.append(voicePanel.strip, voicePanel.root, settings.root, invitePanel.root, ...(joinPanel ? [joinPanel.root] : []), accountPanel.root, padHelp.root);
   mount.append(hud.root);
 
   /*
@@ -846,6 +887,10 @@ async function main(): Promise<void> {
         accountPanel.close();
         return;
       }
+      if (voicePanel.open) {
+        voicePanel.close();
+        return;
+      }
       // L'invitation, par-dessus la pause : elle se ferme avant elle ; l'écran « Rejoindre », lui, ramène au titre.
       if (invitePanel.open) {
         invitePanel.close();
@@ -893,6 +938,7 @@ async function main(): Promise<void> {
       if (worldMap.open) worldMap.close();
       else if (started && !paused && !settings.open && !inventory.open && !world.defeated) worldMap.show();
     }
+    if (shortcut === 'mic') voicePanel.toggleMic();
     if (shortcut === 'debug' && import.meta.env.DEV) hud.toggleDebug();
   }
 
@@ -927,6 +973,7 @@ async function main(): Promise<void> {
     inventory: () => runShortcut('inventory'),
     build: () => buildMenu.handleKey('Space', false, canOpenMenu()),
     map: () => runShortcut('map'),
+    mic: () => runShortcut('mic'),
     zoomStep: (direction) => (worldMap.open ? worldMap.stepZoom(direction) : renderer.stepZoom(direction)),
     zoomBy: (factor) => {
       if (!worldMap.open) renderer.zoomBy(factor, null, true);

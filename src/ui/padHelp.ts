@@ -28,6 +28,7 @@ const ROWS: readonly { keys: readonly HelpKey[]; action: keyof Messages['gamepad
   { keys: ['l1', 'r1'], action: 'zoomStep' },
   { keys: ['l2', 'r2'], action: 'zoom' },
   { keys: ['r3'], action: 'recenter' },
+  { keys: ['l3'], action: 'mic' },
   { keys: ['start'], action: 'pause' },
   { keys: ['select'], action: 'map' },
 ];

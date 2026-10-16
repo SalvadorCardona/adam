@@ -7,6 +7,7 @@
  * - I : le sac, lu par position comme ZQSD ;
  * - M : la carte du monde, lue par caractère — c'est une initiale, et le M
  *   d'un clavier AZERTY n'est pas à la place de celui d'un QWERTY ;
+ * - V : couper ou rouvrir le micro du vocal (L3 à la manette) ;
  * - ² / ` : les statistiques de debug, en dev seulement.
  *
  * Une touche tapée dans un champ (la recherche du menu, un curseur de
@@ -18,7 +19,7 @@
  * Fonction pure, sans DOM : `main.ts` l'applique, les tests la lisent.
  */
 
-export type Shortcut = 'pause' | 'escape' | 'inventory' | 'map' | 'debug';
+export type Shortcut = 'pause' | 'escape' | 'inventory' | 'map' | 'mic' | 'debug';
 
 /** Ce qu'il faut savoir d'une touche enfoncée : `KeyboardEvent`, et si un champ de saisie a le focus. */
 export interface KeyPress {
@@ -38,6 +39,7 @@ export function shortcutOf(press: KeyPress): Shortcut | null {
   if (press.code === 'Backquote') return 'debug';
   if (press.code === 'KeyP') return 'pause';
   if (press.code === 'KeyI') return 'inventory';
+  if (press.code === 'KeyV') return 'mic';
   if (press.key.toLowerCase() === 'm') return 'map';
   return null;
 }
