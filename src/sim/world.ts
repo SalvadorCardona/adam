@@ -583,6 +583,8 @@ export type WorldEvents = {
   raiderBred: { id: number; raiders: number };
   /** Au crépuscule, la veille : la Reine des flaques sortira la nuit `night`. */
   queenAnnounced: { night: number };
+  /** Au crépuscule qui précède la première nuit sans grâce : Ève prévient que les mutants viennent pour de vrai. */
+  graceEnding: { night: number };
   /** La Reine pond : `count` larves sortent de terre autour de (x, y). */
   queenLaid: { id: MobileId; count: number; x: number; y: number };
   /** La Reine plonge en (x, y) et ressortira en (toX, toY), près de la tour `prey`. */
@@ -7425,6 +7427,8 @@ export class World {
       if (clock.phase === 'dusk' && isStarNight(this.seed, clock.cycle)) this.events.emit('starfallAnnounced', { night: clock.cycle });
       // La veille au soir, Ève prévient : la Reine sort demain.
       if (clock.phase === 'dusk' && queenWave(clock.cycle + 1) !== null) this.events.emit('queenAnnounced', { night: clock.cycle + 1 });
+      // Le soir qui précède la première nuit sans grâce, Ève prévient : cette fois, ils viennent pour de vrai.
+      if (clock.phase === 'dusk' && clock.cycle === WAVE_STRENGTH.graceNights + 1) this.events.emit('graceEnding', { night: clock.cycle });
       if (clock.phase === 'night') this.night = clock.cycle;
       if (clock.phase === 'dawn') this.dawn();
     }
@@ -9560,9 +9564,9 @@ export class World {
     else if (entity.hp === 0) this.destroyBuilding(entity);
   }
 
-  /** Une des premières nuits (`WAVE_STRENGTH.earlyCaps`) : la grâce d'une colonie neuve. */
+  /** Une des premières nuits (`WAVE_STRENGTH.graceNights`) : la grâce d'une colonie neuve. */
   private graceNight(): boolean {
-    return this.night >= 1 && this.night <= WAVE_STRENGTH.earlyCaps.length;
+    return this.night >= 1 && this.night <= WAVE_STRENGTH.graceNights;
   }
 
   private destroyBuilding(building: Building): void {

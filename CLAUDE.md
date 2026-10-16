@@ -445,7 +445,7 @@ du monde, un toast et la notification « Vague annoncée » (type `attack` des
 Notifications, `waveAnnounced`) si la fenêtre n'a pas le focus.
 L'effectif annoncé est exact : la production des bases se déroule d'avance
 (`projectedRaiders`). Pas de vague hors ligne : onglet caché, le jeu est en pause.
-Grâce des trois premières nuits (`WAVE_STRENGTH.earlyCaps`, `earlyCap`) : la réserve commune des bases est plafonnée à 2, 3, 4 assaillants, quel que soit le nombre de bases du premier anneau, et la prévision suit. Ces nuits-là, la mairie ne descend pas sous `WAVE_STRENGTH.graceHallFloor` de ses PV : elle sort abîmée, jamais à terre. Force (`WAVE_STRENGTH`) : la cadence des bases (le temps), plus des renforts
+Plafond commun des premières nuits (`WAVE_STRENGTH.earlyCaps`, `earlyCap`) : la réserve des bases est plafonnée à 2, 3, 4, 4, 5, 6, 6, 7, 8… assaillants (une ligne par nuit, jusqu'à la 14), quel que soit le nombre de bases du premier anneau, et la prévision suit : il monte d'un ou deux par nuit jusqu'à rejoindre la production réelle, sans saut de plus de ×1,6 (`defense.test.ts`). Grâce des trois premières nuits (`WAVE_STRENGTH.graceNights`) : la mairie ne descend pas sous `WAVE_STRENGTH.graceHallFloor` de ses PV : elle sort abîmée, jamais à terre. Au crépuscule qui précède la première nuit sans grâce (la 4), Ève prévient (`graceEnding`, « Cette nuit, ils viennent pour de vrai »), et le chapitre 2 demande une tour de guet (`firstTower`, recherche « Guet »). Force (`WAVE_STRENGTH`) : la cadence des bases (le temps), plus des renforts
 de la base de tête — `perEra` par ère (`waveEraOf` : fin de l’acte I, Signal) et
 un par `buildingsPerRaider` bâtiments au-delà de `freeBuildings`, palissades
 exclues (`World.townSize`). Abattue toute avant l'aube, une vague paie sa
@@ -464,7 +464,7 @@ La courbe vient des bases : chaque nuit, elles produisent plus vite
 (`RAIDS.paceGrowth`) et en gardent plus (`capacityEvery`), les anneaux
 lointains s'éveillent plus tard (`raid.from`). Les chefs sont une table
 (`NIGHT_BOSSES`, cinq dernières nuits répétées) : un **gros mutant**
-(`brute`) dès la nuit 5, et aux nuits 10, 15, 20…
+(`brute`) dès la nuit 6, et aux nuits 10, 15, 20…
 la **Reine des flaques** (`queen`, `QUEEN`), tous sortis de la base la plus proche de la mairie :
 annoncée la veille au crépuscule par Ève, compte à rebours au bandeau
 (`World.queenCountdown()`). Phase 1, elle marche sur la mairie et pond des
@@ -609,7 +609,7 @@ chacun avec plusieurs objectifs ouverts à la fois, faits dans l'ordre qu'on
 veut ; le suivant s'ouvre quand tous sont réussis (`World.chapter`,
 `World.objectivesDone` par id, `World.chapterBase` ; événements
 `objectiveCompleted` puis `chapterCompleted`). Le premier toit (la mairie,
-seule), les fondations (labo, cabane, carrière, puits, maison), passer la nuit
+seule), les fondations (labo, cabane, carrière, puits, maison, première tour de guet), passer la nuit
 (3 nuits, 2 tours de guet, 4 palissades), les demandes d'Ève (ses quêtes,
 postes de logistique et de construction), nourrir la ville (élevage, ferme,
 20 pains, premier enfant), l'industrie (20 fer, 20 charbons, 10 plaques,

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { TILE_SIZE } from '../core/grid.ts';
 import { REPAIR, buildingLevel } from '../data/buildings.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
-import { ENEMIES, QUEEN, nightBosses, queenWave } from '../data/enemies.ts';
+import { ENEMIES, QUEEN, WAVE_STRENGTH, nightBosses, queenWave } from '../data/enemies.ts';
 import type { ItemId } from '../data/items.ts';
 import { isTargetable } from './combat.ts';
+import { raidCapacity } from './enemyBases.ts';
 import { queenPhase } from './enemies.ts';
+import { earlyCap } from './waves.ts';
 import { deserialize, serialize } from './save.ts';
 import type { Mutant } from './types.ts';
 import { repairCost } from './world.ts';
@@ -91,14 +93,14 @@ describe('réparer', () => {
 
 
 describe('Reine des flaques — calendrier', () => {
-  it('sort aux nuits 10, 15, 20 ; la nuit 5 garde son gros mutant', () => {
+  it('sort aux nuits 10, 15, 20 ; la nuit 6 garde son gros mutant', () => {
     expect(nightBosses(10).queen).toBe(1);
     expect(queenWave(10)).not.toBeNull();
     expect(queenWave(15)).not.toBeNull();
     expect(queenWave(20)).not.toBeNull();
 
     for (const night of [1, 4, 5, 6, 9, 11, 14, 16]) expect(queenWave(night), `nuit ${night}`).toBeNull();
-    expect(nightBosses(5).brute).toBe(1);
+    expect(nightBosses(6).brute).toBe(1);
     expect(nightBosses(9).queen ?? 0).toBe(0);
   });
 
@@ -241,3 +243,47 @@ describe('Reine des flaques — phases', () => {
  * crépuscule à son aube. Deux tours de base ne se couvrent pas assez : elle
  * en rase une. Quatre tours renforcées la descendent avant le jour.
  */
+
+describe('sortie de grâce', () => {
+  const SEEDS = [1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 42, 99, 100, 1234];
+
+  it('le plafond monte d’un ou deux par nuit, sans saut de plus de ×1,6', () => {
+    const caps = WAVE_STRENGTH.earlyCaps;
+
+    expect(caps.length).toBeGreaterThanOrEqual(8);
+    expect(caps.slice(0, WAVE_STRENGTH.graceNights + 1)).toEqual([2, 3, 4, 4]);
+    caps.slice(1).forEach((cap, k) => {
+      expect(cap - caps[k]!, `nuit ${k + 2}`).toBeGreaterThanOrEqual(0);
+      expect(cap - caps[k]!, `nuit ${k + 2}`).toBeLessThanOrEqual(2);
+      expect(cap / caps[k]!, `nuit ${k + 2}`).toBeLessThanOrEqual(1.6);
+    });
+  });
+
+  it('la vague la plus forte que les bases permettent, nuits 1 à 8, ne saute jamais de plus de ×1,6', () => {
+    for (const seed of SEEDS) {
+      const { enemyBases } = worldWithTownHall(seed);
+      // Les bases pleines, plafond commun appliqué : le plus que la carte puisse lâcher cette nuit-là.
+      const ceiling = (night: number): number =>
+        Math.min(earlyCap(night), enemyBases.reduce((sum, base) => sum + raidCapacity(base.level, night), 0)) +
+        Object.values(nightBosses(night)).reduce((sum, n) => sum + n, 0);
+      const counts = Array.from({ length: 8 }, (_, k) => ceiling(k + 1));
+
+      counts.slice(1).forEach((count, k) => {
+        if (counts[k] === 0) return;
+        expect(count / counts[k]!, `graine ${seed}, nuit ${k + 2} : ${counts.join(', ')}`).toBeLessThanOrEqual(1.6);
+      });
+    }
+  });
+
+  it('Ève prévient au crépuscule de la première nuit sans grâce, et de celle-là seule', () => {
+    const world = worldWithTownHall(42);
+    const warned: number[] = [];
+
+    world.events.on('graceEnding', ({ night }) => warned.push(night));
+    for (const night of [2, 3, 4, 5]) {
+      jumpToNight(world, night, DAY_CYCLE.dusk);
+      world.tick();
+    }
+    expect(warned).toEqual([WAVE_STRENGTH.graceNights + 1]);
+  });
+});

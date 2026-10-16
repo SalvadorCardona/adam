@@ -51,7 +51,8 @@ describe('courbe des nuits', () => {
 
     expect(world.defeated).toBe(false);
     expect(world.night).toBe(10);
-    expect(lowest).toBeGreaterThan(BUILDINGS.townHall.hp / 3);
+    // Le gros mutant de la nuit 6 (et non plus 5) frappe une mairie moins réparée : un tiers, à quelques points près.
+    expect(lowest).toBeGreaterThan(BUILDINGS.townHall.hp * 0.3);
   }, 60_000);
 });
 
@@ -162,10 +163,10 @@ describe('premières nuits', () => {
   it('les nuits 1 à 3 plafonnent l’effectif, et il varie peu d’une carte à l’autre', () => {
     const all = SEEDS.map((seed) => raidsOf(seed, 3));
 
-    for (const [index, cap] of WAVE_STRENGTH.earlyCaps.entries()) {
+    for (let index = 0; index < WAVE_STRENGTH.graceNights; index += 1) {
       const night = all.map((counts) => counts[index]!);
 
-      expect(Math.max(...night)).toBeLessThanOrEqual(cap);
+      expect(Math.max(...night)).toBeLessThanOrEqual(WAVE_STRENGTH.earlyCaps[index]!);
       expect(Math.max(...night) - Math.min(...night)).toBeLessThanOrEqual(SPREAD);
     }
   }, 120_000);
@@ -201,7 +202,7 @@ describe('premières nuits', () => {
     // Adam part loin, hors de portée de son arc : rien ne défend la mairie.
     world.player.x = world.player.prevX = (hall.tx + 60) * TILE_SIZE;
     world.player.y = world.player.prevY = (hall.ty + 60) * TILE_SIZE;
-    for (let night = 1; night <= WAVE_STRENGTH.earlyCaps.length; night += 1) {
+    for (let night = 1; night <= WAVE_STRENGTH.graceNights; night += 1) {
       playThroughNight(world, night, () => {
         lowest = Math.min(lowest, hallOf(world).hp);
       });
