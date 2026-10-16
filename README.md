@@ -282,7 +282,7 @@ l'autre donne un écran noir.
 
 ## Auteur
 
-[Salvador Cardona](https://cardona.digital)
+A Hermez product
 
 ## Licence
 
