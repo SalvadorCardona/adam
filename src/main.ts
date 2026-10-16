@@ -16,7 +16,7 @@ import '@fontsource/fredoka/latin-700.css';
 import './style.css';
 import { HarvestCombo, comboPitch } from './ui/harvestCombo.ts';
 import { rewardOf } from './data/achievements.ts';
-import { HASTEN } from './data/dayNight.ts';
+import { HASTEN, NIGHT_STAKES } from './data/dayNight.ts';
 import { AudioEngine } from './audio/engine.ts';
 import { prefetchMusic } from './audio/music.ts';
 import { VOICES } from './audio/synth.ts';
@@ -40,7 +40,10 @@ import { shortcutOf, type Shortcut } from './input/shortcuts.ts';
 import { Placement } from './input/placement.ts';
 import { PointerRouter } from './input/pointer.ts';
 import { Pinch, bindWheelZoom } from './input/zoom.ts';
+import { hallDanger } from './render/hallDanger.ts';
+import { reducedMotion } from './render/motion.ts';
 import { GameRenderer } from './render/renderer.ts';
+import { TimeDilation } from './render/timeDilation.ts';
 import { AchievementTracker } from './sim/achievements.ts';
 import { earnedSkins, type Collection } from './sim/collection.ts';
 import { activePerks, harvestSeeds, plant, type Garden } from './sim/garden.ts';
@@ -1153,6 +1156,11 @@ async function main(): Promise<void> {
 
   let accumulator = 0;
   let frame = 0;
+  // Arrêt sur image à la mise à mort, ralenti sur le dernier mutant : le temps de la vue, pas de la simulation.
+  const dilation = new TimeDilation(reducedMotion);
+
+  for (const kill of ['mutantDied', 'mutantStunned'] as const) world.events.on(kill, () => dilation.hit());
+  world.events.on('waveCleared', () => dilation.slow());
 
   // Une partie de test peut s'ouvrir sur l'éditeur de personnage, pour les captures.
   if (scenario && (TEST_SCENARIOS[scenario] as TestScenarioProto).wardrobe?.open) inventory.show('wardrobe');
@@ -1173,7 +1181,9 @@ async function main(): Promise<void> {
       accumulator = (guest.session.sync?.alpha ?? 0) * STEP_MS;
     } else if (running && !celebrating) {
       // Une nuit calme que le joueur fait passer : plus de ticks par image, la simulation n'en sait rien.
-      accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS) * (hud.hastening && world.calmNight() ? HASTEN.speed : 1);
+      accumulator +=
+        Math.min(ticker.deltaMS, MAX_FRAME_MS) * (hud.hastening && world.calmNight() ? HASTEN.speed : 1) * dilation.scale(ticker.deltaMS);
+      audio.setDanger(hallDanger(world));
     }
 
     while (!guest && accumulator >= STEP_MS && !celebrating) {
@@ -1959,6 +1969,8 @@ function wireAlarm(world: World, renderer: GameRenderer, hud: Hud): void {
  */
 function wireShake(world: World, renderer: GameRenderer, busy: () => boolean): void {
   world.events.on('waveCountdown', ({ seconds, x, y }) => {
+    // Au cor, la caméra tremble un instant.
+    if (seconds === WAVE_ANNOUNCE_SECONDS && !reducedMotion()) renderer.shake(NIGHT_STAKES.hornShake);
     if (seconds === WAVE_ANNOUNCE_SECONDS && !busy()) renderer.zoomOut(WAVE_ZOOM, WAVE_ZOOM_MS, { x, y });
   });
   world.events.on('waveStarted', ({ x, y }) => {

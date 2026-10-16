@@ -202,6 +202,65 @@ button:disabled,
   }
 }
 
+/* L'enjeu de la nuit : le bord qui pulse du côté de la vague, la vignette de la mairie en danger. */
+.hud-edge,
+.hud-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.hud-edge {
+  background: radial-gradient(ellipse 70% 70% at var(--edge-x, 50%) var(--edge-y, 50%), rgb(255 77 109 / 0.75), transparent 70%);
+}
+
+.hud-edge[data-on='true'] {
+  animation: edge-pulse 0.5s ease-in-out 4;
+}
+
+@keyframes edge-pulse {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.hud-vignette {
+  background: radial-gradient(ellipse at center, transparent 45%, rgb(217 42 91 / 0.7) 100%);
+}
+
+.hud-vignette[data-on='true'] {
+  animation: hall-beat var(--beat, 1.6s) ease-in-out infinite;
+}
+
+@keyframes hall-beat {
+  0%,
+  100% {
+    opacity: calc(0.25 + var(--hall-danger, 0) * 0.3);
+  }
+  20% {
+    opacity: calc(0.6 + var(--hall-danger, 0) * 0.4);
+  }
+  40% {
+    opacity: calc(0.3 + var(--hall-danger, 0) * 0.3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-edge {
+    display: none;
+  }
+
+  .hud-vignette[data-on='true'] {
+    animation: none;
+    opacity: calc(0.3 + var(--hall-danger, 0) * 0.4);
+  }
+}
+
 /* Le HUD flotte au-dessus du canvas et ne capte le doigt que sur ses boutons. */
 .hud {
   position: absolute;
@@ -3347,6 +3406,7 @@ button:disabled,
 
 .hud-banner[data-tone='cleared'] .hud-banner-title {
   color: var(--good-text);
+  font-size: 32px;
 }
 
 @keyframes banner-in {

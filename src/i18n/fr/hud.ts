@@ -214,6 +214,8 @@ export const hud = {
   /** Le bandeau des vagues et de la Reine. */
   wave: {
     night: (night: number): string => `Nuit ${night}`,
+    /** Le compteur sous la capsule de vague : abattus sur envoyés. */
+    tally: (done: number, total: number): string => `${done} mutants abattus sur ${total}`,
     reinforcements: 'Renforts',
     /** `from` : « par le nord » (`from`). */
     queen: (from: string): string => `La Reine des flaques sort ${from} !`,

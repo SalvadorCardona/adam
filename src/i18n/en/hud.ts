@@ -176,6 +176,8 @@ export const hud: Messages['hud'] = {
   },
   wave: {
     night: (night: number): string => `Night ${night}`,
+    /** Le compteur sous la capsule de vague : abattus sur envoyés. */
+    tally: (done: number, total: number): string => `${done} of ${total} mutants down`,
     reinforcements: 'Reinforcements',
     queen: (from: string): string => `The Puddle Queen rises ${from}!`,
     boss: (from: string, target: string): string => `A big mutant leads the charge ${from}: it’s after the ${lower(target)}!`,
