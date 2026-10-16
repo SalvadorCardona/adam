@@ -219,6 +219,10 @@ export const hud: Messages['hud'] = {
     short: (day: number): string => `D${day}`,
   },
   /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
+  daily: {
+    title: 'Daily challenge',
+    done: (label: string, prestige: number): string => `Daily challenge done: ${label}! +${prestige} Prestige`,
+  },
   boon: {
     title: 'Dawn favour',
     lead: 'The night is held. Eve found something to help you: pick one card.',

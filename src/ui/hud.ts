@@ -68,6 +68,7 @@ import { RESEARCH, type ResearchId } from '../data/research.ts';
 import { WEATHER, WEATHER_CALENDAR } from '../data/weather.ts';
 import { dayDialSvg, type UiIcon } from '../art/ui.ts';
 import { BOONS } from '../data/boons.ts';
+import { CHALLENGES, type ChallengeId } from '../data/challenges.ts';
 import type { AtlasStats } from '../render/spriteLibrary.ts';
 import type { WaterStats } from '../render/waterLayer.ts';
 import type { Compass } from '../sim/enemies.ts';
@@ -1740,7 +1741,9 @@ export class Hud {
     const quest = world.eve()?.state === 'idle' || world.eve()?.state === 'repair' ? currentQuest(world.questsDone) : null;
     const progress = quest ? questProgress(quest, world.entities.values()) : null;
 
-    key = `hall:${world.chapter}:${progressKey}:${detailKey}:${selected}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}`;
+    const daily = world.challenge();
+
+    key = `hall:${world.chapter}:${progressKey}:${detailKey}:${selected}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}:${daily && `${daily.id}:${daily.have}:${daily.done}`}`;
     if (key === this.lastQuest) return;
     this.lastQuest = key;
 
@@ -1773,6 +1776,7 @@ export class Hud {
       line,
     );
     if (this.crewOpen) this.questBody.append(crewDetail(crew));
+    if (daily) this.questBody.append(dailyRow(daily));
 
     if (quest && progress) {
       const row = element('div', 'hud-quest-eve');
@@ -2718,4 +2722,21 @@ export function clock(seconds: number): string {
   const rest = seconds % 60;
 
   return `${minutes}:${rest.toString().padStart(2, '0')}`;
+}
+
+/** Le défi du jour, sous les objectifs : son icône, son intitulé, sa jauge — cochée une fois réussi. */
+function dailyRow(daily: { id: ChallengeId; have: number; need: number; done: boolean }): HTMLElement {
+  const row = element('div', 'hud-quest-daily');
+  const { icon } = CHALLENGES[daily.id];
+  const label = text('hud-quest-daily-label', t().challenges[daily.id]);
+
+  row.dataset['done'] = String(daily.done);
+  row.append(
+    text('hud-quest-daily-title', t().hud.daily.title),
+    daily.done ? uiIcon('check', 18) : 'item' in icon ? itemIcon(icon.item, 18) : uiIcon(icon.ui, 18),
+    label,
+    bar(daily.have / daily.need),
+    text('hud-meter-value', `${daily.have}/${daily.need}`),
+  );
+  return row;
 }

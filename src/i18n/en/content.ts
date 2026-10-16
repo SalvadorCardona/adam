@@ -1118,6 +1118,15 @@ export const content: Content = {
       description: 'A drill in the colony’s colours.',
     },
   },
+  challenges: {
+    woodcutter: 'Harvest 40 wood',
+    stonecutter: 'Harvest 30 stone',
+    miner: 'Harvest 12 iron ore',
+    courier: 'Deliver 30 items to sites',
+    builder: 'Finish 2 buildings',
+    hunter: 'Defeat 4 enemies',
+    scout: 'Discover 250 tiles',
+  },
   boons: {
     coffee: { label: 'Eve’s coffee', description: 'Everyone trots along: 30% faster until nightfall.' },
     workSongs: { label: 'Work songs', description: 'Everyone works 40% faster until nightfall.' },

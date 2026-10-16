@@ -904,6 +904,45 @@ button:disabled,
   flex: 1;
 }
 
+/*
+ * Le défi du jour : son titre en capitales sur sa ligne, puis l'icône,
+ * l'intitulé et la jauge ; réussi, il passe à la menthe, coché.
+ */
+.hud-quest-daily {
+  display: grid;
+  grid-template-columns: auto 1fr 56px auto;
+  align-items: center;
+  gap: 2px 6px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: var(--yellow-light);
+}
+
+.hud-quest-daily-title {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--yellow-shade);
+}
+
+.hud-quest-daily-label {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hud-quest-daily[data-done='true'] {
+  background: var(--mint-light);
+}
+
+.hud-quest-daily[data-done='true'] .hud-quest-daily-title,
+.hud-quest-daily[data-done='true'] .hud-quest-daily-label {
+  color: var(--mint-shade);
+}
+
 /* ------------------------------------------------------------ bulle d'Ève */
 
 /*

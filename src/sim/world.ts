@@ -57,6 +57,8 @@ import { PIGS, PIG_FARM } from '../data/pigs.ts';
 import { DAWN_REWARD, DAY_CYCLE, SURVIVORS } from '../data/dayNight.ts';
 import { BOON_OFFER, BOONS, type BoonId } from '../data/boons.ts';
 import { boonBonus, drawBoons } from './boons.ts';
+import { CHALLENGES, type ChallengeId, type ChallengeStat } from '../data/challenges.ts';
+import { drawChallenge, type DailyChallenge } from './challenges.ts';
 import {
   CHIEF,
   ENEMIES,
@@ -591,6 +593,10 @@ export type WorldEvents = {
    * `reward` est entré en ville ou dans le sac (`to`) ; le reste est tombé au sol en `lootDropped`.
    */
   dawnBroke: { night: number; reward: [ItemId, number][]; to: 'town' | 'bag' };
+  /** Le défi d'un nouveau jour (`data/challenges.ts`). */
+  challengeStarted: { id: ChallengeId; day: number };
+  /** Le défi du jour réussi : ce que sa récompense a versé. */
+  challengeCompleted: { id: ChallengeId; reward: [ItemId, number][]; to: 'town' | 'bag'; prestige: number };
   /** L'aube propose ses faveurs (`data/boons.ts`). */
   boonOffered: { night: number; choices: BoonId[] };
   /** Une faveur prise : `reward`, ce que son colis a versé (vide pour un coup de pouce). */
@@ -894,6 +900,11 @@ export class World {
   private offeredBoons: { night: number; choices: BoonId[] } | null = null;
   /** Le coup de pouce de la journée, jusqu'au tick `until`. */
   private dayBoon: { id: BoonId; until: number } | null = null;
+  /**
+   * Le défi du jour (`data/challenges.ts`) : son jour, son compte, et pour
+   * `explore` les cases déjà connues à son départ.
+   */
+  private daily: DailyChallenge | null = null;
 
   /** Mutants abattus depuis le début de la partie — le score de l'écran de fin. */
   public kills = 0;
@@ -1239,6 +1250,7 @@ export class World {
       ...(this.bountyNight !== null && { bountyNight: this.bountyNight }),
       ...(this.offeredBoons !== null && { boonOffer: { night: this.offeredBoons.night, choices: [...this.offeredBoons.choices] } }),
       ...(this.dayBoon !== null && { boon: { ...this.dayBoon } }),
+      ...(this.daily !== null && { challenge: { ...this.daily } }),
       ...(this.scared.size > 0 && { scared: [...this.scared] }),
       kills: this.kills,
       prestige: this.prestige,
@@ -1316,6 +1328,7 @@ export class World {
     this.bountyNight = state.bountyNight ?? null;
     this.offeredBoons = state.boonOffer ? { night: state.boonOffer.night, choices: [...state.boonOffer.choices] } : null;
     this.dayBoon = state.boon ? { ...state.boon } : null;
+    this.daily = state.challenge ? { ...state.challenge } : null;
     this.scared.clear();
     for (const id of state.scared ?? []) this.scared.add(id);
     this.kills = state.kills;
@@ -1966,6 +1979,7 @@ export class World {
       site.delivered[item] = (site.delivered[item] ?? 0) + amount;
       moved += amount;
       this.events.emit('siteDelivered', { id: site.id, item, amount, missing: siteMissing(site), source });
+      this.countChallenge('deliver', amount);
     }
     return moved;
   }
@@ -2583,6 +2597,7 @@ export class World {
     if (taken.stageChanged) this.dirtyTile(tx, ty);
 
     this.events.emit('resourceHarvested', { tx, ty, item, amount, remaining: taken.resource.remaining });
+    this.countChallenge('harvest', amount, item);
     this.findSpecialty(tx, ty, taken.resource.remaining);
   }
 
@@ -2663,6 +2678,7 @@ export class World {
       const missing = siteMissing(site);
 
       this.events.emit('siteDelivered', { id: site.id, item, amount: 1, missing, source: 'bag' });
+      this.countChallenge('deliver', 1);
 
       // Le dernier objet posé achève le chantier : le joueur a déjà fait l'effort. Sauf dans le rayon
       // d'un poste de construction, où les bâtisseurs viennent le bâtir.
@@ -2978,6 +2994,50 @@ export class World {
     }
     this.dayBoon = { id: boon, until: this.tickCount + BOON_OFFER.durationTicks };
     this.events.emit('boonChosen', { boon, reward: [], to: 'town' });
+  }
+
+  /* ------------------------------------------------------- défi du jour */
+
+  /** Le défi du jour, son avancement et son but ; `null` avant le premier jour. */
+  public challenge(): { id: ChallengeId; have: number; need: number; done: boolean } | null {
+    const daily = this.daily;
+
+    if (!daily) return null;
+
+    const need = CHALLENGES[daily.id].goal.count;
+
+    return { id: daily.id, have: Math.min(need, this.challengeProgress(daily)), need, done: daily.done };
+  }
+
+  private challengeProgress(daily: DailyChallenge): number {
+    return CHALLENGES[daily.id].goal.stat === 'explore' ? Math.max(0, this.fog.exploredCount() - daily.base) : daily.progress;
+  }
+
+  private startChallenge(day: number): void {
+    const id = drawChallenge(this.seed, day);
+
+    this.daily = { day, id, progress: 0, base: this.fog.exploredCount(), done: false };
+    this.events.emit('challengeStarted', { id, day });
+  }
+
+  /** Ajoute `amount` à la statistique `stat` (`item` pour une récolte) ; le but atteint, la récompense tombe. */
+  private countChallenge(stat: ChallengeStat, amount: number, item?: ItemId): void {
+    const daily = this.daily;
+
+    if (!daily || daily.done) return;
+
+    const { goal, reward, prestige } = CHALLENGES[daily.id];
+
+    if (goal.stat !== stat || (goal.stat === 'harvest' && goal.item !== item)) return;
+    daily.progress += amount;
+    if (this.challengeProgress(daily) < goal.count) return;
+
+    daily.done = true;
+
+    const paid = this.bestow(Object.entries(reward) as [ItemId, number][]);
+
+    this.gainPrestige(prestige, this.player.x, this.player.y);
+    this.events.emit('challengeCompleted', { id: daily.id, reward: paid.reward, to: paid.to, prestige });
   }
 
   /** Le niveau d'Adam, déduit de son XP. */
@@ -3622,6 +3682,7 @@ export class World {
     this.dirtyTile(site.tx, site.ty);
     this.rosterChanged();
     this.events.emit('buildingCompleted', { id: site.id });
+    this.countChallenge('build', 1);
     this.awardBuilding(building);
 
     // Le bâtiment est debout : ses bâtisseurs posent le marteau et repartent.
@@ -5349,6 +5410,7 @@ export class World {
     }
     this.mobiles.delete(mutant.id);
     this.kills += 1;
+    this.countChallenge('kills', 1);
     this.gainPrestige(KILL_PRESTIGE[mutant.proto], mutant.x, mutant.y);
     this.gainXp(killXp(mutant.proto), shooter, mutant.x, mutant.y);
 
@@ -6014,6 +6076,7 @@ export class World {
     }
 
     this.events.emit('beastDied', { id: beast.id, proto: beast.proto, x: beast.x, y: beast.y });
+    this.countChallenge('kills', 1);
     this.gainPrestige(KILL_PRESTIGE[beast.proto], beast.x, beast.y);
     this.gainXp(killXp(beast.proto) + (beast.proto === 'chief' && base ? baseXp(base.level, 'chief') : 0), shooter, beast.x, beast.y);
     this.dropLoot(proto.loot, beast.x, beast.y);
@@ -6890,6 +6953,12 @@ export class World {
     const clock = this.clock();
 
     if (!clock || this.defeated) return;
+
+    // Un nouveau jour, un nouveau défi ; une fois par seconde, celui qui se compte au brouillard.
+    const day = dayDial(clock).day;
+
+    if (this.daily?.day !== day) this.startChallenge(day);
+    else if (this.tickCount % TICKS_PER_SECOND === 0) this.countChallenge('explore', 0);
 
     if (clock.elapsed === 0) {
       if (clock.phase === 'dusk') this.events.emit('duskFell', { night: clock.cycle });

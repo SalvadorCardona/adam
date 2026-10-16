@@ -762,7 +762,6 @@ async function main(): Promise<void> {
   const boons = new BoonPanel(world, (boon) => {
     accumulator = 0;
     hud.notify(t().hud.boon.chosen(t().boons[boon].label), 'good');
-    audio.play('eureka');
   });
 
   hud.onBoonOpen = () => {
@@ -771,6 +770,7 @@ async function main(): Promise<void> {
     boons.show();
     audio.play('open');
   };
+  world.events.on('challengeCompleted', ({ id, prestige }) => hud.notify(t().hud.daily.done(t().challenges[id], prestige), 'good'));
   world.events.on('boonOffered', () => hud.notify(t().hud.boon.ready, 'good', { label: t().hud.boon.see, run: () => hud.onBoonOpen() }));
   hud.root.append(boons.root);
 
@@ -1247,6 +1247,8 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('buildingSupplied', () => audio.play('deliver'));
   world.events.on('labSupplied', () => audio.play('deliver'));
   world.events.on('researchCompleted', () => audio.play('eureka'));
+  world.events.on('boonChosen', () => audio.play('eureka'));
+  world.events.on('challengeCompleted', () => audio.play('objective'));
   world.events.on('townDeposited', () => audio.play('deliver'));
   world.events.on('itemDropped', () => audio.play('pickup'));
   world.events.on('buildingCompleted', () => audio.play('build'));

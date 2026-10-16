@@ -1618,7 +1618,8 @@ describe('bâtiments de départ', () => {
     world.researchDone = [...done];
     world.questsDone = QUEST_IDS.length;
     world.chapter = CHAPTERS.length;
-    world.fog.reveal(world.player.x / TILE_SIZE, world.player.y / TILE_SIZE, 20);
+    // Assez de cases explorées pour la fontaine (`unlockExplored`).
+    world.fog.reveal(world.player.x / TILE_SIZE, world.player.y / TILE_SIZE, 24);
     for (const id of MENU_BUILDING_IDS) expect(free(world, id)).toBe(true);
   });
 

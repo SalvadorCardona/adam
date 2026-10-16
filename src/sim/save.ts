@@ -16,6 +16,8 @@
  */
 
 import { BOONS, type BoonId } from '../data/boons.ts';
+import { CHALLENGES, type ChallengeId } from '../data/challenges.ts';
+import type { DailyChallenge } from './challenges.ts';
 import { CHUNK_TILES } from '../core/grid.ts';
 import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, maxLevel, type BuildingId } from '../data/buildings.ts';
 import { COMPANION_CLASSES, isCompanionClass, type CompanionClassId } from '../data/companions.ts';
@@ -143,6 +145,8 @@ export interface WorldState {
   boonOffer?: { night: number; choices: BoonId[] };
   /** Le coup de pouce de la journée et le tick où il s'éteint. Absent : aucun. */
   boon?: { id: BoonId; until: number };
+  /** Le défi du jour (`data/challenges.ts`). Absent : il se tire au prochain tick. */
+  challenge?: DailyChallenge;
   /** Ceux qui ont eu peur depuis l'aube, cf. `World.scared` : leur nuit pèse sur le moral de l'aube. Absent : personne. */
   scared?: number[];
   kills: number;
@@ -537,6 +541,7 @@ function parseState(raw: unknown): WorldState {
     ...(state['bountyNight'] !== undefined && { bountyNight: int(state['bountyNight']) }),
     ...(state['boonOffer'] !== undefined && { boonOffer: parseBoonOffer(state['boonOffer']) }),
     ...(state['boon'] !== undefined && { boon: parseBoon(state['boon']) }),
+    ...(state['challenge'] !== undefined && { challenge: parseChallenge(state['challenge']) }),
     ...(state['scared'] !== undefined && { scared: [...new Set(array(state['scared']).map(int))] }),
     kills: int(state['kills']),
     // Absents d'une sauvegarde d'avant le Prestige : la colonie repart de zéro, ses bâtiments déjà payés.
@@ -633,6 +638,18 @@ function parseBoon(raw: unknown): { id: BoonId; until: number } {
   const boon = record(raw);
 
   return { id: oneOf(boon['id'], BOONS) as BoonId, until: int(boon['until']) };
+}
+
+function parseChallenge(raw: unknown): DailyChallenge {
+  const daily = record(raw);
+
+  return {
+    day: int(daily['day']),
+    id: oneOf(daily['id'], CHALLENGES) as ChallengeId,
+    progress: int(daily['progress']),
+    base: int(daily['base']),
+    done: bool(daily['done']),
+  };
 }
 
 function parseStats(raw: unknown): WorldStats {

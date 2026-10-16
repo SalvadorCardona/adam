@@ -225,13 +225,17 @@ describe('Prestige', () => {
     if (!decoded.ok) throw new Error(decoded.reason);
 
     const restored = decoded.world;
+    // Le défi du jour paie aussi du Prestige : il se compte à part.
+    let daily = 0;
+
+    restored.events.on('challengeCompleted', ({ prestige }) => (daily += prestige));
 
     expect(restored.prestige).toBe(0);
     finish(restored, ruin(restored, camp));
-    expect(restored.prestige).toBe(0);
+    expect(restored.prestige).toBe(daily);
 
     // Un bâtiment neuf, lui, rapporte.
     buildCamp(restored);
-    expect(restored.prestige).toBe(BUILD_PRESTIGE.lumberCamp);
+    expect(restored.prestige).toBe(BUILD_PRESTIGE.lumberCamp + daily);
   });
 });
