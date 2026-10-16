@@ -31,6 +31,7 @@ export const panel: Messages['panel'] = {
     building: (builders: number, percent: number): string => `${builders} builder${s(builders)} hammering away — ${percent}%`,
     byYard: 'The construction post builders bring supplies from the town hall, then build it.',
     comeCloser: 'Under construction — come closer to deliver.',
+    outOfRange: 'Outside the town hall’s radius: bring it yourself, or build a logistics or construction post in range.',
     transferOrBump: 'Under construction — transfer your bag, or bump into it.',
     workers: (count: number): string => `Workers it will employ: ${count}`,
     coverage: {
@@ -393,6 +394,7 @@ export const panel: Messages['panel'] = {
 
   placement: {
     locked: 'You don’t have the blueprint',
+    outOfRange: 'Out of range: nobody will deliver it',
     terrain: 'Not on water',
     occupied: 'Tile taken',
     onPlayer: 'You are standing on the spot',

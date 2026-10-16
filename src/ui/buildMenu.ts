@@ -804,8 +804,12 @@ export class BuildMenu {
 
     // Refusé, le motif va dans la bulle sous le fantôme ; la barre ne garde que le remède.
     const bubble = block && ghost && reason ? reason.text : null;
+    // Posable mais hors du rayon de la mairie : un avertissement dans la même bulle, pas un refus.
+    const far = !block && ghost && this.world.outsideTownRange(ghost.building, ghost.tx, ghost.ty);
+    const warning = far ? t().panel.placement.outOfRange : null;
 
-    this.placeBubble(bubble, ghost);
+    this.ghostBubble.dataset['warn'] = String(bubble === null && warning !== null);
+    this.placeBubble(bubble ?? warning, ghost);
     this.reason.hidden = !reason || (bubble !== null && !reason.remedy);
     this.reason.dataset['ok'] = String(!block);
     if (reason) {

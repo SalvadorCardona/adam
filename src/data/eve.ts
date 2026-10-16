@@ -58,6 +58,7 @@ export const EVE_LINES = {
      * logistique à portée, ni porteurs) : ce qu'il fait reste chez lui.
      * `{building}` : son nom, sans article.
      */
+    outOfRange: 'Ton {building} est hors du rayon de la mairie : personne ne le livrera. Apporte-le toi-même, ou pose un poste de logistique ou de construction à portée.',
     storeStuck: 'Ton {building} déborde et personne ne le vide ! Pose un poste de logistique à côté : ses gars porteront tout à la mairie.',
     /**
      * La nourriture fond et rien ne la refait : la ferme donne du blé, qui ne

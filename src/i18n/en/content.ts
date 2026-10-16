@@ -722,6 +722,7 @@ export const content: Content = {
       forge: 'The forge is unlocked! Iron and coal in, iron plates out.',
       farm: 'We’re running out of food, Adam! A farm for wheat, then a bakery for bread.',
       bakery: 'Wheat isn’t eaten raw, Adam! A bakery will turn it into bread for our crew.',
+      outOfRange: 'Your {building} is outside the town hall’s radius: nobody will deliver to it. Bring it yourself, or place a logistics or construction post in range.',
       storeStuck: 'Your {building} is overflowing and nobody empties it! Put a logistics post next to it: its crew will haul everything to the town hall.',
       kiln: 'Forge hungry for coal? A charcoal kiln bakes your spare wood: three logs, one coal.',
       idle: 'Your {n} guys are slacking, Adam: place a logistics post, or any building that hires.',
