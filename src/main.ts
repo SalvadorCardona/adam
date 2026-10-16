@@ -88,7 +88,7 @@ import { SettingsPanel } from './ui/settingsPanel.ts';
 import { formatSeed, parseSeed } from './ui/seed.ts';
 import { testBanner, testScenarioOf } from './ui/testRoute.ts';
 import { ZoomControls } from './ui/zoomControls.ts';
-import { SeenArea } from './ui/mapSight.ts';
+import { FogSight } from './ui/mapSight.ts';
 import { WorldMap } from './ui/worldMap.ts';
 import { AccountClient } from './net/account.ts';
 import { inviteCodeOf, playCodeOf, playUrl, resyncsOf, titleUrl, withoutInvite } from './net/invite.ts';
@@ -121,12 +121,6 @@ const AXIS_EPSILON = 0.01;
 /** L'axe d'un clavier au repos : ce que lit le déplacement quand le menu de construction a le clavier. */
 const STILL: KeyboardState = { active: false, axisX: 0, axisY: 0 };
 
-/**
- * Ce que la carte du monde montre déjà au chargement, en tuiles autour
- * d'Adam et de chaque bâtiment : la colonie se voit avant d'avoir bougé.
- */
-const KNOWN_AROUND_PLAYER = 20;
-const KNOWN_AROUND_BUILDING = 8;
 
 /** Distance, en tuiles, à laquelle Adam entend la hache d'un bûcheron. */
 const CHOP_HEARING_TILES = 9;
@@ -474,17 +468,8 @@ async function main(): Promise<void> {
 
   if (savedZoom !== null) renderer.restoreZoom(savedZoom);
 
-  /*
-   * La carte du monde. En attendant le brouillard de guerre, elle montre ce
-   * que la caméra a montré depuis le chargement (`SeenArea`), plus les
-   * abords d'Adam et du bâti.
-   */
-  const seen = new SeenArea();
-
-  seen.seeAround(Math.floor(world.player.x / TILE_SIZE), Math.floor(world.player.y / TILE_SIZE), KNOWN_AROUND_PLAYER);
-  for (const entity of world.entities.values()) {
-    seen.seeAround(entity.tx + Math.floor(entity.width / 2), entity.ty + Math.floor(entity.height / 2), KNOWN_AROUND_BUILDING);
-  }
+  // La carte du monde montre ce que le brouillard de guerre a découvert : explorée, ou visible en direct.
+  const seen = new FogSight(world);
 
   const worldMap = new WorldMap(world, seen, {
     onOpen: () => {
@@ -1110,17 +1095,6 @@ async function main(): Promise<void> {
         stick.root.getBoundingClientRect(),
         zoom.root.getBoundingClientRect(),
       ]);
-      // Ce que la caméra montre entre dans la zone découverte de la carte du monde.
-      if (!worldMap.open) {
-        const view = renderer.cameraView;
-
-        seen.see({
-          minTx: Math.floor((view.x - view.width / 2) / TILE_SIZE),
-          minTy: Math.floor((view.y - view.height / 2) / TILE_SIZE),
-          maxTx: Math.floor((view.x + view.width / 2) / TILE_SIZE),
-          maxTy: Math.floor((view.y + view.height / 2) / TILE_SIZE),
-        });
-      }
       if (renderer.zoomLevel !== shownZoom) {
         shownZoom = renderer.zoomLevel;
         zoomPrefs.save(shownZoom);

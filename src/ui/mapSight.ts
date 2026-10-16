@@ -7,16 +7,16 @@
  * dessus), **visible** (tout, en direct). La carte ne lit que cette
  * interface : le brouillard du monde la remplira par `World.sightAt`.
  *
- * En attendant, `SeenArea` en tient lieu : les blocs de 16 × 16 tuiles que
- * la caméra a montrés depuis le chargement, plus les abords du bâti et
- * d'Adam au départ. Tout ce qui a été vu est « visible » — sans brouillard,
- * le monde se voit en direct. C'est une mémoire de la vue, pas de la
- * partie : rien n'est sauvegardé.
+ * `FogSight` la remplit avec le brouillard du monde (`World.sightAt`) : la
+ * carte montre ce que la partie a exploré, sauvegarde comprise. `SeenArea`,
+ * la mémoire de ce que la caméra a montré, reste pour les tests et un monde
+ * sans brouillard.
  *
  * Sans DOM ni Pixi : se teste en Node.
  */
 
 import { floorDiv } from '../core/grid.ts';
+import type { World } from '../sim/world.ts';
 
 export type Sight = 'unexplored' | 'explored' | 'visible';
 
@@ -94,4 +94,35 @@ export class SeenArea implements MapSight {
 /** Une clé numérique par bloc : pas de chaîne à fabriquer à chaque case lue. */
 function blockKey(bx: number, by: number): number {
   return (bx + 0x8000) * 0x10000 + (by + 0x8000);
+}
+
+/**
+ * La carte du monde lue dans le brouillard de guerre de la partie. Son
+ * `revision` ne bouge qu'avec une case explorée pour la première fois — pas
+ * à chaque pas d'Adam — et ses bornes se recalculent alors seulement.
+ */
+export class FogSight implements MapSight {
+  private readonly world: World;
+  private boundsRevision = -1;
+  private box: TileRect | null = null;
+
+  public constructor(world: World) {
+    this.world = world;
+  }
+
+  public get revision(): number {
+    return this.world.fog.exploredRevision;
+  }
+
+  public sightAt(tx: number, ty: number): Sight {
+    return this.world.sightAt(tx, ty);
+  }
+
+  public known(): TileRect | null {
+    if (this.boundsRevision !== this.world.fog.exploredRevision) {
+      this.boundsRevision = this.world.fog.exploredRevision;
+      this.box = this.world.fog.bounds();
+    }
+    return this.box;
+  }
 }

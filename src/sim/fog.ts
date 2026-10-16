@@ -73,6 +73,9 @@ export class FogOfWar {
   /** Monte à chaque case qui change d'état. */
   public revision = 0;
 
+  /** Monte à chaque case explorée pour la première fois : la carte du monde refait son fond sur lui. */
+  public exploredRevision = 0;
+
   /** Captures des ressources, en copie sur écriture. */
   public readonly looks = new Map<string, TileLook>();
 
@@ -158,6 +161,7 @@ export class FogOfWar {
         if (chunk.explored[index]) continue;
         chunk.explored[index] = 1;
         this.revision += 1;
+        this.exploredRevision += 1;
       }
     });
   }
@@ -178,6 +182,7 @@ export class FogOfWar {
       for (let index = from; index <= to; index += 1) {
         if (delta > 0) {
           if (chunk.seen[index]!++ > 0) continue;
+          if (!chunk.explored[index]) this.exploredRevision += 1;
           chunk.explored[index] = 1;
           this.revision += 1;
           if (this.looks.size > 0) {
@@ -296,5 +301,22 @@ export class FogOfWar {
     this.bases.clear();
     for (const base of saved.bases) this.bases.set(base.id, { ...base });
     this.revision += 1;
+    this.exploredRevision += 1;
+  }
+
+  /** Le rectangle de chunks qui contient tout ce qui a été vu, en tuiles ; `null` si rien. */
+  public bounds(): { minTx: number; minTy: number; maxTx: number; maxTy: number } | null {
+    let box: { minTx: number; minTy: number; maxTx: number; maxTy: number } | null = null;
+
+    for (const key of this.chunks.keys()) {
+      const [cx, cy] = key.split(',').map(Number) as [number, number];
+      const minTx = cx * CHUNK_TILES;
+      const minTy = cy * CHUNK_TILES;
+
+      box = box
+        ? { minTx: Math.min(box.minTx, minTx), minTy: Math.min(box.minTy, minTy), maxTx: Math.max(box.maxTx, minTx + CHUNK_TILES - 1), maxTy: Math.max(box.maxTy, minTy + CHUNK_TILES - 1) }
+        : { minTx, minTy, maxTx: minTx + CHUNK_TILES - 1, maxTy: minTy + CHUNK_TILES - 1 };
+    }
+    return box;
   }
 }
