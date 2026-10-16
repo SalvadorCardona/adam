@@ -26,7 +26,7 @@ import { firstOpenObjective, goalProgress, objectiveWait, type GoalWait } from '
 import { eraReady, nextEra } from '../sim/eras.ts';
 import { openingResearch, researchStatus, unlockingResearch } from '../sim/research.ts';
 import { inDepotRange, isProducer } from '../sim/jobs.ts';
-import type { Building, Depot } from '../sim/types.ts';
+import type { Building, Depot, Entity } from '../sim/types.ts';
 import { TICKS_PER_SECOND, type World } from '../sim/world.ts';
 import { t } from '../i18n/locale.ts';
 
@@ -176,6 +176,11 @@ export function tutorialAdvice(
     return say(lines.storeStuck.replace('{building}', t().hud.hint.inSentence(t().buildings[stuck.proto].label)));
   }
 
+  // Un chantier ou un labo hors du rayon de la mairie, à sec : la ville ne le livrera pas, Ève ne dit pas qu'elle couvre.
+  const stranded = mutants === 0 ? strandedBuilding(world) : null;
+
+  if (stranded) return say(lines.outOfRange.replace('{building}', t().hud.hint.inSentence(t().buildings[stranded.proto].label)));
+
   // L'objectif que le joueur a touché : c'est ce qu'il veut faire, Ève l'y aide plutôt que de parler d'autre chose.
   if (chosen && selected && mutants === 0) return selectedAdvice(world, selected, mutants);
 
@@ -241,6 +246,18 @@ function selectedAdvice(world: World, selected: ObjectiveId, mutants: number): A
   }
 
   return objectiveAdvice(world, selected);
+}
+
+/** Un chantier (hors mairie) ou un labo qui attend son coût, hors du rayon de la mairie, et que rien ne livre. */
+function strandedBuilding(world: World): Entity | null {
+  for (const entity of world.entities.values()) {
+    if (entity.id === world.townHallId || world.inTownRange(entity)) continue;
+
+    const lines = entity.kind === 'site' ? world.siteLedger(entity) : entity.kind === 'lab' ? world.labLedger(entity) : [];
+
+    if (lines.some((line) => line.dry)) return entity;
+  }
+  return null;
 }
 
 /**

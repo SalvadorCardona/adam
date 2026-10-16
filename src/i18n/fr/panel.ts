@@ -44,6 +44,7 @@ export const panel = {
     building: (builders: number, percent: number): string => `${builders} bâtisseur${s(builders)} au marteau — ${percent} %`,
     byYard: 'Les bâtisseurs du poste de construction le livrent depuis la mairie, puis le bâtiront.',
     comeCloser: 'Chantier en cours — rapprochez-vous pour livrer.',
+    outOfRange: 'Hors du rayon de la mairie : apportez-le vous-même, ou bâtissez un poste de logistique ou de construction à portée.',
     transferOrBump: 'Chantier en cours — transférez le sac, ou heurtez-le.',
     workers: (count: number): string => `Ouvriers qu’il emploiera : ${count}`,
     /** Ce que « Transférer » ferait, selon d'où vient la matière (`SiteCoverage`). */
@@ -456,6 +457,7 @@ export const panel = {
    */
   placement: {
     locked: 'Il vous manque le plan',
+    outOfRange: 'Hors du rayon : personne ne le livrera',
     terrain: 'Pas sur l’eau',
     occupied: 'Case occupée',
     onPlayer: 'Vous êtes sur l’emplacement',

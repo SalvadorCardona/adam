@@ -66,3 +66,29 @@ describe('siteLedger', () => {
     expect(lines.every((line) => line.inTown === null && !line.dry && line.incoming === 0)).toBe(true);
   });
 });
+
+describe('relevé hors du rayon de la mairie', () => {
+  it('une cabane posée hors du rayon, ville pleine : rien en ville, à sec', () => {
+    const world = new World(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+    world.tick();
+
+    const hall = world.warehouse()!;
+
+    hall.store.add('wood', 60);
+    hall.store.add('stone', 39);
+
+    const far = { kind: 'site', id: 9999, proto: 'lumberCamp', tx: hall.tx + 40, ty: hall.ty, width: 2, height: 2, delivered: {}, work: 0 } as Site;
+    const near = { ...far, tx: hall.tx + 4 } as Site;
+    world.entities.set(far.id, far);
+    world.entities.set(near.id, { ...near, id: 9998 });
+
+    expect(world.inTownRange(far)).toBe(false);
+    expect(world.siteLedger(far).map((line) => [line.inTown, line.dry])).toEqual([[0, true], [0, true]]);
+    expect(world.siteLedger({ ...near, id: 9998 }).map((line) => line.dry)).toEqual([false, false]);
+  });
+});

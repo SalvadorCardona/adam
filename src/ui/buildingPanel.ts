@@ -754,7 +754,9 @@ export class BuildingPanel {
         lines.push(
           this.world.builderYard(entity)
             ? text.site.byYard
-            : !inReach
+            : !fromTown && entity.id !== this.world.townHallId
+              ? text.site.outOfRange
+              : !inReach
               ? text.site.comeCloser
               : !fromTown
                 ? text.site.transferOrBump

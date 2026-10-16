@@ -8054,12 +8054,31 @@ export class World {
 
   /** Le relevé du chantier, objet par objet : livré, manquant, en route, en ville (`sim/siteLedger.ts`). */
   public siteLedger(site: Site): SiteLine[] {
-    return siteLedger(site, (item) => this.jobs.siteIncoming(site.id, item), this.townStock());
+    return siteLedger(site, (item) => this.jobs.siteIncoming(site.id, item), this.ledgerTown(site));
+  }
+
+  /**
+   * La ville telle que le relevé la voit : le stock de la mairie dans son rayon, rien hors de lui
+   * (la ville ne livrera pas ce bâtiment), `null` tant qu'il n'y a pas de mairie.
+   */
+  private ledgerTown(entity: Entity): { available(item: ItemId): number } | null {
+    const hall = this.warehouse();
+
+    if (!hall) return null;
+    return inLogisticRange(hall, entity) ? hall.store : { available: () => 0 };
+  }
+
+  /** Un bâtiment posé là serait-il hors du rayon de la mairie finie ? Faux sans mairie : le fantôme avertit, il ne refuse pas. */
+  public outsideTownRange(building: BuildingId, tx: number, ty: number): boolean {
+    const hall = this.warehouse();
+    const { width, height } = BUILDINGS[building];
+
+    return hall !== null && !inLogisticRange(hall, { tx, ty, width, height });
   }
 
   /** Le même relevé pour le labo qui attend le coût de sa recherche ; vide s'il n'attend rien. */
   public labLedger(lab: Lab): SiteLine[] {
-    return labLedger(lab, this.townStock());
+    return labLedger(lab, this.ledgerTown(lab));
   }
 
   private readonly lineIsClear: LineTest = (x0, y0, x1, y1) => clearLine(this.seed, x0, y0, x1, y1);

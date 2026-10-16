@@ -3742,6 +3742,11 @@ button:disabled,
   pointer-events: none;
 }
 
+.build-ghost-bubble[data-warn='true'] {
+  background: var(--coral);
+  box-shadow: 0 3px 0 var(--coral-shade);
+}
+
 .build-drawer {
   pointer-events: auto;
   width: 100%;
