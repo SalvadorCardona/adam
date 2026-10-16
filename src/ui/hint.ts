@@ -25,7 +25,8 @@ import { RESOURCES } from '../data/resources.ts';
 import { firstOpenObjective, goalProgress, objectiveWait, type GoalWait } from '../sim/objectives.ts';
 import { eraReady, nextEra } from '../sim/eras.ts';
 import { openingResearch, researchStatus, unlockingResearch } from '../sim/research.ts';
-import type { Building } from '../sim/types.ts';
+import { inDepotRange, isProducer } from '../sim/jobs.ts';
+import type { Building, Depot } from '../sim/types.ts';
 import { TICKS_PER_SECOND, type World } from '../sim/world.ts';
 import { t } from '../i18n/locale.ts';
 
@@ -153,6 +154,13 @@ export function tutorialAdvice(
 
   if (mutants > 0 && world.night <= 2) return say(lines.bow);
 
+  // Un producteur plein que personne ne vide : sans logisticiens ni porteurs, ce qu'il fait n'arrive jamais en ville.
+  const stuck = mutants === 0 ? stuckProducer(world) : null;
+
+  if (stuck && world.isUnlocked('logisticsPost')) {
+    return say(lines.storeStuck.replace('{building}', t().hud.hint.inSentence(t().buildings[stuck.proto].label)));
+  }
+
   // L'objectif que le joueur a touché : c'est ce qu'il veut faire, Ève l'y aide plutôt que de parler d'autre chose.
   if (chosen && selected && mutants === 0) return selectedAdvice(world, selected, mutants);
 
@@ -218,6 +226,26 @@ function selectedAdvice(world: World, selected: ObjectiveId, mutants: number): A
   }
 
   return objectiveAdvice(world, selected);
+}
+
+/**
+ * Un producteur dont le coffre est plein (`storeFull`) et que rien ne vide :
+ * aucun poste de logistique ne le couvre, aucun porteur n'existe en ville.
+ */
+function stuckProducer(world: World): Building | null {
+  const entities = [...world.entities.values()];
+  const porters = entities.some((entity) => entity.kind === 'house' && BUILDINGS[entity.proto].workers > 0);
+
+  if (porters) return null;
+
+  const depots = entities.filter((entity): entity is Depot => entity.kind === 'depot');
+
+  for (const entity of entities) {
+    if (entity.kind === 'site' || !isProducer(entity) || world.problem(entity) !== 'storeFull') continue;
+    if (depots.some((depot) => inDepotRange(depot, entity))) continue;
+    return entity;
+  }
+  return null;
 }
 
 /**

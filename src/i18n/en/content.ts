@@ -720,6 +720,7 @@ export const content: Content = {
       labForge: 'To reinforce our towers, we’ll need iron plates. Build a lab: that’s where we’ll learn to forge.',
       foundry: 'At the lab, start the Foundry: the forge and the charcoal kiln will show up in “Build”.',
       forge: 'The forge is unlocked! Iron and coal in, iron plates out.',
+      storeStuck: 'Your {building} is overflowing and nobody empties it! Put a logistics post next to it: its crew will haul everything to the town hall.',
       kiln: 'Forge hungry for coal? A charcoal kiln bakes your spare wood: three logs, one coal.',
       idle: 'Your {n} guys are slacking, Adam: place a logistics post, or any building that hires.',
       idleHousing: 'Your {n} guys are slacking and sleeping outside: place a house for them, then a logistics post.',

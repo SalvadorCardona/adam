@@ -291,6 +291,41 @@ describe('conseil du sac plein', () => {
   });
 });
 
+describe('producteur qui déborde', () => {
+  it('une carrière pleine que personne ne vide : Ève conseille un poste de logistique', () => {
+    const world = new World(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    const origin = worldToTile(world.player.x, world.player.y);
+    let id: EntityId | null = null;
+
+    world.events.on('buildingPlaced', (event) => (id = event.id));
+    for (let dy = -6; dy <= 6 && id === null; dy += 1) {
+      for (let dx = -6; dx <= 6 && id === null; dx += 1) {
+        if (world.canPlace('quarry', origin.tx + dx, origin.ty + dy) !== null) continue;
+        world.push({ type: 'placeBuilding', building: 'quarry', tx: origin.tx + dx, ty: origin.ty + dy });
+        world.tick();
+      }
+    }
+    for (const [item, amount] of Object.entries(BUILDINGS.quarry.cost) as [ItemId, number][]) world.player.inventory.add(item, amount);
+    world.push({ type: 'transferToSite', id: id! });
+    world.tick();
+
+    const quarry = world.entities.get(id!)!;
+
+    if (quarry.kind !== 'quarry') throw new Error('la carrière ne s’est pas achevée');
+    quarry.store.add('stone', quarry.store.freeSpace());
+    for (let i = 0; i < 20 * 120 && world.problem(quarry) !== 'storeFull'; i += 1) world.tick();
+
+    expect(world.problem(quarry)).toBe('storeFull');
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.storeStuck.replace('{building}', 'carrière'));
+  });
+});
+
 describe('conseil d’attente', () => {
   /** Pose une tour de guet à portée d'Adam et l'achève, sac rempli de son coût. */
   function buildTower(world: World): EntityId {

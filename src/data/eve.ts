@@ -53,6 +53,12 @@ export const EVE_LINES = {
     repairFetch: 'La mairie est abîmée ! Rapporte du bois et fonce dedans : ça la répare.',
     /** L'eau de départ fond et pas de puits : sans eau, les ouvriers s'arrêtent. */
     well: 'Nos ouvriers vont avoir soif, Adam ! Pose un puits au bord d’une rivière : un seul ouvrier y puise l’eau.',
+    /**
+     * Un producteur au coffre plein que personne ne vide (ni poste de
+     * logistique à portée, ni porteurs) : ce qu'il fait reste chez lui.
+     * `{building}` : son nom, sans article.
+     */
+    storeStuck: 'Ton {building} déborde et personne ne le vide ! Pose un poste de logistique à côté : ses gars porteront tout à la mairie.',
     /** Plus de pierre en ville et pas de carrière : la source qui ne s'épuise pas. */
     quarry: 'Plus de pierre en ville ? Pose une carrière : ses ouvriers la taillent dans les ruines.',
     /** Par radio, entre deux nuits, tant qu'elle n'est pas là. `{n}` : nuits restantes. */
