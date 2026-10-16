@@ -17,7 +17,7 @@
 import { TILE_SIZE, floorDiv } from '../core/grid.ts';
 import type { ItemId } from '../data/items.ts';
 import { RESOURCE_IDS, RESOURCES, ROCK_OF_ORE, type ResourceId } from '../data/resources.ts';
-import { oreNodesNear } from './terrain.ts';
+import { oreNodesNear, terrainAt } from './terrain.ts';
 import type { World } from './world.ts';
 
 /** Cellules de gisement fouillées autour d'Adam (20 tuiles chacune) : une centaine de tuiles. */
@@ -51,6 +51,8 @@ export function findDeposit(
   const rock = ROCK_OF_ORE[item];
 
   if (rock) return nearestRock(world, rock, item, tx, ty, known);
+  // L'eau ne se récolte pas : la rive la plus proche, où poser un puits.
+  if (item === 'water') return nearestWater(world.seed, tx, ty, known);
 
   const ids = RESOURCE_IDS.filter((id) => RESOURCES[id].item === item);
 
@@ -92,12 +94,42 @@ function nearestTile(
   ty: number,
   known: (tx: number, ty: number) => boolean,
 ): Deposit | null {
-  const best = new Nearest(tx, ty);
-  const matches = (x: number, y: number): boolean => {
+  return nearestTerrain(tx, ty, known, (x, y) => {
     const id = world.resources.at(x, y)?.id;
 
     return id !== undefined && ids.includes(id);
-  };
+  });
+}
+
+/**
+ * L'eau ne bouge jamais : la plus proche se garde par seed et par bloc de
+ * 4 × 4 tuiles autour d'Adam, et seul « déjà vue ? » se relit à chaque fois.
+ */
+const WATER_CACHE = new Map<string, { tx: number; ty: number } | null>();
+const WATER_CACHE_MAX = 256;
+
+function nearestWater(seed: number, tx: number, ty: number, known: (tx: number, ty: number) => boolean): Deposit | null {
+  const key = `${seed}:${tx >> 2}:${ty >> 2}`;
+  let tile = WATER_CACHE.get(key);
+
+  if (tile === undefined) {
+    const found = nearestTerrain(tx, ty, () => false, (x, y) => terrainAt(seed, x, y) === 'water');
+
+    tile = found && { tx: found.tx, ty: found.ty };
+    if (WATER_CACHE.size >= WATER_CACHE_MAX) WATER_CACHE.clear();
+    WATER_CACHE.set(key, tile);
+  }
+  return tile && { ...tile, known: known(tile.tx, tile.ty) };
+}
+
+/** La tuile la plus proche qui satisfait `matches`, en anneaux, dans le rayon des forêts. */
+function nearestTerrain(
+  tx: number,
+  ty: number,
+  known: (tx: number, ty: number) => boolean,
+  matches: (x: number, y: number) => boolean,
+): Deposit | null {
+  const best = new Nearest(tx, ty);
 
   for (let ring = 0; ring <= FOREST_RANGE; ring += 1) {
     if (best.knownDistanceSq < ring * ring) break;

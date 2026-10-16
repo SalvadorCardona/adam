@@ -973,7 +973,7 @@ async function main(): Promise<void> {
   settings.setGamepad(gamepadPrefs.rumble, gamepadPrefs.deadZone);
   document.body.append(pad.cursor.root);
   // En dev : la manette aussi sous la main dans la console, pour poser son curseur sans stick.
-  if (import.meta.env.DEV) Object.assign(window, { adam: { world, audio, pad, connection } });
+  if (import.meta.env.DEV) Object.assign(window, { adam: { world, audio, pad, connection, hud, renderer } });
   wireRumble(world, pad);
 
   // Les étiquettes de la manette sur le sac (△ / Y) et « Bâtir » (□ / X) : visibles seulement en mode manette.
@@ -1127,7 +1127,7 @@ async function main(): Promise<void> {
       }
     }
     zoom.update(worldMap.open ? worldMap.zoomLimits : renderer.zoomLimits);
-    renderer.setObjective(hud.wantedItem());
+    renderer.setObjective(hud.pointedItem());
     renderer.setSelected(panel.selection);
     buildMenu.refresh();
     panel.update();

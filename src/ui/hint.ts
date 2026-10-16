@@ -48,6 +48,8 @@ export interface Advice {
   wants: ItemId | null;
   /** La recherche que le conseil envoie lancer au labo : sa fenêtre la met en tête. */
   research?: ResearchId | null;
+  /** Ce vers quoi le repère de bord pointe, quand ce n'est pas ce qu'on récolte (`wants`) : l'eau du puits. */
+  pointTo?: ItemId | null;
 }
 
 /** Le sac contient-il au moins un objet qu'on attend quelque part — chantier, recette ou ville ? */
@@ -150,7 +152,10 @@ export function tutorialAdvice(
   const welled = [...world.entities.values()].some((entity) => entity.proto === 'well');
   const water = world.townStock()?.available('water') ?? 0;
 
-  if (mutants === 0 && !welled && (water < COLONY.startingStock.water / 2 || world.needAlert()?.need === 'thirst')) return viaLab(world, 'well', lines.well);
+  if (mutants === 0 && !welled && (water < COLONY.startingStock.water / 2 || world.needAlert()?.need === 'thirst')) {
+    // Le repère de bord montre la rive la plus proche : le puits s'y pose.
+    return { ...viaLab(world, 'well', lines.well), pointTo: 'water' };
+  }
 
   if (mutants > 0 && world.night <= 2) return say(lines.bow);
 
@@ -262,12 +267,15 @@ function objectiveAdvice(world: World, id: ObjectiveId): Advice {
   });
   const building = goal ? goalBuilding(goal) : null;
 
+  // Le puits se pose au bord de l'eau : le repère montre la rive la plus proche.
+  const pointTo = building === 'well' ? 'water' : null;
+
   if (building && !world.isUnlocked(building)) {
     const research = openingResearch(building) ?? unlockingResearch(building);
 
-    if (research !== null && world.researchOpen(research)) return viaLab(world, building, line);
+    if (research !== null && world.researchOpen(research)) return { ...viaLab(world, building, line), pointTo };
   }
-  return { text: line, wants: null };
+  return { text: line, wants: null, pointTo };
 }
 
 /** Le bâtiment qu'une condition demande, ou celui qui produit l'objet qu'elle compte. */

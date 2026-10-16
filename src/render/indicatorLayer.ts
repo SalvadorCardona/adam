@@ -285,7 +285,8 @@ export class IndicatorLayer {
     if (this.objective && this.deposit) {
       const x = (this.deposit.tx + 0.5) * TILE_SIZE;
       const y = (this.deposit.ty + 0.5) * TILE_SIZE;
-      const center = this.arrow(camera, zone, x, y, ITEM_TONES[this.objective], 1, 1, 'item');
+      // Pas encore vu, il est sous le brouillard même à l'écran : le repère reste au bord, avec son « ? ».
+      const center = this.arrow(camera, zone, x, y, ITEM_TONES[this.objective], 1, 1, 'item', !this.deposit.known);
 
       if (center) {
         this.icon.texture = this.library.texture(iconKey(this.objective));
@@ -421,8 +422,9 @@ export class IndicatorLayer {
     }
   }
 
+  /** Déjà vu : passé à l'écran, et sorti du brouillard — à l'écran sous l'indigo, il reste une piste. */
   private isSeen(tx: number, ty: number): boolean {
-    return this.seen.has(`${floorDiv(tx, SEEN_CELL)},${floorDiv(ty, SEEN_CELL)}`);
+    return this.seen.has(`${floorDiv(tx, SEEN_CELL)},${floorDiv(ty, SEEN_CELL)}`) && this.world.sightAt(tx, ty) !== 'unexplored';
   }
 
   /**

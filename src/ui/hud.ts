@@ -324,6 +324,7 @@ export class Hud {
   /** Tick où le conseil a été montré (ou déplié) : il se replie `HINT_FOLD_TICKS` plus tard. */
   private hintSince = 0;
   private wanted: ItemId | null = null;
+  private pointed: ItemId | null = null;
   private advisedResearch: ResearchId | null = null;
 
   /** Les répliques d'Ève en attente, et l'heure où la réplique affichée s'en va. */
@@ -1273,6 +1274,11 @@ export class Hud {
     return this.wanted;
   }
 
+  /** Ce que le repère de bord montre : ce qu'on récolte, ou l'eau où poser le puits. */
+  public pointedItem(): ItemId | null {
+    return this.pointed;
+  }
+
   /** Le panneau de debug est-il ouvert ? Ses raccourcis (brouillard) n'agissent qu'alors. */
   /** Le bandeau de la ville : là où volent les gains du récap hors ligne. */
   public get townBanner(): HTMLElement {
@@ -2006,6 +2012,7 @@ export class Hud {
     const hint = advice?.text ?? '';
 
     this.wanted = advice?.wants ?? null;
+    this.pointed = advice?.pointTo ?? this.wanted;
     this.advisedResearch = advice?.research ?? null;
 
     // La langue vient de changer : le même conseil, dans l'autre langue, sans le relancer ni le déplier.
