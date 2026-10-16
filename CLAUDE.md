@@ -1246,6 +1246,19 @@ commandes du jeu par `sim/testScenario.ts` ; `/test/<id>` ouvrira un autre
 scénario (`ui/testRoute.ts`). GitHub Pages n'ayant pas de page de repli, le
 build copie `index.html` sous chaque route (`vite.config.ts`).
 
+## Joueur simulé
+
+`npm run playtest -- --seeds 50 --minutes 60` (`--strategy afk|both`,
+`--json`) : un bot sans rendu (`sim/playtest.ts`) joue chaque graine en
+suivant les objectifs — récolter ce que réclame le chantier ou le labo, poser
+au plus près de la mairie, lancer la recherche qui ouvre le bâtiment, garder
+la mairie la nuit — uniquement par des commandes ; `afk` ne fait plus rien
+après la mairie. Rapport par partie (jalons, morts par cause et par nuit,
+vagues et PV de la mairie, temps sans rien à faire, nuit de la chute) et
+tableau médiane / p10 / p90, un fil par cœur (`tools/playtestPool.ts`).
+`sim/playtest.test.ts` en tient les invariants sur cinq graines. Mode
+d'emploi : `src/tools/README.md`. C'est la mesure des tickets d'équilibrage.
+
 ## Aperçu en direct
 
 `.claude/launch.json` déclare le serveur Vite (`npm run dev`, port 5173) :
