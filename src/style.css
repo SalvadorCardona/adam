@@ -1782,7 +1782,7 @@ button:disabled,
   border-radius: var(--hud-r);
 }
 
-/* L'objectif : la dernière case, jaune de la colonie, au bord droit de la barre. */
+/* L'objectif : la dernière case, une carte blanche comme la quête qu'il ouvre, au bord droit de la barre. */
 .hud-topbar .hud-objective {
   position: relative;
   box-sizing: border-box;
@@ -1795,11 +1795,34 @@ button:disabled,
   padding: 0 8px;
   border: none;
   border-radius: var(--cell-r);
-  background: var(--yellow-light);
-  box-shadow: 0 3px 0 var(--yellow-shade);
+  background: var(--paper);
+  box-shadow: 0 3px 0 var(--paper-shade);
   font: inherit;
   color: var(--ink);
   cursor: var(--cursor-hand);
+}
+
+/* Le rappel d'un volet : un chevron vers le bas, qui se retourne quand la quête est ouverte. */
+.hud-topbar .hud-objective .hud-objective-chevron {
+  display: flex;
+  flex: none;
+  margin-left: 4px;
+  transition: transform 200ms ease;
+}
+
+.hud-topbar .hud-objective .hud-objective-chevron .icon {
+  width: var(--cell-icon);
+  height: var(--cell-icon);
+}
+
+.hud-topbar .hud-objective[aria-expanded='true'] .hud-objective-chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-topbar .hud-objective .hud-objective-chevron {
+    transition: none;
+  }
 }
 
 .hud-topbar .hud-objective:active {
