@@ -386,3 +386,24 @@ describe('brouillard de guerre', () => {
     expect(a.fog.exploredCount()).toBeGreaterThan(new World(11).fog.exploredCount());
   });
 });
+
+describe('compte des cases explorées', () => {
+  it('tenu à mesure, il vaut le compte case par case, rechargement compris', () => {
+    const world = World.newColony(11);
+    const brute = (fog: FogOfWar): number => {
+      let count = 0;
+
+      for (let ty = -80; ty < 80; ty += 1) for (let tx = -80; tx < 80; tx += 1) if (fog.sight(tx, ty) !== 'unexplored') count += 1;
+      return count;
+    };
+
+    world.revealAround(20, 20, 9);
+    for (let i = 0; i < 40; i += 1) world.tick();
+    expect(world.fog.exploredCount()).toBe(brute(world.fog));
+
+    const copy = new FogOfWar();
+
+    copy.restore(world.fog.toJSON());
+    expect(copy.exploredCount()).toBe(world.fog.exploredCount());
+  });
+});
