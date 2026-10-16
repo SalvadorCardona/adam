@@ -7,7 +7,10 @@
 
 import {
   API_PATHS,
+  cleanNickname,
   isPartyError,
+  nicknameProblem,
+  type FieldProblem,
   isPartyResponse,
   partyJoinPath,
   partyLeavePath,
@@ -24,6 +27,9 @@ export type PartyFailure = {
 };
 
 export type PartyResult = { readonly ok: true; readonly party: PartyInfo } | PartyFailure;
+
+/** Le pseudo d'un invité est refusé : la raison, que la fenêtre met en mots sous le champ. */
+export type NicknameFailure = { readonly ok: false; readonly reason: 'nickname'; readonly problem: FieldProblem };
 
 export type PartyDone = { readonly ok: true } | PartyFailure;
 
@@ -61,6 +67,24 @@ export class PartyClient {
     return this.result(await this.account.authorized('POST', partyJoinPath(code), {}));
   }
 
+  /**
+   * Rejoindre avec son seul pseudo : sans compte, le serveur ouvre d'abord une
+   * session d'invité (`AccountClient.guest`), puis on entre dans la salle avec
+   * elle. Déjà connecté, on garde son compte et le pseudo ne sert pas.
+   */
+  public async joinAs(code: string, nickname: string): Promise<PartyResult | NicknameFailure> {
+    const signedIn = await this.signIn(nickname);
+
+    return signedIn ?? this.join(code);
+  }
+
+  /** Héberger avec son seul pseudo, comme `joinAs` : l'hôte non plus n'a pas besoin de compte. */
+  public async hostAs(nickname: string): Promise<PartyResult | NicknameFailure> {
+    const signedIn = await this.signIn(nickname);
+
+    return signedIn ?? this.host();
+  }
+
   public async leave(code: string): Promise<PartyDone> {
     return this.done(await this.account.authorized('POST', partyLeavePath(code), {}));
   }
@@ -68,6 +92,28 @@ export class PartyClient {
   /** L'hôte ferme la session. */
   public async close(code: string): Promise<PartyDone> {
     return this.done(await this.account.authorized('DELETE', partyPath(code)));
+  }
+
+  /** Une session d'invité si l'on n'en a pas ; `null` : on peut y aller, sinon pourquoi pas. */
+  private async signIn(raw: string): Promise<PartyFailure | NicknameFailure | null> {
+    if (this.account.user) return null;
+
+    const nickname = cleanNickname(raw);
+    const problem = nicknameProblem(nickname);
+
+    if (problem) return { ok: false, reason: 'nickname', problem };
+
+    const result = await this.account.guest(nickname);
+
+    if (result.ok) return null;
+    if (result.reason === 'invalid' && 'fields' in result) {
+      return { ok: false, reason: 'nickname', problem: result.fields?.[0]?.problem ?? 'badFormat' };
+    }
+    if (result.reason === 'offline' || result.reason === 'tooManyAttempts') {
+      return { ok: false, reason: result.reason, ...('retryAfter' in result && result.retryAfter !== undefined && { retryAfter: result.retryAfter }) };
+    }
+
+    return { ok: false, reason: 'server' };
   }
 
   private result(answer: Answer): PartyResult {

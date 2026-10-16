@@ -1,9 +1,10 @@
 /**
  * « Rejoindre la partie de <pseudo> » : l'écran de l'ami qui a ouvert le lien
  * (`?join=CODE`). Il s'ouvre par-dessus l'écran titre, regarde l'invitation,
- * demande de se connecter si besoin — la fenêtre du compte s'ouvre par-dessus
- * et, une fois connecté, on retrouve ici l'invitation —, puis place l'ami
- * dans la salle d'attente de l'hôte — d'où il entre aussitôt dans la partie
+ * demande un pseudo à qui n'a pas de compte — rien d'autre : le serveur lui
+ * ouvre une session d'invité (`PartyClient.joinAs`) ; qui a un compte peut s'y
+ * connecter (la fenêtre du compte s'ouvre par-dessus, puis on revient ici) —,
+ * puis place l'ami dans la salle d'attente de l'hôte — d'où il entre aussitôt dans la partie
  * (`onEnter`, `?play=CODE`). Lien expiré, fermé, invalide ou partie pleine :
  * un message clair et « Retour à l'écran titre ».
  */
@@ -15,6 +16,7 @@ import type { Connection } from '../net/connection.ts';
 import type { PartyClient, PartyFailure } from '../net/party.ts';
 import { uiIcon } from './icons.ts';
 import { POLL_MS } from './invitePanel.ts';
+import { NicknameField } from './nicknameField.ts';
 import { createRoom, fillRoom } from './partyRoom.ts';
 
 type State = 'loading' | 'ready' | 'joining' | 'waiting' | 'own' | 'failed';
@@ -31,6 +33,7 @@ export class JoinPanel {
   private readonly title: HTMLHeadingElement;
   private readonly status: HTMLParagraphElement;
   private readonly signIn: HTMLButtonElement;
+  private readonly nickname: NicknameField;
   private readonly joinButton: HTMLButtonElement;
   private readonly leaveButton: HTMLButtonElement;
   private readonly retryButton: HTMLButtonElement;
@@ -79,7 +82,8 @@ export class JoinPanel {
     this.status = document.createElement('p');
     this.status.className = 'settings-note account-status';
     this.status.setAttribute('role', 'status');
-    this.signIn = button('button-primary', () => this.openAccount());
+    this.signIn = button('button-secondary', () => this.openAccount());
+    this.nickname = new NicknameField(() => void this.join());
     this.joinButton = button('button-primary', () => void this.join());
     this.roomTitle = document.createElement('h3');
     this.roomTitle.className = 'invite-room-title';
@@ -87,7 +91,7 @@ export class JoinPanel {
     this.leaveButton = button('button-secondary', () => void this.leave());
     this.retryButton = button('button-secondary', () => void this.look());
     this.backButton = button('button-secondary', () => this.dismiss());
-    panel.append(this.title, this.status, this.signIn, this.joinButton, this.roomTitle, this.room, this.leaveButton, this.retryButton, this.backButton);
+    panel.append(this.title, this.status, this.nickname.root, this.joinButton, this.signIn, this.roomTitle, this.room, this.leaveButton, this.retryButton, this.backButton);
     this.root.append(panel);
 
     accounts.subscribe((user) => {
@@ -144,9 +148,18 @@ export class JoinPanel {
     this.state = 'joining';
     this.render();
 
-    const result = await this.party.join(this.code);
+    // Sans compte, le pseudo suffit : une session d'invité s'ouvre d'abord.
+    const result = this.accounts.user ? await this.party.join(this.code) : await this.party.joinAs(this.code, this.nickname.value);
 
     this.busy = false;
+    if (!result.ok && result.reason === 'nickname') {
+      this.state = 'ready';
+      this.nickname.show(result.problem);
+      this.render();
+      this.nickname.input.focus({ preventScroll: true });
+
+      return;
+    }
     this.apply(result);
     this.focusFirst();
   }
@@ -199,7 +212,9 @@ export class JoinPanel {
   }
 
   private focusFirst(): void {
-    const target = [this.signIn, this.joinButton, this.retryButton, this.leaveButton, this.backButton].find((candidate) => !candidate.hidden);
+    const target = [this.nickname.input, this.joinButton, this.retryButton, this.leaveButton, this.backButton].find(
+      (candidate) => !candidate.hidden && candidate.closest('[hidden]') === null,
+    );
 
     (target ?? this.backButton).focus({ preventScroll: true });
   }
@@ -216,9 +231,14 @@ export class JoinPanel {
     this.title.textContent = failed || info === null ? t().party.joinTitle : text.title(host);
     this.status.textContent = this.statusText(signedIn);
     this.status.dataset['tone'] = failed ? 'offline' : 'info';
+    const asGuest = (state === 'ready' || state === 'joining') && !signedIn;
+
+    this.nickname.root.hidden = !asGuest;
+    this.nickname.input.disabled = state === 'joining';
+    this.nickname.render();
     this.signIn.hidden = !(state === 'ready' && !signedIn);
-    this.signIn.replaceChildren(text.signInButton);
-    this.joinButton.hidden = !(state === 'ready' && signedIn) && state !== 'joining';
+    this.signIn.replaceChildren(t().party.haveAccount);
+    this.joinButton.hidden = state !== 'ready' && state !== 'joining';
     this.joinButton.disabled = state === 'joining';
     this.joinButton.replaceChildren(uiIcon('invite', 22), state === 'joining' ? text.joining : text.button);
     this.roomTitle.hidden = !showRoom;
@@ -241,7 +261,7 @@ export class JoinPanel {
       case 'loading':
         return text.loading;
       case 'ready':
-        return signedIn ? '' : text.signInFirst;
+        return signedIn ? '' : text.guestIntro;
       case 'joining':
         return text.joining;
       case 'waiting':

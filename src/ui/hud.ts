@@ -291,6 +291,8 @@ export class Hud {
   /** L'engrenage : il ouvre le menu des réglages (`settingsPanel.ts`). */
   public readonly settingsButton: HTMLButtonElement;
   public readonly pauseButton: HTMLButtonElement;
+  /** « Inviter un ami », à portée de doigt sans passer par la pause (`main.ts` le pose s'il y a un serveur). */
+  public readonly inviteButton: HTMLButtonElement;
   private lastBag = '';
   private lastTown = '';
   private lastQuest = '';
@@ -480,6 +482,12 @@ export class Hud {
     this.settingsButton.setAttribute('aria-haspopup', 'dialog');
     this.settingsButton.append(uiIcon('settings'));
     onLocale(() => setTip(this.settingsButton, t().settings.title));
+
+    this.inviteButton = element('button', 'hud-button hud-invite');
+    this.inviteButton.type = 'button';
+    this.inviteButton.setAttribute('aria-haspopup', 'dialog');
+    this.inviteButton.append(uiIcon('invite'));
+    onLocale(() => setTip(this.inviteButton, t().party.invite));
 
     this.defeat = element('div', 'overlay hud-defeat');
     this.defeat.hidden = true;

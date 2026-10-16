@@ -18,6 +18,7 @@ import {
   type AccountErrorResponse,
   type AccountUser,
   type FieldError,
+  type GuestRequest,
   type LoginRequest,
   type RegisterRequest,
 } from '../../shared/api.ts';
@@ -112,6 +113,14 @@ export class AccountClient {
     return this.open(API_PATHS.login, request);
   }
 
+  /**
+   * Jouer à deux sans compte : un pseudo suffit, le serveur ouvre une session
+   * d'invité, gardée ici comme une autre (l'ami qui rouvre le lien la retrouve).
+   */
+  public async guest(nickname: string): Promise<AccountResult> {
+    return this.open(API_PATHS.guest, { nickname });
+  }
+
   /** Se déconnecter vaut toujours côté appareil ; le serveur est prévenu si on peut. */
   public async logout(): Promise<void> {
     const session = this.session;
@@ -120,7 +129,7 @@ export class AccountClient {
     if (session) await this.call('POST', API_PATHS.logout, {}, session.token);
   }
 
-  private async open(path: string, request: RegisterRequest | LoginRequest): Promise<AccountResult> {
+  private async open(path: string, request: RegisterRequest | LoginRequest | GuestRequest): Promise<AccountResult> {
     const answer = await this.call('POST', path, request);
 
     if (answer.status === 'offline') return { ok: false, reason: 'offline' };
