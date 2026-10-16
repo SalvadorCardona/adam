@@ -382,7 +382,7 @@ export class ResearchPanel {
       locale(),
       advised,
       statuses.map(([, status]) => status).join(','),
-      lab.endTick > 0,
+      lab.research !== null,
       queueFull(lab),
       world.perks.join(','),
       world.era,
@@ -447,9 +447,9 @@ export class ResearchPanel {
 
       launch.type = 'button';
       launch.dataset['tone'] = 'deposit';
-      // Une recherche tourne déjà : celle-ci se met en file, tant qu'il y a de la place.
-      launch.textContent = lab.endTick > 0 ? text.enqueue : text.launch;
-      launch.disabled = lab.endTick > 0 && queueFull(lab);
+      // Une recherche est déjà choisie : celle-ci se met en file, tant qu'il y a de la place.
+      launch.textContent = lab.research !== null ? text.enqueue : text.launch;
+      launch.disabled = lab.research !== null && queueFull(lab);
       launch.addEventListener('click', () => world.push({ type: 'startResearch', lab: lab.id, research: id }));
       head.append(launch);
     }

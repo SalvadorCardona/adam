@@ -3004,7 +3004,8 @@ export class World {
       this.events.emit('researchRejected', { id, reason: 'taken' });
       return;
     }
-    if (lab.endTick > 0) {
+    // Une recherche est déjà choisie — qu'elle tourne ou attende son coût — : celle-ci se met en file.
+    if (lab.research !== null) {
       if (queueFull(lab)) {
         this.events.emit('researchRejected', { id, reason: 'busy' });
         return;

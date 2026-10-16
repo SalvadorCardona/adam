@@ -238,6 +238,18 @@ describe('labo de recherche', () => {
     expect(world.productionTimer(lab)).not.toBeNull();
   });
 
+  it('une recherche qui attend son coût n’est pas remplacée : la suivante se met en file', () => {
+    const { world, lab } = withLab();
+
+    world.push({ type: 'startResearch', lab: lab.id, research: 'walkingBoots' });
+    world.push({ type: 'startResearch', lab: lab.id, research: 'sharpAxes' });
+    world.tick();
+
+    expect(lab.endTick).toBe(0);
+    expect(lab.research).toBe('walkingBoots');
+    expect(lab.queue).toEqual(['sharpAxes']);
+  });
+
   it('la file est bornée, sans doublon', () => {
     const { world, lab } = withLab();
     const refused = rejections(world);
@@ -353,6 +365,7 @@ describe('labo de recherche', () => {
     fill(world, { wood: 8 });
     world.push({ type: 'transferToLab', id: lab.id });
     world.tick();
+    world.push({ type: 'cancelResearch', lab: lab.id });
     world.push({ type: 'startResearch', lab: lab.id, research: 'bigBag' });
     fill(world, { crabClaw: 4 });
     world.push({ type: 'transferToLab', id: lab.id });
