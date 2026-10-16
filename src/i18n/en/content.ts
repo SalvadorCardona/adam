@@ -717,6 +717,8 @@ export const content: Content = {
       coming: 'Hang in there: {n} more night{s} and I’m coming with my machine!',
       labOpen: 'We need: {building}. It opens at the lab, Adam — build one, it’s in “Build”.',
       labResearch: 'We need: {building}. At the lab, start “{research}” and it’ll show up in “Build”.',
+      labSupply: 'We need “{research}”: bring {item} to the lab and it will start the research.',
+      labRunning: '“{research}” is running at the lab: a little patience, it will show up in “Build”.',
       labForge: 'To reinforce our towers, we’ll need iron plates. Build a lab: that’s where we’ll learn to forge.',
       foundry: 'At the lab, start the Foundry: the forge and the charcoal kiln will show up in “Build”.',
       forge: 'The forge is unlocked! Iron and coal in, iron plates out.',
