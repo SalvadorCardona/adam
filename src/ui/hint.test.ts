@@ -92,6 +92,22 @@ describe('tutorialHint', () => {
     expect(tutorialHint(world, FRESH, false, 0)).toBe(EVE_LINES.hints.labResearch.replace('{research}', 'Guet').replace('{building}', tower));
   });
 
+  it('un objectif touché passe devant la tour : Ève aide à faire ce que le joueur a choisi', () => {
+    const world = World.newColony(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    const cabin = OBJECTIVES.find((objective) => objective.goals.some((goal) => goal.type === 'build' && goal.building === 'lumberCamp'))!;
+    const advice = tutorialAdvice(world, FRESH, false, 0, cabin.id, true);
+
+    expect(advice?.text).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.lumberCamp.label));
+    // Sans choix du joueur, la tour reste le conseil d'avant la première nuit.
+    expect(tutorialAdvice(world, FRESH, false, 0, cabin.id)?.text).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.watchtower.label));
+  });
+
   it('dix ouvriers qui glandent, la tour posée : Ève les envoie travailler, et loger si les lits manquent', () => {
     const world = World.newColony(1);
 
@@ -272,6 +288,78 @@ describe('conseil du sac plein', () => {
     } finally {
       setLocale('fr');
     }
+  });
+});
+
+describe('producteur qui déborde', () => {
+  it('une carrière pleine que personne ne vide : Ève conseille un poste de logistique', () => {
+    const world = new World(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    const origin = worldToTile(world.player.x, world.player.y);
+    let id: EntityId | null = null;
+
+    world.events.on('buildingPlaced', (event) => (id = event.id));
+    for (let dy = -6; dy <= 6 && id === null; dy += 1) {
+      for (let dx = -6; dx <= 6 && id === null; dx += 1) {
+        if (world.canPlace('quarry', origin.tx + dx, origin.ty + dy) !== null) continue;
+        world.push({ type: 'placeBuilding', building: 'quarry', tx: origin.tx + dx, ty: origin.ty + dy });
+        world.tick();
+      }
+    }
+    for (const [item, amount] of Object.entries(BUILDINGS.quarry.cost) as [ItemId, number][]) world.player.inventory.add(item, amount);
+    world.push({ type: 'transferToSite', id: id! });
+    world.tick();
+
+    const quarry = world.entities.get(id!)!;
+
+    if (quarry.kind !== 'quarry') throw new Error('la carrière ne s’est pas achevée');
+    quarry.store.add('stone', quarry.store.freeSpace());
+    for (let i = 0; i < 20 * 120 && world.problem(quarry) !== 'storeFull'; i += 1) world.tick();
+
+    expect(world.problem(quarry)).toBe('storeFull');
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.storeStuck.replace('{building}', 'carrière'));
+  });
+});
+
+describe('la nourriture qui fond', () => {
+  it('la ferme debout, sans boulangerie : Ève dit que le blé ne se mange pas cru', () => {
+    const world = new World(1);
+
+    world.player.inventory.add('wood', 25);
+    world.player.inventory.add('stone', 12);
+    world.push({ type: 'transferToSite', id: world.townHallId });
+    world.tick();
+
+    const town = world.townStock()!;
+
+    town.remove('food', town.count('food'));
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.farm);
+
+    const origin = worldToTile(world.player.x, world.player.y);
+    let id: EntityId | null = null;
+
+    world.events.on('buildingPlaced', (event) => (id = event.id));
+    for (let dy = -8; dy <= 8 && id === null; dy += 1) {
+      for (let dx = -8; dx <= 8 && id === null; dx += 1) {
+        if (world.canPlace('farm', origin.tx + dx, origin.ty + dy) !== null) continue;
+        world.push({ type: 'placeBuilding', building: 'farm', tx: origin.tx + dx, ty: origin.ty + dy });
+        world.tick();
+      }
+    }
+    for (const [item, amount] of Object.entries(BUILDINGS.farm.cost) as [ItemId, number][]) world.player.inventory.add(item, amount);
+    world.push({ type: 'transferToSite', id: id! });
+    world.tick();
+
+    expect(world.entities.get(id!)?.kind).toBe('farm');
+    // La boulangerie s'ouvre au labo : Ève y envoie d'abord.
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.labOpen.replace('{building}', BUILDINGS.bakery.label));
+    world.researchDone.push('baking');
+    expect(tutorialHint(world, FRESH, true, 0)).toBe(EVE_LINES.hints.bakery);
   });
 });
 

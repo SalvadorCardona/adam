@@ -220,6 +220,13 @@ export const WAVE_WARNING = {
  */
 export const WAVE_STRENGTH = {
   earlyCaps: [2, 3, 4],
+  /**
+   * Pendant ces nuits de grâce, la mairie ne descend pas sous cette part de
+   * ses points de vie : trois mutants la rasaient en dix secondes, le temps
+   * qu'Adam revienne de la forêt. Elle sort abîmée — à réparer —, jamais à
+   * terre : une colonie neuve ne se perd pas avant sa quatrième nuit.
+   */
+  graceHallFloor: 0.25,
   perEra: 2,
   freeBuildings: 8,
   buildingsPerRaider: 6,

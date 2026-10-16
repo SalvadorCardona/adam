@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TILE_SIZE, worldToTile } from '../core/grid.ts';
 import { BUILDINGS } from '../data/buildings.ts';
 import { DAWN_REWARD, DAY_CYCLE } from '../data/dayNight.ts';
-import { ENEMIES, LOOT_DROPS, NIGHT_BOSSES, WAVES, isBossNight, nightBosses } from '../data/enemies.ts';
+import { ENEMIES, LOOT_DROPS, NIGHT_BOSSES, WAVES, WAVE_STRENGTH, isBossNight, nightBosses } from '../data/enemies.ts';
 import { RAIDS } from '../data/enemyBases.ts';
 import type { ItemId } from '../data/items.ts';
 import { COLONY } from '../data/inhabitants.ts';
@@ -711,6 +711,8 @@ describe('mutants', () => {
 
     // Le reste de la nuit ne suffirait pas à un seul mutant : la mairie est déjà bien entamée.
     if (hall.kind !== 'site') hall.hp = 6 * ENEMIES.mutant.damage;
+    // Passé les nuits de grâce, où elle ne tombe pas (`WAVE_STRENGTH.graceHallFloor`).
+    world.night = WAVE_STRENGTH.earlyCaps.length + 1;
     for (let i = 0; i < 20 * 60 && !world.defeated; i += 1) world.tick();
 
     expect(world.defeated).toBe(true);

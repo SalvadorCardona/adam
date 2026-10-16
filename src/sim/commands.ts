@@ -182,6 +182,11 @@ export type Command =
    */
   | { type: 'trade'; caravan: MobileId; offer: number }
   /**
+   * La faveur de l'aube choisie (`data/boons.ts`) : `index` dans les cartes
+   * proposées (`World.boonOffer`). Sans offre, ou hors des cartes : ignorée.
+   */
+  | { type: 'chooseBoon'; index: number }
+  /**
    * Les bonus plantés au jardin des souvenirs, au départ d'une nouvelle
    * colonie. Poussée avant le premier tick ; ignorée ensuite.
    */

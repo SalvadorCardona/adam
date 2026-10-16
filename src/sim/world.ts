@@ -55,6 +55,12 @@ import { DEATH } from '../data/death.ts';
 import { COMPANIONS, COMPANION_CLASSES, type CompanionClassId } from '../data/companions.ts';
 import { PIGS, PIG_FARM } from '../data/pigs.ts';
 import { DAWN_REWARD, DAY_CYCLE, SURVIVORS } from '../data/dayNight.ts';
+import { BOON_OFFER, BOONS, type BoonId } from '../data/boons.ts';
+import { boonBonus, drawBoons } from './boons.ts';
+import { CHALLENGE_STREAK, CHALLENGES, type ChallengeId, type ChallengeStat } from '../data/challenges.ts';
+import { drawChallenge, type DailyChallenge } from './challenges.ts';
+import { STARFALL } from '../data/starfall.ts';
+import { isStarNight, starDrop } from './starfall.ts';
 import {
   CHIEF,
   ENEMIES,
@@ -62,6 +68,7 @@ import {
   LOOT_DROPS,
   QUEEN,
   WAVES,
+  WAVE_STRENGTH,
   WAVE_WARNING,
   WILDLIFE,
   WILDLIFE_SPAWN,
@@ -109,7 +116,7 @@ import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../d
 import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
-import { BUILDERS, FARMERS, FORESTERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
+import { BUILDERS, FARMERS, FORESTERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherId } from '../data/weather.ts';
 import { ChunkIndex } from './chunk.ts';
 import { floorCost, floorMissing, floorNeeds, floorWants } from './antenna.ts';
@@ -168,6 +175,7 @@ import {
 import {
   JobBoard,
   PORTER_CREW,
+  VOLUNTEER_CREW,
   doorOf,
   inDepotRange,
   inYardRange,
@@ -589,6 +597,18 @@ export type WorldEvents = {
    * `reward` est entré en ville ou dans le sac (`to`) ; le reste est tombé au sol en `lootDropped`.
    */
   dawnBroke: { night: number; reward: [ItemId, number][]; to: 'town' | 'bag' };
+  /** Au crépuscule : la nuit qui tombe sera une nuit d'étoiles filantes (`data/starfall.ts`). */
+  starfallAnnounced: { night: number };
+  /** Une étoile est tombée : son éclat attend au sol. */
+  starFell: { id: MobileId; item: ItemId; x: number; y: number };
+  /** Le défi d'un nouveau jour (`data/challenges.ts`). */
+  challengeStarted: { id: ChallengeId; day: number };
+  /** Le défi du jour réussi : ce que sa récompense a versé. */
+  challengeCompleted: { id: ChallengeId; reward: [ItemId, number][]; to: 'town' | 'bag'; prestige: number; streak: number };
+  /** L'aube propose ses faveurs (`data/boons.ts`). */
+  boonOffered: { night: number; choices: BoonId[] };
+  /** Une faveur prise : `reward`, ce que son colis a versé (vide pour un coup de pouce). */
+  boonChosen: { boon: BoonId; reward: [ItemId, number][]; to: 'town' | 'bag' };
   /** Un mutant a fui le jour : il disparaît sans compter comme abattu. */
   mutantFled: { id: MobileId; x: number; y: number };
   /** Un arc a tiré, depuis (x, y). */
@@ -884,6 +904,15 @@ export class World {
   private nextWaveTarget: EntityId | null = null;
   /** La nuit dont la vague est dehors et paiera sa prime si on l'abat toute avant l'aube ; `null` sinon. */
   private bountyNight: number | null = null;
+  /** Les faveurs de l'aube proposées, en attente d'un choix (`data/boons.ts`). */
+  private offeredBoons: { night: number; choices: BoonId[] } | null = null;
+  /** Le coup de pouce de la journée, jusqu'au tick `until`. */
+  private dayBoon: { id: BoonId; until: number } | null = null;
+  /**
+   * Le défi du jour (`data/challenges.ts`) : son jour, son compte, et pour
+   * `explore` les cases déjà connues à son départ.
+   */
+  private daily: DailyChallenge | null = null;
 
   /** Mutants abattus depuis le début de la partie — le score de l'écran de fin. */
   public kills = 0;
@@ -1123,6 +1152,8 @@ export class World {
     world.openBuildings = new Set(START_BUILDINGS);
     // Une seule région : la prairie de départ. Le reste se conquiert.
     world.conquered = new Set([HOME_REGION_ID]);
+    // La clairière est connue d'avance : le premier écran montre où l'on vit.
+    world.fog.reveal(floorDiv(world.target.x, TILE_SIZE), floorDiv(world.target.y, TILE_SIZE), FOG_VISION.home);
 
     return world;
   }
@@ -1225,6 +1256,9 @@ export class World {
       cycleStartTick: this.cycleStartTick,
       ...(this.nextWaveTarget !== null && { nextWaveTarget: this.nextWaveTarget }),
       ...(this.bountyNight !== null && { bountyNight: this.bountyNight }),
+      ...(this.offeredBoons !== null && { boonOffer: { night: this.offeredBoons.night, choices: [...this.offeredBoons.choices] } }),
+      ...(this.dayBoon !== null && { boon: { ...this.dayBoon } }),
+      ...(this.daily !== null && { challenge: { ...this.daily } }),
       ...(this.scared.size > 0 && { scared: [...this.scared] }),
       kills: this.kills,
       prestige: this.prestige,
@@ -1300,6 +1334,9 @@ export class World {
     this.cycleStartTick = state.cycleStartTick;
     this.nextWaveTarget = state.nextWaveTarget ?? null;
     this.bountyNight = state.bountyNight ?? null;
+    this.offeredBoons = state.boonOffer ? { night: state.boonOffer.night, choices: [...state.boonOffer.choices] } : null;
+    this.dayBoon = state.boon ? { ...state.boon } : null;
+    this.daily = state.challenge ? { ...state.challenge } : null;
     this.scared.clear();
     for (const id of state.scared ?? []) this.scared.add(id);
     this.kills = state.kills;
@@ -1660,6 +1697,10 @@ export class World {
         this.removeDecor(command.id);
         break;
 
+      case 'chooseBoon':
+        this.chooseBoon(command.index);
+        break;
+
       case 'trade':
         this.trade(command.caravan, command.offer);
         break;
@@ -1946,6 +1987,7 @@ export class World {
       site.delivered[item] = (site.delivered[item] ?? 0) + amount;
       moved += amount;
       this.events.emit('siteDelivered', { id: site.id, item, amount, missing: siteMissing(site), source });
+      this.countChallenge('deliver', amount);
     }
     return moved;
   }
@@ -2563,6 +2605,7 @@ export class World {
     if (taken.stageChanged) this.dirtyTile(tx, ty);
 
     this.events.emit('resourceHarvested', { tx, ty, item, amount, remaining: taken.resource.remaining });
+    this.countChallenge('harvest', amount, item);
     this.findSpecialty(tx, ty, taken.resource.remaining);
   }
 
@@ -2643,6 +2686,7 @@ export class World {
       const missing = siteMissing(site);
 
       this.events.emit('siteDelivered', { id: site.id, item, amount: 1, missing, source: 'bag' });
+      this.countChallenge('deliver', 1);
 
       // Le dernier objet posé achève le chantier : le joueur a déjà fait l'effort. Sauf dans le rayon
       // d'un poste de construction, où les bâtisseurs viennent le bâtir.
@@ -2916,7 +2960,97 @@ export class World {
    * d'Adam (`sim/levels.ts`) s'y ajoutent : un seul cumul, aucun doublon.
    */
   public bonus(stat: ResearchStat): number {
-    return researchBonus(this.researchDone, stat) + levelBonus(this.level(), stat);
+    return researchBonus(this.researchDone, stat) + levelBonus(this.level(), stat) + boonBonus(this.activeBoon()?.id ?? null, stat);
+  }
+
+  /* ------------------------------------------------------ faveurs de l'aube */
+
+  /** Les faveurs proposées à la dernière aube, tant qu'aucune n'est choisie. */
+  public boonOffer(): { night: number; choices: readonly BoonId[] } | null {
+    return this.offeredBoons;
+  }
+
+  /** Le coup de pouce de la journée et les ticks qui lui restent, ou `null`. */
+  public activeBoon(): { id: BoonId; left: number } | null {
+    const boon = this.dayBoon;
+
+    return boon && this.tickCount < boon.until ? { id: boon.id, left: boon.until - this.tickCount } : null;
+  }
+
+  /** L'aube propose ses faveurs ; celles d'avant, pas choisies, s'envolent. */
+  private offerBoons(): void {
+    this.offeredBoons = { night: this.night, choices: drawBoons(this.seed, this.night) };
+    this.events.emit('boonOffered', { night: this.night, choices: [...this.offeredBoons.choices] });
+  }
+
+  /** Une carte prise : le colis en ville (ou dans le sac), ou le coup de pouce pour la journée. */
+  private chooseBoon(index: number): void {
+    const offer = this.offeredBoons;
+    const boon = offer?.choices[index];
+
+    if (!offer || boon === undefined) return;
+
+    this.offeredBoons = null;
+
+    const { effect } = BOONS[boon];
+
+    if (effect.kind === 'items') {
+      const { reward, to } = this.bestow(Object.entries(effect.items) as [ItemId, number][]);
+
+      this.events.emit('boonChosen', { boon, reward, to });
+      return;
+    }
+    this.dayBoon = { id: boon, until: this.tickCount + BOON_OFFER.durationTicks };
+    this.events.emit('boonChosen', { boon, reward: [], to: 'town' });
+  }
+
+  /* ------------------------------------------------------- défi du jour */
+
+  /** Le défi du jour, son avancement et son but ; `null` avant le premier jour. */
+  public challenge(): { id: ChallengeId; have: number; need: number; done: boolean; streak: number } | null {
+    const daily = this.daily;
+
+    if (!daily) return null;
+
+    const need = CHALLENGES[daily.id].goal.count;
+
+    return { id: daily.id, have: Math.min(need, this.challengeProgress(daily)), need, done: daily.done, streak: daily.streak };
+  }
+
+  private challengeProgress(daily: DailyChallenge): number {
+    return CHALLENGES[daily.id].goal.stat === 'explore' ? Math.max(0, this.fog.exploredCount() - daily.base) : daily.progress;
+  }
+
+  private startChallenge(day: number): void {
+    const id = drawChallenge(this.seed, day);
+
+    const before = this.daily;
+    // Hier réussi, la série continue ; raté (ou sauté), elle repart de zéro.
+    const streak = before?.done && before.day === day - 1 ? before.streak + 1 : 0;
+
+    this.daily = { day, id, progress: 0, base: this.fog.exploredCount(), done: false, streak };
+    this.events.emit('challengeStarted', { id, day });
+  }
+
+  /** Ajoute `amount` à la statistique `stat` (`item` pour une récolte) ; le but atteint, la récompense tombe. */
+  private countChallenge(stat: ChallengeStat, amount: number, item?: ItemId): void {
+    const daily = this.daily;
+
+    if (!daily || daily.done) return;
+
+    const { goal, reward, prestige } = CHALLENGES[daily.id];
+
+    if (goal.stat !== stat || (goal.stat === 'harvest' && goal.item !== item)) return;
+    daily.progress += amount;
+    if (this.challengeProgress(daily) < goal.count) return;
+
+    daily.done = true;
+
+    const paid = this.bestow(Object.entries(reward) as [ItemId, number][]);
+    const total = prestige + CHALLENGE_STREAK.prestigePerDay * Math.min(daily.streak, CHALLENGE_STREAK.max);
+
+    this.gainPrestige(total, this.player.x, this.player.y);
+    this.events.emit('challengeCompleted', { id: daily.id, reward: paid.reward, to: paid.to, prestige: total, streak: daily.streak + 1 });
   }
 
   /** Le niveau d'Adam, déduit de son XP. */
@@ -3004,7 +3138,8 @@ export class World {
       this.events.emit('researchRejected', { id, reason: 'taken' });
       return;
     }
-    if (lab.endTick > 0) {
+    // Une recherche est déjà choisie — qu'elle tourne ou attende son coût — : celle-ci se met en file.
+    if (lab.research !== null) {
       if (queueFull(lab)) {
         this.events.emit('researchRejected', { id, reason: 'busy' });
         return;
@@ -3560,6 +3695,7 @@ export class World {
     this.dirtyTile(site.tx, site.ty);
     this.rosterChanged();
     this.events.emit('buildingCompleted', { id: site.id });
+    this.countChallenge('build', 1);
     this.awardBuilding(building);
 
     // Le bâtiment est debout : ses bâtisseurs posent le marteau et repartent.
@@ -4329,6 +4465,15 @@ export class World {
     return false;
   }
 
+  /**
+   * Une nuit calme : la vague de la nuit est abattue (ou n'est jamais sortie),
+   * Adam est debout, personne ne joue avec lui. Le joueur peut alors hâter
+   * l'aube (`HASTEN`) : le temps de jeu ne change pas, il passe plus vite.
+   */
+  public calmNight(): boolean {
+    return this.clock()?.phase === 'night' && !this.defeated && !this.dead && this.partner === null && !this.hasMutants();
+  }
+
   /** Ève, si elle a rejoint la colonie — en route ou arrivée. */
   public eve(): Eve | undefined {
     for (const mobile of this.mobiles.values()) {
@@ -4440,7 +4585,7 @@ export class World {
     if (mobile.kind === 'kid') return { kind: 'child', days: yearsToWork(mobile.age) };
     if (mobile.inside) return { kind: 'home' };
     if (mobile.sleepingOut) return { kind: 'outside' };
-    if (this.isIdle(mobile) || (mobile.kind === 'worker' && mobile.free)) return { kind: 'idle' };
+    if (this.isIdle(mobile) || (mobile.kind === 'worker' && mobile.free && !mobile.job)) return { kind: 'idle' };
 
     const place =
       mobile.kind === 'worker'
@@ -5278,6 +5423,7 @@ export class World {
     }
     this.mobiles.delete(mutant.id);
     this.kills += 1;
+    this.countChallenge('kills', 1);
     this.gainPrestige(KILL_PRESTIGE[mutant.proto], mutant.x, mutant.y);
     this.gainXp(killXp(mutant.proto), shooter, mutant.x, mutant.y);
 
@@ -5298,6 +5444,36 @@ export class World {
     if (!this.defeated && !this.hasMutants()) {
       this.events.emit('waveCleared', { night: this.night });
       if (this.bountyNight === this.night) this.payBounty();
+    }
+  }
+
+  /**
+   * L'étoile `index` de la nuit tombe : sur une case explorée où l'on marche,
+   * dans l'anneau autour de la mairie (huit essais), elle laisse un éclat au
+   * sol, ramassé comme un butin.
+   */
+  private dropStar(night: number, index: number): void {
+    const hall = this.warehouse();
+
+    if (!hall) return;
+
+    const center = { x: hall.tx + hall.width / 2, y: hall.ty + hall.height / 2 };
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const { dx, dy, loot } = starDrop(this.seed, night, index, attempt);
+      const tx = Math.floor(center.x + dx);
+      const ty = Math.floor(center.y + dy);
+
+      if (!isWalkable(terrainAt(this.seed, tx, ty)) || this.chunks.occupantAt(tx, ty) !== undefined || this.resources.isSolid(tx, ty)) continue;
+      if (this.sightAt(tx, ty) === 'unexplored') continue;
+
+      const x = (tx + 0.5) * TILE_SIZE;
+      const y = (ty + 0.5) * TILE_SIZE;
+      const pickup = this.spawnPickup(loot.item, loot.amount, x, y, false);
+
+      pickup.star = true;
+      this.events.emit('starFell', { id: pickup.id, item: loot.item, x, y });
+      return;
     }
   }
 
@@ -5943,6 +6119,7 @@ export class World {
     }
 
     this.events.emit('beastDied', { id: beast.id, proto: beast.proto, x: beast.x, y: beast.y });
+    this.countChallenge('kills', 1);
     this.gainPrestige(KILL_PRESTIGE[beast.proto], beast.x, beast.y);
     this.gainXp(killXp(beast.proto) + (beast.proto === 'chief' && base ? baseXp(base.level, 'chief') : 0), shooter, beast.x, beast.y);
     this.dropLoot(proto.loot, beast.x, beast.y);
@@ -6820,12 +6997,30 @@ export class World {
 
     if (!clock || this.defeated) return;
 
+    // Un nouveau jour, un nouveau défi ; une fois par seconde, celui qui se compte au brouillard.
+    const day = dayDial(clock).day;
+
+    if (this.daily?.day !== day) this.startChallenge(day);
+    else if (this.tickCount % TICKS_PER_SECOND === 0) this.countChallenge('explore', 0);
+
     if (clock.elapsed === 0) {
       if (clock.phase === 'dusk') this.events.emit('duskFell', { night: clock.cycle });
+      // Au crépuscule, Ève voit venir la pluie d'étoiles de la nuit.
+      if (clock.phase === 'dusk' && isStarNight(this.seed, clock.cycle)) this.events.emit('starfallAnnounced', { night: clock.cycle });
       // La veille au soir, Ève prévient : la Reine sort demain.
       if (clock.phase === 'dusk' && queenWave(clock.cycle + 1) !== null) this.events.emit('queenAnnounced', { night: clock.cycle + 1 });
       if (clock.phase === 'night') this.night = clock.cycle;
       if (clock.phase === 'dawn') this.dawn();
+    }
+
+    // Une nuit d'étoiles filantes : un éclat tombe de temps en temps autour de la mairie.
+    if (
+      clock.phase === 'night' &&
+      clock.elapsed >= STARFALL.delayTicks &&
+      (clock.elapsed - STARFALL.delayTicks) % STARFALL.everyTicks === 0 &&
+      isStarNight(this.seed, clock.cycle)
+    ) {
+      this.dropStar(clock.cycle, (clock.elapsed - STARFALL.delayTicks) / STARFALL.everyTicks);
     }
 
     // Un jour sur deux, une caravane de troc, une fois le matin bien levé.
@@ -7167,6 +7362,7 @@ export class World {
     // La nuit est survécue : la mairie tient encore (`stepClock` s'arrête à la défaite).
     this.stats.nightsSurvived += 1;
     this.events.emit('dawnBroke', { night: this.night, reward, to });
+    this.offerBoons();
 
     // Après le Signal, des survivants ont entendu l'antenne : ils arrivent avec le jour.
     if (this.victory) this.welcomeSurvivors();
@@ -7925,10 +8121,25 @@ export class World {
       return;
     }
 
-    // Libre, il flâne devant la mairie en attendant qu'un bâtiment le prenne.
+    // Libre, il donne un coup de main aux chantiers de la mairie (`VOLUNTEERS`), sinon il flâne devant elle.
     if (worker.free) {
-      if (homeDoor) this.idle(worker, homeDoor, bedtime);
-      else this.mobiles.delete(worker.id);
+      if (!homeDoor) {
+        this.mobiles.delete(worker.id);
+        return;
+      }
+      if (!worker.job && !bedtime) {
+        worker.searchTicks -= 1;
+        if (worker.searchTicks <= 0) {
+          worker.searchTicks = PORTERS.retryTicks;
+          worker.job = this.jobs.assign(this.entities, this.townHallId, worker, homeDoor, this.lineIsClear, VOLUNTEERS.carry, VOLUNTEER_CREW);
+          if (worker.job) worker.inside = false;
+        }
+      }
+      if (!worker.job) {
+        this.idle(worker, homeDoor, bedtime);
+        return;
+      }
+      this.followJob(worker, worker.job);
       return;
     }
 
@@ -7985,6 +8196,11 @@ export class World {
       return;
     }
 
+    this.followJob(worker, job);
+  }
+
+  /** Un pas sur son job : jusqu'à la source, puis jusqu'à la destination. */
+  private followJob(worker: Worker, job: Job): void {
     worker.inside = false;
 
     const stop = this.entities.get(job.carried ? job.to : job.from);
@@ -8126,7 +8342,24 @@ export class World {
         bestSq = d;
       }
     }
+    // Il donnait un coup de main : le poste passe avant, sa charge retourne à la mairie.
+    if (best?.job) this.dropVolunteerJob(best, best.job);
     return best;
+  }
+
+  /**
+   * Un ouvrier libre embauché pendant un coup de main : rien à porter, son
+   * job s'annule des deux côtés ; chargé, sa place réservée à destination est
+   * rendue et sa charge rentre au coffre de la mairie. Rien ne se perd.
+   */
+  private dropVolunteerJob(worker: Worker, job: Job): void {
+    worker.job = null;
+    if (!job.carried) {
+      this.jobs.cancel(this.entities, job);
+      return;
+    }
+    this.jobs.releaseIn(this.entities, job);
+    this.townStock()?.add(job.item, job.amount);
   }
 
   private goHome(worker: Laborer, door: { x: number; y: number }): void {
@@ -9439,11 +9672,19 @@ export class World {
 
     if (!entity || entity.kind === 'site') return;
 
-    entity.hp = Math.max(0, entity.hp - amount);
+    // Les nuits de grâce, la mairie plie sans tomber (`WAVE_STRENGTH.graceHallFloor`).
+    const floor = id === this.townHallId && this.graceNight() ? Math.ceil(buildingLevel(entity.proto, entity.level).hp * WAVE_STRENGTH.graceHallFloor) : 0;
+
+    entity.hp = Math.max(Math.min(floor, entity.hp), entity.hp - amount);
     this.events.emit('buildingDamaged', { id, hp: entity.hp });
 
     if (entity.hp === 0 && entity.kind === 'antenna' && entity.level > 1) this.dropFloor(entity);
     else if (entity.hp === 0) this.destroyBuilding(entity);
+  }
+
+  /** Une des premières nuits (`WAVE_STRENGTH.earlyCaps`) : la grâce d'une colonie neuve. */
+  private graceNight(): boolean {
+    return this.night >= 1 && this.night <= WAVE_STRENGTH.earlyCaps.length;
   }
 
   private destroyBuilding(building: Building): void {
@@ -9993,6 +10234,8 @@ export class World {
       fog.source(entity.id * 2, tx, ty, (entity.kind === 'site' ? FOG_VISION.building : reach) + Math.max(entity.width, entity.height) / 2);
     }
     for (const mobile of this.mobiles.values()) {
+      // Un éclat d'étoile éclaire la nuit autour de lui, jusqu'à ce qu'on le ramasse.
+      if (mobile.kind === 'pickup' && mobile.star) fog.source(mobile.id * 2 + 1, floorDiv(mobile.x, TILE_SIZE), floorDiv(mobile.y, TILE_SIZE), FOG_VISION.star);
       if (!seesAround(mobile)) continue;
       fog.source(mobile.id * 2 + 1, floorDiv(mobile.x, TILE_SIZE), floorDiv(mobile.y, TILE_SIZE), FOG_VISION.people);
     }

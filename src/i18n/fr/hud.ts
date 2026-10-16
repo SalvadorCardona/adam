@@ -269,6 +269,36 @@ export const hud = {
     /** Le numéro du jour, à côté du cadran. */
     short: (day: number): string => `J${day}`,
   },
+  /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
+  /** Les faveurs de l'aube (`ui/boonPanel.ts`) et leur capsule à côté de l'horloge. */
+  /** Le défi du jour, dans la quête, et son toast. */
+  /** Au crépuscule d'une nuit d'étoiles filantes (`data/starfall.ts`). */
+  starfall: 'Ève : « Ce soir, il va pleuvoir des étoiles. Les éclats valent le détour ! »',
+  daily: {
+    title: 'Défi du jour',
+    done: (label: string, prestige: number, streak: number): string =>
+      `Défi du jour réussi : ${label} ! +${prestige} Prestige${streak > 1 ? ` · ${streak} jours d’affilée` : ''}`,
+    /** La série en cours, à côté du titre. */
+    streak: (days: number): string => `${days} d’affilée`,
+  },
+  boon: {
+    title: 'Faveur de l’aube',
+    lead: 'La nuit est tenue. Ève a déniché de quoi vous aider : choisissez une carte.',
+    later: 'Plus tard',
+    parcel: 'Colis',
+    forTheDay: 'Pour la journée',
+    /** La capsule, quand une faveur attend. */
+    /** Le toast de l'aube, et son bouton. */
+    ready: 'L’aube vous fait une faveur : choisissez une carte.',
+    see: 'Voir',
+    offer: 'Faveur de l’aube',
+    /** Le toast, à la carte prise. */
+    chosen: (label: string): string => `${label} !`,
+  },
+  hasten: {
+    idle: 'Passer la nuit',
+    active: (left: string): string => `Aube dans ${left}`,
+  },
   /** La météo en capsule, sous la quête. */
   weather: {
     /** `weather` : son nom, avec sa majuscule. */

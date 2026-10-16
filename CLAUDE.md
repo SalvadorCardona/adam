@@ -134,7 +134,10 @@ entrent (`World.hosted`, non sauvegardé, refait de la répartition au
 chargement). Un ouvrier retiré, ou dont le bâtiment tombe, redevient libre
 sur place ; une ancienne sauvegarde garde ses équipes et pose les libres
 qui manquent devant la mairie (`settleColonists`). Le HUD compte
-« libres/total ». Ceux de la maison sont des **porteurs** (mobile
+« libres/total ». Le jour, un libre donne un **coup de main** (`VOLUNTEERS`,
+équipe `volunteer` de `JobBoard.assign`) : il porte de la mairie aux
+chantiers et aux labos de son rayon, en petites charges ; embauché chargé,
+sa charge retourne à la mairie (`dropVolunteerJob`). Ceux de la maison sont des **porteurs** (mobile
 `worker`, `src/sim/workers.ts`, `PORTERS` dans `src/data/workers.ts`) : ils
 vident foreuses, fermes et cabanes de bûcheron dans la mairie et livrent les chantiers,
 la forge et la nurserie depuis la mairie (`sim/consumers.ts` ; une machine en
@@ -350,6 +353,33 @@ leurs vraies durées ; cadran `dayDialSvg` de `art/ui.ts`) : l'aiguille porte
 le soleil, la lune la nuit, « J2 » à côté (un de plus à chaque aube) ; à
 `DAY_DIAL.nightWarning` de la nuit, elle bat en corail ; un tap dit « Jour 2 ·
 nuit dans 1:31 » (c'est aussi son `aria-label`).
+**Passer la nuit** — une nuit calme (`World.calmNight` : vague abattue ou
+jamais sortie, Adam debout, pas d'ami) montre à côté de l'horloge un bouton
+« Passer la nuit » (`.hud-hasten`, pictogramme `hasten`) ; actif, la boucle
+de `main.ts` fait `HASTEN.speed` fois plus de ticks par image jusqu'à l'aube
+— un mutant qui reparaît l'arrête. La simulation n'en sait rien.
+**Faveurs de l'aube** (`data/boons.ts`, `sim/boons.ts`, `ui/boonPanel.ts`) —
+chaque aube propose trois cartes hachées de la seed et de la nuit
+(`World.boonOffer`) ; la capsule violette `.hud-boon` les ouvre (l'horloge
+s'arrête), « Plus tard » les garde jusqu'à l'aube suivante. Une carte prise
+(`chooseBoon`) est un colis versé en ville ou un coup de pouce sur une
+statistique de la recherche jusqu'au crépuscule (`World.activeBoon`, lu par
+`World.bonus` ; capsule menthe et son temps). Sauvegardés sous `boonOffer` et
+`boon`.
+**Étoiles filantes** (`data/starfall.ts`, `sim/starfall.ts`) — dès la nuit 2,
+une nuit sur trois environ (hachée de la seed, jamais le PRNG du monde), Ève
+l'annonce au crépuscule (`starfallAnnounced`) et des étoiles tombent toutes
+les 7 s autour de la mairie, à 5–15 tuiles, sur une case explorée où l'on
+marche : chacune laisse un éclat au sol (le `pickup` du butin, `star: true`,
+sauvegardé) — minerai, charbon, pierre, parfois une plaque — qui luit la nuit
+(lampe de `render/nightLayer.ts`) et éclaire le brouillard (`FOG_VISION.star`).
+Une raison de sortir, la vague abattue, plutôt que d'attendre l'aube.
+**Défi du jour** (`data/challenges.ts`, `sim/challenges.ts`) — chaque jour,
+de l'aube à l'aube, un petit but tiré de la seed (jamais deux fois de suite
+le même) : récolter, livrer, bâtir, abattre, explorer. Il se lit dans la
+quête sous les objectifs (`.hud-quest-daily`, `World.challenge`) et paie dès
+sa réussite, en objets et en Prestige (`challengeCompleted`). Sauvegardé
+sous `challenge`.
 
 **Menace** — la nuit, des **mutants** sortent des bases mutantes : une
 vague par nuit (`WAVES`, `src/data/enemies.ts`), à sa tombée, faite des
@@ -374,7 +404,7 @@ du monde, un toast et la notification « Vague annoncée » (type `attack` des
 Notifications, `waveAnnounced`) si la fenêtre n'a pas le focus.
 L'effectif annoncé est exact : la production des bases se déroule d'avance
 (`projectedRaiders`). Pas de vague hors ligne : onglet caché, le jeu est en pause.
-Grâce des trois premières nuits (`WAVE_STRENGTH.earlyCaps`, `earlyCap`) : la réserve commune des bases est plafonnée à 2, 3, 4 assaillants, quel que soit le nombre de bases du premier anneau, et la prévision suit. Force (`WAVE_STRENGTH`) : la cadence des bases (le temps), plus des renforts
+Grâce des trois premières nuits (`WAVE_STRENGTH.earlyCaps`, `earlyCap`) : la réserve commune des bases est plafonnée à 2, 3, 4 assaillants, quel que soit le nombre de bases du premier anneau, et la prévision suit. Ces nuits-là, la mairie ne descend pas sous `WAVE_STRENGTH.graceHallFloor` de ses PV : elle sort abîmée, jamais à terre. Force (`WAVE_STRENGTH`) : la cadence des bases (le temps), plus des renforts
 de la base de tête — `perEra` par ère (`waveEraOf` : fin de l’acte I, Signal) et
 un par `buildingsPerRaider` bâtiments au-delà de `freeBuildings`, palissades
 exclues (`World.townSize`). Abattue toute avant l'aube, une vague paie sa
@@ -577,7 +607,10 @@ coché et en sourdine une fois réussi), l'objectif choisi au doigt ou à la
 croix de la manette déplié en jauges dessous (le chantier de la mairie, une
 jauge par objet), la quête d'Ève en cours dessous ; le conseil d'Ève retombe
 sur celui de l'objectif choisi (`tutorialAdvice`, `selected`, ou le chemin
-du labo qui ouvre son bâtiment). Chaque objectif réussi a sa petite
+du labo qui ouvre son bâtiment) ; touché par le joueur (`chosen`), il passe
+devant tout conseil qui ne presse pas. Un producteur au coffre plein que rien
+ne vide (ni poste de logistique à portée, ni porteurs) lui fait conseiller un
+poste de logistique (`storeStuck`). Chaque objectif réussi a sa petite
 célébration (jingle, toast, la case rebondit), chaque chapitre la grande
 (fanfare, pluie de feuilles, bandeau), et une récompense concrète (objets,
 places de sac relues dans les objectifs réussis — `objectiveBagBonus` —,
@@ -811,7 +844,8 @@ se montrent ni ne se tapent hors des cases vues (`World.sees`), leurs repères
 de bord et halos non plus. On ne bâtit ni ne pave sur l'inexploré (refus
 `unexplored`). Sauvegardés : cases explorées (plages par chunk) et captures,
 sous `fog` ; une sauvegarde d'avant explore `FOG_VISION.legacy` autour du
-bâti et d'Adam. Débogage : `?nofog` en dev, ou F panneau `?debug` ouvert
+bâti et d'Adam. Une colonie neuve connaît sa clairière : `FOG_VISION.home`
+tuiles explorées autour de la mairie. Débogage : `?nofog` en dev, ou F panneau `?debug` ouvert
 (commande `setFog`). Une partie de test explore `SCENARIO_REVEAL` autour de
 la mairie.
 
@@ -1111,8 +1145,8 @@ Les règles, en résumé :
   marqueurs, le cadre de la caméra ; glisser, molette et pinch (`MapView`),
   un tap y pose la caméra (`Camera.lookAt`, jusqu'au prochain pas d'Adam).
   Le jeu tourne derrière, scène masquée. Elle ne montre que ce que
-  `MapSight` permet (inexploré / exploré / visible) — pour l'instant la zone
-  que la caméra a montrée (`SeenArea`, pas sauvegardée).
+  `MapSight` permet (inexploré / exploré / visible) : le brouillard de
+  guerre de la partie (`FogSight`, sur `World.sightAt`).
   `render/indicatorLayer.ts` dessine les repères de bord (mutants, mairie,
   gisement que réclame le conseil — `sim/deposits.ts`), jamais sous le HUD ;
   taper celui de la mairie y jette un coup d'œil (`Camera.peek`).

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TILE_SIZE } from '../core/grid.ts';
 import { RESOURCES } from '../data/resources.ts';
 import { findDeposit } from './deposits.ts';
+import { terrainAt } from './terrain.ts';
 import { World } from './world.ts';
 
 const SEEDS = [1, 42, 99, 1234];
@@ -69,5 +70,19 @@ describe('findDeposit', () => {
     const world = new World(1);
 
     expect(findDeposit(world, 'food', world.player.x, world.player.y, everythingSeen)).toBeNull();
+  });
+});
+
+describe('findDeposit — l’eau du puits', () => {
+  it('montre la tuile d’eau la plus proche, vue ou non', () => {
+    for (const seed of [7, 2026, 12345]) {
+      const world = World.newColony(seed);
+      const found = findDeposit(world, 'water', world.player.x, world.player.y, () => false);
+
+      expect(found).not.toBeNull();
+      expect(terrainAt(seed, found!.tx, found!.ty)).toBe('water');
+      expect(found!.known).toBe(false);
+      expect(findDeposit(world, 'water', world.player.x, world.player.y, () => true)?.known).toBe(true);
+    }
   });
 });

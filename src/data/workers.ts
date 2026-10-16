@@ -18,6 +18,18 @@ export const PORTERS = {
 } as const;
 
 /**
+ * Les **coups de main** : un ouvrier libre — sans poste — n'attend plus les
+ * bras croisés. Le jour, il porte depuis la mairie ce qu'attendent les
+ * chantiers et les labos de son rayon logistique, en petites charges. Un
+ * bâtiment qui l'embauche le prend même chargé : sa charge retourne à la
+ * mairie. La nuit, il dort ; pendant une vague, il s'abrite.
+ */
+export const VOLUNTEERS = {
+  /** Objets portés en un voyage : moins qu'un porteur, il n'a pas de hotte. */
+  carry: 3,
+} as const;
+
+/**
  * Un ex-mutant, sorti guéri de la clinique, porte comme un ouvrier — mais
  * pas tout à fait : il a gardé la carrure de sa vie d'avant, pas l'allure.
  * Il porte plus lourd, et marche plus lentement.

@@ -85,3 +85,13 @@ export const SURVIVORS = {
 export const DAY_DIAL = {
   nightWarning: 20 * 20,
 } as const;
+
+/**
+ * « Passer la nuit » : une nuit calme (`World.calmNight`) peut défiler plus
+ * vite, `speed` ticks de simulation par tick de temps réel, jusqu'à l'aube —
+ * ou jusqu'à ce qu'un mutant reparaisse. Rien ne change dans la simulation :
+ * c'est la boucle de `main.ts` qui en fait plus par image.
+ */
+export const HASTEN = {
+  speed: 4,
+} as const;

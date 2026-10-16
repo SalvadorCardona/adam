@@ -563,6 +563,32 @@ export const UI_ICONS = {
   ),
   /** Le joystick : un disque et son bouton, pour « glissez le pouce ». */
   move: svg(S, S, circle(12, 12, 10, cyan.light), circle(12.8, 12.8, 5.5, cyan.shade), circle(12, 12, 5, cyan.base)),
+  /** La faveur de l'aube : un paquet jaune de la colonie, ruban corail et nœud. */
+  gift: svg(
+    S,
+    S,
+    rect(3.5, 9.5, 17, 11.5, yellow.shade, 3),
+    rect(3.5, 9, 17, 10, yellow.base, 3),
+    rect(2.5, 7, 19, 4.5, yellow.shade, 2),
+    rect(2.5, 6.5, 19, 3.8, yellow.base, 2),
+    rect(10.5, 6.5, 3, 14.5, coral.shade, 1),
+    rect(10.5, 6.5, 3, 13, coral.base, 1),
+    pill(6, 2.5, 6, 4.5, coral.base),
+    pill(12, 2.5, 6, 4.5, coral.base),
+    circle(12, 5.5, 2, coral.shade),
+    pill(4.5, 11.5, 2, 5, yellow.light),
+  ),
+  /** « Passer la nuit » : l'avance rapide, deux flèches jaunes vers l'aube. */
+  hasten: svg(
+    S,
+    S,
+    polygon([3.5, 6, 12.5, 12.5, 3.5, 19], yellow.shade),
+    polygon([11.5, 6, 20.5, 12.5, 11.5, 19], yellow.shade),
+    polygon([3, 5, 12, 11.5, 3, 18], yellow.base),
+    polygon([11, 5, 20, 11.5, 11, 18], yellow.base),
+    pill(4.2, 7, 1.6, 4, yellow.light),
+    pill(12.2, 7, 1.6, 4, yellow.light),
+  ),
   /** La flèche du bouton « Jouer ». */
   play: svg(S, S, polygon([8.5, 5.5, 19.5, 12.5, 8.5, 19.5], orange.shade), polygon([7.5, 4.5, 18.5, 11.5, 7.5, 18.5], paper.base)),
   /** « Recommencer », sur un bouton blanc : la flèche corail qui repart. */

@@ -159,6 +159,8 @@ const LOOT_GLINT_MS = 380;
 const LOOT_GLINT_X = 6;
 const LOOT_GLINT_Y = -16;
 const LOOT_GLINT_SCALE = 0.55;
+/** L'étincelle d'un éclat d'étoile filante, plus grande que celle d'un butin : elle ne s'éteint jamais. */
+const STAR_GLINT_SCALE = 2;
 
 /** Sous ce nombre de ticks restants, le butin oublié clignote. */
 const LOOT_BLINK_TICKS = 20 * 10;
@@ -703,9 +705,13 @@ export class MobileLayer {
     icon.y = -hop;
     view.root.scale.set(0.4 + drop * 0.6);
 
-    // Chaque butin a sa phase : ils ne scintillent pas tous ensemble.
+    // Chaque butin a sa phase : ils ne scintillent pas tous ensemble. Un éclat d'étoile, lui, brille sans cesse.
     const phase = (view.age + pickup.id * 397) % LOOT_GLINT_PERIOD_MS;
-    const bloom = drop < 1 || phase >= LOOT_GLINT_MS ? 0 : Math.sin((phase / LOOT_GLINT_MS) * Math.PI);
+    const bloom = pickup.star
+      ? STAR_GLINT_SCALE * (0.75 + 0.25 * Math.sin(view.age / 180))
+      : drop < 1 || phase >= LOOT_GLINT_MS
+        ? 0
+        : Math.sin((phase / LOOT_GLINT_MS) * Math.PI);
 
     glint.visible = bloom > 0;
     glint.y = LOOT_GLINT_Y - hop;

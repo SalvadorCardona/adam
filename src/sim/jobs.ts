@@ -41,7 +41,8 @@ import { labSurplus, labWants, researchCost } from './research.ts';
 import { consumerDemands, forgeOutputs, isConsumer } from './consumers.ts';
 import { priorityRank } from './staffing.ts';
 import type { Store } from './store.ts';
-import type { Depot, Drill, Entity, EntityId, Farm, Forge, Job, LumberCamp, Nursery, PigPen, Quarry, Site, TownHall, Yard } from './types.ts';
+import { inLogisticRange } from './warehouse.ts';
+import type { Depot, Drill, Entity, EntityId, Farm, Forge, Job, Lab, LumberCamp, Nursery, PigPen, Quarry, Site, TownHall, Yard } from './types.ts';
 
 /** Le trajet en ligne droite de (x0, y0) à (x1, y1) est-il praticable ? */
 export type LineTest = (x0: number, y0: number, x1: number, y1: number) => boolean;
@@ -53,9 +54,12 @@ type Offer = Omit<Job, 'carried'>;
  * Qui cherche du travail : un porteur (maison des constructeurs, ex-mutant
  * de la clinique), un logisticien ou un bâtisseur, avec le poste qui le loge.
  */
-export type Crew = { kind: 'porter' } | { kind: 'logistician'; depot: Depot } | { kind: 'builder'; yard: Yard };
+export type Crew = { kind: 'porter' } | { kind: 'volunteer' } | { kind: 'logistician'; depot: Depot } | { kind: 'builder'; yard: Yard };
 
 export const PORTER_CREW: Crew = { kind: 'porter' };
+
+/** Les ouvriers libres qui donnent un coup de main (`VOLUNTEERS`) : chantiers et labos du rayon de la mairie. */
+export const VOLUNTEER_CREW: Crew = { kind: 'volunteer' };
 
 type Footprint = { tx: number; ty: number; width: number; height: number };
 
@@ -230,6 +234,14 @@ export class JobBoard {
         continue;
       }
 
+      if (crew.kind === 'volunteer') {
+        // Un coup de main : les chantiers et les labos du rayon de la mairie, rien d'autre.
+        if (!inLogisticRange(hall, entity)) continue;
+        if (entity.kind === 'site' && !yards.some((yard) => inYardRange(yard, entity))) this.siteOffers(entity, hall, carry, offers);
+        if (entity.kind === 'lab') this.labOffers(entity, hall, carry, offers);
+        continue;
+      }
+
       switch (entity.kind) {
         case 'site':
           // Un poste de construction couvre ce chantier : ses bâtisseurs s'en chargent.
@@ -238,12 +250,7 @@ export class JobBoard {
           break;
 
         case 'lab':
-          // Ce que la recherche attend, depuis la mairie, comme un chantier ; le reste d'une recherche abandonnée y retourne.
-          for (const [item] of entity.research === null ? [] : researchCost(entity.research)) {
-            const amount = Math.min(carry, labWants(entity, item), hall.store.available(item), entity.store.freeSpace());
-
-            if (amount > 0) offers.push({ from: hall.id, to: entity.id, item, amount, priority: JOB_PRIORITY.site });
-          }
+          this.labOffers(entity, hall, carry, offers);
           for (const [item] of entity.store.entries()) {
             const amount = Math.min(carry, labSurplus(entity, item), hall.store.freeSpace());
 
@@ -282,6 +289,15 @@ export class JobBoard {
       }
     }
     return offers;
+  }
+
+  /** Ce que la recherche attend, depuis la mairie, comme un chantier. */
+  private labOffers(lab: Lab, hall: TownHall, carry: number, offers: Offer[]): void {
+    for (const [item] of lab.research === null ? [] : researchCost(lab.research)) {
+      const amount = Math.min(carry, labWants(lab, item), hall.store.available(item), lab.store.freeSpace());
+
+      if (amount > 0) offers.push({ from: hall.id, to: lab.id, item, amount, priority: JOB_PRIORITY.site });
+    }
   }
 
   /** Livrer un chantier depuis la mairie : un voyage par objet qu'il attend encore et que la mairie a. */

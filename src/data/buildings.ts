@@ -1103,7 +1103,7 @@ export const BUILDINGS = {
     mood: { amount: 3, radius: 8 },
     menu: true,
     unique: false,
-    unlockExplored: 500,
+    unlockExplored: 1200,
     plan: false,
     sprite: 'fountain',
     weapon: null,

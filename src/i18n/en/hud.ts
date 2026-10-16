@@ -218,6 +218,31 @@ export const hud: Messages['hud'] = {
     day: (day: number, left: string): string => `Day ${day} · night in ${left}`,
     short: (day: number): string => `D${day}`,
   },
+  /** « Passer la nuit », à côté de l'horloge par nuit calme ; actif, le temps jusqu'à l'aube. */
+  /** Au crépuscule d'une nuit d'étoiles filantes (`data/starfall.ts`). */
+  starfall: 'Eve: “Stars will fall tonight. The shards are worth a detour!”',
+  daily: {
+    title: 'Daily challenge',
+    done: (label: string, prestige: number, streak: number): string =>
+      `Daily challenge done: ${label}! +${prestige} Prestige${streak > 1 ? ` · ${streak} days in a row` : ''}`,
+    streak: (days: number): string => `${days} in a row`,
+  },
+  boon: {
+    title: 'Dawn favour',
+    lead: 'The night is held. Eve found something to help you: pick one card.',
+    later: 'Later',
+    parcel: 'Parcel',
+    forTheDay: 'For the day',
+    /** Le toast de l'aube, et son bouton. */
+    ready: 'Dawn brings a favour: pick a card.',
+    see: 'See',
+    offer: 'Dawn favour',
+    chosen: (label: string): string => `${label}!`,
+  },
+  hasten: {
+    idle: 'Skip the night',
+    active: (left: string): string => `Dawn in ${left}`,
+  },
   weather: {
     soon: (weather: string, seconds: number): string => `${weather} in ${seconds} s`,
   },

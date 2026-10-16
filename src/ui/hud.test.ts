@@ -45,16 +45,17 @@ describe('defeatRows', () => {
   it('ne compte pas la nuit pendant laquelle la mairie tombe', () => {
     const world = builtWorld();
 
-    runUntil(world, () => world.night === 3 && world.mobiles.size > 0, CYCLE * 4);
+    // Passé les nuits de grâce (où elle ne tombe pas) : la nuit 4.
+    runUntil(world, () => world.night === 4 && world.mobiles.size > 0, CYCLE * 5);
 
-    // La mairie redevient fragile : le premier coup de mutant la fait tomber, en pleine nuit 3.
+    // La mairie redevient fragile : le premier coup de mutant la fait tomber, en pleine nuit 4.
     const hall = world.entities.get(world.townHallId);
 
     if (hall?.kind !== 'townHall') throw new Error('la mairie devrait être debout');
     hall.hp = 1;
     runUntil(world, () => world.defeated, DAY_CYCLE.night);
     expect(world.clock()?.phase).toBe('night');
-    expect(nightsSurvived(world)).toBe('2');
+    expect(nightsSurvived(world)).toBe('3');
   });
 
   it('compte la nuit 3 si la mairie tombe le jour qui la suit', () => {

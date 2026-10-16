@@ -25,4 +25,6 @@ export const offline = {
     storeFull: 'Des coffres sont pleins : personne pour les vider.',
   },
   collect: 'Récupérer',
+  /** Le bouton quand rien n'a été produit : il n'y a rien à récupérer. */
+  resume: 'Continuer',
 };

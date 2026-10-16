@@ -25,4 +25,6 @@ export const offline: Messages['offline'] = {
     storeFull: 'Some chests are full: nobody to empty them.',
   },
   collect: 'Collect',
+  /** Le bouton quand rien n'a été produit : il n'y a rien à récupérer. */
+  resume: 'Continue',
 };

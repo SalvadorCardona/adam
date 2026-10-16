@@ -600,4 +600,23 @@ describe('premières nuits', () => {
     expect(world.defeated).toBe(false);
     expect(world.night).toBe(1);
   }, 60_000);
+
+  it('Adam au loin, la mairie plie sans tomber pendant les nuits de grâce', () => {
+    const world = worldWithTownHall(3);
+    const hall = hallOf(world);
+    const max = buildingLevel(hall.proto, hall.level).hp;
+    let lowest = max;
+
+    // Adam part loin, hors de portée de son arc : rien ne défend la mairie.
+    world.player.x = world.player.prevX = (hall.tx + 60) * TILE_SIZE;
+    world.player.y = world.player.prevY = (hall.ty + 60) * TILE_SIZE;
+    for (let night = 1; night <= WAVE_STRENGTH.earlyCaps.length; night += 1) {
+      playThroughNight(world, night, () => {
+        lowest = Math.min(lowest, hallOf(world).hp);
+      });
+      expect(world.defeated).toBe(false);
+    }
+    expect(lowest).toBeGreaterThanOrEqual(Math.ceil(max * WAVE_STRENGTH.graceHallFloor));
+    expect(lowest).toBeLessThan(max);
+  }, 120_000);
 });

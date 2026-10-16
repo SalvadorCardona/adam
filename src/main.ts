@@ -15,6 +15,7 @@ import '@fontsource/fredoka/latin-600.css';
 import '@fontsource/fredoka/latin-700.css';
 import './style.css';
 import { rewardOf } from './data/achievements.ts';
+import { HASTEN } from './data/dayNight.ts';
 import { AudioEngine } from './audio/engine.ts';
 import { prefetchMusic } from './audio/music.ts';
 import { VOICES } from './audio/synth.ts';
@@ -73,6 +74,7 @@ import { BuildMenu } from './ui/buildMenu.ts';
 import { rewardText } from './ui/collectionPanel.ts';
 import { Hud, clock as clockText } from './ui/hud.ts';
 import { OfflineRecap } from './ui/offlineRecap.ts';
+import { BoonPanel } from './ui/boonPanel.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
 import { haptics } from './ui/haptics.ts';
 import { PAD_POINTER_ID } from './ui/padCursor.ts';
@@ -86,7 +88,7 @@ import { SettingsPanel } from './ui/settingsPanel.ts';
 import { formatSeed, parseSeed } from './ui/seed.ts';
 import { testBanner, testScenarioOf } from './ui/testRoute.ts';
 import { ZoomControls } from './ui/zoomControls.ts';
-import { SeenArea } from './ui/mapSight.ts';
+import { FogSight } from './ui/mapSight.ts';
 import { WorldMap } from './ui/worldMap.ts';
 import { AccountClient } from './net/account.ts';
 import { inviteCodeOf, playCodeOf, playUrl, resyncsOf, titleUrl, withoutInvite } from './net/invite.ts';
@@ -119,12 +121,6 @@ const AXIS_EPSILON = 0.01;
 /** L'axe d'un clavier au repos : ce que lit le déplacement quand le menu de construction a le clavier. */
 const STILL: KeyboardState = { active: false, axisX: 0, axisY: 0 };
 
-/**
- * Ce que la carte du monde montre déjà au chargement, en tuiles autour
- * d'Adam et de chaque bâtiment : la colonie se voit avant d'avoir bougé.
- */
-const KNOWN_AROUND_PLAYER = 20;
-const KNOWN_AROUND_BUILDING = 8;
 
 /** Distance, en tuiles, à laquelle Adam entend la hache d'un bûcheron. */
 const CHOP_HEARING_TILES = 9;
@@ -472,17 +468,8 @@ async function main(): Promise<void> {
 
   if (savedZoom !== null) renderer.restoreZoom(savedZoom);
 
-  /*
-   * La carte du monde. En attendant le brouillard de guerre, elle montre ce
-   * que la caméra a montré depuis le chargement (`SeenArea`), plus les
-   * abords d'Adam et du bâti.
-   */
-  const seen = new SeenArea();
-
-  seen.seeAround(Math.floor(world.player.x / TILE_SIZE), Math.floor(world.player.y / TILE_SIZE), KNOWN_AROUND_PLAYER);
-  for (const entity of world.entities.values()) {
-    seen.seeAround(entity.tx + Math.floor(entity.width / 2), entity.ty + Math.floor(entity.height / 2), KNOWN_AROUND_BUILDING);
-  }
+  // La carte du monde montre ce que le brouillard de guerre a découvert : explorée, ou visible en direct.
+  const seen = new FogSight(world);
 
   const worldMap = new WorldMap(world, seen, {
     onOpen: () => {
@@ -756,6 +743,23 @@ async function main(): Promise<void> {
   });
   hud.root.append(recap.root);
 
+  // Les faveurs de l'aube : la capsule du HUD ouvre les cartes ; ouvertes, elles arrêtent l'horloge.
+  const boons = new BoonPanel(world, (boon) => {
+    accumulator = 0;
+    hud.notify(t().hud.boon.chosen(t().boons[boon].label), 'good');
+  });
+
+  hud.onBoonOpen = () => {
+    buildMenu.close();
+    panel.close();
+    boons.show();
+    audio.play('open');
+  };
+  world.events.on('starfallAnnounced', () => hud.notify(t().hud.starfall, 'good'));
+  world.events.on('challengeCompleted', ({ id, prestige, streak }) => hud.notify(t().hud.daily.done(t().challenges[id], prestige, streak), 'good'));
+  world.events.on('boonOffered', () => hud.notify(t().hud.boon.ready, 'good', { label: t().hud.boon.see, run: () => hud.onBoonOpen() }));
+  hud.root.append(boons.root);
+
   hud.pauseButton.addEventListener('click', () => setPaused(!paused));
   hud.inviteButton.addEventListener('click', () => invitePanel.show());
   hud.settingsButton.addEventListener('click', () => settings.toggle());
@@ -849,6 +853,11 @@ async function main(): Promise<void> {
       }
       if (joinPanel?.open) {
         joinPanel.dismiss();
+        return;
+      }
+      // Les cartes de l'aube : « Plus tard ».
+      if (boons.open) {
+        boons.close();
         return;
       }
       // L'aide de la manette est par-dessus les réglages : elle se ferme la première.
@@ -950,7 +959,7 @@ async function main(): Promise<void> {
   settings.setGamepad(gamepadPrefs.rumble, gamepadPrefs.deadZone);
   document.body.append(pad.cursor.root);
   // En dev : la manette aussi sous la main dans la console, pour poser son curseur sans stick.
-  if (import.meta.env.DEV) Object.assign(window, { adam: { world, audio, pad, connection } });
+  if (import.meta.env.DEV) Object.assign(window, { adam: { world, audio, pad, connection, hud, renderer } });
   wireRumble(world, pad);
 
   // Les étiquettes de la manette sur le sac (△ / Y) et « Bâtir » (□ / X) : visibles seulement en mode manette.
@@ -1038,7 +1047,7 @@ async function main(): Promise<void> {
   let lastAxisY = 0;
 
   renderer.app.ticker.add((ticker) => {
-    const running = started && !paused && !settings.open && !notifyPrompt.open && !tabPanel.open && !inventory.dressing && !recap.open;
+    const running = started && !paused && !settings.open && !notifyPrompt.open && !tabPanel.open && !inventory.dressing && !recap.open && !boons.open;
 
     // La manette se lit une fois par frame, avant les ticks : l'axe de marche est frais.
     pad.update(ticker.deltaMS, performance.now(), !worldMap.open);
@@ -1050,7 +1059,8 @@ async function main(): Promise<void> {
       guest.session.sync?.advance(ticker.deltaMS);
       accumulator = (guest.session.sync?.alpha ?? 0) * STEP_MS;
     } else if (running && !celebrating) {
-      accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS);
+      // Une nuit calme que le joueur fait passer : plus de ticks par image, la simulation n'en sait rien.
+      accumulator += Math.min(ticker.deltaMS, MAX_FRAME_MS) * (hud.hastening && world.calmNight() ? HASTEN.speed : 1);
     }
 
     while (!guest && accumulator >= STEP_MS && !celebrating) {
@@ -1086,24 +1096,13 @@ async function main(): Promise<void> {
         stick.root.getBoundingClientRect(),
         zoom.root.getBoundingClientRect(),
       ]);
-      // Ce que la caméra montre entre dans la zone découverte de la carte du monde.
-      if (!worldMap.open) {
-        const view = renderer.cameraView;
-
-        seen.see({
-          minTx: Math.floor((view.x - view.width / 2) / TILE_SIZE),
-          minTy: Math.floor((view.y - view.height / 2) / TILE_SIZE),
-          maxTx: Math.floor((view.x + view.width / 2) / TILE_SIZE),
-          maxTy: Math.floor((view.y + view.height / 2) / TILE_SIZE),
-        });
-      }
       if (renderer.zoomLevel !== shownZoom) {
         shownZoom = renderer.zoomLevel;
         zoomPrefs.save(shownZoom);
       }
     }
     zoom.update(worldMap.open ? worldMap.zoomLimits : renderer.zoomLimits);
-    renderer.setObjective(hud.wantedItem());
+    renderer.setObjective(hud.pointedItem());
     renderer.setSelected(panel.selection);
     buildMenu.refresh();
     panel.update();
@@ -1223,6 +1222,9 @@ function wireAudio(world: World, audio: AudioEngine, settings: SettingsPanel): v
   world.events.on('buildingSupplied', () => audio.play('deliver'));
   world.events.on('labSupplied', () => audio.play('deliver'));
   world.events.on('researchCompleted', () => audio.play('eureka'));
+  world.events.on('boonChosen', () => audio.play('eureka'));
+  world.events.on('starFell', () => audio.play('pickup'));
+  world.events.on('challengeCompleted', () => audio.play('objective'));
   world.events.on('townDeposited', () => audio.play('deliver'));
   world.events.on('itemDropped', () => audio.play('pickup'));
   world.events.on('buildingCompleted', () => audio.play('build'));
@@ -1625,6 +1627,11 @@ function wireParticles(world: World, renderer: GameRenderer): void {
     particles.burst(x, y - 12, PARTICLES.mutant, 12, 0.12);
   });
   world.events.on('mutantFled', ({ x, y }) => particles.burst(x, y - 12, PARTICLES.mutant, 6, 0.1));
+  // Une étoile filante touche le sol : une gerbe dorée, et son anneau.
+  world.events.on('starFell', ({ x, y }) => {
+    particles.ring(x, y);
+    particles.burst(x, y - 6, PARTICLES.star, 16, 0.14);
+  });
   world.events.on('beastHit', ({ proto, x, y }) => {
     particles.ring(x, y - 8);
     particles.burst(x, y - 8, BEAST_PARTICLES[proto], 4);

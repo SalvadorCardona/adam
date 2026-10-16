@@ -67,6 +67,8 @@ import { QUESTS, type QuestReward } from '../data/quests.ts';
 import { RESEARCH, type ResearchId } from '../data/research.ts';
 import { WEATHER, WEATHER_CALENDAR } from '../data/weather.ts';
 import { dayDialSvg, type UiIcon } from '../art/ui.ts';
+import { BOONS } from '../data/boons.ts';
+import { CHALLENGES, type ChallengeId } from '../data/challenges.ts';
 import type { AtlasStats } from '../render/spriteLibrary.ts';
 import type { WaterStats } from '../render/waterLayer.ts';
 import type { Compass } from '../sim/enemies.ts';
@@ -204,6 +206,16 @@ export class Hud {
   private readonly hintBulb: HTMLButtonElement;
   /** L'horloge du jour et de la nuit, dans la tête de la quête : cadran, numéro du jour, détail au tap. */
   private readonly dayClock: HTMLButtonElement;
+  /** « Passer la nuit » : visible par nuit calme, il hâte l'aube (`HASTEN`). */
+  private readonly hastenButton: HTMLButtonElement;
+  private hastenKey = '';
+  /** Le joueur a demandé de hâter l'aube ; `main.ts` le lit à chaque image. */
+  public hastening = false;
+  /** La faveur de l'aube : la capsule qui l'attend, puis le coup de pouce qui court. */
+  private readonly boonButton: HTMLButtonElement;
+  private boonKey = '';
+  /** Ouvre les cartes de l'aube ; `main.ts` y branche `BoonPanel`. */
+  public onBoonOpen: () => void = () => undefined;
   private readonly dayClockDial: HTMLImageElement;
   private readonly dayClockDay: HTMLElement;
   private readonly dayClockTip: HTMLElement;
@@ -312,6 +324,7 @@ export class Hud {
   /** Tick où le conseil a été montré (ou déplié) : il se replie `HINT_FOLD_TICKS` plus tard. */
   private hintSince = 0;
   private wanted: ItemId | null = null;
+  private pointed: ItemId | null = null;
   private advisedResearch: ResearchId | null = null;
 
   /** Les répliques d'Ève en attente, et l'heure où la réplique affichée s'en va. */
@@ -446,6 +459,19 @@ export class Hud {
     this.waveSoon.addEventListener('click', () => {
       if (this.waveOrigin) this.onFocus(this.waveOrigin.x, this.waveOrigin.y);
     });
+    this.hastenButton = element('button', 'panel hud-wave hud-hasten');
+    this.hastenButton.type = 'button';
+    this.hastenButton.hidden = true;
+    this.hastenButton.addEventListener('click', () => {
+      this.hastening = !this.hastening;
+      this.updateHasten();
+    });
+    this.boonButton = element('button', 'panel hud-wave hud-boon');
+    this.boonButton.type = 'button';
+    this.boonButton.hidden = true;
+    this.boonButton.addEventListener('click', () => {
+      if (this.world.boonOffer()) this.onBoonOpen();
+    });
     this.floats = element('div', 'hud-floats');
     this.stats = element('div', 'panel hud-stats');
     this.stats.hidden = !debug;
@@ -562,7 +588,7 @@ export class Hud {
     main.append(this.bar, this.quest);
     this.left = element('div', 'hud-left');
     // L'horloge du jour juste à droite de la population.
-    this.left.append(this.town, this.people, this.dayClock, this.waveSoon, this.hunger);
+    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.boonButton, this.waveSoon, this.hunger);
     this.right = element('div', 'hud-right');
     this.right.append(this.weather);
     this.top.append(this.left, main, this.right);
@@ -687,6 +713,9 @@ export class Hud {
       if (plan) this.notify(t().hud.discovery.plan(t().buildings[plan].label), 'good');
       this.flyFindsToBag(items, x, y);
     });
+    // Le colis d'une faveur de l'aube, la récompense d'un défi du jour : ils volent d'Adam jusqu'à la ville (ou au sac).
+    world.events.on('boonChosen', ({ reward, to }) => this.flyFindsToBag(reward, world.player.x, world.player.y, to));
+    world.events.on('challengeCompleted', ({ reward, to }) => this.flyFindsToBag(reward, world.player.x, world.player.y, to));
     world.events.on('prestigeGained', ({ amount, x, y }) => this.floatPrestige(amount, x, y));
     world.events.on('xpGained', ({ amount, x, y }) => this.floatXp(amount, x, y));
     world.events.on('levelUp', ({ level, maxHp, bowDamage }) => {
@@ -1248,6 +1277,11 @@ export class Hud {
     return this.wanted;
   }
 
+  /** Ce que le repère de bord montre : ce qu'on récolte, ou l'eau où poser le puits. */
+  public pointedItem(): ItemId | null {
+    return this.pointed;
+  }
+
   /** Le panneau de debug est-il ouvert ? Ses raccourcis (brouillard) n'agissent qu'alors. */
   /** Le bandeau de la ville : là où volent les gains du récap hors ligne. */
   public get townBanner(): HTMLElement {
@@ -1466,11 +1500,12 @@ export class Hud {
    * bouton du sac, qui rebondit à chaque arrivée. Sous `prefers-reduced-motion`, il monte sur place
    * comme un gain ordinaire.
    */
-  private flyFindsToBag(items: readonly [ItemId, number][], worldX: number, worldY: number): void {
+  private flyFindsToBag(items: readonly [ItemId, number][], worldX: number, worldY: number, to: 'bag' | 'town' = 'bag'): void {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const origin = this.project(worldX, worldY - 16);
     const field = this.floats.getBoundingClientRect();
-    const target = this.bag.getBoundingClientRect();
+    const goal = to === 'bag' ? this.bag : this.town;
+    const target = goal.getBoundingClientRect();
     const dx = target.left + target.width / 2 - field.left - origin.x;
     const dy = target.top + target.height / 2 - field.top - origin.y;
 
@@ -1500,6 +1535,10 @@ export class Hud {
 
       flight.onfinish = () => {
         flier.remove();
+        if (to === 'town') {
+          goal.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)', offset: 0.4 }, { transform: 'scale(1)' }], { duration: 240, easing: 'ease-out' });
+          return;
+        }
         this.bag.dataset['bump'] = 'true';
         window.setTimeout(() => delete this.bag.dataset['bump'], 260);
       };
@@ -1716,7 +1755,9 @@ export class Hud {
     const quest = world.eve()?.state === 'idle' || world.eve()?.state === 'repair' ? currentQuest(world.questsDone) : null;
     const progress = quest ? questProgress(quest, world.entities.values()) : null;
 
-    key = `hall:${world.chapter}:${progressKey}:${detailKey}:${selected}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}`;
+    const daily = world.challenge();
+
+    key = `hall:${world.chapter}:${progressKey}:${detailKey}:${selected}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}:${daily && `${daily.id}:${daily.have}:${daily.done}:${daily.streak}`}`;
     if (key === this.lastQuest) return;
     this.lastQuest = key;
 
@@ -1749,6 +1790,7 @@ export class Hud {
       line,
     );
     if (this.crewOpen) this.questBody.append(crewDetail(crew));
+    if (daily) this.questBody.append(dailyRow(daily));
 
     if (quest && progress) {
       const row = element('div', 'hud-quest-eve');
@@ -1821,7 +1863,67 @@ export class Hud {
    * détail en toutes lettres au tap et pour les lecteurs d'écran. Cachée tant
    * que la mairie est en chantier — le cycle n'a pas commencé.
    */
+  /**
+   * « Passer la nuit » : le bouton n'existe que par nuit calme ; actif, il dit
+   * le temps jusqu'à l'aube. Un mutant qui reparaît, l'aube, la défaite : le
+   * bouton disparaît et le temps reprend son pas.
+   */
+  private updateHasten(): void {
+    const calm = this.world.calmNight();
+
+    if (!calm) this.hastening = false;
+    if (this.hastenButton.hidden !== !calm) this.hastenButton.hidden = !calm;
+    if (!calm) return;
+
+    const dial = this.world.dayDial();
+    const words = t().hud.hasten;
+    const label = this.hastening && dial ? words.active(clock(Math.ceil(dial.left / TICKS_PER_SECOND))) : words.idle;
+    const key = `${locale()}|${label}`;
+
+    if (key === this.hastenKey) return;
+    this.hastenKey = key;
+    this.hastenButton.dataset['active'] = String(this.hastening);
+    this.hastenButton.setAttribute('aria-pressed', String(this.hastening));
+    this.hastenButton.replaceChildren(uiIcon('hasten', 18), text('hud-wave-text', label));
+    setTip(this.hastenButton, label);
+  }
+
+  /**
+   * La capsule de la faveur : « Faveur de l'aube » qui bat tant qu'une carte
+   * attend ; puis l'icône du coup de pouce et le temps qui lui reste. Un colis
+   * pris ne laisse rien : il est déjà en ville.
+   */
+  private updateBoon(): void {
+    const offer = this.world.boonOffer();
+    const active = this.world.activeBoon();
+    const visible = offer !== null || active !== null;
+
+    if (this.boonButton.hidden !== !visible) this.boonButton.hidden = !visible;
+    if (!visible) return;
+
+    const words = t().hud.boon;
+    const seconds = active ? Math.ceil(active.left / TICKS_PER_SECOND) : 0;
+    const key = offer ? `offer|${locale()}` : `active|${active!.id}|${locale()}|${seconds}`;
+
+    if (key === this.boonKey) return;
+    this.boonKey = key;
+    this.boonButton.dataset['state'] = offer ? 'offer' : 'active';
+    if (offer) {
+      this.boonButton.replaceChildren(uiIcon('gift', 18), text('hud-wave-text', words.offer));
+      setTip(this.boonButton, words.offer);
+      return;
+    }
+
+    const { icon } = BOONS[active!.id];
+    const label = t().boons[active!.id];
+
+    this.boonButton.replaceChildren('item' in icon ? itemIcon(icon.item, 18) : uiIcon(icon.ui, 18), text('hud-wave-text', clock(seconds)));
+    setTip(this.boonButton, `${label.label} — ${label.description}`);
+  }
+
   private updateClock(): void {
+    this.updateHasten();
+    this.updateBoon();
     const dial = this.world.dayDial();
 
     if (this.dayClock.hidden !== !dial) this.dayClock.hidden = !dial;
@@ -1909,6 +2011,7 @@ export class Hud {
       towers,
       this.mutantCount(),
       this.selectedObjective(),
+      this.chosenObjective !== null && this.selectedObjective() === this.chosenObjective,
     );
   }
 
@@ -1917,6 +2020,7 @@ export class Hud {
     const hint = advice?.text ?? '';
 
     this.wanted = advice?.wants ?? null;
+    this.pointed = advice?.pointTo ?? this.wanted;
     this.advisedResearch = advice?.research ?? null;
 
     // La langue vient de changer : le même conseil, dans l'autre langue, sans le relancer ni le déplier.
@@ -2633,4 +2737,26 @@ export function clock(seconds: number): string {
   const rest = seconds % 60;
 
   return `${minutes}:${rest.toString().padStart(2, '0')}`;
+}
+
+/** Le défi du jour, sous les objectifs : son icône, son intitulé, sa jauge — cochée une fois réussi. */
+function dailyRow(daily: { id: ChallengeId; have: number; need: number; done: boolean; streak: number }): HTMLElement {
+  const row = element('div', 'hud-quest-daily');
+  const { icon } = CHALLENGES[daily.id];
+  const label = text('hud-quest-daily-label', t().challenges[daily.id]);
+
+  // La série : les jours réussis d'affilée, aujourd'hui compris une fois réussi.
+  const days = daily.streak + (daily.done ? 1 : 0);
+  const title = text('hud-quest-daily-title', t().hud.daily.title);
+
+  if (days > 1) title.append(text('hud-quest-daily-streak', t().hud.daily.streak(days)));
+  row.dataset['done'] = String(daily.done);
+  row.append(
+    title,
+    daily.done ? uiIcon('check', 18) : 'item' in icon ? itemIcon(icon.item, 18) : uiIcon(icon.ui, 18),
+    label,
+    bar(daily.have / daily.need),
+    text('hud-meter-value', `${daily.have}/${daily.need}`),
+  );
+  return row;
 }

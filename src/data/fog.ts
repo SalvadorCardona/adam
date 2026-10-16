@@ -28,6 +28,8 @@ export const FOG_VISION = {
   people: 3,
   /** Un bâtiment du joueur, chantier compris, depuis le bord de son emprise. */
   building: 3,
+  /** Un éclat d'étoile filante tombé au sol (`data/starfall.ts`) : il brille. */
+  star: 2,
   /**
    * Les bâtiments qui voient plus loin. La tour de guet surveille ce que son
    * arc (8, puis 10 renforcée) ne touche pas encore : on voit venir la vague.
@@ -38,6 +40,12 @@ export const FOG_VISION = {
    * alentours de ce qu'elle a bâti, à ce rayon autour de chaque bâtiment et d'Adam.
    */
   legacy: 12,
+  /**
+   * Une colonie neuve connaît sa clairière : explorée à ce rayon autour de la
+   * mairie, sous le voile, pour que le premier écran ne soit pas qu'indigo.
+   * Les premières bases (34 tuiles) restent loin dehors.
+   */
+  home: 16,
 } as const;
 
 /**
