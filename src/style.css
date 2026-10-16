@@ -407,9 +407,72 @@ button:disabled,
   flex-wrap: wrap;
 }
 
+/*
+ * La pile d'événements, à droite de l'horloge : la capsule la plus pressante,
+ * puis « +N » ; ouverte, le reste tombe en liste dessous. Le bloc lui-même n'a
+ * pas de carte : chaque capsule est la sienne.
+ */
+.hud .hud-top .hud-events {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hud-gap);
+  border-radius: 0;
+}
+
+.hud-events[hidden],
+.hud-events-more[hidden],
+.hud-events-list[hidden] {
+  display: none;
+}
+
+/* Le « +N » : après la capsule de tête, qu'il suit dans la rangée. */
+.hud .hud-events-more {
+  order: 2;
+  min-width: var(--hud-h);
+  padding: 0 12px;
+  border: none;
+  background: var(--paper);
+  box-shadow: var(--face);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  cursor: var(--cursor-hand);
+}
+
+.hud .hud-events-more[aria-expanded='true'] {
+  background: var(--yellow-light);
+}
+
+.hud .hud-events-more:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.hud-events-list {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--hud-gap));
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+/* Une capsule en liste prend sa largeur : la liste se lit comme un menu. */
+.hud-events-list > * {
+  justify-content: flex-start;
+}
+
 /* Un bloc d'un groupe : une carte blanche de la hauteur et des rayons de la barre. */
 .hud .hud-top .hud-left > *,
-.hud .hud-top .hud-right > * {
+.hud .hud-top .hud-right > *,
+.hud .hud-top .hud-events > *,
+.hud .hud-top .hud-events-list > * {
   box-sizing: border-box;
   flex: none;
   height: var(--hud-h);
@@ -1480,9 +1543,13 @@ button:disabled,
  * (la molette aussi), sans jamais revenir à la ligne.
  */
 .hud .hud-top .hud-town {
+  /* De quoi lire quatre objets : la place d'un objet (icône, quantité, flèche) et celle du reste du bandeau (niveau, Prestige, maison, bouton). */
+  --town-item: 52px;
+  --town-chrome: 230px;
+
   flex: 0 1 auto;
   width: auto;
-  min-width: 0;
+  min-width: calc(var(--town-chrome) + 4 * var(--town-item));
   overflow: hidden;
   flex-direction: row;
   align-items: center;
@@ -1497,7 +1564,8 @@ button:disabled,
 
 .hud-town .hud-stock-items {
   display: flex;
-  min-width: 0;
+  /* Le bandeau garde la place de quatre objets, quoi que la pile d'événements prenne. */
+  min-width: calc(4 * var(--town-item));
   gap: 12px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1589,6 +1657,9 @@ button:disabled,
   }
 
   .hud .hud-top .hud-town {
+    --town-item: 44px;
+    --town-chrome: 190px;
+
     gap: 8px;
     padding: 0 10px;
   }
@@ -1601,6 +1672,14 @@ button:disabled,
   .hud-town .hud-stock-items .icon {
     width: 15px;
     height: 15px;
+  }
+}
+
+/* Un petit téléphone : quatre objets serrés tiennent encore dans la rangée de la ville. */
+@media (max-width: 399px) {
+  .hud .hud-top .hud-town {
+    --town-item: 38px;
+    --town-chrome: 150px;
   }
 }
 

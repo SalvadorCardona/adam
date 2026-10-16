@@ -252,6 +252,10 @@ export const hud: Messages['hud'] = {
     offer: 'Dawn favour',
     chosen: (label: string): string => `${label}!`,
   },
+  /** The event stack: the most pressing one, then “+N” which opens the list. */
+  events: {
+    more: (count: number): string => `${count} more event${count > 1 ? 's' : ''} — show the list`,
+  },
   hasten: {
     idle: 'Skip the night',
     active: (left: string): string => `Dawn in ${left}`,

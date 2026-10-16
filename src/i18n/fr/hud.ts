@@ -311,6 +311,10 @@ export const hud = {
     /** Le toast, à la carte prise. */
     chosen: (label: string): string => `${label} !`,
   },
+  /** La pile d'événements : le plus pressant, puis « +N » qui ouvre la liste. */
+  events: {
+    more: (count: number): string => `${count} autre${count > 1 ? 's' : ''} événement${count > 1 ? 's' : ''} — voir la liste`,
+  },
   hasten: {
     idle: 'Passer la nuit',
     active: (left: string): string => `Aube dans ${left}`,

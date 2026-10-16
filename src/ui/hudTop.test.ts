@@ -161,8 +161,65 @@ describe('le haut de l’écran', () => {
     const town = rules.find((rule) => rule.selectors.includes('.hud .hud-top .hud-town'));
 
     expect(town?.declarations.get('flex')).toBe('0 1 auto');
-    expect(town?.declarations.get('min-width')).toBe('0');
     expect(town?.declarations.get('overflow')).toBe('hidden');
+  });
+
+  /** La largeur minimale du bandeau de la ville, à une largeur d'écran : ce qui l'entoure, `--town-chrome`, et ses objets. */
+  function townMin(width: number): { min: number; item: number } {
+    const vars = new Map<string, number>();
+    const matching = rules.filter((rule) => rule.selectors.includes('.hud .hud-top .hud-town') && rule.declarations.has('--town-item'));
+
+    for (const rule of matching) {
+      const max = /max-width: (\d+)px/.exec(rule.media)?.[1];
+
+      if (max !== undefined && width > Number(max)) continue;
+      for (const name of ['--town-item', '--town-chrome']) {
+        const value = rule.declarations.get(name);
+
+        if (value) vars.set(name, parseFloat(value));
+      }
+    }
+    const item = vars.get('--town-item')!;
+
+    return { min: vars.get('--town-chrome')! + 4 * item, item };
+  }
+
+  it('garde au bandeau de la ville la place de quatre objets', () => {
+    const town = rules.find((rule) => rule.selectors.includes('.hud .hud-top .hud-town') && rule.declarations.has('min-width'));
+    const items = rules.find((rule) => rule.selectors.includes('.hud-town .hud-stock-items') && rule.declarations.has('min-width'));
+
+    expect(town?.declarations.get('min-width')).toBe('calc(var(--town-chrome) + 4 * var(--town-item))');
+    expect(items?.declarations.get('min-width')).toBe('calc(4 * var(--town-item))');
+  });
+
+  /*
+   * Avec tous les événements actifs (faveur, vague, vivres, météo, combo, « Passer la nuit »),
+   * la pile n'occupe que sa capsule de tête et son « +N » : sur la rangée du groupe de gauche,
+   * la ville garde sa place minimale. Largeurs prudentes des autres blocs de la rangée.
+   */
+  const OTHERS = { people: 330, clock: 110, stack: 150 + 48 };
+
+  it.each([1366, 1460, 1920])('laisse au moins quatre objets à la ville à %i px, tous les événements actifs', (width) => {
+    const row = width - 2 * 8;
+    const gaps = 3 * 8;
+    const { min, item } = townMin(width);
+
+    expect(item).toBeGreaterThan(0);
+    expect(min).toBeGreaterThanOrEqual(4 * item);
+    expect(min + OTHERS.people + OTHERS.clock + OTHERS.stack + gaps).toBeLessThanOrEqual(row);
+  });
+
+  it.each([320, 390])('tient la ville sur sa propre rangée à %i px, quatre objets lisibles', (width) => {
+    const { min } = townMin(width);
+
+    expect(min).toBeLessThanOrEqual(width - 2 * (width < 360 ? 4 : 8));
+  });
+
+  it('range tous les événements dans une seule pile', () => {
+    const hud = readFileSync(new URL('./hud.ts', import.meta.url), 'utf8');
+
+    for (const id of ['hasten', 'combo', 'boon', 'wave', 'hunger', 'weather']) expect(hud).toContain(`this.events.add('${id}'`);
+    expect(hud).toContain('this.left.append(this.town, this.people, this.dayClock, this.events.root)');
   });
 
 });
