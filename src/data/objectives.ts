@@ -132,6 +132,14 @@ export const CHAPTERS = [
     icon: 'lumberCamp',
     objectives: [
       {
+        id: 'lab',
+        title: 'Bâtir un labo',
+        hint: 'Le labo ouvre tout le reste : cabane, carrière, puits. Il lui faut 4 fer — suis le repère jusqu’aux rochers bleus !',
+        goals: [{ type: 'build', building: 'lab', count: 1 }],
+        reward: {},
+        celebration: 'Le labo est debout : les recherches ouvrent le menu « Bâtir ».',
+      },
+      {
         id: 'lumberCamp',
         title: `Bâtir une ${lower(lumberCamp.name)}`,
         hint: 'Des bûcherons couperont le bois pour nous. « Bûcheronnage », au labo, et la cabane est au menu !',

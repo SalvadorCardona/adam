@@ -77,7 +77,8 @@ import type { Entity, Mobile, MobileId } from '../sim/types.ts';
 import { DIAL_ARCS } from '../sim/dayNight.ts';
 import { currentQuest, questProgress } from '../sim/eve.ts';
 import { moodOf } from '../sim/housing.ts';
-import { chapterObjectives, currentChapter, firstOpenObjective, goalProgress, goalWait, openObjectives, type GoalWait } from '../sim/objectives.ts';
+import { researchCost } from '../sim/research.ts';
+import { chapterObjectives, currentChapter, firstOpenObjective, goalProgress, goalWait, labSpot, objectiveLock, openObjectives, type GoalWait, type ObjectiveLock } from '../sim/objectives.ts';
 import { COMBO } from '../data/skills.ts';
 import { TICKS_PER_SECOND, type Inhabitant, type Workforce, type World } from '../sim/world.ts';
 import { locale, onLocale, t } from '../i18n/locale.ts';
@@ -1872,6 +1873,10 @@ export class Hud {
   /** Un tap sur la ligne d'un objectif le choisit : ses jauges, et son conseil à l'ampoule. */
   private chooseObjective(id: ObjectiveId): void {
     this.chosenObjective = id;
+    // Fermé au menu : le doigt va au labo — ou à son chantier — où la recherche se lance.
+    const lab = objectiveLock(this.world, id) ? labSpot(this.world) : null;
+
+    if (lab) this.onFocus((lab.tx + lab.width / 2) * TILE_SIZE, (lab.ty + lab.height / 2) * TILE_SIZE);
     this.unfoldQuest(QUEST_TAP_TICKS);
     this.updateQuest();
     this.updateHint();
@@ -2609,11 +2614,14 @@ interface ObjectiveLine {
   have: number;
   need: number;
   icon: Goal;
+  /** Le bâtiment qu'il demande n'est pas au menu : la recherche du labo qui l'ouvre. */
+  lock: ObjectiveLock | null;
 }
 
 function objectiveLine(world: World, id: ObjectiveId, goals: readonly Goal[]): ObjectiveLine {
   const done = world.objectivesDone.has(id);
   const icon = goals[0]!;
+  const lock = objectiveLock(world, id);
   const hall = world.entities.get(world.townHallId);
 
   // La mairie en chantier se compte en objets livrés : la jauge avance à chaque bois.
@@ -2626,12 +2634,13 @@ function objectiveLine(world: World, id: ObjectiveId, goals: readonly Goal[]): O
       have: cost.reduce((sum, [item, needed]) => sum + Math.min(hall.delivered[item] ?? 0, needed), 0),
       need: cost.reduce((sum, [, needed]) => sum + needed, 0),
       icon,
+      lock,
     };
   }
   if (goals.length === 1) {
     const { have, need } = goalProgress(world, icon);
 
-    return { id, done, have: done ? need : have, need, icon };
+    return { id, done, have: done ? need : have, need, icon, lock };
   }
 
   const met = goals.filter((goal) => {
@@ -2640,7 +2649,7 @@ function objectiveLine(world: World, id: ObjectiveId, goals: readonly Goal[]): O
     return have >= need;
   }).length;
 
-  return { id, done, have: done ? goals.length : met, need: goals.length, icon };
+  return { id, done, have: done ? goals.length : met, need: goals.length, icon, lock };
 }
 
 /**
@@ -2683,11 +2692,16 @@ function objectiveRow(id: ObjectiveId, choose: () => void): ObjectiveRowView {
   const title = text('hud-objective-title', '');
   const gauge = bar(0);
   const value = text('hud-meter-value', '');
+  const lock = element('span', 'hud-objective-lock');
+  const lockText = text('hud-objective-lock-text', '');
   let shown = '';
+  let locked = '';
 
+  lock.hidden = true;
+  lock.append(uiIcon('lock', 16), lockText);
   node.type = 'button';
   node.dataset['objective'] = id;
-  node.append(icon, title, gauge, value);
+  node.append(icon, title, gauge, value, lock);
   node.addEventListener('click', choose);
   return {
     node,
@@ -2701,12 +2715,29 @@ function objectiveRow(id: ObjectiveId, choose: () => void): ObjectiveRowView {
       }
       title.textContent = label;
       node.dataset['done'] = String(line.done);
+      node.dataset['locked'] = String(line.lock !== null);
       node.setAttribute('aria-pressed', String(selected));
+
+      const hint = line.lock ? labLockText(line.lock) : '';
+
+      lock.hidden = hint === '';
+      if (hint !== locked) {
+        locked = hint;
+        lockText.textContent = hint;
+      }
       (gauge.firstElementChild as HTMLElement).style.width = `${Math.round((Math.min(line.have, line.need) / line.need) * 100)}%`;
       value.textContent = `${line.have}/${line.need}`;
-      node.setAttribute('aria-label', `${label} ${line.have}/${line.need}${line.done ? ` — ${t().hud.objectiveDone}` : ''}`);
+      node.setAttribute('aria-label', `${label} ${line.have}/${line.need}${line.done ? ` — ${t().hud.objectiveDone}` : ''}${hint ? ` — ${hint}` : ''}`);
     },
   };
+}
+
+/** « Au labo : Bûcheronnage (8 bois, 4 pierres) » : la recherche qui ouvre le bâtiment, et son coût. */
+function labLockText({ research }: ObjectiveLock): string {
+  const words = t().hud.quest;
+  const cost = researchCost(research).map(([item, amount]) => words.labCost(amount, t().items[item]));
+
+  return words.labLock(t().research[research].label, cost.join(', '));
 }
 
 /**

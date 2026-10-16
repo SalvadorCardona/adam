@@ -24,13 +24,15 @@
  * peut le payer — le sac d'Adam et le stock de la ville : vert ce qu'il y a
  * déjà, orange ce qui manque.
  *
- * Le menu ne montre que ce qui se bâtit : ni carte grisée, ni cadenas
- * (`World.inMenu`). Tant que la mairie est en chantier, le bouton « Bâtir »
+ * Le menu ne montre que ce qui se bâtit (`World.inMenu`) : pas de carte
+ * grisée, sauf pour un bâtiment que le chapitre en cours demande et que le
+ * labo n'a pas encore ouvert — « À découvrir au labo », avec sa recherche
+ * (`lockedObjectiveBuildings`), au bout de la liste, sans rien à toucher. Tant que la mairie est en chantier, le bouton « Bâtir »
  * lui-même reste caché : un débutant ne dépense pas son premier bois
  * ailleurs. Ensuite, un bâtiment n'y entre qu'une fois débloqué — sa
  * recherche finie au labo (forge, four, clinique), son plan donné par Ève,
  * son objectif atteint (l'antenne) — et un bâtiment unique déjà posé en sort.
- * Ce qui reste à découvrir se lit au labo, pas ici.
+ * Le reste à découvrir se lit au labo, pas ici.
  *
  * Un bâtiment qui vient d'entrer porte « Nouveau » jusqu'à ce qu'on choisisse
  * sa carte (commande `seeBuilding`) ou qu'on le pose ; le bouton « Bâtir »
@@ -81,8 +83,9 @@ import type { CategoryFilter } from '../data/categoryIcons.ts';
 import type { ItemId } from '../data/items.ts';
 import type { Placement } from '../input/placement.ts';
 import { footingHalf } from '../sim/footing.ts';
+import { lockedObjectiveBuildings } from '../sim/objectives.ts';
 import type { World } from '../sim/world.ts';
-import { onLocale, t } from '../i18n/locale.ts';
+import { locale, onLocale, t } from '../i18n/locale.ts';
 import { BuildFilter, type FilterCard } from './buildFilter.ts';
 import { buildOrder } from './buildOrder.ts';
 import { buildingTerms, searchKey } from './buildSearch.ts';
@@ -133,6 +136,9 @@ export class BuildMenu {
   private project: (x: number, y: number) => { x: number; y: number } = (x, y) => ({ x, y });
   private readonly cards = new Map<BuildingId, HTMLButtonElement>();
   private readonly badges = new Map<BuildingId, HTMLElement>();
+  /** Les cartes grisées « À découvrir au labo », au bout de la liste, et ce qu'elles montrent. */
+  private teasers: HTMLElement[] = [];
+  private teaserKey = '';
   private readonly costs: { item: ItemId; amount: number; element: HTMLElement }[] = [];
   /** Les libellés fixes des cartes, réécrits à chaque changement de langue. */
   private readonly relabels: (() => void)[] = [];
@@ -488,6 +494,7 @@ export class BuildMenu {
 
       if (card) this.list.append(card);
     }
+    this.list.append(...this.teasers);
     this.list.scrollTop = 0;
   }
 
@@ -747,6 +754,43 @@ export class BuildMenu {
     return this.world.inMenu(id) && !this.world.atLimit(id);
   }
 
+  /**
+   * Les bâtiments que le chapitre demande et que le labo n'a pas encore
+   * ouverts : une carte grisée chacun, avec sa recherche. Les autres restent
+   * cachés. Aucune pendant une recherche de texte : elle ne cherche que ce qui se bâtit.
+   */
+  private refreshTeasers(): void {
+    const locks = this.unlocked() && this.search.value.trim() === '' ? lockedObjectiveBuildings(this.world) : [];
+    const key = `${locale()}:${locks.map(({ building, research }) => `${building}/${research}`).join()}`;
+
+    if (key === this.teaserKey) return;
+    this.teaserKey = key;
+    for (const teaser of this.teasers) teaser.remove();
+
+    const text = t();
+
+    this.teasers = locks.map(({ building, research }) => {
+      const card = document.createElement('div');
+      const thumb = document.createElement('span');
+      const body = document.createElement('div');
+      const name = document.createElement('div');
+      const effect = document.createElement('div');
+
+      card.className = 'build-card build-teaser';
+      thumb.className = 'build-card-thumb';
+      thumb.append(buildingIcon(building), uiIcon('lock', 18));
+      body.className = 'build-card-body';
+      name.className = 'build-card-name';
+      name.textContent = text.buildings[building].label;
+      effect.className = 'build-card-effect';
+      effect.textContent = `${text.menu.discover} — ${text.menu.discoverResearch(text.research[research].label)}`;
+      body.append(name, effect);
+      card.append(thumb, body);
+      return card;
+    });
+    this.list.append(...this.teasers);
+  }
+
   /** Recalcule l'état visible. Appelé à chaque changement de placement et à chaque frame. */
   public refresh(): void {
     const armed = this.placement.armedBuilding();
@@ -764,6 +808,7 @@ export class BuildMenu {
     }
 
     this.refreshFilter();
+    this.refreshTeasers();
     this.toggleButton.dataset['new'] = String(fresh);
 
     // Le sac et la ville ne comptent que tiroir ouvert : fermé, personne ne voit les coûts.

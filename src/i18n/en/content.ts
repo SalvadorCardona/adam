@@ -535,6 +535,11 @@ export const content: Content = {
       hint: 'Wood and stone to the site, Adam.',
       celebration: 'The first roof stands: the town hall becomes the town’s storehouse.',
     },
+    lab: {
+      title: 'Build a lab',
+      hint: 'The lab opens up everything else: lumber camp, quarry, well. It needs 4 iron — follow the marker to the blue rocks!',
+      celebration: 'The lab stands: research opens up the “Build” menu.',
+    },
     lumberCamp: {
       title: 'Build a lumber camp',
       hint: 'Lumberjacks will cut wood for us. “Woodcraft” at the lab, and the camp shows up in “Build”!',

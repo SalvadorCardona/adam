@@ -19,11 +19,10 @@ import { EVE } from '../data/eve.ts';
 import { COLONY } from '../data/inhabitants.ts';
 import { TOWN_PLENTY, type ItemId } from '../data/items.ts';
 import { objectiveProto, type Goal, type ObjectiveId } from '../data/objectives.ts';
-import { RECIPES, type RecipeProto } from '../data/recipes.ts';
 import { WAVE_STRENGTH } from '../data/enemies.ts';
 import { RESEARCH_IDS, type ResearchId } from '../data/research.ts';
 import { RESOURCES } from '../data/resources.ts';
-import { firstOpenObjective, goalProgress, objectiveWait, type GoalWait } from '../sim/objectives.ts';
+import { firstOpenObjective, goalBuilding, goalProgress, objectiveWait, type GoalWait } from '../sim/objectives.ts';
 import { eraReady, nextEra } from '../sim/eras.ts';
 import { openingResearch, researchStatus, unlockingResearch } from '../sim/research.ts';
 import { inDepotRange, isProducer } from '../sim/jobs.ts';
@@ -340,6 +339,15 @@ function stuckProducer(world: World): Building | null {
   return null;
 }
 
+/** Le labo n'a pas, ni dans le sac, ni en ville, ni sur son chantier, tout le fer qu'il demande. */
+function labIronShort(world: World): boolean {
+  const needed = BUILDINGS.lab.cost.ironOre;
+  const site = [...world.entities.values()].find((entity) => entity.kind === 'site' && entity.proto === 'lab');
+  const delivered = site?.kind === 'site' ? (site.delivered.ironOre ?? 0) : 0;
+
+  return delivered + world.player.inventory.count('ironOre') + (world.townStock()?.available('ironOre') ?? 0) < needed;
+}
+
 /**
  * Le conseil d'un objectif : sa réplique, ou, si le bâtiment qu'il demande —
  * ou qui produit ce qu'il demande — n'est pas encore au menu, le chemin du
@@ -355,7 +363,8 @@ function objectiveAdvice(world: World, id: ObjectiveId): Advice | null {
   const building = goal ? goalBuilding(goal) : null;
 
   // Le puits se pose au bord de l'eau : le repère montre la rive la plus proche.
-  const pointTo = building === 'well' ? 'water' : null;
+  // Le labo veut du fer, qu'on n'a pas encore vu : le repère montre le filon.
+  const pointTo = building === 'well' ? 'water' : building === 'lab' && labIronShort(world) ? 'ironOre' : null;
 
   if (building && !world.inMenu(building)) {
     const way = viaLab(world, building, line);
@@ -364,16 +373,6 @@ function objectiveAdvice(world: World, id: ObjectiveId): Advice | null {
     return way ? { ...way, pointTo } : null;
   }
   return { text: line, wants: null, pointTo };
-}
-
-/** Le bâtiment qu'une condition demande, ou celui qui produit l'objet qu'elle compte. */
-function goalBuilding(goal: Goal): BuildingId | null {
-  if (goal.type === 'build') return goal.building;
-  if (goal.type !== 'produce') return null;
-
-  const recipe = (Object.values(RECIPES) as RecipeProto[]).find((proto) => goal.item in proto.outputs);
-
-  return recipe?.building ?? null;
 }
 
 /**

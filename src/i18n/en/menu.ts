@@ -22,6 +22,8 @@ export const menu: Messages['menu'] = {
   searchPlaceholder: 'Search for a building…',
   searchClear: 'Clear search',
   searchEmpty: 'No building matches',
+  discover: 'To discover at the lab',
+  discoverResearch: (research: string): string => `Research: ${research}`,
   allCategories: 'All',
   categoryCount: (category, n) => `${category}, ${count(n, 'building')}`,
   resultsElsewhere: (n, category) => `${count(n, 'result')} in ${category}`,

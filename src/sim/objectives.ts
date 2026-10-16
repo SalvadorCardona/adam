@@ -7,11 +7,14 @@
  * pleine et l'objectif réussi ne peuvent pas diverger.
  */
 
+import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
 import type { ItemId } from '../data/items.ts';
-import { CHAPTERS, OBJECTIVES, type ChapterProto, type Goal, type ObjectiveId, type ObjectiveProto } from '../data/objectives.ts';
-import { RECIPES } from '../data/recipes.ts';
+import { CHAPTERS, OBJECTIVES, objectiveProto, type ChapterProto, type Goal, type ObjectiveId, type ObjectiveProto } from '../data/objectives.ts';
+import { RECIPES, type RecipeProto } from '../data/recipes.ts';
+import type { ResearchId } from '../data/research.ts';
 import { CYCLE_TICKS, ticksToDawn } from './dayNight.ts';
-import type { Nursery, WorldStats } from './types.ts';
+import { openingResearch, unlockingResearch } from './research.ts';
+import type { Entity, Nursery, WorldStats } from './types.ts';
 import type { World } from './world.ts';
 
 export interface GoalProgress {
@@ -191,4 +194,71 @@ export function copyStats(stats: WorldStats): WorldStats {
 
 export function emptyStats(): WorldStats {
   return { nightsSurvived: 0, births: 0, produced: {} };
+}
+
+/** Le bâtiment qu'une condition demande, ou celui qui produit l'objet qu'elle compte. */
+export function goalBuilding(goal: Goal): BuildingId | null {
+  if (goal.type === 'build') return goal.building;
+  if (goal.type !== 'produce') return null;
+
+  const recipe = (Object.values(RECIPES) as RecipeProto[]).find((proto) => goal.item in proto.outputs);
+
+  return recipe?.building ?? null;
+}
+
+/** Ce qui ferme un objectif au menu : le bâtiment qu'il demande, et la recherche du labo qui l'ouvre. */
+export interface ObjectiveLock {
+  building: BuildingId;
+  research: ResearchId;
+}
+
+/** La recherche qui ouvre `building` au menu, tant qu'il n'y est pas et qu'elle est de l'ère atteinte. */
+export function buildingLock(world: World, building: BuildingId): ObjectiveLock | null {
+  if (!BUILDINGS[building].menu || world.isUnlocked(building)) return null;
+
+  const research = openingResearch(building) ?? unlockingResearch(building);
+
+  return research !== null && world.researchOpen(research) ? { building, research } : null;
+}
+
+/**
+ * Ce qui ferme l'objectif au menu : son premier bâtiment à bâtir (ou qui
+ * produit ce qu'il compte) pas encore au menu. `null` si l'objectif est réussi
+ * ou que son bâtiment est à portée de « Bâtir ».
+ */
+export function objectiveLock(world: World, id: ObjectiveId): ObjectiveLock | null {
+  const objective = objectiveProto(id);
+
+  if (world.objectivesDone.has(id)) return null;
+
+  const goal = objective.goals.find((condition) => count(world, condition) < condition.count);
+  const building = goal ? goalBuilding(goal) : null;
+
+  return building ? buildingLock(world, building) : null;
+}
+
+/**
+ * Les bâtiments que le chapitre en cours demande et que le menu n'ouvre pas
+ * encore : les seuls que « Bâtir » montre grisés, avec leur recherche.
+ */
+export function lockedObjectiveBuildings(world: World): ObjectiveLock[] {
+  const locks = new Map<BuildingId, ObjectiveLock>();
+
+  for (const objective of openObjectives(world)) {
+    const lock = objectiveLock(world, objective.id);
+
+    if (lock && !locks.has(lock.building)) locks.set(lock.building, lock);
+  }
+  return [...locks.values()];
+}
+
+/** Le labo à montrer du doigt : le plus ancien debout, sinon son chantier ; `null` s'il n'y en a pas encore. */
+export function labSpot(world: World): Entity | null {
+  let site: Entity | null = null;
+
+  for (const entity of world.entities.values()) {
+    if (entity.kind === 'lab') return entity;
+    if (entity.kind === 'site' && entity.proto === 'lab') site ??= entity;
+  }
+  return site;
 }
