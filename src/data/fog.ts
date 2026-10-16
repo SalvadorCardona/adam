@@ -43,7 +43,7 @@ export const FOG_VISION = {
    * mairie, sous le voile, pour que le premier écran ne soit pas qu'indigo.
    * Les premières bases (34 tuiles) restent loin dehors.
    */
-  home: 13,
+  home: 16,
 } as const;
 
 /**
