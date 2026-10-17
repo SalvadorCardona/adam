@@ -11,6 +11,7 @@ import { BUILD_REACH_TILES } from './player.ts';
 import type { Entity, EntityId, Mutant } from './types.ts';
 import { nextWeather, spoilsNight, weatherAt, weatherOfSlot, type WeatherSpell } from './weather.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 const { slotTicks, announceTicks, calmSlots } = WEATHER_CALENDAR;
 
@@ -355,7 +356,7 @@ describe('météo dans le monde', () => {
     expect(shots(fog.start + 1)).toBe(0);
   });
 
-  it('ne fait jamais tomber la pluie acide sur une nuit de vagues, ni juste avant', () => {
+  it.skipIf(!SLOW)('ne fait jamais tomber la pluie acide sur une nuit de vagues, ni juste avant', () => {
     // Une seed où la pluie tombe dans les douze premiers créneaux, entre deux nuits.
     const seed = 42;
     const world = new World(seed);

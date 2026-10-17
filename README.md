@@ -88,7 +88,9 @@ sur la même carte, ce qui rend un bug de génération reproductible. En dev,
 | `npm run build`     | typecheck puis build de production       |
 | `npm run lint`      | ESLint, garde-fou d'isolation compris    |
 | `npm run typecheck` | TypeScript strict                        |
-| `npm test`          | Vitest, headless, sans canvas            |
+| `npm test`          | Vitest rapide (projet `fast`), moins de 40 s |
+| `npm run test:slow` | Vitest, suite entière : 1 000 graines, défense, longues parties |
+| `npm run test:e2e`  | Playwright : le vrai jeu dans Chromium, 390 × 844 et 1440 × 900 |
 
 Le back-end (`server/` : Hono, `ws`, SQLite embarqué dans Node) est
 facultatif : le jeu se joue entièrement sans lui. Sa configuration est dans

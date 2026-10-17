@@ -3,6 +3,7 @@ import { BOON_IDS, BOON_OFFER, BOONS, type BoonId } from '../data/boons.ts';
 import { drawBoons } from './boons.ts';
 import { deserialize, serialize } from './save.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** La mairie bâtie, puis le temps jusqu'à la première aube. */
 function firstDawn(seed = 1): World {
@@ -34,7 +35,7 @@ describe('faveurs de l’aube', () => {
     expect(seen.size).toBe(BOON_IDS.length);
   });
 
-  it('l’aube les propose ; un colis va en ville, une seule fois', () => {
+  it.skipIf(!SLOW)('l’aube les propose ; un colis va en ville, une seule fois', () => {
     const world = firstDawn();
     const offer = world.boonOffer();
 
@@ -61,7 +62,7 @@ describe('faveurs de l’aube', () => {
     expect(world.boonOffer()).toBeNull();
   });
 
-  it('un coup de pouce s’ajoute à la statistique pour la journée, puis s’éteint', () => {
+  it.skipIf(!SLOW)('un coup de pouce s’ajoute à la statistique pour la journée, puis s’éteint', () => {
     let world: World | null = null;
     let index = -1;
 

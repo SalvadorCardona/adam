@@ -17,6 +17,7 @@ import { isWalkable, terrainAt } from './terrain.ts';
 import type { EntityId, Forge, Site, TownHall, Worker } from './types.ts';
 import { clearLine } from './workers.ts';
 import { TICKS_PER_SECOND, World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 type Stock = Partial<Record<ItemId, number>>;
 
@@ -325,7 +326,7 @@ describe('porteurs', () => {
     expect(workers(world).every((worker) => worker.job === null && nearHome(world, worker))).toBe(true);
   });
 
-  it('sous charge — 10 ouvriers, 5 chantiers, un stock trop court : aucune double réservation, rien de perdu ni de dupliqué', () => {
+  it.skipIf(!SLOW)('sous charge — 10 ouvriers, 5 chantiers, un stock trop court : aucune double réservation, rien de perdu ni de dupliqué', () => {
     const world = colony({
       hall: { wood: 30, stone: 20, ironOre: 4 },
       houses: 3,
@@ -463,7 +464,7 @@ describe('porteurs', () => {
     expect(sites(world)).toHaveLength(0);
   });
 
-  it('une sauvegarde en plein transport se recharge avec ses réservations', () => {
+  it.skipIf(!SLOW)('une sauvegarde en plein transport se recharge avec ses réservations', () => {
     const world = colony({ hall: { wood: 30, stone: 20 }, houses: 2, sites: ['farm', 'nursery', 'watchtower'] });
 
     // En plein transport : on recharge dès qu'un porteur a une charge en route.
@@ -707,7 +708,7 @@ describe('grill', () => {
     expect(HUNTING.foodPerGrilled).toBeGreaterThan(HUNTING.foodPerMeat);
   });
 
-  it('6 viandes en ville : le grill en garde 4 à cuire, les porteurs rapportent les grillées, le reste est converti cru', () => {
+  it.skipIf(!SLOW)('6 viandes en ville : le grill en garde 4 à cuire, les porteurs rapportent les grillées, le reste est converti cru', () => {
     const world = colony({ hall: { meat: 6 }, houses: 1, grills: [{}] });
     const [grill] = grillsOf(world);
     const food = hallOf(world).store.count('food');
@@ -859,7 +860,7 @@ describe('four à charbon', () => {
    * deux plaques en 33 minutes. Une foreuse, deux fours et une forge, la
    * ville pleine de bois : la chaîne bois → charbon → plaque tourne seule.
    */
-  it('forge + 2 fours + foreuse pendant 5 min : au moins 30 plaques, sans rien dupliquer', () => {
+  it.skipIf(!SLOW)('forge + 2 fours + foreuse pendant 5 min : au moins 30 plaques, sans rien dupliquer', () => {
     // De l'eau pour cinq minutes : ce n'est pas la soif qu'on mesure ici.
     const world = colony({ hall: { wood: 300, water: 100 }, houses: 2, forges: [{}], kilns: [{}, {}], drills: [{ ironOre: 1 }] });
     let plates = 0;

@@ -4,6 +4,7 @@ import { GLEANERS } from '../data/workers.ts';
 import { deserialize, serialize } from './save.ts';
 import type { EntityId, Worker } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** La mairie bâtie, la ville à sec, le matin du premier jour : seuls les libres peuvent la nourrir. */
 function bareTown(seed = 5): World {
@@ -113,7 +114,7 @@ describe('glaneurs', () => {
     expect(gleaning(world)).toHaveLength(0);
   });
 
-  it('personne ne glane la nuit ni pendant une vague', () => {
+  it.skipIf(!SLOW)('personne ne glane la nuit ni pendant une vague', () => {
     const world = bareTown();
 
     site(world, 'home');

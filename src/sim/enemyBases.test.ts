@@ -12,6 +12,7 @@ import { earlyCap } from './waves.ts';
 import { deserialize, serialize } from './save.ts';
 import type { Beast, EnemyBase, EntityId, Mutant } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** Un chantier livré d'office sauf un objet, que le sac apporte : le dernier objet l'achève. */
 function finish(world: World, id: EntityId): void {
@@ -132,7 +133,7 @@ function firstRingBase(world: World): EnemyBase {
 }
 
 describe('bases mutantes', () => {
-  it('se posent en anneaux autour de la mairie, de plus en plus fortes, et laissent la ville de départ libre', () => {
+  it.skipIf(!SLOW)('se posent en anneaux autour de la mairie, de plus en plus fortes, et laissent la ville de départ libre', () => {
     for (let seed = 0; seed < 30; seed += 1) {
       const world = new World(seed);
       const hall = hallCenter(world);
@@ -512,7 +513,7 @@ describe('bases mutantes — production et sorties', () => {
     for (let i = 0; i < 100; i += 1) old.tick();
   });
 
-  it('deux parties de même seed produisent et lâchent les mêmes assaillants', () => {
+  it.skipIf(!SLOW)('deux parties de même seed produisent et lâchent les mêmes assaillants', () => {
     const run = (): string => {
       const world = withTownHall(42);
 

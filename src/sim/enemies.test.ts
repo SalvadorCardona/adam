@@ -16,6 +16,7 @@ import { BUILD_REACH_TILES } from './player.ts';
 import { deserialize, serialize } from './save.ts';
 import type { Entity, EntityId, Mutant, Pickup } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** Place Adam sur une tuile libre collée à l'emprise, et renvoie l'axe qui pousse vers elle. */
 function standNextTo(world: World, tx: number, ty: number, width: number, height: number): { x: number; y: number } {
@@ -228,7 +229,7 @@ function townHallCenter(world: World): { x: number; y: number } {
 }
 
 describe('vagues', () => {
-  it('n’envoie aucun mutant tant que la mairie est en chantier', () => {
+  it.skipIf(!SLOW)('n’envoie aucun mutant tant que la mairie est en chantier', () => {
     const world = new World(7);
 
     for (let i = 0; i < CYCLE_TICKS; i += 1) world.tick();
@@ -238,7 +239,7 @@ describe('vagues', () => {
     expect(world.clock()).toBeNull();
   });
 
-  it('une journée sans mutant, le crépuscule, puis les bases lâchent leurs assaillants à la tombée de la nuit', () => {
+  it.skipIf(!SLOW)('une journée sans mutant, le crépuscule, puis les bases lâchent leurs assaillants à la tombée de la nuit', () => {
     const world = worldWithTownHall();
     const started = world.cycleStartTick;
     const waves: string[] = [];
@@ -279,7 +280,7 @@ describe('vagues', () => {
     expect(waves).toHaveLength(1);
   });
 
-  it('à l’aube, les mutants fuient, le butin tombe, et la journée suivante est calme', () => {
+  it.skipIf(!SLOW)('à l’aube, les mutants fuient, le butin tombe, et la journée suivante est calme', () => {
     const world = worldWithTownHall();
     const started = world.cycleStartTick;
     const fled: number[] = [];
@@ -423,7 +424,7 @@ describe('vagues', () => {
     expect(WAVES.perNight).toBe(1);
   });
 
-  it('fait sortir le gros mutant de la base la plus proche de la mairie, avec ses assaillants', () => {
+  it.skipIf(!SLOW)('fait sortir le gros mutant de la base la plus proche de la mairie, avec ses assaillants', () => {
     const world = worldWithTownHall();
     const night = NIGHT_BOSSES.findIndex((spec) => 'brute' in spec) + 1;
     const started: { boss: boolean; count: number }[] = [];
@@ -528,7 +529,7 @@ describe('mise en scène des vagues', () => {
     expect(world.player.target).toBe(first!.id);
   });
 
-  it('fait marcher chaque mutant depuis sa base : loin de la mairie, au moins deux secondes avant de tomber', () => {
+  it.skipIf(!SLOW)('fait marcher chaque mutant depuis sa base : loin de la mairie, au moins deux secondes avant de tomber', () => {
     const world = worldWithTownHall(42);
     const hall = world.entities.get(world.townHallId)!;
     const post = { x: (hall.tx + hall.width / 2) * TILE_SIZE, y: (hall.ty + hall.height + 0.5) * TILE_SIZE };
@@ -1039,7 +1040,7 @@ describe('cibles des vagues', () => {
     return { world, drill, announced, count };
   }
 
-  it('annonce sa cible, et une vague qui vise la foreuse fait marcher ses mutants vers elle', () => {
+  it.skipIf(!SLOW)('annonce sa cible, et une vague qui vise la foreuse fait marcher ses mutants vers elle', () => {
     const { world, drill, announced, count } = waveOnDrill();
     const aimed = mutants(world).filter((mutant) => mutant.target === drill.id);
 
@@ -1071,7 +1072,7 @@ describe('cibles des vagues', () => {
     expect(mutants(world).every((mutant) => mutant.target === undefined)).toBe(true);
   });
 
-  it('se recharge en pleine vague : les mutants gardent leur cible, et la suite est identique', () => {
+  it.skipIf(!SLOW)('se recharge en pleine vague : les mutants gardent leur cible, et la suite est identique', () => {
     const { world, drill } = waveOnDrill();
     const restored = deserialize(JSON.parse(JSON.stringify(serialize(world))));
 
@@ -1085,7 +1086,7 @@ describe('cibles des vagues', () => {
     expect(mutants(restored)).toEqual(mutants(world));
   }, 30_000);
 
-  it('fait d’une foreuse abattue un chantier à moitié livré, et ses mutants repartent sur la mairie', () => {
+  it.skipIf(!SLOW)('fait d’une foreuse abattue un chantier à moitié livré, et ses mutants repartent sur la mairie', () => {
     const { world, drill } = waveOnDrill();
     const destroyed: number[] = [];
 

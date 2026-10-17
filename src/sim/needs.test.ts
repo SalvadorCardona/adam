@@ -13,6 +13,7 @@ import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isBuildable, isWalkable, terrainAt, touchesWater } from './terrain.ts';
 import type { Entity, Kid, Mobile, Worker } from './types.ts';
 import { World } from './world.ts';
+import { SWEEP_SEEDS } from './sweep.ts';
 
 type Stock = Partial<Record<ItemId, number>>;
 
@@ -586,14 +587,14 @@ describe('puits', () => {
    * prairie de départ — la plus proche dans une région à conquérir ou la zone
    * d'une base —, et la colonie mourait de soif vers vingt minutes.
    */
-  it('trouve une rive où poser le puits dans la prairie de départ, hors des zones des bases, sur 1 000 seeds', () => {
+  it('trouve une rive où poser le puits dans la prairie de départ, hors des zones des bases, sur un balayage de seeds', () => {
     const reach = 36;
     const offsets: [number, number][] = [];
 
     for (let dy = -reach; dy <= reach; dy += 1) for (let dx = -reach; dx <= reach; dx += 1) offsets.push([dx, dy]);
     offsets.sort((a, b) => a[0] ** 2 + a[1] ** 2 - (b[0] ** 2 + b[1] ** 2));
 
-    for (let seed = 0; seed < 1000; seed += 1) {
+    for (let seed = 0; seed < SWEEP_SEEDS; seed += 1) {
       const world = new World(seed);
       const hall = world.entities.get(world.townHallId)!;
       const usable = (tx: number, ty: number): boolean =>

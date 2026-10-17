@@ -1517,3 +1517,20 @@ hors ligne. La base de dev est `server/data/` (ignorée par git).
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
 ```
+
+`npm test` est le projet Vitest **`fast`** (`vitest.config.ts`), à lancer avant
+chaque commit : moins de 40 s. Il saute les `*.slow.test.ts` (courbes de
+défense `defense.slow.test.ts`, longue partie `longRun.slow.test.ts`) et les
+longues parties marquées `it.skipIf(!SLOW)` (`SLOW`, `sim/sweep.ts`), et réduit
+les balayages de graines à 200 (`SWEEP_SEEDS`, même fichier). Un nouveau
+balayage lit `SWEEP_SEEDS`, une partie de plus de 3 s `SLOW`. Les tests de
+`ui/` qui touchent au DOM sont des `*.dom.test.ts` (`// @vitest-environment
+happy-dom`).
+
+`npm run test:slow` est le projet **`slow`** : la suite entière, balayages à
+1 000 graines. Il tourne en CI (job `slow`) et avant une release, en local sur
+demande. `npm run test:e2e` (Playwright, `playwright.config.ts`, `e2e/`) construit
+le jeu et le lance dans Chromium headless à 390 × 844 et 1440 × 900 : titre,
+« Jouer », pas au clavier, pause, aucun bloc du HUD hors de l'écran, aucun
+`[hidden]` visible, aucune erreur console. Première fois :
+`npx playwright install chromium`. CI : job `e2e`.

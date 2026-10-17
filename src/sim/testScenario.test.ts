@@ -6,6 +6,7 @@ import { baseCenter } from './enemyBases.ts';
 import { encodeSave } from './save.ts';
 import { stageScenario } from './testScenario.ts';
 import { siteMissing } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 const IDS = Object.keys(TEST_SCENARIOS) as TestScenarioId[];
 
@@ -72,7 +73,7 @@ describe('parties de test', () => {
     expect(siteMissing(lab)).toBeGreaterThan(0);
   });
 
-  it('la petite base tourne seule dix minutes : personne ne meurt, et l’eau de la ville remonte', () => {
+  it.skipIf(!SLOW)('la petite base tourne seule dix minutes : personne ne meurt, et l’eau de la ville remonte', () => {
     const world = stageScenario(TEST_SCENARIOS.base);
     const deaths: string[] = [];
 

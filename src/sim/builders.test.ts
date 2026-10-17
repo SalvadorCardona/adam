@@ -10,6 +10,7 @@ import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isWalkable, terrainAt } from './terrain.ts';
 import type { Entity, EntityId, Site, TownHall, Worker, Yard } from './types.ts';
 import { World, siteMissing } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 type Stock = Partial<Record<ItemId, number>>;
 
@@ -339,7 +340,7 @@ describe('poste de construction', () => {
     expect(strikes(true)).toBe(Math.round(strikes(false) * 1.25));
   });
 
-  it('plusieurs chantiers en parallèle, sans rien perdre ni dupliquer, sans jamais promettre deux fois', () => {
+  it.skipIf(!SLOW)('plusieurs chantiers en parallèle, sans rien perdre ni dupliquer, sans jamais promettre deux fois', () => {
     const world = colony({ wood: 40, stone: 20, ironOre: 4 }, [
       YARD,
       { proto: 'farm', ...NEAR_A, site: true },
@@ -365,7 +366,7 @@ describe('poste de construction', () => {
     expect(hallOf(world).store.count('ironOre')).toBe(4 - spent('ironOre'));
   });
 
-  it('le plus ancien chantier d’abord ; la mairie à court, ils passent à ce qu’elle a, puis attendent', () => {
+  it.skipIf(!SLOW)('le plus ancien chantier d’abord ; la mairie à court, ils passent à ce qu’elle a, puis attendent', () => {
     // De quoi livrer une ferme (10 bois, 4 pierre), pas la foreuse (pierre et fer) ni les deux.
     const world = colony({ wood: 10, stone: 4 }, [
       YARD,
@@ -391,7 +392,7 @@ describe('poste de construction', () => {
     expect(world.entities.get(newer.id)?.kind).toBe('farm');
   });
 
-  it('le partage : les chantiers du rayon aux bâtisseurs, les autres aux porteurs, qui les achèvent au dernier objet', () => {
+  it.skipIf(!SLOW)('le partage : les chantiers du rayon aux bâtisseurs, les autres aux porteurs, qui les achèvent au dernier objet', () => {
     const world = colony({ wood: 40, stone: 20 }, [
       HOUSE,
       YARD,
@@ -451,7 +452,7 @@ describe('poste de construction', () => {
     expect(world.entities.get(waiting.id)?.kind).toBe('farm');
   });
 
-  it('annuler un chantier : le livré retourne en ville, la charge en route aussi, rien ne se perd', () => {
+  it.skipIf(!SLOW)('annuler un chantier : le livré retourne en ville, la charge en route aussi, rien ne se perd', () => {
     const world = colony({ wood: 30, stone: 20 }, [YARD, { proto: 'farm', ...NEAR_A, site: true, delivered: { wood: 3 } }]);
     const site = siteAt(world, NEAR_A);
     const hall = hallOf(world);
@@ -544,7 +545,7 @@ describe('poste de construction', () => {
     until(world, () => world.entities.get(site.id)?.kind === 'farm');
   });
 
-  it('une sauvegarde en plein chantier se recharge — charges, marteau, avancement — et la suite est identique', () => {
+  it.skipIf(!SLOW)('une sauvegarde en plein chantier se recharge — charges, marteau, avancement — et la suite est identique', () => {
     const world = colony({ wood: 30, stone: 20 }, [
       YARD,
       { proto: 'farm', ...NEAR_A, site: true, delivered: BUILDINGS.farm.cost },

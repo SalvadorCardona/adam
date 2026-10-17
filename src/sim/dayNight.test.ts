@@ -3,6 +3,7 @@ import { DAY_CYCLE, DAY_DIAL } from '../data/dayNight.ts';
 import { WAVES } from '../data/enemies.ts';
 import { CYCLE_TICKS, DIAL_ARCS, clockAt, darkness, dayDial, isWaveTick, ticksToDawn, ticksToNextWave, ticksToNight } from './dayNight.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 const NIGHTFALL = DAY_CYCLE.day + DAY_CYCLE.dusk;
 
@@ -123,7 +124,7 @@ describe('cadran de l’horloge du HUD', () => {
 });
 
 describe('nuit calme (« Passer la nuit »)', () => {
-  it('ni le jour, ni tant qu’un mutant rôde ; oui une fois la vague abattue', () => {
+  it.skipIf(!SLOW)('ni le jour, ni tant qu’un mutant rôde ; oui une fois la vague abattue', () => {
     const world = new World(1);
 
     world.player.inventory.add('wood', 25);

@@ -10,6 +10,7 @@ import { breed, raidCapacity, raidTicks } from './enemyBases.ts';
 import type { Building, EnemyBase, EntityId, Mutant } from './types.ts';
 import { waveEraOf, projectedRaiders, reinforcements, waveBounty } from './waves.ts';
 import { World, type WaveForecast } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** Un chantier achevé d'office : son coût dans le sac, Adam à portée le temps de « Transférer ». */
 function finish(world: World, id: EntityId): Building {
@@ -137,7 +138,7 @@ describe('planification des vagues', () => {
     expect(projectedRaiders({ ...freshBase(), raiders: raidCapacity(1, 3) }, 3, DAY_CYCLE.day)).toBe(raidCapacity(1, 3));
   });
 
-  it('chaque nuit, la vague s’annonce WAVE_WARNING.leadTicks avant de sortir, avec l’effectif qui sortira', () => {
+  it.skipIf(!SLOW)('chaque nuit, la vague s’annonce WAVE_WARNING.leadTicks avant de sortir, avec l’effectif qui sortira', () => {
     const world = worldWithTownHall();
     const announced: (WaveForecast & { at: number })[] = [];
     const started: { night: number; count: number; at: number }[] = [];

@@ -12,6 +12,7 @@ import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isWalkable, terrainAt } from './terrain.ts';
 import type { Depot, Entity, Nursery, TownHall, Worker } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 type Stock = Partial<Record<ItemId, number>>;
 
@@ -235,7 +236,7 @@ describe('poste de logistique', () => {
     expect(count(camp, 'wood')).toBeLessThan(LOGISTICIANS.carry);
   });
 
-  it('vide les producteurs du rayon sans rien perdre ni dupliquer, et sans jamais promettre deux fois', () => {
+  it.skipIf(!SLOW)('vide les producteurs du rayon sans rien perdre ni dupliquer, et sans jamais promettre deux fois', () => {
     const world = colony({}, [
       DEPOT,
       { proto: 'drill', ...NEAR_A, store: { ironOre: 20 } },
@@ -389,7 +390,7 @@ describe('poste de logistique', () => {
     expect(census(world)).toEqual(before);
   });
 
-  it('une sauvegarde en plein transport se recharge avec ses réservations, et la suite est identique', () => {
+  it.skipIf(!SLOW)('une sauvegarde en plein transport se recharge avec ses réservations, et la suite est identique', () => {
     const world = colony({}, [
       DEPOT,
       { proto: 'drill', ...NEAR_A, store: { ironOre: 20 } },
@@ -593,7 +594,7 @@ describe('la nurserie, destination de livraison', () => {
     expect(kids(world)).toBe(1);
   });
 
-  it('une sauvegarde en pleine livraison — même d’une ancienne priorité — se recharge, et la suite est identique', () => {
+  it.skipIf(!SLOW)('une sauvegarde en pleine livraison — même d’une ancienne priorité — se recharge, et la suite est identique', () => {
     const world = colony({ food: 12 }, [DEPOT, NURSERY]);
     const nursery = nurseryOf(world);
     const carrying = (): boolean => logisticians(world).some((worker) => worker.job?.carried && worker.job.to === nursery.id);

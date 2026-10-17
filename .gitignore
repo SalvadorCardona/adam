@@ -27,3 +27,7 @@ dist-ssr
 .env
 server/.env
 server/data
+
+# Playwright
+test-results/
+playwright-report/

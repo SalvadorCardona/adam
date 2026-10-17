@@ -9,6 +9,7 @@ import { BUILD_REACH_TILES } from './player.ts';
 import { deserialize } from './save.ts';
 import type { EntityId } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** Un chantier livré d'office sauf un objet, que le sac apporte : le dernier objet l'achève. Adam est à portée. */
 function finish(world: World, id: EntityId): void {
@@ -69,7 +70,7 @@ function clearMutants(world: World): void {
 }
 
 describe('Ève', () => {
-  it('arrive une fois la troisième nuit repoussée, et la population compte deux adultes', () => {
+  it.skipIf(!SLOW)('arrive une fois la troisième nuit repoussée, et la population compte deux adultes', () => {
     const world = withTownHall();
     const arrived: number[] = [];
 

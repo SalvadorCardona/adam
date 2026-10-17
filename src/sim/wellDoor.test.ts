@@ -5,6 +5,7 @@ import { doorOf } from './jobs.ts';
 import { decodeSave, encodeSave } from './save.ts';
 import { doorSide, isWalkable, terrainAt, touchesWater } from './terrain.ts';
 import { World } from './world.ts';
+import { SWEEP_SEEDS } from './sweep.ts';
 
 const { width, height } = BUILDINGS.well;
 
@@ -30,8 +31,8 @@ function shores(seed: number, reach: number): [number, number][] {
 }
 
 describe('la porte d’un bâtiment de rive', () => {
-  it('tombe sur une case où l’on marche, sur 1 000 seeds', () => {
-    for (let seed = 0; seed < 1000; seed += 1) {
+  it('tombe sur une case où l’on marche, sur un balayage de seeds', () => {
+    for (let seed = 0; seed < SWEEP_SEEDS; seed += 1) {
       for (const [tx, ty] of shores(seed, 8)) {
         const side = doorSide(seed, tx, ty, width, height);
 

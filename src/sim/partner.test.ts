@@ -7,6 +7,7 @@ import { PARTNER_LOOK, parsePartnerCommand } from './partner.ts';
 import { decodeSave, encodeSave } from './save.ts';
 import { stageScenario } from './testScenario.ts';
 import type { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 const asPartner = (command: Command): Command => ({ type: 'asPartner', command });
 
@@ -188,7 +189,7 @@ describe('réconciliation : deux mondes, mêmes commandes, même empreinte', () 
     }
   }
 
-  it('l’image de l’hôte, rejouée chez l’ami, ne diverge pas', () => {
+  it.skipIf(!SLOW)('l’image de l’hôte, rejouée chez l’ami, ne diverge pas', () => {
     const host = withPartner();
 
     for (let i = 0; i < 400; i += 1) host.tick();
