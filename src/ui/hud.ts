@@ -98,6 +98,7 @@ import type { PerfReading } from './perfMeter.ts';
 import { haptics } from './haptics.ts';
 import { footingText } from './placementReason.ts';
 import { mapUrl, seedLine } from './seed.ts';
+import { EventStack } from './eventStack.ts';
 import { setTip, Tooltips } from './tooltip.ts';
 
 /** Durée de l'alarme après le dernier coup reçu par la mairie hors de l'écran, en ms. */
@@ -262,7 +263,7 @@ export class Hud {
   /** À gauche de la barre (ou sous elle, sur un téléphone) : le Prestige, la ville et son alerte de vivres. */
   private readonly left: HTMLElement;
   /** À droite de la barre (ou sous elle) : la météo et l'horloge du jour. */
-  private readonly right: HTMLElement;
+  private readonly events: EventStack;
   private lastPrestige = '';
   private lastLevel = '';
   /** La population de la ville : au travail, inactifs, enfants. */
@@ -635,10 +636,18 @@ export class Hud {
     main.append(this.bar, this.quest);
     this.left = element('div', 'hud-left');
     // L'horloge du jour juste à droite de la population.
-    this.left.append(this.town, this.people, this.dayClock, this.hastenButton, this.comboChip, this.boonButton, this.waveSoon, this.tally, this.hunger);
-    this.right = element('div', 'hud-right');
-    this.right.append(this.weather);
-    this.top.append(this.left, main, this.right);
+    // Faveur, vague, vivres, météo, combo, « Passer la nuit » : une pile, le plus pressant devant.
+    this.events = new EventStack();
+    this.events.add('hasten', this.hastenButton);
+    this.events.add('combo', this.comboChip);
+    this.events.add('boon', this.boonButton);
+    this.events.add('wave', this.waveSoon);
+    this.events.add('hunger', this.hunger);
+    this.events.add('weather', this.weather);
+    this.left.append(this.town, this.people, this.dayClock, this.events.root);
+    // Le compteur abattus/sortis suit la pile, à côté de la capsule de vague.
+    this.left.append(this.tally);
+    this.top.append(this.left, main);
 
     this.root.append(
       // Les confettis d'abord : ils tombent derrière les cartes du HUD et les fenêtres.
@@ -660,7 +669,8 @@ export class Hud {
       this.death,
       this.defeat,
     );
-    this.tips = new Tooltips(this.root);
+    // Une infobulle ne recouvre jamais la bulle d'Ève (ni celle d'un habitant) : elle se décale.
+    this.tips = new Tooltips(this.root, () => [this.speech, this.person].filter((node) => !node.hidden).map((node) => node.getBoundingClientRect()));
 
     // Les libellés fixes se réécrivent au changement de langue ; les rendus
     // en cache repartent de zéro, et un écran de fin ouvert se réécrit.
@@ -1380,7 +1390,7 @@ export class Hud {
 
     if (controls.height <= controls.width) return top;
 
-    return Math.max(...[this.bar, this.left, this.right].map((node) => node.getBoundingClientRect().bottom));
+    return Math.max(...[this.bar, this.left].map((node) => node.getBoundingClientRect().bottom));
   }
 
   /** Range la rangée des contrôles dans le haut de l'écran, en haut à droite. */
@@ -1391,7 +1401,7 @@ export class Hud {
 
   /** La barre du haut et ses deux groupes : les repères de bord les contournent. */
   public obstacles(): DOMRect[] {
-    return [this.bar, this.left, this.right, this.controls, this.actions].map((node) => node.getBoundingClientRect());
+    return [this.bar, this.left, this.controls, this.actions].map((node) => node.getBoundingClientRect());
   }
 
   /** La ressource que le conseil envoie chercher, ou `null` : le renderer y pointe un repère. */
@@ -1808,6 +1818,7 @@ export class Hud {
     this.updateSpeech();
     this.updatePerson();
     this.updateWeather();
+    this.events.update();
     this.updateDeath();
     this.placeCelebration();
     this.updateQueenBanner();
@@ -2638,11 +2649,14 @@ function chip(icon: 'people' | 'mutant', value: number, label: string): HTMLElem
 }
 
 /** `node`, avec son libellé (`setTip`). */
-/** Le stock de la ville, plus à 0 les objets des besoins (`NEEDS`) qu'il n'a plus. */
+/** Le stock de la ville, plus à 0 les objets des besoins (`NEEDS`) qu'il n'a plus, ceux à sec en tête. */
 function withVitals(entries: [ItemId, number][]): [ItemId, number][] {
-  const missing = NEED_IDS.map((need) => NEEDS[need].item).filter((item) => !entries.some(([owned]) => owned === item));
+  const vitals: ItemId[] = NEED_IDS.map((need) => NEEDS[need].item);
+  const missing = vitals.filter((item) => !entries.some(([owned]) => owned === item));
+  const all = [...entries, ...missing.map((item): [ItemId, number] => [item, 0])];
 
-  return [...entries, ...missing.map((item): [ItemId, number] => [item, 0])];
+  // Un objet vital à sec passe en tête du bandeau : c'est ce qui presse, et il ne doit pas défiler hors de vue.
+  return [...all.filter(([item, amount]) => amount === 0 && vitals.includes(item)), ...all.filter(([item, amount]) => !(amount === 0 && vitals.includes(item)))];
 }
 
 /** Un objet du bandeau de la ville : son icône, sa quantité, et sa flèche s'il monte ou baisse. */

@@ -45,6 +45,32 @@ export function placeTip(
   return { left: Math.round(left), top: Math.round(Math.max(MARGIN, top)), below };
 }
 
+/**
+ * Décale la bulle (`tip`) hors des cartes à ne pas recouvrir (`avoid`, la
+ * bulle d'Ève) : dessous si l'écran y laisse la place, sinon dessus ; à défaut,
+ * elle reste où elle était.
+ */
+export function dodgeTips(
+  tip: { left: number; top: number; width: number; height: number },
+  avoid: readonly { left: number; top: number; width: number; height: number }[],
+  viewportHeight: number,
+): number {
+  let top = tip.top;
+
+  for (const card of avoid) {
+    const overlaps = tip.left < card.left + card.width && card.left < tip.left + tip.width && top < card.top + card.height && card.top < top + tip.height;
+
+    if (!overlaps) continue;
+
+    const below = card.top + card.height + GAP;
+    const above = card.top - GAP - tip.height;
+
+    if (below + tip.height <= viewportHeight - MARGIN) top = below;
+    else if (above >= MARGIN) top = above;
+  }
+  return Math.round(top);
+}
+
 /** Le libellé d'une icône : sa bulle, et son nom pour les lecteurs d'écran (`alt` d'une image). */
 export function setTip(node: HTMLElement, label: string): void {
   node.dataset['tip'] = label;
@@ -77,8 +103,12 @@ export class Tooltips {
   /** Un appui long a montré la bulle : le tap qui le termine ne fait rien d'autre. */
   private swallowClick = false;
 
-  public constructor(root: HTMLElement) {
+  /** Les cartes que la bulle ne doit pas recouvrir. */
+  private readonly avoid: () => readonly Rect[];
+
+  public constructor(root: HTMLElement, avoid: () => readonly Rect[] = () => []) {
     this.root = root;
+    this.avoid = avoid;
     this.bubble = document.createElement('div');
     this.bubble.className = 'hud-tip';
     this.bubble.hidden = true;
@@ -230,8 +260,10 @@ export class Tooltips {
       { width: window.innerWidth, height: window.innerHeight },
     );
 
+    const placed = dodgeTips({ left, top, width: this.bubble.offsetWidth, height: this.bubble.offsetHeight }, this.avoid(), window.innerHeight);
+
     this.bubble.style.left = `${left}px`;
-    this.bubble.style.top = `${top}px`;
+    this.bubble.style.top = `${placed}px`;
     this.bubble.dataset['below'] = String(below);
   }
 

@@ -1078,6 +1078,7 @@ Les règles, en résumé :
   détail, attaque, conseil d'Ève ; elle s'ouvre seule à un nouveau conseil, un
   objectif réussi, la mairie qui faiblit, et se referme au temps ou d'un tap
   sur sa tête).
+- Les capsules d'événement (faveur de l'aube, vague, alerte de vivres, météo, combo, « Passer la nuit ») forment **une seule pile** à droite de l'horloge (`ui/eventStack.ts`, `EventStack`, rang par `eventRank`) : la plus pressante devant, puis « +N » qui ouvre le reste en liste (tap, Entrée, Espace, curseur de la manette ; Échap ferme). Le bandeau de la ville garde la place de quatre objets (`--town-item`, `--town-chrome`, verrouillé par `hudTop.test.ts` à 320, 390, 1366, 1460 et 1920 px) et met en tête, en corail, l'eau ou la nourriture à 0. Une infobulle se décale hors de la bulle d'Ève (`dodgeTips`).
 - Clavier : ZQSD / WASD (par position) et flèches font marcher Adam
   (`input/keyboard.ts`) ; Espace, flèches, Entrée et Échap tiennent le menu
   de construction (`BuildMenu.handleKey`) ; P, Échap, I, M et ² sont une
