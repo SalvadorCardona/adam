@@ -200,6 +200,12 @@ export type Command =
    */
   | { type: 'chooseBoon'; index: number }
   /**
+   * Le talent choisi au passage d'un niveau (`data/talents.ts`) : `index`
+   * dans les cartes proposées (`World.talentOffer`). Sans offre, ou hors des
+   * cartes : ignorée.
+   */
+  | { type: 'chooseTalent'; index: number }
+  /**
    * Les bonus plantés au jardin des souvenirs, au départ d'une nouvelle
    * colonie. Poussée avant le premier tick ; ignorée ensuite.
    */

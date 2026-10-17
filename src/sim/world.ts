@@ -59,6 +59,8 @@ import { DAWN_REWARD, DAY_CYCLE, SURVIVORS } from '../data/dayNight.ts';
 import { DAILY_MODS, type DailyGame, type DailyModProto } from '../data/dailyMods.ts';
 import { BOON_OFFER, BOONS, type BoonId } from '../data/boons.ts';
 import { boonBonus, drawBoons } from './boons.ts';
+import { TALENTS, type TalentId, type TalentProto } from '../data/talents.ts';
+import { drawTalents, pendingTalents, talentBonus } from './talents.ts';
 import { CHALLENGE_STREAK, CHALLENGES, type ChallengeId, type ChallengeStat } from '../data/challenges.ts';
 import { drawChallenge, type DailyChallenge } from './challenges.ts';
 import { STARFALL } from '../data/starfall.ts';
@@ -120,7 +122,7 @@ import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../d
 import { RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
 import { CLEAN_NIGHT, COMBO, HUNTERS, VOLLEY } from '../data/skills.ts';
 import { WEAPONS } from '../data/weapons.ts';
-import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
+import { baseXp, killXp, levelHp, levelOf, sharedXp } from './levels.ts';
 import { BUILDERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherId } from '../data/weather.ts';
 import { ChunkIndex } from './chunk.ts';
@@ -628,6 +630,7 @@ export type WorldEvents = {
   boonOffered: { night: number; choices: BoonId[] };
   /** Une faveur prise : `reward`, ce que son colis a versé (vide pour un coup de pouce). */
   boonChosen: { boon: BoonId; reward: [ItemId, number][]; to: 'town' | 'bag' };
+  talentChosen: { talent: TalentId; level: number };
   /** Un mutant a fui le jour : il disparaît sans compter comme abattu. */
   mutantFled: { id: MobileId; x: number; y: number };
   /** Un arc a tiré, depuis (x, y). */
@@ -650,7 +653,7 @@ export type WorldEvents = {
   /** Adam gagne de l'expérience : `amount` rapporté par l'ennemi, `x`, `y` d'où il tombe. */
   xpGained: { amount: number; total: number; x: number; y: number };
   /** Adam passe un niveau : ce qu'il y gagne, pour le message et l'effet. */
-  levelUp: { level: number; maxHp: number; bowDamage: number; x: number; y: number };
+  levelUp: { level: number; maxHp: number; x: number; y: number };
   /** Une bête — ou le crachat d'un cracheur — a frappé Adam ; `hp` est ce qui lui reste. */
   playerHurt: { by: MobileId; hp: number };
   /** Un cracheur a craché (`spit` est le crachat) : il se gonfle et recule d'un coup. */
@@ -1456,6 +1459,9 @@ export class World {
     this.chapterBase = copyStats(state.chapterBase);
 
     const { inventory, ...player } = state.player;
+
+    // Les talents d'abord : « Poches profondes » compte dans la taille du sac.
+    this.adam.talents = [...player.talents];
     // La taille du sac se relit dans les bonus, les recherches, les récompenses déjà tombées et les trocs.
     const capacity =
       INVENTORY_CAPACITY +
@@ -1468,6 +1474,7 @@ export class World {
       look: copyLook(player.look),
       wardrobe: [...player.wardrobe],
       unseenPieces: [...player.unseenPieces],
+      talents: [...player.talents],
       inventory: Store.fromJSON(capacity, inventory),
     });
     this.partner = state.partner ? restorePartner(state.partner) : null;
@@ -1803,6 +1810,10 @@ export class World {
 
       case 'chooseBoon':
         this.chooseBoon(command.index);
+        break;
+
+      case 'chooseTalent':
+        this.chooseTalent(command.index);
         break;
 
       case 'trade':
@@ -3103,7 +3114,7 @@ export class World {
   public bonus(stat: ResearchStat): number {
     return (
       this.researchBonus(stat) +
-      levelBonus(this.level(), stat) +
+      talentBonus(this.adam.talents, stat) +
       boonBonus(this.activeBoon()?.id ?? null, stat) +
       toolBonus(this.player.axe, this.player.pickaxe, stat) +
       this.dailyBonus(stat)
@@ -3187,6 +3198,41 @@ export class World {
     }
     this.dayBoon = { id: boon, until: this.tickCount + BOON_OFFER.durationTicks };
     this.events.emit('boonChosen', { boon, reward: [], to: 'town' });
+  }
+
+  /* ------------------------------------------------------- talents d'Adam */
+
+  /**
+   * Le talent qui attend d'être choisi : le niveau qu'il paie (le premier
+   * passé sans talent), combien attendent et ses trois cartes, ou `null`.
+   * Il se déduit des talents pris : « Plus tard » le garde sans rien stocker.
+   */
+  public talentOffer(): { level: number; pending: number; choices: readonly TalentId[] } | null {
+    const { talents } = this.adam;
+    const pending = pendingTalents(this.level(), talents);
+
+    // Les talents sont ceux d'Adam : l'ami d'une partie à deux n'en choisit pas.
+    if (pending === 0 || this.player !== this.adam) return null;
+
+    const level = talents.length + 2;
+
+    return { level, pending, choices: drawTalents(this.seed, level, talents) };
+  }
+
+  /** Un talent pris : il compte dès ce tick dans `World.bonus` ; un sac plus grand grandit sur-le-champ. */
+  private chooseTalent(index: number): void {
+    const offer = this.talentOffer();
+    const talent = offer?.choices[index];
+
+    if (!offer || talent === undefined) return;
+
+    const { adam } = this;
+    const { effect }: TalentProto = TALENTS[talent];
+
+    adam.talents.push(talent);
+    if (effect.stat === 'bagCapacity') adam.inventory = Store.fromJSON(adam.inventory.capacity + effect.amount, adam.inventory.toJSON());
+    if (effect.stat === 'maxHp' && adam.hp > 0) adam.hp = Math.min(this.maxHp(), adam.hp + effect.amount);
+    this.events.emit('talentChosen', { talent, level: offer.level });
   }
 
   /* ------------------------------------------------------- défi du jour */
@@ -6726,7 +6772,12 @@ export class World {
     player.calmTicks += 1;
 
     if (player.hp >= this.maxHp() || player.calmTicks < PLAYER_CALM_TICKS) return;
-    if ((player.calmTicks - PLAYER_CALM_TICKS) % PLAYER_REGEN_TICKS === 0) player.hp += 1;
+    if ((player.calmTicks - PLAYER_CALM_TICKS) % PLAYER_REGEN_TICKS !== 0) return;
+
+    // « Infirmier » : une part de point en plus à chaque pas, répartie sur les pas.
+    const pulse = (player.calmTicks - PLAYER_CALM_TICKS) / PLAYER_REGEN_TICKS;
+
+    player.hp += 1 + extraUnits(1, this.bonus('hpRegen'), pulse);
   }
 
   /**
@@ -9197,9 +9248,13 @@ export class World {
 
     worker.facing = 'up';
     // Affamé, il ne frappe plus qu'un tick sur deux ; de bons outils abattent plus d'ouvrage.
-    const work = this.toil(worker.needs);
+    const toil = this.toil(worker.needs);
 
-    if (work === 0) return;
+    if (toil === 0) return;
+
+    // « Contremaître » : une part d'ouvrage en plus, répartie sur les coups.
+    const work = toil + extraUnits(toil, this.bonus('buildSpeed'), this.tickCount);
+
     site.work += work;
     if (site.work >= siteWork(site)) this.complete(site);
   }
@@ -9583,7 +9638,6 @@ export class World {
     this.events.emit('levelUp', {
       level: after,
       maxHp: LEVEL_GAINS.maxHp * (after - before),
-      bowDamage: levelBonus(after, 'bowDamage') - levelBonus(before, 'bowDamage'),
       x: player.x,
       y: player.y,
     });
@@ -10379,9 +10433,9 @@ function bagPart(entries: [ItemId, number][], only?: ItemId, amount?: number): [
 
 /** Un joueur tel que la sauvegarde le range : son sac en données. */
 function savePlayer(player: Player): SavedPlayer {
-  const { inventory, look, wardrobe, unseenPieces, ...rest } = player;
+  const { inventory, look, wardrobe, unseenPieces, talents, ...rest } = player;
 
-  return { ...rest, look: copyLook(look), wardrobe: [...wardrobe], unseenPieces: [...unseenPieces], inventory: inventory.toJSON() };
+  return { ...rest, look: copyLook(look), wardrobe: [...wardrobe], unseenPieces: [...unseenPieces], talents: [...talents], inventory: inventory.toJSON() };
 }
 
 /** L'ami d'une sauvegarde — ou d'une image envoyée par l'hôte. */
@@ -10395,6 +10449,7 @@ function restorePartner(saved: SavedPartner): Partner {
       look: copyLook(player.look),
       wardrobe: [...player.wardrobe],
       unseenPieces: [...player.unseenPieces],
+      talents: [...player.talents],
       inventory: Store.fromJSON(INVENTORY_CAPACITY, inventory),
     },
   };

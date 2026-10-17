@@ -242,6 +242,10 @@ export class Hud {
   private boonKey = '';
   /** Ouvre les cartes de l'aube ; `main.ts` y branche `BoonPanel`. */
   public onBoonOpen: () => void = () => undefined;
+  /** Ouvre les talents d'Adam ; `main.ts` y branche `TalentPanel`. */
+  public onTalentOpen: () => void = () => undefined;
+  private readonly talentButton: HTMLButtonElement;
+  private talentKey = '';
   private readonly dayClockDial: HTMLImageElement;
   private readonly dayClockDay: HTMLElement;
   private readonly dayClockTip: HTMLElement;
@@ -508,8 +512,16 @@ export class Hud {
     this.prestige = element('div', 'hud-prestige');
     this.prestige.hidden = true;
     this.prestige.setAttribute('role', 'status');
+    // Le niveau d'Adam se touche : il ouvre ses talents, la fiche et le choix qui attend.
     this.level = element('div', 'hud-level');
-    this.level.setAttribute('role', 'status');
+    this.level.setAttribute('role', 'button');
+    this.level.tabIndex = 0;
+    this.level.addEventListener('click', () => this.onTalentOpen());
+    this.level.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      this.onTalentOpen();
+    });
     this.people = element('div', 'panel hud-people');
     this.people.hidden = true;
     this.person = element('div', 'hud-speech hud-person');
@@ -549,6 +561,11 @@ export class Hud {
     this.boonButton.addEventListener('click', () => {
       if (this.world.boonOffer()) this.onBoonOpen();
     });
+    this.talentButton = element('button', 'panel hud-wave hud-boon hud-talent');
+    this.talentButton.type = 'button';
+    this.talentButton.hidden = true;
+    this.talentButton.dataset['state'] = 'offer';
+    this.talentButton.addEventListener('click', () => this.onTalentOpen());
     this.floats = element('div', 'hud-floats');
     this.stats = element('div', 'panel hud-stats');
     this.stats.hidden = !debug;
@@ -670,6 +687,7 @@ export class Hud {
     this.events.add('hasten', this.hastenButton);
     this.events.add('combo', this.comboChip);
     this.events.add('boon', this.boonButton);
+    this.events.add('talent', this.talentButton);
     this.events.add('wave', this.waveSoon);
     this.events.add('hunger', this.hunger);
     this.events.add('weather', this.weather);
@@ -828,8 +846,8 @@ export class Hud {
     world.events.on('challengeCompleted', ({ reward, to }) => this.flyFindsToBag(reward, world.player.x, world.player.y, to));
     world.events.on('prestigeGained', ({ amount, x, y }) => this.floatPrestige(amount, x, y));
     world.events.on('xpGained', ({ amount, x, y }) => this.floatXp(amount, x, y));
-    world.events.on('levelUp', ({ level, maxHp, bowDamage }) => {
-      this.notify(t().hud.toast.levelUp(level, maxHp, bowDamage), 'good');
+    world.events.on('levelUp', ({ level, maxHp }) => {
+      this.notify(t().hud.toast.levelUp(level, maxHp), 'good', { label: t().hud.talent.see, run: () => this.onTalentOpen() });
       this.level.dataset['up'] = 'true';
       window.setTimeout(() => delete this.level.dataset['up'], 1400);
     });
@@ -2161,6 +2179,25 @@ export class Hud {
     setTip(this.boonButton, `${label.label} — ${label.description}`);
   }
 
+  /** La capsule du talent : « Talent à choisir » qui bat tant qu'un niveau attend son talent. */
+  private updateTalent(): void {
+    const pending = this.world.talentOffer()?.pending ?? 0;
+
+    if (this.talentButton.hidden !== (pending === 0)) this.talentButton.hidden = pending === 0;
+    this.level.dataset['pending'] = String(pending > 0);
+    if (pending === 0) return;
+
+    const key = `${pending}|${locale()}`;
+
+    if (key === this.talentKey) return;
+    this.talentKey = key;
+
+    const label = t().hud.talent.offer;
+
+    this.talentButton.replaceChildren(uiIcon('trophy', 18), text('hud-wave-text', pending > 1 ? `${label} ×${pending}` : label));
+    setTip(this.talentButton, label);
+  }
+
   /**
    * La Volée : visible du crépuscule à l'aube (ou tant qu'un mutant rôde), un
    * anneau de recharge qui se vide ; le combo de nuit dans sa capsule. Le DOM
@@ -2207,6 +2244,7 @@ export class Hud {
     this.updateSkill();
     this.updateHasten();
     this.updateBoon();
+    this.updateTalent();
     const dial = this.world.dayDial();
 
     if (this.dayClock.hidden !== !dial) this.dayClock.hidden = !dial;

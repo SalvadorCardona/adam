@@ -43,6 +43,8 @@ export const STAT_BASE: Readonly<Record<ResearchStat, number>> = {
   drillTicks: RECIPES.mineOre.duration,
   purifyTicks: PURIFIER.intervalTicks,
   farmYield: CROPS.yield,
+  buildSpeed: 0,
+  hpRegen: 0,
 };
 
 /** Ce que les recherches finies ajoutent à la statistique. */

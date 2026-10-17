@@ -435,8 +435,9 @@ describe('base mutante entamée par un bonus d\'arc fractionnaire', () => {
     const world = new World(100);
     const base = world.enemyBases[0]!;
 
-    // Niveau 2 : +0,1 de dégâts d'arc ; chef abattu : plus de bouclier.
+    // Niveau 2 et « Flèches perçantes » : +0,25 de dégâts d'arc ; chef abattu : plus de bouclier.
     world.player.xp = xpForLevel(2);
+    world.player.talents.push('piercingArrows');
     base.chief = 0;
 
     const damage = 1 + world.bonus('bowDamage');

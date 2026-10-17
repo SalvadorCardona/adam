@@ -801,6 +801,8 @@ export const content: Content = {
     drillTicks: { label: 'Mining time', unit: ' s' },
     purifyTicks: { label: 'Time per cleaned tile', unit: ' s' },
     farmYield: { label: 'Wheat per harvest', unit: '' },
+    buildSpeed: { label: 'Builder speed', unit: '' },
+    hpRegen: { label: 'Adam’s recovery', unit: '' },
   },
   buildingCategories: {
     ore: 'Ore',
@@ -1152,6 +1154,17 @@ export const content: Content = {
     scrapCrate: { label: 'Scrap crate', description: 'A crate left by the town hall: 25 wood and 15 stone.' },
     picnic: { label: 'Picnic', description: 'A forgotten basket: 15 food and 15 water for the town.' },
     oreCart: { label: 'Ore cart', description: 'A tipped-over cart: 10 iron ore and 8 coal.' },
+  },
+  talents: {
+    piercingArrows: { label: 'Piercing arrows', description: 'Each of Adam’s arrows deals 0.25 more damage.' },
+    quickDraw: { label: 'Quick draw', description: 'Adam looses arrows 0.1 s sooner.' },
+    deepPockets: { label: 'Deep pockets', description: 'The bag holds 15 more items.' },
+    greenThumb: { label: 'Green thumb', description: 'One more wood every time you harvest a tree.' },
+    stoneHand: { label: 'Quarry grip', description: 'One more unit every time you harvest a rock.' },
+    foreman: { label: 'Foreman', description: 'Builders build sites 20% faster.' },
+    medic: { label: 'Medic', description: 'At rest, Adam regains HP 50% faster.' },
+    fleetFoot: { label: 'Light step', description: 'Adam walks 0.4 tiles per second faster.' },
+    quartermaster: { label: 'Quartermaster', description: 'Porters carry one more item per trip.' },
   },
   perks: {
     woodStart: {

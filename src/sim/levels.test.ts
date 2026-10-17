@@ -3,9 +3,10 @@ import { TILE_SIZE } from '../core/grid.ts';
 import { ENEMIES } from '../data/enemies.ts';
 import { BASE_XP, KILL_XP, LEVEL_GAINS, MAX_LEVEL, XP_SHARE } from '../data/levels.ts';
 import { RESEARCH } from '../data/research.ts';
+import { TALENTS } from '../data/talents.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { validatePrototypes } from '../data/validate.ts';
-import { baseXp, levelBonus, levelHp, levelOf, levelProgress, xpForLevel, xpToNext } from './levels.ts';
+import { baseXp, levelHp, levelOf, levelProgress, xpForLevel, xpToNext } from './levels.ts';
 import { PLAYER_MAX_HP } from './player.ts';
 import { decodeSave, encodeSave, serialize } from './save.ts';
 import type { Arrow, Mutant } from './types.ts';
@@ -119,9 +120,9 @@ describe('Niveaux d’Adam', () => {
     expect(BASE_XP[0].base).toBeGreaterThan(KILL_XP.brute);
   });
 
-  it('passer un niveau soigne Adam, annonce les gains et augmente PV et dégâts', () => {
+  it('passer un niveau soigne Adam, annonce les PV et laisse un talent à choisir', () => {
     const world = new World(SEED);
-    const ups: { level: number; maxHp: number; bowDamage: number }[] = [];
+    const ups: { level: number; maxHp: number }[] = [];
 
     world.events.on('levelUp', (event) => ups.push(event));
     world.player.xp = xpForLevel(2) - 1;
@@ -130,24 +131,25 @@ describe('Niveaux d’Adam', () => {
     world.tick();
 
     expect(world.level()).toBe(2);
-    expect(ups).toMatchObject([{ level: 2, maxHp: LEVEL_GAINS.maxHp, bowDamage: 0.1 }]);
+    expect(ups).toMatchObject([{ level: 2, maxHp: LEVEL_GAINS.maxHp }]);
     expect(world.maxHp()).toBe(PLAYER_MAX_HP + LEVEL_GAINS.maxHp);
     expect(world.player.hp).toBe(world.maxHp());
-    expect(world.bonus('bowDamage')).toBeCloseTo(0.1);
+    // Aucun bonus fixe : les statistiques attendent le talent choisi.
+    expect(world.bonus('bowDamage')).toBe(0);
+    expect(world.talentOffer()).toMatchObject({ level: 2, pending: 1 });
     expect(levelHp(5)).toBe(4 * LEVEL_GAINS.maxHp);
-    expect(levelBonus(5, 'walkSpeed')).toBe(0);
   });
 
   it('plusieurs niveaux d’un coup : un seul message, tous les gains', () => {
     const world = new World(SEED);
-    const ups: { level: number; maxHp: number; bowDamage: number }[] = [];
+    const ups: { level: number; maxHp: number }[] = [];
 
     world.events.on('levelUp', (event) => ups.push(event));
     (world as unknown as { gainXp(amount: number, shooter: string, x: number, y: number): void }).gainXp(xpForLevel(4), 'player', 0, 0);
 
     expect(ups).toHaveLength(1);
     expect(ups[0]).toMatchObject({ level: 4, maxHp: 3 * LEVEL_GAINS.maxHp });
-    expect(ups[0]!.bowDamage).toBeCloseTo(0.3);
+    expect(world.talentOffer()?.pending).toBe(3);
   });
 
   it('au niveau maximum, l’XP ne monte plus', () => {
@@ -169,7 +171,8 @@ describe('Niveaux d’Adam', () => {
 
     expect(labo).toBe(research.effect.amount);
     world.player.xp = xpForLevel(5);
-    expect(world.bonus('bowDamage')).toBeCloseTo(labo + 4 * LEVEL_GAINS.stats.bowDamage);
+    world.player.talents.push('piercingArrows', 'piercingArrows');
+    expect(world.bonus('bowDamage')).toBeCloseTo(labo + 2 * TALENTS.piercingArrows.effect.amount);
     expect(WEAPONS.bow.damage + world.bonus('bowDamage')).toBeGreaterThan(WEAPONS.bow.damage + labo);
   });
 

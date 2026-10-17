@@ -2,7 +2,7 @@ import { onLocale, t } from '../i18n/locale.ts';
 
 /**
  * La pile d'événements du haut de l'écran, à droite de l'horloge : faveur de
- * l'aube, vague, alerte de vivres, météo, combo, « Passer la nuit ». Elle ne
+ * l'aube, talent à choisir, vague, alerte de vivres, météo, combo, « Passer la nuit ». Elle ne
  * montre que le plus pressant, puis « +2 » ; un tap sur le « +2 » (ou Entrée,
  * Espace, le curseur de la manette) ouvre le reste en liste dessous, Échap la
  * referme. Les capsules gardent leur propre rendu : la pile ne fait que les
@@ -18,6 +18,8 @@ export function eventRank(id: string, data: DOMStringMap): number {
       return 90;
     case 'boon':
       return data['state'] === 'offer' ? 60 : 20;
+    case 'talent':
+      return 62;
     case 'weather':
       return data['harsh'] === 'true' ? 65 : 45;
     case 'combo':

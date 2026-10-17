@@ -3,14 +3,12 @@
  *
  * Adam gagne de l'expérience (XP) à chaque ennemi qu'il abat, et plus il
  * en a, plus il est fort. Seule l'XP totale est de l'état (`Player.xp`) :
- * le niveau, ses bonus et la barre du HUD s'en déduisent (`sim/levels.ts`).
- * Les gains d'un niveau sont des modificateurs additifs sur les mêmes
- * statistiques que la recherche (`World.bonus`) : ils se cumulent avec le
- * labo sans autre logique.
+ * le niveau, ses points de vie et la barre du HUD s'en déduisent
+ * (`sim/levels.ts`). Chaque niveau donne des PV max fixes ; ses bonus de
+ * statistiques sont des **talents** que le joueur choisit (`data/talents.ts`).
  */
 
 import type { EnemyId, WildlifeId } from './enemies.ts';
-import type { ResearchStat } from './research.ts';
 
 /** Le niveau le plus haut : la courbe est là pour que le dernier se mérite. */
 export const MAX_LEVEL = 15;
@@ -65,15 +63,12 @@ export const XP_SHARE = {
 
 export type Shooter = keyof typeof XP_SHARE;
 
-/** Ce qu'Adam gagne à chaque niveau atteint après le premier. */
+/** Ce qu'Adam gagne d'office à chaque niveau atteint après le premier ; le reste est un talent à choisir. */
 export interface LevelGains {
   /** Points de vie max en plus. */
   maxHp: number;
-  /** Les statistiques de la recherche, en modificateur additif (`World.bonus`). */
-  stats: Partial<Record<ResearchStat, number>>;
 }
 
 export const LEVEL_GAINS = {
   maxHp: 1,
-  stats: { bowDamage: 0.1 },
 } as const satisfies LevelGains;

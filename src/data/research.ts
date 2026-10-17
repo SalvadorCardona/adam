@@ -75,7 +75,11 @@ export type ResearchStat =
   /** Ticks entre deux cases nettoyées par une station de dépollution (négatif : elle va plus vite). */
   | 'purifyTicks'
   /** Blé par récolte d'une ferme. */
-  | 'farmYield';
+  | 'farmYield'
+  /** Part d'ouvrage en plus à chaque coup de marteau d'un bâtisseur. */
+  | 'buildSpeed'
+  /** Part de points de vie en plus à chaque pas de récupération d'Adam, au calme. */
+  | 'hpRegen';
 
 /**
  * Comment afficher une statistique : son libellé, son unité, et `ticks` si
@@ -107,6 +111,8 @@ export const RESEARCH_STATS = {
   drillTicks: { label: 'Temps d’extraction', unit: ' s', ticks: true, percent: false, buildings: ['drill', 'quarry'] },
   purifyTicks: { label: 'Temps par case dépolluée', unit: ' s', ticks: true, percent: false, buildings: ['purifier'] },
   farmYield: { label: 'Blé par récolte', unit: '', ticks: false, percent: false, buildings: ['farm'] },
+  buildSpeed: { label: 'Vitesse des bâtisseurs', unit: '', ticks: false, percent: true, buildings: ['constructionPost'] },
+  hpRegen: { label: 'Récupération d’Adam', unit: '', ticks: false, percent: true },
 } as const satisfies Record<ResearchStat, ResearchStatProto>;
 
 /**

@@ -84,6 +84,7 @@ import { rewardText } from './ui/collectionPanel.ts';
 import { Hud, clock as clockText } from './ui/hud.ts';
 import { OfflineRecap } from './ui/offlineRecap.ts';
 import { BoonPanel } from './ui/boonPanel.ts';
+import { TalentPanel } from './ui/talentPanel.ts';
 import { PauseScreen, TitleScreen } from './ui/screens.ts';
 import { haptics } from './ui/haptics.ts';
 import { PAD_POINTER_ID } from './ui/padCursor.ts';
@@ -886,6 +887,28 @@ async function main(): Promise<void> {
   world.events.on('boonOffered', () => hud.notify(t().hud.boon.ready, 'good', { label: t().hud.boon.see, run: () => hud.onBoonOpen() }));
   hud.root.append(boons.root);
 
+  // Les talents d'Adam : au passage d'un niveau, trois cartes ; ouvertes, elles arrêtent l'horloge.
+  const talents = new TalentPanel(world, () => {
+    accumulator = 0;
+  });
+
+  hud.onTalentOpen = () => {
+    buildMenu.close();
+    panel.close();
+    talents.show();
+    audio.play('open');
+  };
+  // Le niveau passé ouvre les cartes, sauf si le joueur est occupé ailleurs : le toast et la capsule les gardent.
+  world.events.on('levelUp', () => {
+    if (placement.mode === 'idle' && !paused && !boons.open && !recap.open && !settings.open) hud.onTalentOpen();
+  });
+  // Un talent pris : s'il en reste à choisir (plusieurs niveaux d'un coup), les cartes suivantes.
+  world.events.on('talentChosen', ({ talent }) => {
+    hud.notify(t().hud.talent.chosen(t().talents[talent].label), 'good');
+    if (world.talentOffer()) talents.show();
+  });
+  hud.root.append(talents.root);
+
   hud.pauseButton.addEventListener('click', () => setPaused(!paused));
   hud.inviteButton.addEventListener('click', () => invitePanel.with((panel) => panel.show()));
   hud.settingsButton.addEventListener('click', () => settings.toggle());
@@ -1012,6 +1035,10 @@ async function main(): Promise<void> {
       // Les cartes de l'aube : « Plus tard ».
       if (boons.open) {
         boons.close();
+        return;
+      }
+      if (talents.open) {
+        talents.close();
         return;
       }
       // L'aide de la manette est par-dessus les réglages : elle se ferme la première.
@@ -1244,7 +1271,7 @@ async function main(): Promise<void> {
       ]);
     }
 
-    const running = started && !paused && !settings.open && !notifyPrompt.open && !tabPanel.open && !inventory.dressing && !recap.open && !boons.open;
+    const running = started && !paused && !settings.open && !notifyPrompt.open && !tabPanel.open && !inventory.dressing && !recap.open && !boons.open && !talents.open;
 
     // La manette se lit une fois par frame, avant les ticks : l'axe de marche est frais.
     pad.update(ticker.deltaMS, performance.now(), !worldMap.open);

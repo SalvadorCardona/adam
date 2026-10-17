@@ -19,6 +19,7 @@ import { PALETTE, auditSvg } from './artDirection.ts';
 import { BUILDINGS, RUIN, START_BUILDINGS, type BuildingId, type BuildingProto } from './buildings.ts';
 import { DAWN_REWARD, DAY_CYCLE } from './dayNight.ts';
 import { BASE_XP, KILL_XP, LEVEL_GAINS, MAX_LEVEL, XP_CURVE, XP_SHARE } from './levels.ts';
+import { TALENT_OFFER, TALENTS, type TalentProto } from './talents.ts';
 import { ENEMY_BASE, ENEMY_BASE_LEVELS, FIREBALL, GUARD_RANGE, RAIDS, type EnemyBaseLevel } from './enemyBases.ts';
 import { CHIEF, ENEMIES, LOOT_DROPS, SPITTER, NIGHT_BOSSES, WAVES, WILDLIFE, WILDLIFE_IDS, WILDLIFE_SPAWN, type LootTable, type WaveSpec, type WildlifeProto } from './enemies.ts';
 import { EVE } from './eve.ts';
@@ -1050,9 +1051,16 @@ function levelErrors(): string[] {
     if (share < 0 || share > 1) errors.push(`XP_SHARE.${id} : une part dans [0, 1]`);
   }
   if (LEVEL_GAINS.maxHp <= 0) errors.push('LEVEL_GAINS.maxHp : au moins un point de vie par niveau');
-  for (const [stat, gain] of Object.entries(LEVEL_GAINS.stats)) {
-    if (!(stat in RESEARCH_STATS) || !(Number(gain) > 0)) errors.push(`LEVEL_GAINS.stats.${stat} : statistique inconnue ou gain nul`);
+  // Les talents : une statistique connue, un effet non nul, et toujours de quoi proposer trois cartes jusqu'au dernier niveau.
+  let stacks = 0;
+
+  for (const [id, talent] of Object.entries(TALENTS) as [string, TalentProto][]) {
+    if (!(talent.effect.stat in RESEARCH_STATS) || talent.effect.amount === 0) errors.push(`TALENTS.${id} : statistique inconnue ou effet nul`);
+    if (!Number.isInteger(talent.max) || talent.max < 1) errors.push(`TALENTS.${id}.max : un entier d'au moins 1`);
+    stacks += talent.max;
   }
+  if (stacks < MAX_LEVEL - 2 + TALENT_OFFER.choices) errors.push('TALENTS : la somme des max doit laisser trois cartes au dernier niveau');
+  if ((TALENT_OFFER.defaults as readonly string[]).length === 0) errors.push('TALENT_OFFER.defaults : au moins un talent par défaut');
   return errors;
 }
 
