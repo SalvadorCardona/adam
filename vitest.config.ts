@@ -23,7 +23,7 @@ import { defineConfig } from 'vitest/config';
  * (`playwright.config.ts`, `npm run test:e2e`).
  */
 const include = [
-  'src/{sim,core,data,art,input,ui,storage,render,audio,i18n,net}/**/*.test.ts',
+  'src/{app,sim,core,data,art,input,ui,storage,render,audio,i18n,net}/**/*.test.ts',
   // Le back-end se teste avec le reste : même Vitest, même Node.
   'server/src/**/*.test.ts',
 ];

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { setLocale } from '../i18n/locale.ts';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { localeListenerCount, setLocale } from '../i18n/locale.ts';
 import { EventStack } from './eventStack.ts';
 
 /*
@@ -125,5 +125,22 @@ describe('la pile d’événements du HUD', () => {
     stack.update();
     expect(list.hidden).toBe(true);
     expect(more.hidden).toBe(true);
+  });
+});
+
+describe('EventStack.dispose', () => {
+  it('rend son toucher du document et son abonnement à la langue', () => {
+    const locale = localeListenerCount();
+    const add = vi.spyOn(document, 'addEventListener');
+    const remove = vi.spyOn(document, 'removeEventListener');
+    const stack = new EventStack();
+
+    expect(localeListenerCount()).toBe(locale + 1);
+    stack.dispose();
+    expect(localeListenerCount()).toBe(locale);
+    for (const [type, listener] of add.mock.calls) {
+      expect(remove.mock.calls.some(([gone, fn]) => gone === type && fn === listener)).toBe(true);
+    }
+    vi.restoreAllMocks();
   });
 });

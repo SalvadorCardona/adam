@@ -11,7 +11,8 @@
 
 import { ACHIEVEMENTS, ACHIEVEMENT_IDS, isRareBuilding, type AchievementId, type StatId } from '../data/achievements.ts';
 import { emptyRun, type Collection } from './collection.ts';
-import type { World } from './world.ts';
+import type { Listener } from '../core/events.ts';
+import type { World, WorldEvents } from './world.ts';
 
 export type Tally = Record<StatId, number>;
 
@@ -56,13 +57,19 @@ export class AchievementTracker {
 
   private readonly world: World;
   private readonly hooks: TrackerHooks;
+  /** Les désabonnements aux événements du monde, pour `dispose()`. */
+  private readonly off: (() => void)[] = [];
 
   public constructor(world: World, collection: Collection, hooks: TrackerHooks) {
     this.world = world;
     this.collection = collection;
     this.hooks = hooks;
 
-    const { events } = world;
+    const events = {
+      on: <K extends keyof WorldEvents>(event: K, listener: Listener<WorldEvents[K]>): void => {
+        this.off.push(world.events.on(event, listener));
+      },
+    };
     const { stats } = collection.run;
     const bump = (stat: keyof typeof stats): void => {
       stats[stat] += 1;
@@ -101,6 +108,11 @@ export class AchievementTracker {
       this.newRun();
     });
     events.on('victory', () => this.update());
+  }
+
+  /** Ne plus rien compter : les écouteurs du monde sont retirés. */
+  public dispose(): void {
+    for (const off of this.off.splice(0)) off();
   }
 
   /** Une nouvelle colonie : les compteurs repartent de zéro, les succès restent. */

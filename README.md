@@ -206,10 +206,11 @@ src/
   render/   renderer, camera, chunkLayer, resourceLayer, entityLayer,
             mobileLayer, puppet, particles, ghostLayer, spriteLibrary, atlas
   input/    joystick, keyboard, pointer, placement, inspect
-  ui/       hud, buildMenu, buildingPanel
+  ui/       hud (+ hud/), buildMenu, buildingPanel (+ views/), disposer
   audio/    engine, synth, music       — Web Audio, sons procéduraux
   tools/    artSheet, brand, playtest  — planche de relecture, icône, bannière,
             joueur simulé (`src/tools/README.md`)
+  app/      boot, ui, input, frame, gameLoop… — le câblage, morceau par morceau
   main.ts   câblage uniquement
 ```
 

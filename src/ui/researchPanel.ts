@@ -33,6 +33,7 @@ import { locale, onLocale, t } from '../i18n/locale.ts';
 import { labNeeds, queueFull, researchBuildings, researchCost, researchStatus, type ResearchStatus } from '../sim/research.ts';
 import type { Lab } from '../sim/types.ts';
 import { timerText, type World } from '../sim/world.ts';
+import { Disposer } from './disposer.ts';
 import { buildingIcon, itemAmount, itemIcon, uiIcon } from './icons.ts';
 import { PanelTabs } from './panelTabs.ts';
 import { siteNeedHeader, siteNeedRow } from './siteNeedRow.ts';
@@ -112,6 +113,8 @@ export class ResearchPanel {
   private advised: () => ResearchId | null = () => null;
 
   private readonly world: World;
+  /** Ce qu'il a branché hors de lui : la langue. */
+  private readonly disposer = new Disposer();
 
   public constructor(world: World) {
     this.world = world;
@@ -177,7 +180,7 @@ export class ResearchPanel {
     this.root.append(this.current, this.queue, this.tabs.bar, this.tabs.pages);
 
     // Les boutons suivent la langue ; les listes se réécrivent au prochain `update()`, dont la clé porte la langue.
-    onLocale(() => {
+    this.disposer.add(onLocale(() => {
       const text = t().researchPanel;
 
       this.transferButton.textContent = text.transfer;
@@ -185,7 +188,12 @@ export class ResearchPanel {
       this.takeButton.textContent = text.takeRest;
       this.tabs.bar.setAttribute('aria-label', text.tabsLabel);
       this.writeTabLabels();
-    });
+    }));
+  }
+
+  /** Ne suit plus la langue ; la fenêtre du bâtiment l'appelle en se défaisant. */
+  public dispose(): void {
+    this.disposer.dispose();
   }
 
   /** Le libellé de chaque onglet, suivi de ce qu'il y a à lancer (« Bâtiments 3 »). */

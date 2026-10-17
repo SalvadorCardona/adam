@@ -1,4 +1,5 @@
 import { onLocale, t } from '../i18n/locale.ts';
+import { Disposer } from './disposer.ts';
 
 /**
  * La pile d'événements du haut de l'écran, à droite de l'horloge : faveur de
@@ -46,6 +47,8 @@ export class EventStack {
   private readonly chips = new Map<string, HTMLElement>();
   private open = false;
   private key = '';
+  /** Ce que la pile a branché hors d'elle : le toucher du document, la langue. */
+  private readonly disposer = new Disposer();
 
   public constructor() {
     this.root = document.createElement('div');
@@ -66,12 +69,12 @@ export class EventStack {
       this.toggle(false);
       this.more.focus();
     });
-    document.addEventListener('pointerdown', (event) => {
+    this.disposer.listen(document, 'pointerdown', (event) => {
       if (this.open && event.target instanceof Node && !this.root.contains(event.target)) this.toggle(false);
     });
-    onLocale(() => {
+    this.disposer.add(onLocale(() => {
       this.key = '';
-    });
+    }));
   }
 
   /** Une capsule de plus dans la pile ; elle se montre et se cache seule (`hidden`). */
@@ -105,6 +108,11 @@ export class EventStack {
     this.more.setAttribute('aria-label', t().hud.events.more(rest.length));
     if (rest.length === 0) this.toggle(false);
     else this.toggle(this.open);
+  }
+
+  /** Débranche le toucher du document et la langue. */
+  public dispose(): void {
+    this.disposer.dispose();
   }
 
   private toggle(open: boolean): void {
