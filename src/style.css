@@ -3923,10 +3923,21 @@ button:disabled,
 
 .hud-bag-wanted {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -10px;
+  left: -6px;
+  gap: 2px;
+  padding: 1px 6px 1px 3px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 2px 0 var(--violet-shade);
+  color: var(--violet);
   font-size: 12px;
+  font-weight: 700;
   pointer-events: none;
+}
+
+.hud-bag-wanted[data-empty='true'] {
+  color: var(--danger);
 }
 
 .hud-bag-wanted .icon {

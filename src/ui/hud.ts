@@ -2396,6 +2396,8 @@ export class Hud {
       const chip = itemAmount(wanted, inventory.count(wanted));
 
       chip.classList.add('hud-bag-wanted');
+      chip.lastElementChild!.textContent = `×${inventory.count(wanted)}`;
+      chip.dataset['empty'] = String(inventory.count(wanted) === 0);
       setTip(chip, label.wanted(t().items[wanted], inventory.count(wanted)));
       this.bag.append(chip);
     }
