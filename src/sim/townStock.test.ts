@@ -194,6 +194,9 @@ describe('ville et sac', () => {
     // Un chantier de tour juste à côté de la mairie.
     let siteId = -1;
 
+    // La récompense de l'objectif de la première tour tomberait dans le sac : elle n'est pas l'objet du test.
+    world.objectivesDone.add('firstTower');
+
     for (let dx = -6; dx <= 6 && siteId < 0; dx += 1) {
       const tx = hall.tx + dx;
       const ty = hall.ty + hall.height + 1;

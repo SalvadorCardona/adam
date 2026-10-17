@@ -133,6 +133,8 @@ export const EVE_LINES = {
   caravan: 'Une caravane ! Va voir ce qu’il propose.',
   /** Au crépuscule, la veille d'une nuit de Reine (`QUEEN`, `data/enemies.ts`). */
   queen: 'Demain soir, la Reine sort. Des tours, Adam !',
+  /** Au crépuscule qui précède la première nuit sans grâce (`WAVE_STRENGTH.graceNights`). */
+  graceEnding: 'Cette nuit, ils viennent pour de vrai. Des tours, Adam !',
   /** Tapée pendant une attaque. */
   busy: 'Pas maintenant, Adam, ils arrivent !',
   /** Toutes les quêtes finies. */

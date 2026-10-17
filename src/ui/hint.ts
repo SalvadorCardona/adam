@@ -203,7 +203,7 @@ function urgentAdvice(world: World, hall: Entity, towers: boolean, mutants: numb
   // Une vague sans grâce sort dans la minute et aucune tour ne garde la mairie.
   const forecast = world.waveForecast();
 
-  if (forecast && !towers && forecast.night > WAVE_STRENGTH.earlyCaps.length && forecast.ticks <= WAVE_URGENT_SECONDS * TICKS_PER_SECOND) {
+  if (forecast && !towers && forecast.night > WAVE_STRENGTH.graceNights && forecast.ticks <= WAVE_URGENT_SECONDS * TICKS_PER_SECOND) {
     const tower = viaLab(world, 'watchtower', lines.tower);
 
     if (tower) return tower;

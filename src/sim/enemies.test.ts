@@ -413,13 +413,13 @@ describe('vagues', () => {
     expect(world.enemyBases.every((base) => base.raiders === 0)).toBe(true);
   });
 
-  it('place un gros mutant à la nuit 5 puis au moins toutes les cinq nuits, la Reine aux nuits 10, 15, 20', () => {
+  it('place un gros mutant à la nuit 6 puis au moins toutes les cinq nuits, la Reine aux nuits 10, 15, 20', () => {
     const bosses = Array.from({ length: 30 }, (_, k) => k + 1).filter((night) => isBossNight(night));
 
-    expect(bosses[0]).toBe(5);
+    expect(bosses[0]).toBe(6);
     bosses.slice(1).forEach((night, k) => expect(night - bosses[k]!, `nuit ${night}`).toBeLessThanOrEqual(5));
     expect(bosses.at(-1)).toBeGreaterThan(25);
-    expect(nightBosses(5).brute).toBe(1);
+    expect(nightBosses(6).brute).toBe(1);
     expect([10, 15, 20].map((night) => nightBosses(night).queen)).toEqual([1, 1, 1]);
     expect(WAVES.perNight).toBe(1);
   });
@@ -716,7 +716,7 @@ describe('mutants', () => {
     // Le reste de la nuit ne suffirait pas à un seul mutant : la mairie est déjà bien entamée.
     if (hall.kind !== 'site') hall.hp = 6 * ENEMIES.mutant.damage;
     // Passé les nuits de grâce, où elle ne tombe pas (`WAVE_STRENGTH.graceHallFloor`).
-    world.night = WAVE_STRENGTH.earlyCaps.length + 1;
+    world.night = WAVE_STRENGTH.graceNights + 1;
     for (let i = 0; i < 20 * 60 && !world.defeated; i += 1) world.tick();
 
     expect(world.defeated).toBe(true);

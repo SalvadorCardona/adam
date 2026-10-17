@@ -211,15 +211,24 @@ export const WAVE_WARNING = {
  *   la convoitise.
  * Au plus `maxReinforcements`. Une jeune colonie n'en reçoit aucun.
  *
- * Les premières nuits, la **grâce** : `earlyCaps[n - 1]` plafonne les
+ * Les premières nuits, un **plafond commun** : `earlyCaps[n - 1]` borne les
  * assaillants que les bases tiennent en réserve la nuit `n`, toutes bases
  * confondues. Le nombre de bases du premier anneau tient à la carte (de un à
  * huit mutants la nuit 2 selon la seed) ; le plafond fait qu'un joueur neuf
- * a le temps de bâtir sa tour quelle que soit la carte. Les chefs et les
- * renforts s'y ajoutent, et valent zéro à ces nuits-là.
+ * a le temps de bâtir sa tour quelle que soit la carte. Il monte d'un ou
+ * deux par nuit jusqu'à rejoindre la production réelle des bases — jamais un
+ * saut de plus de ×1,6 d'une nuit à l'autre —, et ne borne plus rien passé la
+ * dernière ligne. Les chefs et les renforts s'y ajoutent, et valent zéro aux
+ * nuits de grâce.
  */
 export const WAVE_STRENGTH = {
-  earlyCaps: [2, 3, 4],
+  earlyCaps: [2, 3, 4, 4, 5, 6, 6, 7, 8, 9, 10, 12, 14, 16],
+  /**
+   * Les nuits de **grâce** : la mairie y plie sans tomber. La première nuit
+   * qui suit (`graceNights + 1`) est « pour de vrai » : Ève le dit au
+   * crépuscule qui la précède.
+   */
+  graceNights: 3,
   /**
    * Pendant ces nuits de grâce, la mairie ne descend pas sous cette part de
    * ses points de vie : trois mutants la rasaient en dix secondes, le temps
@@ -250,7 +259,7 @@ export const WAVE_BOUNTY = {
  *
  * Elle sort d'une base une nuit sur cinq à partir de la dixième —
  * c'est `NIGHT_BOSSES` qui la place, et son cycle qui la ramène aux nuits 15,
- * 20… La nuit 5 garde son gros mutant d'initiation. Ève l'annonce la veille,
+ * 20… La nuit 6 garde son gros mutant d'initiation. Ève l'annonce la veille,
  * au crépuscule ; le soir venu, le bandeau compte jusqu'à sa sortie.
  *
  * - Phase 1, jusqu'à la moitié de ses points de vie : elle marche sur la
@@ -330,7 +339,7 @@ export const LOOT_DROPS = {
 
 /**
  * Les chefs, nuit par nuit — le nombre d'assaillants, lui, vient des bases
- * (`RAIDS`). Une ligne par nuit : un gros mutant à la nuit 5, puis à la 8 ;
+ * (`RAIDS`). Une ligne par nuit : un gros mutant à la nuit 6, puis à la 8 ;
  * la Reine des flaques à la 10. Au-delà, les `WAVES.cycle` dernières nuits se
  * répètent : un gros mutant toutes les cinq nuits, la Reine aux nuits 15,
  * 20… Ils sortent de la base debout la plus proche de la mairie.
@@ -340,9 +349,9 @@ export const NIGHT_BOSSES = [
   {},
   {},
   {},
-  /** Premier gros mutant. */
-  { brute: 1 },
   {},
+  /** Premier gros mutant : après la première nuit sans grâce, quand la ville a pu bâtir ses tours. */
+  { brute: 1 },
   {},
   /** Un gros mutant de plus. */
   { brute: 1 },
