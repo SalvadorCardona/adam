@@ -373,6 +373,18 @@ describe("dormir", () => {
     }
   });
 
+  it("la nuit, ceux qui dorment ne sont comptés ni au travail ni inactifs : ils sont au repos", () => {
+    const { world } = colony();
+
+    toDusk(world);
+    run(world, 260);
+
+    const people = laborers(world);
+
+    expect(people.every((mobile) => mobile.inside || mobile.sleepingOut)).toBe(true);
+    expect(world.census()).toMatchObject({ working: 0, idle: 0, resting: people.length });
+  });
+
   it("pendant une vague, il rentre s’abriter chez son employeur, lit ou pas", () => {
     const { world, hx, hy } = colony();
 

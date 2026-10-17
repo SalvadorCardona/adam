@@ -1215,7 +1215,7 @@ export class Hud {
    * sur l'un d'eux, le tap suivant sur le suivant.
    */
   private updatePeople(): void {
-    const { working, idle, children } = this.world.census();
+    const { working, idle, resting, children } = this.world.census();
     const { housed, population } = this.world.housing();
     const mood = this.world.happiness();
 
@@ -1225,14 +1225,14 @@ export class Hud {
     const training = this.world.companionCount() - troop.length;
     const troopHp = troop.reduce((sum, companion) => sum + companion.hp, 0);
     const troopMax = troop.reduce((sum, companion) => sum + COMPANION_CLASSES[companion.role].hp, 0);
-    const key = `${working}:${idle}:${children}:${housed}/${population}:${mood.total}:${mood.unhappy}:${trend}:${troop.length}/${training}/${troopHp}/${troopMax}`;
+    const key = `${working}:${idle}:${resting}:${children}:${housed}/${population}:${mood.total}:${mood.unhappy}:${trend}:${troop.length}/${training}/${troopHp}/${troopMax}`;
 
     if (key === this.lastPeople) return;
     const label = t().hud.people;
 
     this.lastPeople = key;
 
-    const count = (icon: 'toil' | 'child', value: number, label: string): HTMLElement => {
+    const count = (icon: 'toil' | 'child' | 'moon', value: number, label: string): HTMLElement => {
       const node = text('hud-people-count', String(value));
 
       node.prepend(uiIcon(icon, 18));
@@ -1282,10 +1282,12 @@ export class Hud {
 
     const hasArmy = troop.length + training > 0;
 
-    this.people.hidden = working + idle + children === 0 && !hasArmy;
+    this.people.hidden = working + idle + resting + children === 0 && !hasArmy;
+    this.people.setAttribute('aria-label', label.summary(working, idle, resting));
     this.people.replaceChildren(
       count('toil', working, label.working(working)),
       lazy,
+      ...(resting > 0 ? [count('moon', resting, label.resting(resting))] : []),
       count('child', children, label.children(children)),
       housing,
       happiness,

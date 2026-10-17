@@ -350,10 +350,14 @@ export const hud = {
       thirst: (count: number): string => `${count} ${count > 1 ? 'ont' : 'a'} soif`,
     },
   },
-  /** La population : au travail, inactifs, enfants. */
+  /** La population : au travail, inactifs, au repos, enfants. */
   people: {
     working: (n: number): string => `${n} ouvrier${s(n)} au travail`,
     idle: (n: number): string => `${n} ouvrier${s(n)} inactif${s(n)}${n > 0 ? ' — taper pour en voir un' : ''}`,
+    resting: (n: number): string => `${n} ouvrier${s(n)} au repos`,
+    /** Le résumé de la bulle, lu par les lecteurs d'écran. */
+    summary: (working: number, idle: number, resting: number): string =>
+      `${working} au travail · ${idle} inactif${s(idle)} · ${resting} au repos`,
     children: (n: number): string => `${n} enfant${s(n)}`,
     /** L'Habitation : logés / ouvriers adultes. */
     housing: (housed: number, population: number): string =>
