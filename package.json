@@ -30,7 +30,8 @@
     "art:brand": "node src/tools/brand.ts",
     "music:night": "node src/tools/music.ts",
     "playtest": "node src/tools/playtest.ts",
-    "bench:sim": "node src/tools/simBench.ts"
+    "bench:sim": "node src/tools/simBench.ts",
+    "bench:save": "node src/tools/saveBench.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

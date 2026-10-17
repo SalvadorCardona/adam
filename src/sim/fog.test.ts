@@ -157,6 +157,30 @@ describe('FogOfWar', () => {
     expect(copy.sight(0, 0)).toBe('unexplored');
     expect(copy.toJSON()).toEqual(fog.toJSON());
   });
+
+  it('ne ré-encode que les chunks changés, et une case explorée de plus se retrouve à la sauvegarde', () => {
+    const fog = new FogOfWar();
+
+    fog.reveal(8, 8, 3);
+    fog.reveal(100, 100, 3);
+
+    const before = fog.toJSON();
+
+    expect(fog.toJSON()).toEqual(before);
+    fog.reveal(12, 8, 3);
+
+    const after = fog.toJSON();
+    const fresh = new FogOfWar();
+
+    fresh.reveal(8, 8, 3);
+    fresh.reveal(100, 100, 3);
+    fresh.reveal(12, 8, 3);
+    expect(after).toEqual(fresh.toJSON());
+    expect(after.explored['0,0']).not.toEqual(before.explored['0,0']);
+    // Une sauvegarde rendue ne partage rien avec le cache : la modifier ne l'abîme pas.
+    after.explored['0,0']!.push(1);
+    expect(fog.toJSON()).toEqual(fresh.toJSON());
+  });
 });
 
 describe('brouillard de guerre', () => {

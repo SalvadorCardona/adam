@@ -326,7 +326,12 @@ export function deserialize(state: unknown): World {
 }
 
 export function encodeSave(world: World, savedAt: number): string {
-  const file: SaveFile = { version: SAVE_VERSION, savedAt, state: serialize(world) };
+  return encodeState(serialize(world), savedAt);
+}
+
+/** Le texte du fichier pour un état déjà pris : `encodeSave` en deux temps, que `storage/` chronomètre chacun. */
+export function encodeState(state: WorldState, savedAt: number): string {
+  const file: SaveFile = { version: SAVE_VERSION, savedAt, state };
 
   return JSON.stringify(file);
 }
@@ -344,22 +349,35 @@ export function decodeSave(text: string): DecodedSave {
   if (!isRecord(file) || typeof file['version'] !== 'number') return { ok: false, reason: 'corrupt' };
   const version = file['version'];
 
-  if (version !== SAVE_VERSION && version !== 10 && version !== 9 && version !== 8 && version !== 7 && version !== 6 && version !== 5 && version !== 4) return { ok: false, reason: 'version' };
+  if (version !== SAVE_VERSION && MIGRATIONS[version] === undefined) return { ok: false, reason: 'version' };
 
   try {
-    const v5 = version === 4 ? migrateV4(file['state']) : file['state'];
-    const v6 = version === 4 || version === 5 ? migrateV5(v5) : v5;
-    const v7 = version <= 6 ? migrateV6(v6) : v6;
-    const v8 = version <= 7 ? migrateV7(v7) : v7;
-    const v9 = version <= 8 ? migrateV8(v8) : v8;
-    const v10 = version <= 9 ? migrateV9(v9) : v9;
-    const state = version === SAVE_VERSION ? v10 : migrateV10(v10);
+    let state = file['state'];
+
+    for (let from = version; from < SAVE_VERSION; from += 1) state = MIGRATIONS[from]!(state);
 
     return { ok: true, world: deserialize(state), savedAt: finite(file['savedAt']) };
   } catch {
     return { ok: false, reason: 'corrupt' };
   }
 }
+
+/**
+ * Les migrations, par version de départ : `MIGRATIONS[v]` fait d'un état de
+ * la version `v` un état de la version `v + 1`. `decodeSave` les enchaîne
+ * depuis la version du fichier jusqu'à `SAVE_VERSION` ; une version qui n'a
+ * pas la sienne (avant la 4) n'est plus lue. Un changement de format ajoute
+ * sa ligne ici en incrémentant `SAVE_VERSION`.
+ */
+export const MIGRATIONS: Readonly<Partial<Record<number, (raw: unknown) => unknown>>> = {
+  4: migrateV4,
+  5: migrateV5,
+  6: migrateV6,
+  7: migrateV7,
+  8: migrateV8,
+  9: migrateV9,
+  10: migrateV10,
+};
 
 /**
  * Version 4 : des vagues à cadence fixe, sans jour ni nuit. La vague devient

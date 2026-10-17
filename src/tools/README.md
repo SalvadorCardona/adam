@@ -10,6 +10,7 @@ Node exécute le TypeScript tel quel (il efface les types) : rien à compiler.
 | `npm run music:night -- <dossier>` | `music.ts` | les boucles de la nuit et du combat |
 | `npm run playtest -- --seeds 50 --minutes 60` | `playtest.ts` | le joueur simulé, en série |
 | `npm run bench:sim -- --runs 5` | `simBench.ts` | le banc de la simulation : ms par tick, réveils, empreinte du rejeu |
+| `npm run bench:save -- --minutes 120` | `saveBench.ts` | le banc de la sauvegarde : taille et temps de `snapshot` + `stringify` sur une partie du joueur simulé |
 
 ## Le joueur simulé
 

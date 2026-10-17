@@ -100,6 +100,7 @@ import { footingText } from './placementReason.ts';
 import { mapUrl, seedLine } from './seed.ts';
 import { EventStack } from './eventStack.ts';
 import { setTip, Tooltips } from './tooltip.ts';
+import type { SaveStats } from '../storage/localSave.ts';
 
 /** Durée de l'alarme après le dernier coup reçu par la mairie hors de l'écran, en ms. */
 const ALARM_MS = 2500;
@@ -413,10 +414,13 @@ export class Hud {
   private project: Projector = (x, y) => ({ x, y });
 
   private readonly world: World;
+  /** Ce qu'a coûté la dernière sauvegarde automatique, pour le panneau de debug. */
+  private readonly saveStats: () => SaveStats | null;
 
-  public constructor(world: World, debug = false) {
+  public constructor(world: World, debug = false, saveStats: () => SaveStats | null = () => null) {
     this.world = world;
     this.debug = debug;
+    this.saveStats = saveStats;
     this.root = element('div', 'hud');
 
     this.quest = element('div', 'panel hud-quest');
@@ -2679,6 +2683,7 @@ export class Hud {
       `${this.world.entities.size} bâtiment(s)   ${this.world.mobiles.size} mobile(s)   ${this.world.pendingWakes()} réveil(s)`,
       `météo ${this.world.weather()?.id ?? 'calme'}   ${weatherParticles} particule(s)`,
       `brouillard ${this.world.fog.enabled ? 'oui' : 'levé'} (F)   ${this.world.fog.exploredCount()} case(s) explorée(s), ${this.world.fog.sourceCount} source(s)`,
+      saveLine(this.saveStats()),
     ];
 
     for (const entity of this.world.entities.values()) {
@@ -2703,6 +2708,17 @@ export class Hud {
 }
 
 /* ------------------------------------------------------------------ outils */
+
+/** La ligne du panneau de debug sur la sauvegarde : taille, temps de chaque étape, pics de la session. */
+function saveLine(stats: SaveStats | null): string {
+  if (!stats) return 'sauvegarde : aucune écriture encore';
+
+  const ko = (chars: number): string => `${(chars / 1024).toFixed(1)} ko`;
+  const ms = (value: number): string => value.toFixed(1);
+  const total = stats.snapshotMs + stats.stringifyMs + stats.writeMs;
+
+  return `sauvegarde ${ko(stats.bytes)}   ${ms(total)} ms (état ${ms(stats.snapshotMs)} + JSON ${ms(stats.stringifyMs)} + écriture ${ms(stats.writeMs)})   pic ${ko(stats.peakBytes)}, ${ms(stats.peakMs)} ms   ${stats.writes} écriture(s)`;
+}
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
