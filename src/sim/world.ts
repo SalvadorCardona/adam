@@ -111,12 +111,13 @@ import {
   type PerkId,
 } from '../data/perks.ts';
 import { CHAPTERS, objectiveBagBonus, type ChapterProto, type ObjectiveId, type Reward } from '../data/objectives.ts';
-import { OFFLINE, OFFLINE_ALERTS, type OfflineAlertId } from '../data/offline.ts';
+import { OFFLINE } from '../data/offline.ts';
 import type { QuestId } from '../data/quests.ts';
-import { RECIPES, recipeOf, type RecipeId, type RecipeProto } from '../data/recipes.ts';
+import { RECIPES, type RecipeProto } from '../data/recipes.ts';
+import { DRILL_RECIPE, NURSERY_RECIPE, amountsOf, canCraft, hasInputs, inputItems, quarryRecipe } from './recipes.ts';
 import { ERAS, type EraProto } from '../data/eras.ts';
 import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../data/research.ts';
-import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
+import { RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
 import { CLEAN_NIGHT, COMBO, HUNTERS, VOLLEY } from '../data/skills.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
@@ -206,7 +207,7 @@ import {
   unlockingResearch,
 } from './research.ts';
 import { TownFlows } from './flows.ts';
-import { count, countedMs, feedNeed, mealsPerTick, wholeUnits, type OfflineReport } from './offline.ts';
+import { catchUp, type OfflineContext, type OfflineReport } from './offline.ts';
 import { ResourceIndex, type TileLook } from './resources.ts';
 import { FogOfWar, type Sight } from './fog.ts';
 import { Land } from './contamination.ts';
@@ -221,7 +222,7 @@ import { campSpot } from './camp.ts';
 import { doorSide, findSpawn, habitatAt, isBuildable, isWalkable, oreAt, terrainAt, touchesWater } from './terrain.ts';
 import { inLogisticRange, pointInLogisticRange } from './warehouse.ts';
 import { gleanNodes } from './gleaners.ts';
-import { LumberjackCrew, chopSpot, treesInRange } from './lumberjacks.ts';
+import { LumberjackCrew, chopSpot } from './lumberjacks.ts';
 import type { CrewContext } from './crew.ts';
 import { ForesterCrew, type PlotTile } from './forester.ts';
 import { FarmerCrew, type FieldTile } from './farmer.ts';
@@ -318,12 +319,6 @@ const ADAM_SIGHT = -1;
 /** Le sel du hachage qui désigne les traqueurs d'une vague (`HUNTERS`). */
 const HUNTER_SALT = 0x48554e54;
 const PARTNER_SIGHT = -2;
-
-/** Recette utilisée par une foreuse. Une seule pour l'instant, cf. `data/recipes.ts`. */
-const DRILL_RECIPE: RecipeId = 'mineOre';
-
-/** Ce que coûte une naissance à la nurserie, et tous les combien. */
-const NURSERY_RECIPE: RecipeId = 'raiseChild';
 
 /** Ticks de contact entre deux objets livrés sur un chantier. Court : le chantier se remplit à vue. */
 export const DELIVER_TICKS = 2;
@@ -4271,347 +4266,49 @@ export class World {
 
   /**
    * La commande `catchUp` : la ville rattrape `awayMs` d'absence, borné au
-   * plafond, en agrégé — par pas de `OFFLINE.stepTicks`, pas tick par tick.
-   * À chaque pas, les producteurs rendent leur cadence moyenne, les forges
-   * transforment, les nurseries et les labos avancent leur compte à rebours,
-   * puis chacun mange et boit. Les porteurs (ou les logisticiens) sont
-   * supposés faire leur tournée : avec eux, ce qui sort va en ville et ce
-   * qui entre en vient ; sans eux, chaque coffre se remplit seul.
-   *
-   * L'horloge du jour, elle, ne bouge pas : ni nuit, ni vague, ni mort. Un
-   * habitant sans vivres s'arrête affamé (`OFFLINE.returnGauge`), et le
-   * récap le dit. Rien sans mairie bâtie, ni sous `OFFLINE.minMs`.
+   * plafond, en agrégé (`sim/offline.ts`). Ni nuit, ni vague, ni mort.
    */
   private catchUp(awayMs: number): void {
-    const hall = this.warehouse();
-    const counted = countedMs(awayMs, this.offlineCapMs());
-    const total = Math.floor(counted / STEP_MS);
+    catchUp(World.offlineContext(this), awayMs);
+  }
 
-    if (!hall || this.defeated || total <= 0) return;
-
-    const report: OfflineReport = {
-      awayMs,
-      ticks: total,
-      capped: awayMs > this.offlineCapMs(),
-      gained: {},
-      spent: {},
-      research: [],
-      births: 0,
-      alerts: [],
+  /** Ce que le rattrapage hors ligne voit du monde, et les gestes qu'il lui prête. */
+  private static offlineContext(world: World): OfflineContext {
+    return {
+      get tickCount() {
+        return world.tickCount;
+      },
+      stepMs: STEP_MS,
+      get defeated() {
+        return world.defeated;
+      },
+      entities: world.entities,
+      resources: world.resources,
+      harvestable: world.harvestable,
+      events: world.events,
+      flows: world.flows,
+      offlineCapMs: () => world.offlineCapMs(),
+      warehouse: () => world.warehouse(),
+      townStock: () => world.townStock(),
+      workers: () => world.workers(),
+      inhabitants: () => world.inhabitants(),
+      staffing: (building) => world.staffing(building),
+      stopped: (building) => world.stopped(building),
+      bonus: (stat) => world.bonus(stat),
+      dailyCycle: (proto) => world.dailyCycle(proto),
+      farmField: (farm) => world.farmers.field(farm),
+      cropYield: () => world.farmers.cropYield(),
+      tally: (item, amount) => world.tally(item, amount),
+      dirtyTile: (tx, ty) => world.dirtyTile(tx, ty),
+      schedule: (id, at) => world.scheduler.schedule(id, at, world.tickCount),
+      nurseryKids: (nursery) => world.nurseryKids(nursery),
+      bear: (nursery) => world.bear(nursery),
+      townStockForLab: (lab) => world.townStockForLab(lab),
+      supplyLab: (lab, item, amount, from, source) => world.supplyLab(lab, item, amount, from, source),
+      startCountdown: (lab) => world.startCountdown(lab),
+      finishResearch: (lab) => world.finishResearch(lab),
+      startPigPen: (pen) => world.startPigPen(pen),
     };
-    const alerts = new Set<OfflineAlertId>();
-    const carriers = this.hasCarriers();
-    const carry = new Map<EntityId, number>();
-    const woodLeft = new Map<EntityId, number>();
-    const felled = new Map<EntityId, number>();
-    const births = new Map<EntityId, number>();
-    const research = new Map<EntityId, number>();
-    let working = 1;
-
-    for (const entity of this.entities.values()) {
-      if (entity.kind === 'nursery') births.set(entity.id, entity.hungry ? 0 : entity.nextBirthTick - this.tickCount);
-      if (entity.kind === 'lab' && entity.endTick > 0) research.set(entity.id, entity.endTick - this.tickCount);
-      if (entity.kind === 'lumberCamp') woodLeft.set(entity.id, this.standingWood(entity));
-    }
-
-    for (let done = 0; done < total; done += OFFLINE.stepTicks) {
-      const span = Math.min(OFFLINE.stepTicks, total - done);
-
-      for (const entity of this.entities.values()) {
-        if (entity.kind === 'site') continue;
-
-        const made = this.offlineOutput(entity, span * (employs(entity.proto) ? working : 1), woodLeft);
-
-        if (made) {
-          const kept = this.offlineYield(entity, made.item, wholeUnits(carry, entity.id, made.amount), carriers, report, alerts);
-
-          if (entity.kind === 'lumberCamp') felled.set(entity.id, (felled.get(entity.id) ?? 0) + kept);
-        }
-        if (entity.kind === 'forge') this.offlineForge(entity, span * working, carry, carriers, report, alerts);
-      }
-      for (const entity of this.entities.values()) {
-        if (entity.kind === 'nursery') this.offlineBirths(entity, span, births, carriers, report);
-        if (entity.kind === 'lab') this.offlineResearch(entity, span, research, carriers, report);
-      }
-      working = this.offlineMeals(hall.store, span, report, alerts);
-    }
-
-    // Le bois rapporté a un prix : les arbres de la cabane, du plus proche au plus loin, perdent autant d'unités.
-    for (const [id, units] of felled) {
-      const camp = this.entities.get(id);
-
-      if (camp?.kind === 'lumberCamp') this.fellTrees(camp, units);
-    }
-
-    // Les comptes à rebours repartent d'où le rattrapage les a laissés ; un ancien réveil, en avance, ne sonne plus pour rien.
-    for (const entity of this.entities.values()) {
-      if (entity.kind === 'nursery' && !entity.paused) {
-        const left = births.get(entity.id) ?? 0;
-
-        if (left > 0) {
-          entity.hungry = false;
-          entity.nextBirthTick = this.tickCount + left;
-          this.scheduler.schedule(entity.id, entity.nextBirthTick, this.tickCount);
-        } else {
-          entity.nextBirthTick = Math.min(entity.nextBirthTick, this.tickCount);
-          if (entity.hungry) alerts.add('nurseryHungry');
-        }
-      }
-      if (entity.kind === 'lab' && entity.endTick > 0) {
-        entity.endTick = this.tickCount + Math.max(1, research.get(entity.id) ?? entity.endTick - this.tickCount);
-        this.scheduler.schedule(entity.id, entity.endTick, this.tickCount);
-      }
-      if (entity.kind === 'barracks' && entity.training) {
-        entity.training.endTick = Math.max(this.tickCount, entity.training.endTick - total);
-      }
-      // Le cycle de l'élevage repart d'ici ; un ancien réveil, en avance, ne sonne plus pour rien.
-      if (entity.kind === 'pigPen' && entity.pigs > 0 && !entity.blocked) this.startPigPen(entity);
-    }
-
-    this.offlineLowStock(hall.store, alerts);
-    report.alerts = OFFLINE_ALERTS.filter((alert) => alerts.has(alert));
-    // Le stock a sauté d'un coup : les débits de la ville repartent de zéro plutôt que d'afficher ce saut.
-    this.flows.reset();
-    this.events.emit('offlineCaughtUp', report);
-  }
-
-  /** Des porteurs ou des logisticiens pour faire la tournée des coffres : un ouvrier au travail qui n'est pas bâtisseur. */
-  private hasCarriers(): boolean {
-    for (const worker of this.workers()) if (!worker.free && !worker.builder) return true;
-    return false;
-  }
-
-  /**
-   * Ce qu'un producteur sans entrée sort en `ticks` de travail, à sa cadence
-   * moyenne : foreuse, carrière et puits, cabane de bûcheron, ferme. Fractionnaire,
-   * `wholeUnits` en fait des unités. `null` s'il ne produit rien.
-   */
-  private offlineOutput(entity: Building, ticks: number, woodLeft: Map<EntityId, number>): { item: ItemId; amount: number } | null {
-    if (entity.paused || ticks <= 0) return null;
-
-    const staffing = this.staffing(entity);
-    const share = staffing ? staffing.filled / Math.max(1, staffing.max) : 1;
-
-    switch (entity.kind) {
-      case 'drill': {
-        if (!entity.output) return null;
-
-        const amount = Object.values(RECIPES[DRILL_RECIPE].outputs)[0] ?? 1;
-
-        return { item: entity.output, amount: (amount * ticks) / Math.max(1, RECIPES[DRILL_RECIPE].duration + this.bonus('drillTicks')) };
-      }
-
-      case 'quarry': {
-        const recipe = quarryRecipe(entity);
-        const [item, amount] = (Object.entries(recipe.outputs) as [ItemId, number][])[0] ?? ['stone', 1];
-
-        return { item, amount: (amount * ticks * share) / (recipe.duration * this.dailyCycle(entity.proto)) };
-      }
-
-      case 'pigPen':
-        return entity.pigs > 0 ? { item: 'meat', amount: (PIG_FARM.meatPerPig * entity.pigs * ticks) / PIG_FARM.cycleTicks } : null;
-
-      case 'lumberCamp': {
-        const left = woodLeft.get(entity.id) ?? 0;
-        const amount = Math.min(left, (OFFLINE.lumberjackWoodPerMinute * (staffing?.filled ?? 0) * ticks) / (20 * 60));
-
-        woodLeft.set(entity.id, left - amount);
-        return { item: 'wood', amount };
-      }
-
-      case 'farm': {
-        const tiles = this.farmField(entity).filter((tile) => tile.state !== 'blocked').length;
-
-        return { item: CROPS.item, amount: (tiles * this.farmers.cropYield() * OFFLINE.farmEfficiency * share * ticks) / CROPS.ripeTicks };
-      }
-
-      default:
-        return null;
-    }
-  }
-
-  /** Range une production hors ligne : en ville si des porteurs font la tournée, sinon dans le coffre du bâtiment, tant qu'il a la place. */
-  private offlineYield(entity: Building, item: ItemId, amount: number, carriers: boolean, report: OfflineReport, alerts: Set<OfflineAlertId>): number {
-    if (amount <= 0) return 0;
-
-    const kept = carriers ? (this.townStock()?.add(item, amount) ?? 0) : entity.store.add(item, Math.min(amount, Math.max(0, entity.store.freeSpace())));
-
-    if (kept < amount) alerts.add('storeFull');
-    if (kept <= 0) return 0;
-    count(report.gained, item, kept);
-    this.tally(item, kept);
-    return kept;
-  }
-
-  /** Les unités de bois qui restent aux arbres debout dans le rayon d'une cabane. */
-  private standingWood(camp: LumberCamp): number {
-    let units = 0;
-
-    for (const tree of treesInRange(camp, this.resources, this.harvestable)) units += this.resources.at(tree.tx, tree.ty)?.remaining ?? 0;
-    return units;
-  }
-
-  /** Abat `units` unités de bois dans le rayon de la cabane, l'arbre le plus proche d'abord : les mêmes prises qu'un coup de hache. */
-  private fellTrees(camp: LumberCamp, units: number): void {
-    let left = units;
-
-    for (const tree of treesInRange(camp, this.resources, this.harvestable)) {
-      while (left > 0) {
-        const taken = this.resources.take(tree.tx, tree.ty);
-
-        if (!taken || taken.resource.id !== 'tree') break;
-        left -= 1;
-        if (taken.stageChanged) this.dirtyTile(tree.tx, tree.ty);
-        if (taken.resource.remaining <= 0) break;
-      }
-      if (left <= 0) return;
-    }
-  }
-
-  /**
-   * Les cycles d'une forge (ou d'un four à charbon) en `ticks` de travail :
-   * ses entrées viennent de son coffre, puis de la ville si des porteurs
-   * l'approvisionnent ; il manque de quoi, elle attend la suite.
-   */
-  private offlineForge(forge: Forge, ticks: number, carry: Map<EntityId, number>, carriers: boolean, report: OfflineReport, alerts: Set<OfflineAlertId>): void {
-    if (this.stopped(forge) || ticks <= 0) return;
-
-    const recipe = forgeRecipe(forge);
-    const town = carriers ? this.townStock() : null;
-    const inputs = amountsOf(recipe.inputs);
-    let cycles = wholeUnits(carry, -forge.id, ticks / recipe.duration);
-
-    for (; cycles > 0; cycles -= 1) {
-      const enough = inputs.every(([item, amount]) => forge.store.count(item) + (town?.available(item) ?? 0) >= amount);
-      const room = town !== null || forge.store.freeSpace() + totalOf(recipe.inputs) >= totalOf(recipe.outputs);
-
-      if (!enough || !room) break;
-      for (const [item, amount] of inputs) {
-        const own = forge.store.remove(item, amount);
-
-        if (own < amount) town?.remove(item, amount - own);
-        count(report.spent, item, amount);
-      }
-      for (const [item, amount] of amountsOf(recipe.outputs)) this.offlineYield(forge, item, amount, carriers, report, alerts);
-    }
-    if (cycles > 0) carry.set(-forge.id, 0);
-  }
-
-  /** Le compte à rebours d'une nurserie sur `ticks` : chaque fois qu'il arrive au bout, un enfant naît s'il y a de quoi le nourrir et de la place. */
-  private offlineBirths(nursery: Nursery, ticks: number, births: Map<EntityId, number>, carriers: boolean, report: OfflineReport): void {
-    if (nursery.paused) return;
-
-    const recipe: RecipeProto = RECIPES[NURSERY_RECIPE];
-    const town = carriers ? this.townStock() : null;
-    let left = (births.get(nursery.id) ?? 0) - ticks;
-
-    while (left <= 0) {
-      if (this.nurseryKids(nursery).length >= NURSERY_CARE.capacity) {
-        nursery.hungry = false;
-        left = 0;
-        break;
-      }
-      for (const [item, amount] of amountsOf(recipe.inputs)) {
-        const missing = amount - nursery.store.count(item);
-
-        if (town && missing > 0) nursery.store.add(item, town.remove(item, Math.min(missing, town.available(item))));
-      }
-      if (!hasInputs(nursery.store, recipe)) {
-        nursery.hungry = true;
-        left = 0;
-        break;
-      }
-      for (const [item, amount] of amountsOf(recipe.inputs)) count(report.spent, item, amount);
-      this.bear(nursery);
-      report.births += 1;
-      left += recipe.duration;
-    }
-    births.set(nursery.id, left);
-  }
-
-  /**
-   * Le compte à rebours d'un labo sur `ticks`. Une recherche finie laisse
-   * partir la suivante de la file ; celle qui attend son coût le reçoit de
-   * la ville, si des porteurs l'apportent et que le labo est dans son rayon.
-   */
-  private offlineResearch(lab: Lab, ticks: number, running: Map<EntityId, number>, carriers: boolean, report: OfflineReport): void {
-    let budget = ticks;
-
-    while (lab.research !== null && budget > 0) {
-      if (isCollecting(lab)) {
-        const town = carriers ? this.townStockForLab(lab) : null;
-
-        if (!town) return;
-        for (const [item] of researchCost(lab.research)) {
-          count(report.spent, item, this.supplyLab(lab, item, Math.min(labWants(lab, item), town.available(item)), town, 'town'));
-        }
-        this.startCountdown(lab);
-        if (isCollecting(lab)) return;
-        running.set(lab.id, RESEARCH[lab.research].duration);
-      }
-
-      const left = (running.get(lab.id) ?? 0) - budget;
-
-      if (left > 0) {
-        running.set(lab.id, left);
-        return;
-      }
-      budget = -left;
-
-      const done = lab.research;
-
-      lab.endTick = this.tickCount;
-      this.finishResearch(lab);
-      report.research.push(done);
-      running.set(lab.id, lab.endTick > 0 && lab.research !== null ? RESEARCH[lab.research].duration : 0);
-    }
-  }
-
-  /**
-   * Les repas d'un pas hors ligne, habitant par habitant, au stock de la
-   * ville. Renvoie la part des ouvriers qui travaillent encore : ceux qui
-   * n'ont plus rien n'avancent plus leur bâtiment au pas suivant.
-   */
-  private offlineMeals(town: Store, ticks: number, report: OfflineReport, alerts: Set<OfflineAlertId>): number {
-    let laborers = 0;
-    let stalled = 0;
-
-    for (const mobile of this.inhabitants()) {
-      const toiling = mobile.kind !== 'kid' && !(mobile.kind === 'worker' && mobile.free);
-      let starved = false;
-
-      for (const need of NEED_IDS) {
-        const { item, meal } = NEEDS[need];
-        const fed = feedNeed(need, mobile.needs[need], ticks, toiling, () => {
-          if (town.available(item) < meal) return false;
-          town.remove(item, meal);
-          count(report.spent, item, meal);
-          return true;
-        });
-
-        mobile.needs[need] = fed.level;
-        if (fed.starved) {
-          starved = true;
-          alerts.add(need);
-        }
-      }
-      if (mobile.kind === 'kid') continue;
-      laborers += 1;
-      if (starved) stalled += 1;
-    }
-    return laborers === 0 ? 1 : 1 - stalled / laborers;
-  }
-
-  /** La ville ne tiendra pas `NEED_ALERT.runwayTicks` au rythme des habitants : une alerte par besoin qui n'a pas déjà manqué. */
-  private offlineLowStock(town: Store, alerts: Set<OfflineAlertId>): void {
-    for (const need of NEED_IDS) {
-      if (alerts.has(need)) continue;
-
-      let rate = 0;
-
-      for (const mobile of this.inhabitants()) rate += mealsPerTick(need, mobile.kind !== 'kid' && !(mobile.kind === 'worker' && mobile.free));
-      if (rate > 0 && town.available(NEEDS[need].item) < rate * NEED_ALERT.runwayTicks) alerts.add(need === 'hunger' ? 'lowFood' : 'lowWater');
-    }
   }
 
   /**
@@ -10647,33 +10344,6 @@ export function siteMissing(site: Site): number {
     missing += Math.max(0, needed - (site.delivered[item] ?? 0));
   }
   return missing;
-}
-
-/** La recette d'une carrière ou d'un puits, trouvée par son id : la taille, le puisage. */
-function quarryRecipe(producer: Quarry): RecipeProto {
-  return recipeOf(producer.proto) ?? RECIPES.cutStone;
-}
-
-function amountsOf(amounts: RecipeProto['inputs']): [ItemId, number][] {
-  return Object.entries(amounts) as [ItemId, number][];
-}
-
-function inputItems(recipe: RecipeProto): ItemId[] {
-  return amountsOf(recipe.inputs).map(([item]) => item);
-}
-
-function totalOf(amounts: RecipeProto['inputs']): number {
-  return amountsOf(amounts).reduce((total, [, amount]) => total + amount, 0);
-}
-
-/** Le coffre contient-il toutes les entrées de la recette ? */
-function hasInputs(store: Store, recipe: RecipeProto): boolean {
-  return amountsOf(recipe.inputs).every(([item, amount]) => store.count(item) >= amount);
-}
-
-/** Toutes les entrées, et la place pour les sorties une fois les entrées consommées. */
-function canCraft(store: Store, recipe: RecipeProto): boolean {
-  return hasInputs(store, recipe) && store.freeSpace() + totalOf(recipe.inputs) >= totalOf(recipe.outputs);
 }
 
 function clamp(value: number, min: number, max: number): number {
