@@ -40,6 +40,7 @@ export type SoundName =
   | 'countdown'
   | 'bite'
   | 'faint'
+  | 'toll'
   | 'horn'
   | 'gloop'
   | 'victory'
@@ -254,6 +255,12 @@ export const SOUNDS: Record<SoundName, (ctx: AudioContext, out: AudioNode, at: n
     tone(ctx, out, at, 'sine', 520, 180, { attack: 0.01, decay: 0.3, peak: 0.3 });
     tone(ctx, out, at + 0.26, 'triangle', 1319, 1568, { decay: 0.07, peak: 0.16 });
     tone(ctx, out, at + 0.36, 'triangle', 1175, 1397, { decay: 0.07, peak: 0.16 });
+  },
+
+  /** Un habitant est mort : une note grave qui s'éteint lentement, un souffle de cloche dessous. */
+  toll(ctx, out, at) {
+    tone(ctx, out, at, 'sine', 98, 94, { attack: 0.04, decay: 1.6, peak: 0.55 });
+    tone(ctx, out, at, 'triangle', 196, 190, { attack: 0.02, decay: 0.9, peak: 0.16 });
   },
 
   /** Un coup de mutant sur un mur. */

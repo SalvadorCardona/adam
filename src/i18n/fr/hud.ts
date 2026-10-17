@@ -140,6 +140,11 @@ export const hud = {
       hunger: (name: string): string => `${name} est mort de faim`,
       thirst: (name: string): string => `${name} est mort de soif`,
     },
+    /** Plusieurs morts en moins de 10 s : un seul toast. */
+    workersStarved: (count: number, cause: 'hunger' | 'thirst' | 'mixed'): string =>
+      `${count} colons sont morts ${cause === 'hunger' ? 'de faim' : cause === 'thirst' ? 'de soif' : 'de faim ou de soif'}`,
+    /** Le bouton du toast de deuil : la caméra va là où ils sont tombés. */
+    see: 'Voir',
     /** Un enfant affamé ou assoiffé ne prend pas d'année : un message par besoin. */
     growthStunted: {
       hunger: (name: string): string => `${name} a faim : pas d’anniversaire cette aube`,

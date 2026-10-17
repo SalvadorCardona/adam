@@ -120,10 +120,10 @@ export function traitPace(trait: TraitId | undefined): number {
 
 /**
  * Ce qui a pesé sur sa nuit : un lit ou dehors, la faim, la soif, la peur
- * d'un ennemi approché (`scared`).
+ * d'un ennemi approché (`scared`), le deuil d'un proche (`grieving`).
  * Un autre besoin qui pèserait sur le moral s'ajoutera ici — et dans `MOOD`.
  */
-export function moodCauses(person: Pick<Housing, 'bed'> & { needs?: Needs }, scared = false): MoodCause[] {
+export function moodCauses(person: Pick<Housing, 'bed'> & { needs?: Needs }, scared = false, grieving = false): MoodCause[] {
   const causes: MoodCause[] = [person.bed === null ? 'outside' : 'bed'];
 
   if (person.needs) {
@@ -134,6 +134,7 @@ export function moodCauses(person: Pick<Housing, 'bed'> & { needs?: Needs }, sca
     if (thirsty) causes.push('thirsty');
   }
   if (scared) causes.push('scared');
+  if (grieving) causes.push('grief');
   return causes;
 }
 

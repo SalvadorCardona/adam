@@ -17,6 +17,7 @@ import { WEATHER } from '../../data/weather.ts';
 import { reducedMotion } from '../../render/motion.ts';
 import { TICKS_PER_SECOND, type World } from '../../sim/world.ts';
 import { t } from '../../i18n/locale.ts';
+import { DeathGroup } from '../deathGroup.ts';
 import { Disposer } from '../disposer.ts';
 import { HarvestCombo } from '../harvestCombo.ts';
 import { carriesWanted, harvestRefusedText } from '../hint.ts';
@@ -32,7 +33,7 @@ import type { EveSpeech } from './eve.ts';
 import type { Floats } from './floats.ts';
 import type { People } from './people.ts';
 import { QUEST_ALERT_TICKS, type Quest } from './quest.ts';
-import type { Toasts } from './toasts.ts';
+import type { ToastHandle, Toasts } from './toasts.ts';
 import type { TownBanner } from './town.ts';
 import type { Victory } from './victory.ts';
 import type { WaveWatch } from './wave.ts';
@@ -54,6 +55,8 @@ export interface ReactionParts {
   victory: Victory;
   /** Ouvre les talents d'Adam (`Hud.onTalentOpen`, lu au moment du tap). */
   openTalent: () => void;
+  /** Centre la caméra sur un point monde (`Hud.onFocus`, lu au moment du tap). */
+  focus: (x: number, y: number) => void;
 }
 
 export class Reactions {
@@ -66,6 +69,10 @@ export class Reactions {
     const float = floats.float.bind(floats);
     const learned = advice.learned;
     const on = this.disposer.add.bind(this.disposer);
+    // Les morts de faim ou de soif rapprochées : un seul toast, que « Voir » mène sur place.
+    const deaths = new DeathGroup();
+    let deathToast: ToastHandle | null = null;
+    let deathSpot = { x: 0, y: 0 };
 
     on(world.mine('placementRejected', ({ reason, ore }) =>
       notify(reason === 'footing' ? footingText(ore) : t().hud.rejection[reason], 'bad'),
@@ -276,7 +283,14 @@ export class Reactions {
     on(world.events.on('mutantHealed', () => notify(t().hud.toast.mutantHealed, 'good')));
     on(world.events.on('kidGrewUp', ({ name }) => notify(t().hud.toast.kidGrewUp(name), 'good')));
     on(world.events.on('starving', ({ name, need, seconds }) => notify(t().hud.toast.starving[need](name, seconds), 'bad')));
-    on(world.events.on('workerStarved', ({ name, need }) => notify(t().hud.toast.workerStarved[need](name), 'bad')));
+    on(world.events.on('workerStarved', ({ name, need, x, y }) => {
+      const reading = deaths.add(performance.now(), need, x, y);
+      const message = reading.count === 1 ? t().hud.toast.workerStarved[need](name) : t().hud.toast.workersStarved(reading.count, reading.need);
+
+      deathSpot = { x: reading.x, y: reading.y };
+      if (reading.count > 1 && deathToast?.update(message)) return;
+      deathToast = notify(message, 'bad', { label: t().hud.toast.see, run: () => parts.focus(deathSpot.x, deathSpot.y) });
+    }));
     on(world.events.on('growthStunted', ({ name, need }) => notify(t().hud.toast.growthStunted[need](name), 'bad')));
     on(world.events.on('townHallDestroyed', () => defeat.show()));
     on(world.events.on('playerKnockedOut', () => death.show()));

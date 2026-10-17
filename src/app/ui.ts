@@ -150,6 +150,7 @@ export function wireUi(life: Disposer, boot: Boot, renderer: GameRenderer, audio
     () => panel.open,
     () => panel.close(),
     (id) => panel.showBase(id),
+    (id) => hud.showGrave(id),
   );
 
   // Le zoom de la carte : un niveau choisi par le joueur, mémorisé sur l'appareil.

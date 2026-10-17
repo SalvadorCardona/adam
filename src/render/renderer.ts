@@ -32,6 +32,7 @@ import { ChunkLayer } from './chunkLayer.ts';
 import { trailsOf } from './meadow.ts';
 import { EnemyBaseLayer } from './enemyBaseLayer.ts';
 import { ChestLayer } from './chestLayer.ts';
+import { GraveLayer } from './graveLayer.ts';
 import { SpotLayer } from './spotLayer.ts';
 import { TILE_SIZE, floorDiv } from '../core/grid.ts';
 import { EntityLayer } from './entityLayer.ts';
@@ -80,6 +81,7 @@ export class GameRenderer {
   private readonly resourceLayer: ResourceLayer;
   private readonly enemyBases: EnemyBaseLayer;
   private readonly chests: ChestLayer;
+  private readonly graves: GraveLayer;
   private readonly spots: SpotLayer;
   private readonly ghostLayer: GhostLayer;
   private readonly workReach: WorkReachLayer;
@@ -120,6 +122,7 @@ export class GameRenderer {
     this.resourceLayer = new ResourceLayer(world, library, this.tiles, this.entityLayer.container, this.shadows);
     this.enemyBases = new EnemyBaseLayer(world, library, this.tiles, this.entityLayer.container, this.shadows);
     this.chests = new ChestLayer(world, library, this.tiles, this.entityLayer.container, this.shadows);
+    this.graves = new GraveLayer(world, library, this.entityLayer.container);
     this.spots = new SpotLayer(world, library, this.entityLayer.container);
     this.indicators = new IndicatorLayer(world, library);
     this.ghostLayer = new GhostLayer(world, library);
@@ -385,6 +388,7 @@ export class GameRenderer {
     this.entityLayer.update(alpha, this.app.ticker, this.camera.zoom, sight);
     this.enemyBases.update(this.app.ticker.deltaMS);
     this.chests.update(this.camera, this.app.ticker.deltaMS);
+    this.graves.update();
     this.spots.update(this.camera, this.app.ticker.deltaMS);
     this.particles.update(this.app.ticker.deltaMS);
     this.nightLayer.update(alpha, sight);
@@ -456,6 +460,7 @@ export class GameRenderer {
     this.signboards.destroy();
     this.enemyBases.destroy();
     this.chests.destroy();
+    this.graves.destroy();
     this.spots.destroy();
     this.ghostLayer.destroy();
     this.workReach.destroy();

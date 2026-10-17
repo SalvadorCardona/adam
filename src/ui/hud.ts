@@ -87,7 +87,8 @@ import { People } from './hud/people.ts';
 import { PersonTip } from './hud/person.ts';
 import { Quest } from './hud/quest.ts';
 import { Reactions } from './hud/reactions.ts';
-import { Toasts, type ToastTone } from './hud/toasts.ts';
+import { Toasts, type ToastHandle, type ToastTone } from './hud/toasts.ts';
+import { t } from '../i18n/locale.ts';
 import { TownBanner } from './hud/town.ts';
 import { Victory } from './hud/victory.ts';
 import { WaveWatch } from './hud/wave.ts';
@@ -333,6 +334,7 @@ export class Hud {
       defeat: this.defeat,
       victory: this.victory,
       openTalent,
+      focus: (x, y) => this.onFocus(x, y),
     });
   }
 
@@ -481,8 +483,19 @@ export class Hud {
    * Une bulle qui monte puis s'en va. `action` : un bouton dans la bulle —
    * « Essayer » sur une pièce de garde-robe trouvée — qui la ferme en servant.
    */
-  public notify(message: string, tone: ToastTone = 'info', action?: { label: string; run: () => void }): void {
-    this.toasts.notify(message, tone, action);
+  public notify(message: string, tone: ToastTone = 'info', action?: { label: string; run: () => void }): ToastHandle | null {
+    return this.toasts.notify(message, tone, action);
+  }
+
+  /** Une tombe tapée : « Ici repose Lina — travailleuse, morte de soif au jour 4 ». */
+  public showGrave(id: number): void {
+    const grave = this.world.graves().find((candidate) => candidate.id === id);
+
+    if (!grave) return;
+
+    const text = t().panel.grave;
+
+    this.notify(text.epitaph(grave.name, text.trait[grave.trait][grave.sex], grave.sex === 'female', text.cause[grave.need], grave.day), 'info');
   }
 
   /**

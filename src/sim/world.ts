@@ -90,6 +90,7 @@ import { GEAR_WORKSHOP, MAX_GEAR, MAX_TOOL, toolBonus, toolOf, type ToolSlot, ge
 import { PIECES, WARDROBE_SPARE, copyLook, isStarter, sameLook, wardrobeDrop, type Look, type LootSource, type PieceId } from '../data/wardrobe.ts';
 import { drawPieces, lookRejection, type LookRejection } from './wardrobe.ts';
 import { CHESTS } from '../data/chests.ts';
+import { addGrave, graveSpot, type Bloom, type Grave } from './graves.ts';
 import { PURIFIER } from '../data/contamination.ts';
 import { chestOfChunk, type Chest } from './chests.ts';
 import { DISCOVERIES, type DiscoveryKind, type RuinReward } from '../data/discoveries.ts';
@@ -753,6 +754,8 @@ export type WorldEvents = {
   starving: { id: MobileId; name: string; need: NeedId; seconds: number; x: number; y: number };
   /** Un ouvrier est mort de faim ou de soif (`need`) : il a quitté la ville. */
   workerStarved: { id: MobileId; name: string; need: NeedId; x: number; y: number };
+  /** Une tombe fleurie a été posée là où l'ouvrier est mort (`World.graves`). */
+  graveLaid: { id: number; tx: number; ty: number };
   /** Un enfant affamé (ou assoiffé : `need`) n'a pas pris d'année à l'aube. */
   growthStunted: { id: MobileId; name: string; need: NeedId };
   /** Le labo `id` a choisi une recherche : il attend son coût. */
@@ -1214,6 +1217,13 @@ export class World {
   private readonly fearUntil = new Map<MobileId, number>();
   /** Ceux qui ont eu peur depuis l'aube : leur nuit pèse sur leur moral (`MOOD.scared`), puis le compte repart. */
   private readonly scared = new Set<MobileId>();
+  /** Ceux dont un proche (même bâtiment) est mort depuis l'aube : leur deuil pèse sur leur moral (`MOOD.grief`), puis le compte repart. */
+  private readonly grieving = new Set<MobileId>();
+  /** Les tombes (`sim/graves.ts`), les plus anciennes d'abord ; sauvegardées. */
+  private readonly graveList: Grave[] = [];
+  /** Les tombes oubliées, réduites à leurs fleurs. */
+  private readonly bloomList: Bloom[] = [];
+  private nextGraveId = 1;
   /** La dernière naissance : de quoi faire sourire quelques ouvriers un instant (`REACTIONS.joyTicks`). */
   private joy: { tick: number; kidId: MobileId } | null = null;
   /** Ticks passés à zéro d'un besoin, par habitant et besoin (`famineKey`). Pas sauvegardé : au chargement, le compte repart. */
@@ -1347,6 +1357,9 @@ export class World {
       ...(this.dayBoon !== null && { boon: { ...this.dayBoon } }),
       ...(this.daily !== null && { challenge: { ...this.daily } }),
       ...(this.scared.size > 0 && { scared: [...this.scared] }),
+      ...(this.grieving.size > 0 && { grieving: [...this.grieving] }),
+      ...(this.graveList.length > 0 && { graves: this.graveList.map((grave) => ({ ...grave })) }),
+      ...(this.bloomList.length > 0 && { blooms: this.bloomList.map((bloom) => ({ ...bloom })) }),
       kills: this.kills,
       prestige: this.prestige,
       prestigeSites: [...this.prestigeSites],
@@ -1432,6 +1445,13 @@ export class World {
     this.daily = state.challenge ? { ...state.challenge } : null;
     this.scared.clear();
     for (const id of state.scared ?? []) this.scared.add(id);
+    this.grieving.clear();
+    for (const id of state.grieving ?? []) this.grieving.add(id);
+    this.graveList.length = 0;
+    this.graveList.push(...(state.graves ?? []).map((grave) => ({ ...grave })));
+    this.bloomList.length = 0;
+    this.bloomList.push(...(state.blooms ?? []).map((bloom) => ({ ...bloom })));
+    this.nextGraveId = this.graveList.reduce((next, grave) => Math.max(next, grave.id + 1), 1);
     this.kills = state.kills;
     this.prestige = state.prestige;
     this.prestigeSites.clear();
@@ -7792,6 +7812,7 @@ export class World {
 
     this.restInhabitants();
     this.scared.clear();
+    this.grieving.clear();
     this.ageInhabitants();
 
     // La nuit est survécue : la mairie tient encore (`stepClock` s'arrête à la défaite).
@@ -7862,7 +7883,7 @@ export class World {
     const spots = this.decorSpots();
 
     for (const mobile of this.mobiles.values()) {
-      if (isLaborer(mobile)) mobile.happiness = nightlyMood(mobile.happiness, moodCauses(mobile, this.scared.has(mobile.id)), this.traitFor(mobile), decorMoodAt(mobile.x, mobile.y, spots));
+      if (isLaborer(mobile)) mobile.happiness = nightlyMood(mobile.happiness, moodCauses(mobile, this.scared.has(mobile.id), this.grieving.has(mobile.id)), this.traitFor(mobile), decorMoodAt(mobile.x, mobile.y, spots));
     }
   }
 
@@ -8253,7 +8274,46 @@ export class World {
     this.mobiles.delete(mobile.id);
     if (isColonist(mobile)) this.colonists = Math.max(0, this.colonists - 1);
     this.rosterChanged();
+    this.layGrave(mobile, need);
     this.events.emit('workerStarved', { id: mobile.id, name: this.nameFor(mobile), need, x: mobile.x, y: mobile.y });
+  }
+
+  /**
+   * Sa tombe, là où il est tombé (la case libre la plus proche s'il y en a déjà
+   * une), et le deuil de ses proches — ceux du même bâtiment — à l'aube.
+   */
+  private layGrave(mobile: Laborer, need: NeedId): void {
+    const spot = graveSpot(Math.floor(mobile.x / TILE_SIZE), Math.floor(mobile.y / TILE_SIZE), (tx, ty) => this.graveFree(tx, ty));
+    const grave: Grave = { id: this.nextGraveId, ...spot, name: this.nameFor(mobile), sex: mobile.sex, trait: this.traitFor(mobile), need, day: this.dayDial()?.day ?? 1 };
+
+    this.nextGraveId += 1;
+    addGrave(this.graveList, this.bloomList, grave);
+    this.events.emit('graveLaid', { id: grave.id, tx: grave.tx, ty: grave.ty });
+
+    for (const other of this.mobiles.values()) {
+      if (isLaborer(other) && other.homeId === mobile.homeId) this.grieving.add(other.id);
+    }
+  }
+
+  /** Une case où poser une tombe : ni eau, ni tombe déjà. */
+  private graveFree(tx: number, ty: number): boolean {
+    if (terrainAt(this.seed, tx, ty) === 'water') return false;
+    return !this.graveList.some((grave) => grave.tx === tx && grave.ty === ty) && !this.bloomList.some((bloom) => bloom.tx === tx && bloom.ty === ty);
+  }
+
+  /** Les tombes fleuries de la colonie, les plus anciennes d'abord (`GRAVES.max` au plus). */
+  public graves(): readonly Grave[] {
+    return this.graveList;
+  }
+
+  /** Les tombes oubliées : leurs fleurs seules. */
+  public blooms(): readonly Bloom[] {
+    return this.bloomList;
+  }
+
+  /** La tombe de la case, ou `undefined`. */
+  public graveAt(tx: number, ty: number): Grave | undefined {
+    return this.graveList.find((grave) => grave.tx === tx && grave.ty === ty);
   }
 
   /** Travaille-t-il ? Dehors, à une tâche. Un enfant ne travaille jamais, un dormeur non plus. */

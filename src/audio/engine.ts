@@ -58,6 +58,10 @@ const SFX_GAIN = 0.8;
 /** Deux sons identiques à moins de cet intervalle : le second est ignoré. */
 const DEDUPE_MS = 35;
 
+/** Un deuil : la musique se tait si longtemps, puis une note grave ; les morts qui suivent, tout de suite après, n'y changent rien. */
+const MOURN_MS = 2000;
+const MOURN_COOLDOWN_MS = 10000;
+
 /** La constante de temps du fondu qui coupe une voix quand une autre commence, en secondes : un clic évité, pas un chevauchement. */
 const VOICE_CUT_S = 0.015;
 
@@ -80,6 +84,8 @@ export class AudioEngine {
   private musicLevel: number;
   private sfxLevel: number;
   private paused = false;
+  private mourning = false;
+  private mournedAt = -Infinity;
   private hidden = false;
 
   public constructor() {
@@ -184,7 +190,24 @@ export class AudioEngine {
   /** Le jeu se met en pause ou reprend : la musique recule, puis revient. */
   public setPaused(paused: boolean): void {
     this.paused = paused;
-    this.music?.setDucked(paused);
+    this.music?.setDucked(paused || this.mourning);
+  }
+
+  /** Un habitant est mort : la musique baisse 2 s, puis une note grave. Plusieurs morts rapprochées ne le font qu'une fois. */
+  public mourn(): void {
+    if (!this.ctx || this.mutedFlag || this.ctx.state !== 'running') return;
+
+    const now = performance.now();
+
+    if (now - this.mournedAt < MOURN_COOLDOWN_MS) return;
+    this.mournedAt = now;
+    this.mourning = true;
+    this.music?.setDucked(true);
+    window.setTimeout(() => {
+      this.mourning = false;
+      this.music?.setDucked(this.paused);
+      this.play('toll');
+    }, MOURN_MS);
   }
 
   /** `pitch` : un facteur de vitesse de lecture (1 = la hauteur de l'échantillon) ; la synthèse de repli l'ignore. */

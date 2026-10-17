@@ -249,6 +249,19 @@ export const panel: Messages['panel'] = {
     open: 'A defeated mutant may drop stunned — touch it and it will follow you here.',
   },
 
+  grave: {
+    trait: {
+      hardworking: { male: 'hardworking', female: 'hardworking' },
+      glutton: { male: 'greedy', female: 'greedy' },
+      fearful: { male: 'fearful', female: 'fearful' },
+      sturdy: { male: 'sturdy', female: 'sturdy' },
+      dreamer: { male: 'dreamy', female: 'dreamy' },
+    },
+    cause: { hunger: 'hunger', thirst: 'thirst' },
+    epitaph: (name: string, trait: string, _female: boolean, cause: string, day: number): string =>
+      `Here lies ${name} — ${trait}, dead of ${cause} on day ${day}`,
+  },
+
   creature: {
     field: {
       sex: 'Sex',
