@@ -11,13 +11,16 @@
  * `t()`. Les textes français du contenu restent dans `data/` ; le dictionnaire
  * français les reprend, l'anglais les traduit.
  *
+ * Le français est dans le paquet de départ ; l'anglais est un morceau à part
+ * (`loadLocale`, import dynamique) que l'on n'attend que si on le veut :
+ * `setLocale('en')` suppose qu'il est arrivé (ou posé par `registerMessages`).
+ *
  * Changer de langue ne recharge rien : `setLocale` rappelle chaque abonné
  * d'`onLocale`, qui réécrit ses libellés fixes ; le reste de l'UI relit `t()`
  * à chaque rendu. Le choix est une préférence de l'appareil
  * (`storage/localLocale.ts`), jamais dans la partie.
  */
 
-import { EN } from './en/index.ts';
 import { FR } from './fr/index.ts';
 import type { Messages } from './messages.ts';
 
@@ -25,7 +28,21 @@ export type Locale = 'fr' | 'en';
 
 export const LOCALES: readonly Locale[] = ['fr', 'en'];
 
-const DICTIONARIES: Record<Locale, Messages> = { fr: FR, en: EN };
+const DICTIONARIES: Partial<Record<Locale, Messages>> & { fr: Messages } = { fr: FR };
+
+/** Chaque langue se nomme dans la sienne : le sélecteur n'a pas besoin de son dictionnaire. */
+export const LOCALE_NAMES: Record<Locale, string> = { fr: 'Français', en: 'English' };
+
+/** Pose le dictionnaire d'une langue (celui que `loadLocale` vient de charger, ou celui d'un test). */
+export function registerMessages(locale: Locale, messages: Messages): void {
+  DICTIONARIES[locale] = messages;
+}
+
+/** Charge le dictionnaire d'une langue s'il n'est pas déjà là : à attendre avant `setLocale`. */
+export async function loadLocale(locale: Locale): Promise<void> {
+  if (DICTIONARIES[locale]) return;
+  if (locale === 'en') registerMessages('en', (await import('./en/index.ts')).EN);
+}
 
 let current: Locale = 'fr';
 const listeners = new Set<(locale: Locale) => void>();
@@ -41,17 +58,12 @@ export function locale(): Locale {
 
 /** Le dictionnaire de la langue en cours : à relire à chaque rendu, jamais à garder. */
 export function t(): Messages {
-  return DICTIONARIES[current];
+  return DICTIONARIES[current] ?? DICTIONARIES.fr;
 }
 
-/** Le dictionnaire d'une langue donnée — le sélecteur de langue nomme chacune dans la sienne. */
-export function messagesOf(locale: Locale): Messages {
-  return DICTIONARIES[locale];
-}
-
-/** Change de langue et prévient les abonnés ; sans effet si c'est déjà la bonne. */
+/** Change de langue et prévient les abonnés ; sans effet si c'est déjà la bonne ou si son dictionnaire n'est pas chargé. */
 export function setLocale(next: Locale): void {
-  if (next === current) return;
+  if (next === current || !DICTIONARIES[next]) return;
   current = next;
   for (const listener of [...listeners]) listener(next);
 }

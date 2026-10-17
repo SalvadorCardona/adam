@@ -94,4 +94,12 @@ function precache(): Plugin {
 export default defineConfig({
   base: '/adam/',
   plugins: [testPages(), precache()],
+  build: {
+    rolldownOptions: {
+      output: {
+        // PixiJS change rarement : un morceau à part reste en cache d'un déploiement à l'autre, et allège le paquet du jeu.
+        codeSplitting: { groups: [{ name: 'pixi', test: /node_modules[\\/]pixi\.js[\\/]/ }] },
+      },
+    },
+  },
 });

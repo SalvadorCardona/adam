@@ -36,6 +36,8 @@ export default defineConfig({
     // faisaient échouer au hasard ; 30 s laisse la marge sans masquer une
     // vraie boucle infinie.
     testTimeout: 30_000,
+    // L'anglais est un morceau chargé à la demande dans le jeu ; les tests le veulent sous la main.
+    setupFiles: ['src/i18n/testSetup.ts'],
     projects: [
       {
         extends: true,

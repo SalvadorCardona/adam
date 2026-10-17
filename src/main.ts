@@ -48,7 +48,6 @@ import { AchievementTracker } from './sim/achievements.ts';
 import { earnedSkins, type Collection } from './sim/collection.ts';
 import { activePerks, harvestSeeds, plant, type Garden } from './sim/garden.ts';
 import { awayMs } from './sim/offline.ts';
-import { stageScenario } from './sim/testScenario.ts';
 import type { Entity } from './sim/types.ts';
 import { STEP_MS, TICKS_PER_SECOND, World } from './sim/world.ts';
 import { LocalCollection } from './storage/localCollection.ts';
@@ -70,7 +69,7 @@ import { LocalUiScale, nextUiScale } from './storage/localUiScale.ts';
 import { LocalZoom } from './storage/localZoom.ts';
 import { TILE_SIZE } from './core/grid.ts';
 import { nextWave } from './sim/dayNight.ts';
-import { detectLocale, onLocale, setLocale, t } from './i18n/locale.ts';
+import { detectLocale, loadLocale, locale, onLocale, setLocale, t } from './i18n/locale.ts';
 import { BuildingPanel } from './ui/buildingPanel.ts';
 import { EraPanel } from './ui/eraPanel.ts';
 import { CaravanPanel } from './ui/caravanPanel.ts';
@@ -104,17 +103,15 @@ import { FogSight } from './ui/mapSight.ts';
 import { WorldMap } from './ui/worldMap.ts';
 import { AccountClient } from './net/account.ts';
 import { inviteCodeOf, playCodeOf, playUrl, resyncsOf, titleUrl, withoutInvite } from './net/invite.ts';
-import { GuestSession, HostSession, type GuestStatus } from './net/play.ts';
+import type { GuestSession, GuestStatus, HostSession } from './net/play.ts';
 import { PartyClient } from './net/party.ts';
 import { Connection } from './net/connection.ts';
 import { LocalAccount } from './storage/localAccount.ts';
 import { adoptLegacyData } from './storage/legacyKeys.ts';
 import { AccountPanel } from './ui/accountPanel.ts';
-import { InvitePanel } from './ui/invitePanel.ts';
-import { JoinPanel } from './ui/joinPanel.ts';
-import { PlayScreen } from './ui/playScreen.ts';
-import { VoiceChat } from './net/voice.ts';
-import { BrowserVoiceEnv } from './net/voiceBrowser.ts';
+import { preloadWhenIdle } from './ui/idleLoad.ts';
+import { LazyPanel } from './ui/lazyPanel.ts';
+import type { PlayScreen } from './ui/playScreen.ts';
 import { VoicePanel } from './ui/voicePanel.ts';
 
 /**
@@ -234,7 +231,10 @@ async function main(): Promise<void> {
   // Lue et écrite même sur la partie de test, comme voulu : la langue est un réglage de l'appareil, pas une donnée de partie.
   const localePrefs = LocalLocale.browser();
 
-  setLocale(localePrefs.load() ?? detectLocale(navigator.languages ?? [navigator.language]));
+  const startLocale = localePrefs.load() ?? detectLocale(navigator.languages ?? [navigator.language]);
+
+  await loadLocale(startLocale);
+  setLocale(startLocale);
   onLocale((locale) => {
     document.documentElement.lang = locale;
     document.title = t().common.pageTitle;
@@ -297,7 +297,7 @@ async function main(): Promise<void> {
   const world = guest
     ? guest.world
     : scenario
-      ? stageScenario(TEST_SCENARIOS[scenario])
+      ? (await import('./sim/testScenario.ts')).stageScenario(TEST_SCENARIOS[scenario])
       : loaded.status === 'ok'
         ? loaded.world
         : dailyOf !== null
@@ -339,16 +339,20 @@ async function main(): Promise<void> {
       hud.inviteButton.hidden = state !== 'hidden';
     },
   );
-  const attachVoice = (session: HostSession | GuestSession): void => {
+  // Le vocal (WebRTC) ne se charge qu'avec une session à deux : jamais en solo.
+  const attachVoice = async (session: HostSession | GuestSession): Promise<void> => {
     const id = accounts.user?.id;
 
     if (id === undefined) return;
 
+    const [{ VoiceChat }, { BrowserVoiceEnv }] = await Promise.all([import('./net/voice.ts'), import('./net/voiceBrowser.ts')]);
     const chat = new VoiceChat(id, new BrowserVoiceEnv(), (data, to) => session.sendVoice(data, to));
 
     session.voice = chat;
     voicePanel.bind(chat);
   };
+  // L'hôte (`net/play.ts`, `net/lockstep.ts`) ne se charge qu'à l'ouverture d'une invitation ; la dernière demande l'emporte.
+  let hostRequest = 0;
   const hostParty = (code: string | null): void => {
     if (guest || hosting?.code === code) return;
     hosting?.stop();
@@ -356,43 +360,53 @@ async function main(): Promise<void> {
     voicePanel.bind(null);
     voicePanel.setPartner(false);
 
+    const request = ++hostRequest;
     const token = accounts.token;
 
     if (code === null || connection.baseUrl === null || token === null) return;
 
-    const session = new HostSession(world, connection.baseUrl, code, token, (event) => {
-      if (hosting !== session) return;
-      /*
-       * L'ami est dans la salle : la fenêtre le dit un instant, puis se retire
-       * et la partie reprend — l'hôte, venu de la pause, n'a rien à faire, et
-       * l'ami n'attend pas « qu'il reprenne le jeu ».
-       */
-      if (event.kind === 'guestIn') voicePanel.setPartner(true);
-      if (event.kind === 'guestOut') voicePanel.setPartner(false);
-      if (event.kind === 'guestIn') {
-        setTimeout(() => {
-          invitePanel.close();
-          if (!document.hidden) setPaused(false);
-        }, WELCOME_MS);
-        return;
-      }
-      if (event.kind !== 'ended') return;
-      hosting = null;
-      voicePanel.bind(null);
-      voicePanel.setPartner(false);
-      hud.notify(t().party.play.sessionEnded, 'good');
-    });
+    const baseUrl = connection.baseUrl;
 
-    hosting = session;
-    attachVoice(session);
-    session.start();
+    void import('./net/play.ts').then(({ HostSession }) => {
+      if (request !== hostRequest) return;
+
+      const session = new HostSession(world, baseUrl, code, token, (event) => {
+        if (hosting !== session) return;
+        /*
+         * L'ami est dans la salle : la fenêtre le dit un instant, puis se retire
+         * et la partie reprend — l'hôte, venu de la pause, n'a rien à faire, et
+         * l'ami n'attend pas « qu'il reprenne le jeu ».
+         */
+        if (event.kind === 'guestIn') voicePanel.setPartner(true);
+        if (event.kind === 'guestOut') voicePanel.setPartner(false);
+        if (event.kind === 'guestIn') {
+          setTimeout(() => {
+            invitePanel.close();
+            if (!document.hidden) setPaused(false);
+          }, WELCOME_MS);
+          return;
+        }
+        if (event.kind !== 'ended') return;
+        hosting = null;
+        voicePanel.bind(null);
+        voicePanel.setPartner(false);
+        hud.notify(t().party.play.sessionEnded, 'good');
+      });
+
+      hosting = session;
+      void attachVoice(session);
+      session.start();
+    });
   };
-  const invitePanel = new InvitePanel(parties, accounts, connection, () => accountPanel.show(), hostParty);
+  // La fenêtre d'invitation (et son QR code) ne se charge qu'à son ouverture.
+  const invitePanel = new LazyPanel(() =>
+    import('./ui/invitePanel.ts').then(({ InvitePanel }) => new InvitePanel(parties, accounts, connection, () => accountPanel.show(), hostParty)),
+  );
   const inviteCode = scenario || guest ? null : inviteCodeOf(window.location.search);
   const joinPanel =
     inviteCode === null
       ? null
-      : new JoinPanel(
+      : new (await import('./ui/joinPanel.ts')).JoinPanel(
           inviteCode,
           parties,
           accounts,
@@ -637,8 +651,11 @@ async function main(): Promise<void> {
   // Les réglages ouverts arrêtent l'horloge, comme la pause, sans en montrer l'écran.
   const settings = new SettingsPanel({
     setLocale: (locale) => {
-      setLocale(locale);
-      localePrefs.save(locale);
+      // L'anglais arrive à la demande : la langue change dès que son dictionnaire est là.
+      void loadLocale(locale).then(() => {
+        setLocale(locale);
+        localePrefs.save(locale);
+      });
     },
     toggleSound: () => settings.setSound(!audio.toggleMuted()),
     toggleMusic: () => settings.setMusic(audio.toggleMusic()),
@@ -751,7 +768,7 @@ async function main(): Promise<void> {
   // Jouer à deux : chacun voit l'autre arriver et partir.
   world.events.on('partnerJoined', ({ name }) => hud.notify(t().party.play.partnerJoined(name), 'good'));
   world.events.on('partnerLeft', ({ name }) => hud.notify(t().party.play.partnerLeft(name), 'bad'));
-  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest || !connection.enabled ? null : () => invitePanel.show(), () => voicePanel.toggleMembership(),
+  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest || !connection.enabled ? null : () => invitePanel.with((panel) => panel.show()), () => voicePanel.toggleMembership(),
     () => settings.show(),
     // L'écran titre : la partie est écrite, la page se recharge sur « Continuer ». Pas de sauvegarde en partie de test ni chez l'ami.
     sandbox ? null : () => {
@@ -761,7 +778,7 @@ async function main(): Promise<void> {
   );
   // Chez l'ami, l'hôte est là d'emblée : le vocal est à portée dès l'arrivée.
   if (guest) {
-    attachVoice(guest.session);
+    void attachVoice(guest.session);
     voicePanel.setPartner(true);
   }
   // La toute première partie de l'appareil : l'écran titre y rappelle les gestes du jeu.
@@ -792,6 +809,11 @@ async function main(): Promise<void> {
       played.save();
       hud.root.dataset['started'] = 'true';
       window.umami?.track(loaded.status === 'ok' ? 'partie-reprise' : 'partie-demarree');
+      // Les morceaux à la demande arrivent aux temps morts : la langue de l'autre bord, puis, avec un serveur, l'invitation et le jeu à deux.
+      preloadWhenIdle([
+        () => loadLocale(locale() === 'fr' ? 'en' : 'fr'),
+        ...(connection.enabled ? [() => invitePanel.warm(), () => import('./net/play.ts'), () => import('./net/voice.ts'), () => import('./net/voiceBrowser.ts')] : []),
+      ]);
     },
     onRestart: () => autosave.restart(),
     onSettings: () => settings.show(),
@@ -871,7 +893,7 @@ async function main(): Promise<void> {
   hud.root.append(boons.root);
 
   hud.pauseButton.addEventListener('click', () => setPaused(!paused));
-  hud.inviteButton.addEventListener('click', () => invitePanel.show());
+  hud.inviteButton.addEventListener('click', () => invitePanel.with((panel) => panel.show()));
   hud.settingsButton.addEventListener('click', () => settings.toggle());
   hud.root.append(pause.root);
 
@@ -2073,12 +2095,14 @@ const WELCOME_MS = 1500;
  * l'hôte part, si la session se ferme ; la connexion perdue ou une
  * divergence rouvrent la page, qui se reconnecte et reçoit une image neuve.
  */
-function joinAsGuest(
+async function joinAsGuest(
   code: string,
   connection: Connection,
   accounts: AccountClient,
   mount: HTMLElement,
 ): Promise<{ world: World; session: GuestSession; screen: PlayScreen } | null> {
+  // Le jeu à deux n'est lu que par l'ami qui arrive par `?play=`.
+  const [{ GuestSession }, { PlayScreen }] = await Promise.all([import('./net/play.ts'), import('./ui/playScreen.ts')]);
   const reopen = (resync = 0): void => window.location.replace(playUrl(window.location.href, code, resync));
   const screen = new PlayScreen(
     () => reopen(),
@@ -2091,7 +2115,7 @@ function joinAsGuest(
 
   if (connection.baseUrl === null || token === null) {
     screen.show({ kind: 'failed', reason: connection.baseUrl === null ? 'offline' : 'signedOut' });
-    return Promise.resolve(null);
+    return null;
   }
 
   return new Promise((resolve) => {

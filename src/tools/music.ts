@@ -613,7 +613,7 @@ for (const [index, variant] of VARIANTS.entries()) {
 
     commands.push(
       `ffmpeg -y -i ${out}/${name}${suffix}.wav -c:a libvorbis -q:a 2 ${target}.ogg`,
-      `ffmpeg -y -i ${out}/${name}${suffix}.wav -c:a aac -b:a 96k ${target}.m4a`,
+      `ffmpeg -y -i ${out}/${name}${suffix}.wav -c:a aac -b:a 72k ${target}.m4a`,
     );
   }
 }
