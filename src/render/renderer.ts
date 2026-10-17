@@ -40,6 +40,9 @@ import { IndicatorLayer, indicatorSources, type ScreenRect } from './indicatorLa
 import { NightLayer } from './nightLayer.ts';
 import { ParticleLayer } from './particles.ts';
 import { ResourceLayer } from './resourceLayer.ts';
+import { reducedMotion } from './motion.ts';
+import { AdamRing } from './adamRing.ts';
+import { campfireTile } from '../sim/camp.ts';
 import { SelectionLayer } from './selectionLayer.ts';
 import { SignalLayer } from './signalLayer.ts';
 import { Signboards } from './signboard.ts';
@@ -51,6 +54,9 @@ import { WeatherLayer } from './weatherLayer.ts';
 
 /** Le recul de la caméra quand l'antenne s'allume : de quoi voir le pylône entier et ses premières ondes. */
 const SIGNAL_ZOOM = 0.75;
+/** Au lancement, la caméra cadre Adam un peu plus serré, une seconde. */
+const INTRO_ZOOM = 1.25;
+const INTRO_MS = 1000;
 
 /** Tous les combien de frames les chemins de terre battue se relisent dans la ville. */
 const TRAIL_CHECK_FRAMES = 30;
@@ -63,6 +69,7 @@ export class GameRenderer {
   private readonly chunkLayer: ChunkLayer;
   /** Les chemins de terre battue se relisent toutes les `TRAIL_CHECK_FRAMES` frames : la ville change rarement. */
   private trailClock = 0;
+  private campLit = false;
   private trailKey: string | null = null;
   private readonly waterLayer: WaterLayer;
   private readonly shadows = new Container();
@@ -74,6 +81,7 @@ export class GameRenderer {
   private readonly ghostLayer: GhostLayer;
   private readonly workReach: WorkReachLayer;
   private readonly selection: SelectionLayer;
+  private readonly adamRing: AdamRing;
   /** Le bâtiment dont la fenêtre est ouverte : un cadre l'entoure, une cabane y montre son rayon de coupe. */
   private selected: Selection | null = null;
   private readonly nightLayer: NightLayer;
@@ -114,6 +122,7 @@ export class GameRenderer {
     this.ghostLayer = new GhostLayer(world, library);
     this.workReach = new WorkReachLayer(world);
     this.selection = new SelectionLayer(world, this.entityLayer.container);
+    this.adamRing = new AdamRing(world);
     this.nightLayer = new NightLayer(app.renderer, world);
     this.fogLayer = new FogLayer(world);
     this.weather = new WeatherLayer(world, library);
@@ -131,6 +140,7 @@ export class GameRenderer {
       this.particles.ground,
       this.weather.ground,
       this.selection.container,
+      this.adamRing.container,
       this.entityLayer.container,
       this.particles.container,
       this.nightLayer.container,
@@ -143,6 +153,7 @@ export class GameRenderer {
     app.stage.addChild(this.worldContainer, this.hudContainer);
 
     this.camera.centerOn(world.player.x, world.player.y);
+    if (!reducedMotion()) this.camera.intro(INTRO_ZOOM, INTRO_MS);
   }
 
   public static async create(world: World, mount: HTMLElement): Promise<GameRenderer> {
@@ -356,6 +367,7 @@ export class GameRenderer {
     this.worldContainer.scale.set(this.camera.zoom);
 
     this.updateTrails();
+    this.updateCamp();
     this.chunkLayer.update(this.camera);
     this.waterLayer.update(this.camera, this.app.ticker.deltaMS);
     // Un seul appel au juge par frame : le fantôme colore les cases, l'arbre qui gêne clignote.
@@ -372,6 +384,7 @@ export class GameRenderer {
     this.ghostLayer.update(armed, ghost, block, this.app.ticker.deltaMS);
     this.workReach.update(building ? ghost : null, this.selected?.kind === 'building' ? this.selected.id : null);
     this.selection.update(this.selected, alpha, this.app.ticker.deltaMS);
+    this.adamRing.update(alpha, this.app.ticker.deltaMS);
     this.weather.update(this.camera, this.app.ticker.deltaMS, alpha);
     this.signal.update(this.camera, this.app.ticker.deltaMS);
     this.indicators.update(this.camera, this.app.ticker.deltaMS, alpha);
@@ -395,6 +408,16 @@ export class GameRenderer {
     if (key === this.trailKey) return;
     this.trailKey = key;
     this.chunkLayer.setTrails(trails);
+  }
+
+  /** Le feu de camp brûle devant le chantier de la mairie, et s'éteint quand elle est bâtie. */
+  private updateCamp(): void {
+    const hall = this.world.entities.get(this.world.townHallId);
+    const lit = hall !== undefined && hall.kind === 'site';
+
+    if (lit === this.campLit) return;
+    this.campLit = lit;
+    this.chunkLayer.setCamp(lit ? campfireTile(hall) : null);
   }
 
   /** Nombre de blocs de sol bakés — le HUD de debug l'affiche. */
@@ -429,6 +452,7 @@ export class GameRenderer {
     this.ghostLayer.destroy();
     this.workReach.destroy();
     this.selection.destroy();
+    this.adamRing.destroy();
     this.nightLayer.destroy();
     this.fogLayer.destroy();
     this.indicators.destroy();

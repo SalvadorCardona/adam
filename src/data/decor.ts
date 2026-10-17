@@ -34,6 +34,8 @@ export const DECOR = {
   rubble: { weights: { grass: 1, sand: 1, rock: 6 } },
   barrel: { weights: { grass: 1, sand: 1, rock: 3 } },
   ruin: { weights: { grass: 1, rock: 2 } },
+  /** Jamais tiré : le chantier de la mairie le pose (`sim/camp.ts`), la mairie bâtie l'éteint. */
+  campfire: { weights: {} },
 } as const satisfies Record<PartOf<'decor'>, DecorProto>;
 
 export type DecorId = keyof typeof DECOR;

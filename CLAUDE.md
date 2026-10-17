@@ -342,6 +342,8 @@ son bonheur et « Dort à : Maison / dehors » ; celle d'un bâtiment à lits,
 ses lits occupés. Partie de test `/test/housing` : le soir tombe, dix
 ouvriers, quatre lits.
 
+**Campement du départ** (`sim/camp.ts`, `render/adamRing.ts`) — tant que la mairie n'est qu'un chantier, un feu de camp (décor `campfire` de `data/decor.ts`, jamais tiré au hasard, posé par `ChunkLayer.setCamp` et éteint à l'achèvement) brûle à `CAMP.fireAhead` cases de sa façade ; les dix colons se placent en couronne autour (`campSpot`, hachage de la seed, jamais une grille) et flânent/glandent comme d'habitude. Adam porte un anneau orange au sol, permanent, plus un halo de 4 s au lancement et après chaque réapparition (coupé sous `prefers-reduced-motion`) ; la caméra cadre Adam à ×1,25 la première seconde (`Camera.intro`).
+
 **Jour et nuit** — dès que la mairie est debout, le cycle démarre
 (`src/data/dayNight.ts`, horloge pure dans `src/sim/dayNight.ts`) : une
 journée sans mutant (~3 min), un crépuscule (carte teintée indigo, lampions

@@ -208,6 +208,9 @@ export class Camera {
   /** Zoom visé pendant un recul, et ms pendant lesquelles il est tenu. */
   private zoomTarget = 1;
   private zoomHold = 0;
+  /** Le cadrage serré du départ : facteur du niveau du joueur, et ms restantes. */
+  private introFactor = 1;
+  private introHold = 0;
   /** Le point à montrer pendant un recul, et le décalage courant vers lui. */
   private focus: { x: number; y: number } | null = null;
   private focusShiftX = 0;
@@ -252,6 +255,7 @@ export class Camera {
     this.leadY += (vy * LEAD_DISTANCE_MS - this.leadY) * lead;
 
     this.zoomHold = Math.max(0, this.zoomHold - deltaMs);
+    this.introHold = Math.max(0, this.introHold - deltaMs);
 
     const zooming = this.zoomHold > 0;
     const zoomTo = this.goal();
@@ -376,6 +380,16 @@ export class Camera {
     this.focus = focus;
   }
 
+  /**
+   * Cadre plus serré (`factor` fois le niveau du joueur) pendant `holdMs`,
+   * posé tout de suite, puis revient en glissant au niveau du joueur.
+   */
+  public intro(factor: number, holdMs: number): void {
+    this.introFactor = factor;
+    this.introHold = holdMs;
+    this.zoom = this.goal();
+  }
+
   /** Le niveau de zoom choisi par le joueur. */
   public get level(): number {
     return this.levelTarget;
@@ -455,7 +469,9 @@ export class Camera {
 
   /** Le zoom vers lequel glisser : le niveau du joueur, ou le recul s'il montre plus large. */
   private goal(): number {
-    return this.zoomHold > 0 ? Math.min(this.levelTarget, this.zoomTarget) : this.levelTarget;
+    const base = this.zoomHold > 0 ? Math.min(this.levelTarget, this.zoomTarget) : this.levelTarget;
+
+    return this.introHold > 0 ? clampZoom(base * this.introFactor) : base;
   }
 
   /**

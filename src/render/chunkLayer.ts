@@ -27,7 +27,7 @@
  */
 
 import { Container, RenderTexture, Sprite, type Renderer, type Texture } from 'pixi.js';
-import { TILE_SIZE, coordKey } from '../core/grid.ts';
+import { TILE_SIZE, coordKey, type TileCoord } from '../core/grid.ts';
 import type { Land } from '../sim/contamination.ts';
 import { decorAt } from '../sim/terrain.ts';
 import type { Camera } from './camera.ts';
@@ -65,6 +65,8 @@ export class ChunkLayer {
   private readonly stale = new Set<string>();
   /** Les chemins de terre battue de la ville, par clé. */
   private trails = new Map<string, Trail>();
+  /** La tuile du feu de camp, tant que la mairie n'est pas bâtie. */
+  private camp: TileCoord | null = null;
 
   private readonly renderer: Renderer;
   private readonly library: SpriteLibrary;
@@ -213,7 +215,7 @@ export class ChunkLayer {
           continue;
         }
 
-        const decor = decorAt(seed, tx, ty);
+        const decor = this.camp && this.camp.tx === tx && this.camp.ty === ty ? 'campfire' : decorAt(seed, tx, ty);
 
         if (decor) {
           props.addChild(tileSprite(this.library.part('decor', decor), lx, ly));
@@ -316,6 +318,14 @@ export class ChunkLayer {
         }
       }
     }
+  }
+
+  /** Le feu de camp s'allume en `tile`, ou s'éteint (`null`) : son bloc se rebake. */
+  public setCamp(tile: TileCoord | null): void {
+    const moved = [this.camp, tile].filter((spot): spot is TileCoord => spot !== null);
+
+    this.camp = tile;
+    for (const { tx, ty } of moved) this.invalidate(tx, ty);
   }
 
   /**
