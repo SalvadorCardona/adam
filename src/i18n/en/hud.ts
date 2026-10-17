@@ -117,6 +117,9 @@ export const hud: Messages['hud'] = {
       hunger: (name: string): string => `${name} starved to death`,
       thirst: (name: string): string => `${name} died of thirst`,
     },
+    workersStarved: (count: number, cause: 'hunger' | 'thirst' | 'mixed'): string =>
+      `${count} colonists ${cause === 'hunger' ? 'starved to death' : cause === 'thirst' ? 'died of thirst' : 'died of hunger or thirst'}`,
+    see: 'Show',
     growthStunted: {
       hunger: (name: string): string => `${name} is hungry: no birthday this dawn`,
       thirst: (name: string): string => `${name} is thirsty: no birthday this dawn`,

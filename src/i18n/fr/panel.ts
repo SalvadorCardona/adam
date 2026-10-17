@@ -287,6 +287,20 @@ export const panel = {
     open: 'Un mutant vaincu peut tomber assommé — touchez-le, il vous suivra jusqu’ici.',
   },
 
+  /** Une tombe tapée sur la carte (`data/graves.ts`) : l'épitaphe, accordée au sexe et au trait. */
+  grave: {
+    trait: {
+      hardworking: { male: 'travailleur', female: 'travailleuse' },
+      glutton: { male: 'gourmand', female: 'gourmande' },
+      fearful: { male: 'peureux', female: 'peureuse' },
+      sturdy: { male: 'costaud', female: 'costaude' },
+      dreamer: { male: 'rêveur', female: 'rêveuse' },
+    },
+    cause: { hunger: 'faim', thirst: 'soif' },
+    epitaph: (name: string, trait: string, female: boolean, cause: string, day: number): string =>
+      `Ici repose ${name} — ${trait}, mort${female ? 'e' : ''} de ${cause} au jour ${day}`,
+  },
+
   /** La fenêtre d'une créature — un habitant ou un ennemi —, tapée sur la carte (`ui/creatureView.ts`). */
   creature: {
     /** Les libellés de la fiche, colonne de gauche : une ligne par donnée. */

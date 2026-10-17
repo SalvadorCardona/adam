@@ -5,7 +5,7 @@ import { Camera } from '../render/camera.ts';
 import type { Entity, Mobile } from '../sim/types.ts';
 import type { World } from '../sim/world.ts';
 import type { Selection } from '../ui/creatureView.ts';
-import { Inspect, buildingAt, creatureAt } from './inspect.ts';
+import { Inspect, buildingAt, creatureAt, graveAt } from './inspect.ts';
 
 /** Le chantier de la mairie, emprise 3 × 3 en (0, 0) : cadre de 96 × 128, 32 px de toit au-dessus. */
 const HALL = { id: 1, kind: 'site', proto: 'townHall', tx: 0, ty: 0, width: 3, height: 3, delivered: {} } as Entity;
@@ -129,6 +129,7 @@ describe('tap dans le vide', () => {
     mobiles: new Map(),
     entities: new Map([[1, HALL]]),
     knownEnemyBases: () => [],
+    graves: () => [],
     sees: () => true,
   } as unknown as World;
 
@@ -194,6 +195,7 @@ describe('un tap sur un bâtiment, un habitant ou un ennemi', () => {
     ]),
     entities: new Map([[1, HALL]]),
     knownEnemyBases: () => [],
+    graves: () => [],
     sees: () => true,
   } as unknown as World;
 
@@ -226,5 +228,19 @@ describe('un tap sur un bâtiment, un habitant ou un ennemi', () => {
     inspect.onUp({ id: 1, x: 500, y: 285 });
     world.mobiles.set(21, mutant);
     expect(selected).toEqual([]);
+  });
+});
+
+describe('graveAt', () => {
+  const grave = { id: 4, tx: 5, ty: 6, name: 'Lina', sex: 'female', trait: 'dreamer', need: 'thirst', day: 4 } as const;
+
+  it('une tombe se tape sur sa stèle, pas à côté', () => {
+    expect(graveAt([grave], 5.5 * 32, 7 * 32 - 14)).toBe(4);
+    expect(graveAt([grave], 5.5 * 32 + 20, 7 * 32 - 14)).toBeUndefined();
+    expect(graveAt([grave], 5.5 * 32, 7 * 32 - 60)).toBeUndefined();
+  });
+
+  it('hors de vue, rien ne se tape', () => {
+    expect(graveAt([grave], 5.5 * 32, 7 * 32 - 14, () => false)).toBeUndefined();
   });
 });

@@ -4,7 +4,11 @@ import { BUILDINGS } from '../data/buildings.ts';
 import { DAY_CYCLE } from '../data/dayNight.ts';
 import { AGES, COLONY } from '../data/inhabitants.ts';
 import type { ItemId } from '../data/items.ts';
+import { GRAVES } from '../data/graves.ts';
+import { MOOD } from '../data/housing.ts';
 import { NEEDS } from '../data/needs.ts';
+import { graveSpot } from './graves.ts';
+import { nightlyMood } from './housing.ts';
 import { RECIPES, recipeOf } from '../data/recipes.ts';
 import { doorOf } from './jobs.ts';
 import { canGrow, deprivedNeed, drainNeeds, fullNeeds, needState, needsPace, pacedTick, stuntingNeed, urgentNeed } from './needs.ts';
@@ -888,5 +892,70 @@ describe('soif — le puits quand la mairie est à sec', () => {
     run(decoded.world, 20 * 30);
     expect(loaded.meal).toBeNull();
     expect(loaded.needs.thirst).toBeGreaterThan(0.8);
+  });
+});
+
+describe('tombes', () => {
+  const THIRST_DEATH = NEEDS.thirst.deathTicks;
+
+  it('un mort de soif laisse une tombe à son nom, sauvegardée, qui survit au rechargement', () => {
+    const world = colony({ food: 50 });
+    const worker = workers(world)[0]!;
+    const name = world.nameFor(worker);
+    const laid: number[] = [];
+
+    world.events.on('graveLaid', ({ id }) => laid.push(id));
+    worker.needs.thirst = 0;
+    run(world, THIRST_DEATH);
+
+    expect(laid).toHaveLength(1);
+    expect(world.graves()).toHaveLength(1);
+    expect(world.graves()[0]).toMatchObject({ name, need: 'thirst', day: 1 });
+    expect(world.graveAt(world.graves()[0]!.tx, world.graves()[0]!.ty)?.name).toBe(name);
+
+    const loaded = decodeSave(encodeSave(world, 0));
+
+    if (!loaded.ok) throw new Error('sauvegarde illisible');
+    expect(loaded.world.graves()).toEqual(world.graves());
+  });
+
+  it('au-delà du plafond, les plus anciennes ne sont plus que des fleurs', () => {
+    const world = colony({ food: 50 });
+    const state = world.snapshot();
+
+    state.graves = Array.from({ length: GRAVES.max }, (_, id) => ({ id: id + 1, tx: id, ty: 0, name: `N${id}`, sex: 'female' as const, trait: 'dreamer' as const, need: 'thirst' as const, day: 1 }));
+
+    const full = World.restore(state);
+    const worker = workers(full)[0]!;
+
+    worker.needs.thirst = 0;
+    run(full, THIRST_DEATH);
+    expect(full.graves()).toHaveLength(GRAVES.max);
+    expect(full.graves()[0]!.name).toBe('N1');
+    expect(full.blooms()).toEqual([{ tx: 0, ty: 0 }]);
+  });
+
+  it('deux morts au même endroit ne se recouvrent pas', () => {
+    const taken = new Set(['3,3']);
+
+    expect(graveSpot(3, 3, (tx, ty) => !taken.has(`${tx},${ty}`))).not.toEqual({ tx: 3, ty: 3 });
+  });
+
+  it('le deuil pèse sur le moral de l’aube des proches — ceux du même bâtiment —, pas des autres', () => {
+    const world = colony({ food: 50 });
+    const [dead, ...rest] = workers(world);
+    const kin = rest.filter((other) => other.homeId === dead!.homeId);
+    const strangers = rest.filter((other) => other.homeId !== dead!.homeId);
+
+    dead!.needs.thirst = 0;
+    run(world, THIRST_DEATH);
+
+    const grieving = new Set(world.snapshot().grieving ?? []);
+
+    expect(kin.length).toBeGreaterThan(0);
+    for (const other of kin) expect(grieving.has(other.id)).toBe(true);
+    for (const other of strangers) expect(grieving.has(other.id)).toBe(false);
+    expect(nightlyMood(50, ['bed', 'grief'])).toBe(50 + MOOD.bed + MOOD.grief);
+    expect(MOOD.grief).toBeLessThan(0);
   });
 });

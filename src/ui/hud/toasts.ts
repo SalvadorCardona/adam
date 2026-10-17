@@ -15,6 +15,12 @@ const MAX_TOASTS = 3;
 
 export type ToastTone = 'info' | 'good' | 'bad';
 
+/** La main sur une bulle affichée : réécrire son texte et relancer son temps. */
+export interface ToastHandle {
+  /** Faux si la bulle est déjà partie. */
+  update: (message: string) => boolean;
+}
+
 export class Toasts {
   public readonly root: HTMLElement;
 
@@ -28,7 +34,7 @@ export class Toasts {
    * Une bulle qui monte puis s'en va. `action` : un bouton dans la bulle —
    * « Essayer » sur une pièce de garde-robe trouvée — qui la ferme en servant.
    */
-  public notify(message: string, tone: ToastTone = 'info', action?: { label: string; run: () => void }): void {
+  public notify(message: string, tone: ToastTone = 'info', action?: { label: string; run: () => void }): ToastHandle | null {
     // Deux fois le même message d'affilée : on relance la bulle au lieu d'en empiler une deuxième.
     const last = this.root.lastElementChild as HTMLElement | null;
 
@@ -36,12 +42,13 @@ export class Toasts {
       last.style.animation = 'none';
       void last.offsetWidth;
       last.style.animation = '';
-      return;
+      return null;
     }
 
     const toast = element('div', 'hud-toast');
+    const text = document.createTextNode(message);
 
-    toast.textContent = message;
+    toast.append(text);
     toast.dataset['tone'] = tone;
     if (action) {
       const button = element('button', 'hud-toast-action');
@@ -58,10 +65,27 @@ export class Toasts {
 
     while (this.root.childElementCount > MAX_TOASTS) this.root.firstElementChild?.remove();
 
-    window.setTimeout(() => {
-      toast.dataset['leaving'] = 'true';
-      window.setTimeout(() => toast.remove(), 240);
-    }, TOAST_MS);
+    let leave = 0;
+    const schedule = (): void => {
+      window.clearTimeout(leave);
+      leave = window.setTimeout(() => {
+        toast.dataset['leaving'] = 'true';
+        window.setTimeout(() => toast.remove(), 240);
+      }, TOAST_MS);
+    };
+
+    schedule();
+    return {
+      update: (next) => {
+        if (!toast.isConnected || toast.dataset['leaving'] === 'true') return false;
+        text.data = next;
+        toast.style.animation = 'none';
+        void toast.offsetWidth;
+        toast.style.animation = '';
+        schedule();
+        return true;
+      },
+    };
   }
 
   /**
