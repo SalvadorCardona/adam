@@ -12,7 +12,7 @@
  * `main.ts` lui renvoie l'état réel.
  */
 
-import { LOCALES, messagesOf, onLocale, t, type Locale } from '../i18n/locale.ts';
+import { LOCALES, LOCALE_NAMES, onLocale, t, type Locale } from '../i18n/locale.ts';
 import { NOTIFICATION_KINDS, type NotificationKind } from '../data/notifications.ts';
 import { GAMEPAD } from '../input/gamepad.ts';
 import type { UiIcon } from '../art/ui.ts';
@@ -136,7 +136,7 @@ export class SettingsPanel {
       button.setAttribute('role', 'radio');
       button.lang = locale;
       // Chaque langue se nomme dans la sienne : on retrouve la sienne même sans lire l'autre.
-      button.textContent = messagesOf(locale).settings.languageName;
+      button.textContent = LOCALE_NAMES[locale];
       button.addEventListener('click', () => actions.setLocale(locale));
       this.languages.set(locale, button);
       languages.append(button);

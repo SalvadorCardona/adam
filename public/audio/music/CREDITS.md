@@ -1,7 +1,9 @@
 # Musique du jeu — sources et licences
 
 Chaque boucle existe en deux encodages, `.ogg` (Vorbis) et `.m4a` (AAC,
-pour Safari). Le jeu les boucle sur leur longueur exacte en échantillons
+pour Safari), à débit modeste : Vorbis q2 (la boucle du jour, 81 kb/s
+environ, réencodée depuis l'original de 175 kb/s) et AAC 80 kb/s (le jour)
+ou 72 kb/s (la nuit, le combat). Le jeu les boucle sur leur longueur exacte en échantillons
 (`src/audio/music.ts`), pas sur celle du fichier décodé.
 
 | Fichier | Moment | Origine | Durée |

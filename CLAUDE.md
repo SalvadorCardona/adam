@@ -1322,6 +1322,19 @@ Rien ne joue avant un geste du joueur.
   engrenage, `ui/settingsPanel.ts` : langue, sons, musique ; il arrête
   l'horloge) et se garde sous `adam:locale`
   (`storage/localLocale.ts`), langue du navigateur au premier lancement.
+  Le français est dans le paquet de départ ; l'anglais est un morceau à part
+  (`loadLocale`, import dynamique, `registerMessages` pour les tests qui le posent
+  d'avance : `i18n/testSetup.ts`) : `setLocale('en')` ne change rien tant qu'il
+  n'est pas arrivé.
+- **Paquet** (`vite.config.ts`) : PixiJS est un morceau à part (`pixi`, il change
+  rarement) ; ce qui n'est pas là au premier écran se charge à la demande par
+  `import()` — anglais, fenêtre d'invitation et son QR code (`ui/lazyPanel.ts`),
+  écran « Rejoindre », jeu à deux (`net/play.ts`, `net/lockstep.ts`), vocal
+  (`net/voice*.ts`), scénarios de test —, et `ui/idleLoad.ts` les tire aux temps
+  morts une fois « Jouer » pressé. `precache` du service worker liste tout fichier
+  du build : un morceau ajouté est en cache sans rien faire. Un nouveau code
+  lourd et rarement ouvert se charge de même. Audio : boucles et bruitages sont
+  réencodés à débit modeste (`public/audio/*/CREDITS.md`) ; bruitages en mono.
 
 ## Partie de test
 

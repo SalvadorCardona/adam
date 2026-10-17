@@ -1,7 +1,7 @@
 # Sons du jeu — sources et licences
 
 Chaque son existe en deux encodages, `.ogg` (Vorbis) et `.m4a` (AAC, pour
-Safari). Les bruitages ont été coupés (< 1 s pour les impacts), passés en
+Safari), réencodés en mono à débit réduit (Vorbis q1, AAC 48 kb/s). Les bruitages ont été coupés (< 1 s pour les impacts), passés en
 mono 44,1 kHz, normalisés vers −16 LUFS avec une crête vraie ≤ −1,5 dBTP
 (limiteur au besoin). Le gain de chaque son dans le jeu est réglé dans
 `src/audio/samples.ts`.
