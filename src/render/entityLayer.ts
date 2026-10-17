@@ -42,6 +42,9 @@
  * une fissure barre sa façade jusqu'à la réparation. Une tour qui tire
  * s'enfonce d'un pixel, le recul. Ce sont des minuteurs de vue,
  * en millisecondes d'écran — la simulation n'en sait rien.
+ *
+ * Culling : un bâtiment dont le dessin ne touche pas la zone vue (`sight.ts`)
+ * est caché, son ombre aussi, et sa mise à jour sautée.
  */
 
 import { Container, Graphics, Sprite, Text, type Ticker } from 'pixi.js';
@@ -53,7 +56,7 @@ import { SPRITES, type SpriteId, type SpriteProto } from '../data/sprites.ts';
 import { DEFAULT_LOOK, sameLook, type Look } from '../data/wardrobe.ts';
 import { adamLookParts } from '../art/adamLook.ts';
 import { locale, t } from '../i18n/locale.ts';
-import type { Entity, EntityId } from '../sim/types.ts';
+import type { Entity, EntityId, Lab, Site } from '../sim/types.ts';
 import { terrainAt } from '../sim/terrain.ts';
 import { floorCost, floorMissing } from '../sim/antenna.ts';
 import { isCollecting, labMissing, researchCost } from '../sim/research.ts';
@@ -62,7 +65,7 @@ import { canPause, employs } from '../sim/staffing.ts';
 import type { WorkPriority } from '../data/workers.ts';
 import { HARVEST_REACH_TILES, siteMissing, timerText, type World } from '../sim/world.ts';
 import { ZOOM, type ChunkBounds } from './camera.ts';
-import { inSight } from './sight.ts';
+import { buildingInSight } from './sight.ts';
 import { MobileLayer, drawHp } from './mobileLayer.ts';
 import { type HeldTool, Puppet } from './puppet.ts';
 import { NEEDS_MIN_ZOOM, SiteNeeds } from './siteNeeds.ts';
@@ -177,13 +180,19 @@ interface EntityView {
   baseX: number;
   /** Morceau affiché (`built`, `damaged`…) : ne change la texture que s'il change. */
   shown: string;
-  /** Dernier état dessiné de la barre : ne retessèle que s'il change. */
-  barKey: string;
+  /** Dernier état dessiné de la barre, couleur et remplissage en millièmes : ne retessèle que s'il change. */
+  barColor: number;
+  barFill: number;
+  /** Hauteur du cadre du sprite, en tuiles : le toit monte au-dessus de l'emprise (culling, `sight.ts`). */
+  frameTiles: number;
   /** Le temps restant en « m:ss », sous la barre d'une nurserie ou d'un labo qui produit ; `null` ailleurs. */
   timer: Text | null;
   timerKey: string;
   /** Sous la barre d'un chantier, ce qu'il attend encore ; `null` pour un bâtiment fini. */
   needs: SiteNeeds | null;
+  /** Le relevé du chantier ou du labo, et le tick où il a été lu : il ne change qu'avec la simulation. */
+  ledger: SiteLine[];
+  ledgerTick: number;
   /** La pancarte d'un bâtiment fini, `null` pour un chantier ; et la clé de sa texture. */
   sign: Sprite | null;
   signKey: string;
@@ -464,10 +473,14 @@ export class EntityLayer {
       sink: 0,
       baseX: 0,
       shown,
-      barKey: '',
+      barColor: -1,
+      barFill: -1,
+      frameTiles: art.height / TILE_SIZE,
       timer,
       timerKey: '',
       needs,
+      ledger: [],
+      ledgerTick: -1,
       sign,
       signKey: '',
     };
@@ -541,11 +554,12 @@ export class EntityLayer {
       }
     }
 
-    const key = `${color}:${ratio.toFixed(3)}`;
+    const thousandths = Math.round(ratio * 1000);
 
     view.bar.visible = true;
-    if (key === view.barKey) return;
-    view.barKey = key;
+    if (color === view.barColor && thousandths === view.barFill) return;
+    view.barColor = color;
+    view.barFill = thousandths;
 
     // Une capsule blanche et son remplissage, flottant au-dessus du bâtiment — comme la maquette.
     const width = Math.min(72, entity.width * TILE_SIZE - 12);
@@ -583,13 +597,27 @@ export class EntityLayer {
 
     let lines: SiteLine[] = [];
 
-    if (zoom >= NEEDS_MIN_ZOOM && entity.kind === 'site' && !this.world.awaitsBuilders(entity)) lines = this.world.siteLedger(entity);
-    else if (zoom >= NEEDS_MIN_ZOOM && entity.kind === 'lab') lines = this.world.labLedger(entity);
+    if (zoom >= NEEDS_MIN_ZOOM && entity.kind === 'site' && !this.world.awaitsBuilders(entity)) lines = this.ledgerOf(view, entity);
+    else if (zoom >= NEEDS_MIN_ZOOM && entity.kind === 'lab') lines = this.ledgerOf(view, entity);
 
     view.needs.root.visible = lines.length > 0;
     if (lines.length === 0) return;
 
     view.needs.update(lines, (entity.width * TILE_SIZE) / 2, barTop(entity) + BAR_HEIGHT + NEEDS_DIP, deltaMs);
+  }
+
+  /**
+   * Le relevé, relu une fois par tick : livraisons, jobs et stock de la ville ne
+   * bougent que dans la simulation, pas d'une image à l'autre.
+   */
+  private ledgerOf(view: EntityView, entity: Site | Lab): SiteLine[] {
+    const tick = this.world.tickCount;
+
+    if (view.ledgerTick !== tick) {
+      view.ledgerTick = tick;
+      view.ledger = entity.kind === 'site' ? this.world.siteLedger(entity) : this.world.labLedger(entity);
+    }
+    return view.ledger;
   }
 
   /** La pancarte : médaillon et nom, le médaillon seul en reculant, rien plus loin ou si le réglage la masque. */
@@ -650,7 +678,7 @@ export class EntityLayer {
       .fill(hex(PALETTE.paper.base));
   }
 
-  /** `alpha` est la fraction du pas de simulation déjà écoulée, dans [0, 1[. */
+  /** `alpha` est la fraction du pas de simulation déjà écoulée, dans [0, 1[ ; `sight`, la zone vue en tuiles, marge comprise (`sight.ts`). */
   public update(alpha: number, ticker: Ticker, zoom: number, sight: ChunkBounds): void {
     const player = this.world.adam;
     const x = player.prevX + (player.x - player.prevX) * alpha;
@@ -674,7 +702,7 @@ export class EntityLayer {
       if (this.adamHp.visible) drawHp(this.adamHp, player.hp / maxHp);
     }
 
-    this.mobiles.update(alpha, ticker);
+    this.mobiles.update(alpha, ticker, sight);
 
     for (const [id, view] of this.views) {
       const entity = this.world.entities.get(id);
@@ -683,6 +711,13 @@ export class EntityLayer {
         this.remove(id, view);
         continue;
       }
+
+      // Hors champ, le bâtiment n'est ni dessiné ni mis à jour : il le sera en y entrant, une tuile avant le bord.
+      const shown = buildingInSight(entity, view.frameTiles, sight);
+
+      view.root.visible = shown;
+      view.shadow.visible = shown;
+      if (!shown) continue;
 
       if (entity.kind !== 'site') {
         const face = this.faceOf(entity);
@@ -698,7 +733,7 @@ export class EntityLayer {
       this.showTimer(view, entity);
       this.showNeeds(view, entity, zoom, ticker.deltaMS);
       this.showSign(view, entity, zoom);
-      this.showAlert(view, entity, ticker.lastTime, inSight(entity, sight));
+      this.showAlert(view, entity, ticker.lastTime);
       this.showPause(view, entity, ticker.lastTime);
       this.showPriority(view, entity);
       this.feel(view, ticker.deltaMS);
@@ -706,14 +741,11 @@ export class EntityLayer {
     }
   }
 
-  /**
-   * La bulle d'alerte flotte et bat au-dessus du toit tant qu'un problème arrête le producteur.
-   * Hors de la zone vue (`onScreen`), elle est cachée et on n'y touche plus.
-   */
-  private showAlert(view: EntityView, entity: Entity, now: number, onScreen: boolean): void {
+  /** La bulle d'alerte flotte et bat au-dessus du toit tant qu'un problème arrête le producteur. */
+  private showAlert(view: EntityView, entity: Entity, now: number): void {
     if (!view.alert || entity.kind === 'site') return;
 
-    const problem = onScreen ? this.world.problem(entity) : null;
+    const problem = this.world.problem(entity);
 
     view.alert.visible = problem !== null;
     if (problem === null) return;

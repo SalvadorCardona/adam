@@ -14,8 +14,11 @@
  * et qui montent au-dessus de leur tuile, sont des sprites à part
  * (`resourceLayer.ts`).
  *
- * Trois règles tenues ici :
+ * Quatre règles tenues ici :
  * - bake unique ;
+ * - budget : quelques blocs par image, partagés avec l'eau, les plus proches
+ *   du centre de la caméra d'abord, les manquants avant les périmés
+ *   (`bakeBudget.ts`) ;
  * - culling : seuls les blocs intersectant la caméra sont dans le graphe ;
  * - éviction : au-delà de la marge, la RenderTexture est détruite. C'est ce
  *   qui empêche une exploration de 20 minutes de saturer la VRAM du téléphone.
@@ -35,6 +38,7 @@ import type { SpriteLibrary } from './spriteLibrary.ts';
 import { BlockTerrain, CORNERS, CORNER_SIDES, SIDES, SIDE_OFFSET, groundRoll, type Surface, type TerrainTiles } from './terrainTiles.ts';
 import { PATCH_SIZE, TRAIL_WIDTH } from '../art/terrain.ts';
 import { patchesIn, sprinkleAt, trailBounds, trailPoints, type Trail } from './meadow.ts';
+import { bakeOrder, type BakeBudget } from './bakeBudget.ts';
 
 /** Pas entre deux ronds d'un chemin, en pixels monde : assez serré pour que leur union soit lisse. */
 const TRAIL_STEP = 3;
@@ -89,23 +93,20 @@ export class ChunkLayer {
     return this.baked.size;
   }
 
-  public update(camera: Camera): void {
+  /** `budget` : les blocs que cette image peut encore baker (`bakeBudget.ts`). */
+  public update(camera: Camera, budget: BakeBudget): void {
     const bounds = camera.visibleCells(BLOCK_SIZE, BAKE_MARGIN);
+    const order = bakeOrder(bounds, camera.centerX / BLOCK_SIZE, camera.centerY / BLOCK_SIZE, (key) => this.baked.has(key), this.stale);
 
-    for (let by = bounds.minCy; by <= bounds.maxCy; by += 1) {
-      for (let bx = bounds.minCx; bx <= bounds.maxCx; bx += 1) {
-        const key = coordKey(bx, by);
+    for (const { bx, by, key } of order) {
+      if (!budget.take(performance.now())) break;
 
-        if (!this.baked.has(key)) this.baked.set(key, this.bake(bx, by));
-      }
-    }
-
-    for (const key of this.stale) {
       const entry = this.baked.get(key);
 
-      if (entry) this.renderInto(entry.bx, entry.by, entry.texture);
+      if (entry) this.renderInto(bx, by, entry.texture);
+      else this.baked.set(key, this.bake(bx, by));
+      this.stale.delete(key);
     }
-    this.stale.clear();
 
     this.evict(camera.visibleCells(BLOCK_SIZE, KEEP_MARGIN));
   }

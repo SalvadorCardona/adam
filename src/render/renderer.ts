@@ -26,6 +26,7 @@ import type { GhostState } from '../input/placement.ts';
 import type { EntityId } from '../sim/types.ts';
 import type { Selection } from '../ui/creatureView.ts';
 import { STEP_MS, type World } from '../sim/world.ts';
+import { BakeBudget } from './bakeBudget.ts';
 import { Camera, FIT_REACH, ZOOM, fitZoom, knownSpan, stepZoom } from './camera.ts';
 import { ChunkLayer } from './chunkLayer.ts';
 import { trailsOf } from './meadow.ts';
@@ -63,6 +64,8 @@ const TRAIL_CHECK_FRAMES = 30;
 
 export class GameRenderer {
   public readonly camera = new Camera();
+  /** Les blocs de sol et d'eau que chaque image peut faire. */
+  private readonly bakes = new BakeBudget();
 
   private readonly worldContainer = new Container();
   private readonly hudContainer = new Container();
@@ -366,20 +369,25 @@ export class GameRenderer {
     );
     this.worldContainer.scale.set(this.camera.zoom);
 
+    // La zone vue, en tuiles, marge d'une tuile : bâtiments, mobiles et lampes hors champ ne sont ni dessinés ni animés.
+    const sight = this.camera.visibleCells(TILE_SIZE, 1);
+
     this.updateTrails();
     this.updateCamp();
-    this.chunkLayer.update(this.camera);
-    this.waterLayer.update(this.camera, this.app.ticker.deltaMS);
+    // Le sol d'abord : un bloc manquant y fait un trou, quand l'eau qui manque laisse voir la terre de sa rive.
+    this.bakes.start(performance.now());
+    this.chunkLayer.update(this.camera, this.bakes);
+    this.waterLayer.update(this.camera, this.app.ticker.deltaMS, this.bakes);
     // Un seul appel au juge par frame : le fantôme colore les cases, l'arbre qui gêne clignote.
     const block = building && ghost ? this.world.placementBlock(ghost.building, ghost.tx, ghost.ty) : null;
 
-    this.resourceLayer.update(this.camera, this.app.ticker.deltaMS, block?.reason === 'resource' ? block.tiles : []);
-    this.entityLayer.update(alpha, this.app.ticker, this.camera.zoom, this.camera.visibleCells(TILE_SIZE, 1));
+    this.resourceLayer.update(this.camera, this.app.ticker.deltaMS, block?.reason === 'resource' ? block.tiles : [], this.bakes);
+    this.entityLayer.update(alpha, this.app.ticker, this.camera.zoom, sight);
     this.enemyBases.update(this.app.ticker.deltaMS);
     this.chests.update(this.camera, this.app.ticker.deltaMS);
     this.spots.update(this.camera, this.app.ticker.deltaMS);
     this.particles.update(this.app.ticker.deltaMS);
-    this.nightLayer.update(alpha);
+    this.nightLayer.update(alpha, sight);
     this.fogLayer.update(this.camera, this.app.ticker.deltaMS);
     this.ghostLayer.update(armed, ghost, block, this.app.ticker.deltaMS);
     this.workReach.update(building ? ghost : null, this.selected?.kind === 'building' ? this.selected.id : null);

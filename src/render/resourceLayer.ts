@@ -8,7 +8,8 @@
  * partagent l'atlas : Pixi les dessine en quelques appels, même par centaines.
  *
  * Seuls les chunks visibles ont leurs sprites ; au-delà d'une marge, ils sont
- * détruits. Une tuile heurtée est remise à jour à l'événement (entamée,
+ * détruits. Un chunk neuf se construit sous le budget de bake de l'image,
+ * partagé avec le sol (`bakeBudget.ts`). Une tuile heurtée est remise à jour à l'événement (entamée,
  * disparue) — par Adam ou par la hache d'un bûcheron —, et elle **tremble** : un minuteur de vue, la simulation n'en
  * sait rien. Un chunk sali par la simulation est reconstruit en entier.
  *
@@ -31,7 +32,7 @@
 
 import type { Container} from 'pixi.js';
 import { Sprite } from 'pixi.js';
-import { CHUNK_TILES, TILE_SIZE, coordKey, floorDiv, type TileCoord } from '../core/grid.ts';
+import { CHUNK_SIZE, CHUNK_TILES, TILE_SIZE, coordKey, floorDiv, type TileCoord } from '../core/grid.ts';
 import { hash3 } from '../core/rng.ts';
 import { LIGHT } from '../data/artDirection.ts';
 import { RESOURCES, SAPLING } from '../data/resources.ts';
@@ -39,9 +40,13 @@ import { SPRITES, type SpriteId } from '../data/sprites.ts';
 import type { TileLook } from '../sim/resources.ts';
 import { terrainAt } from '../sim/terrain.ts';
 import type { World } from '../sim/world.ts';
+import { bakeOrder, type BakeBudget } from './bakeBudget.ts';
 import type { Camera } from './camera.ts';
 import type { SpriteLibrary } from './spriteLibrary.ts';
 import type { TerrainTiles } from './terrainTiles.ts';
+
+/** Un chunk de ressources ne se « rebake » pas par le budget : sali, il se reconstruit aussitôt. */
+const NO_STALE: ReadonlySet<string> = new Set();
 
 /** Durée du tremblement d'une ressource frappée. */
 const WOBBLE_MS = 200;
@@ -107,23 +112,32 @@ export class ResourceLayer {
   }
 
   /** `blocking` : les tuiles dont la ressource gêne le fantôme, à faire clignoter. */
-  public update(camera: Camera, deltaMs: number, blocking: readonly TileCoord[]): void {
+  public update(camera: Camera, deltaMs: number, blocking: readonly TileCoord[], budget: BakeBudget): void {
     const visible = camera.visibleChunks(0);
+    const keep = camera.visibleChunks(1);
 
+    // Un chunk sali se reconstruit tout de suite : un arbre abattu ne reste pas debout à l'écran.
     for (let cy = visible.minCy; cy <= visible.maxCy; cy += 1) {
       for (let cx = visible.minCx; cx <= visible.maxCx; cx += 1) {
         const key = coordKey(cx, cy);
         const chunk = this.world.chunks.peek(cx, cy);
 
-        if (this.chunks.has(key) && !chunk?.dirty) continue;
+        if (!this.chunks.has(key) || !chunk?.dirty) continue;
 
         this.clearChunk(key);
         this.buildChunk(cx, cy);
-        if (chunk) chunk.dirty = false;
+        chunk.dirty = false;
       }
     }
 
-    const keep = camera.visibleChunks(1);
+    // Un chunk neuf attend le budget de bake de l'image (`bakeBudget.ts`), le plus proche du centre d'abord. Pas d'avance
+    // sur la marge : ses arbres, jamais cachés, seraient dessinés hors champ à chaque image.
+    const order = bakeOrder(visible, camera.centerX / CHUNK_SIZE, camera.centerY / CHUNK_SIZE, (key) => this.chunks.has(key), NO_STALE);
+
+    for (const { bx, by, key } of order) {
+      if (!budget.take(performance.now())) break;
+      this.build(bx, by, key);
+    }
 
     for (const key of [...this.chunks.keys()]) {
       const [cx, cy] = key.split(',').map(Number) as [number, number];
@@ -160,6 +174,15 @@ export class ResourceLayer {
     const [tx, ty] = key.split(',').map(Number) as [number, number];
 
     return this.chunks.get(coordKey(floorDiv(tx, CHUNK_TILES), floorDiv(ty, CHUNK_TILES)))?.get(key);
+  }
+
+  /** Un chunk neuf : ses sprites, le chunk de la simulation marqué propre. */
+  private build(cx: number, cy: number, key: string): void {
+    const chunk = this.world.chunks.peek(cx, cy);
+
+    this.clearChunk(key);
+    this.buildChunk(cx, cy);
+    if (chunk) chunk.dirty = false;
   }
 
   private buildChunk(cx: number, cy: number): void {

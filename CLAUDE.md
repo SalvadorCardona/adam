@@ -1218,7 +1218,11 @@ Les règles, en résumé :
   (jamais au contact d'un autre sol), brins et fleurettes semés hors de la
   grille, tirés de la seed ; et des chemins de terre battue de la mairie
   bâtie à chaque bâtiment fini, lus dans la ville — le bloc qu'un chemin
-  traverse se rebake quand il apparaît ou disparaît.
+  traverse se rebake quand il apparaît ou disparaît. Ces bakes, le champ de
+  l'eau et les arbres d'un chunk neuf partagent un **budget par image**
+  (`render/bakeBudget.ts` : `BAKES_PER_FRAME` blocs au plus, aucun de plus
+  après `BAKE_BUDGET_MS`, le plus proche du centre de la caméra d'abord, un
+  trou avant un bloc périmé) : un dézoom ne bake plus tout dans la même image.
   Le décor ne se heurte pas et n'est jamais de l'état.
   L'eau n'est pas bakée (sous elle, la terre de sa rive) : un seul shader la
   peint par-dessus (`render/waterLayer.ts`, `waterShader.ts`), d'après un
@@ -1226,6 +1230,10 @@ Les règles, en résumé :
   rive arrondie sans marche, dégradé turquoise → bleu, écume qui respire en
   3 s, crêtes en arc qui naissent et s'effacent ; un maillage par bloc
   d'eau, sur le temps de rendu, figé sous `prefers-reduced-motion`.
+- **Culling** (`render/sight.ts`) : un bâtiment ou un mobile dont le dessin
+  (toit, barre, bulles, tête) ne touche pas la zone vue, marge d'une tuile, est
+  caché et sa mise à jour sautée ; la nuit, les lampes hors champ ne sont pas
+  posées, et le voile n'est rendu que si ce qu'il montre bouge (`NightLayer`).
 - Ombres portées : capsules pleines dans la teinte foncée du sol sous
   l'objet (`TerrainTiles.shadow`), dans un conteneur sous tout le reste.
 - Ressenti (rebond, secousse, tremblement, flash, caméra) : des minuteurs

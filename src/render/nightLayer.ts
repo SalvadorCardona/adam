@@ -4,8 +4,9 @@
  * L'heure se lit dans la simulation (`world.clock()`, `sim/dayNight.ts`) ;
  * ici, on ne fait qu'appliquer sa part de nuit (`darkness`, de 0 à 1).
  *
- * - **Le voile** : une texture de lumière, rendue à chaque image de nuit,
- *   puis posée en un seul sprite en fusion `multiply`, centré sur Adam. Elle
+ * - **Le voile** : une texture de lumière, rendue de nuit dès que ce
+ *   qu'elle montre bouge — Adam qui marche, une lampe qui entre dans le
+ *   champ, un mutant qui avance —, et seulement alors (`drawn`), puis posée en un seul sprite en fusion `multiply`, centré sur Adam. Elle
  *   est remplie de l'indigo de `NIGHT_TINT.veil` — la carte vire au bleu nuit
  *   sans jamais tomber au noir. Son alpha suit la part de nuit, ce qui fond
  *   la teinte au crépuscule et à l'aube.
@@ -17,6 +18,9 @@
  *   au-delà : deux lampes qui se recouvrent n'éclairent pas plus qu'une, et
  *   la carte multipliée ne dépasse jamais sa couleur de jour. Une ville de
  *   vingt bâtiments n'est pas plus blanche qu'une maison seule.
+ *
+ * Une lampe hors du champ de la caméra n'y est pas posée. La part de nuit
+ * n'est que l'alpha du voile : elle ne fait rien rendre.
  *
  * Pas de filtre : une texture en basse définition (un texel pour `TEXEL`
  * pixels monde), quelques dizaines de sprites dedans, un quad multiplié.
@@ -30,6 +34,8 @@ import { PALETTE, hex } from '../data/artDirection.ts';
 import { NIGHT_TINT } from '../data/dayNight.ts';
 import { darkness } from '../sim/dayNight.ts';
 import type { World } from '../sim/world.ts';
+import type { ChunkBounds } from './camera.ts';
+import { boxInSight } from './sight.ts';
 
 /** Pixels monde par texel de la texture de lumière : elle est agrandie d'autant. */
 const TEXEL = 8;
@@ -70,6 +76,13 @@ export class NightLayer {
   private readonly lamps = new Container();
   private readonly halos = new Container();
   private readonly world: World;
+  /**
+   * Ce que la texture de lumière montre — vision, puis chaque lumière posée
+   * (x, y, rayon) — au dernier rendu, et ce qu'elle montrerait maintenant :
+   * pareils, elle n'est pas rendue de nouveau.
+   */
+  private drawn: number[] = [];
+  private next: number[] = [];
 
   public constructor(renderer: Renderer, world: World) {
     this.renderer = renderer;
@@ -101,7 +114,8 @@ export class NightLayer {
     this.container.visible = false;
   }
 
-  public update(alpha: number): void {
+  /** `sight` : la zone vue en tuiles, marge comprise (`sight.ts`) ; les lampes hors champ n'y sont pas posées. */
+  public update(alpha: number, sight: ChunkBounds): void {
     const clock = this.world.clock();
     const dark = clock ? darkness(clock) : 0;
 
@@ -119,19 +133,31 @@ export class NightLayer {
     this.veil.position.set(left, top);
     this.vision.position.set((x - left) / TEXEL, (y - top) / TEXEL);
 
+    const next = this.next;
+
+    next.length = 0;
+    next.push(this.vision.x, this.vision.y);
+
     let lamps = 0;
 
     for (const entity of this.world.entities.values()) {
       if (entity.kind === 'site') continue;
 
-      const radius = (Math.max(entity.width, entity.height) / 2 + NIGHT_TINT.lampRadius) * TILE_SIZE;
+      const reach = Math.max(entity.width, entity.height) / 2 + NIGHT_TINT.lampRadius;
+      const cx = entity.tx + entity.width / 2;
+      const cy = entity.ty + entity.height / 2;
+
+      if (!boxInSight(cx - reach, cy - reach, cx + reach, cy + reach, sight)) continue;
+
+      const radius = reach * TILE_SIZE;
 
       place(
+        next,
         this.lamps,
         this.lampTexture,
         lamps++,
-        ((entity.tx + entity.width / 2) * TILE_SIZE - left) / TEXEL,
-        ((entity.ty + entity.height / 2) * TILE_SIZE - top) / TEXEL,
+        (cx * TILE_SIZE - left) / TEXEL,
+        (cy * TILE_SIZE - top) / TEXEL,
         radius / TEXEL,
       );
     }
@@ -139,7 +165,7 @@ export class NightLayer {
     // Un éclat d'étoile filante tombé au sol : une petite lampe jaune, jusqu'à ce qu'on le ramasse.
     for (const mobile of this.world.mobiles.values()) {
       if (mobile.kind !== 'pickup' || !mobile.star) continue;
-      place(this.lamps, this.lampTexture, lamps++, (mobile.x - left) / TEXEL, (mobile.y - top) / TEXEL, (STAR_GLOW_TILES * TILE_SIZE) / TEXEL);
+      place(next, this.lamps, this.lampTexture, lamps++, (mobile.x - left) / TEXEL, (mobile.y - top) / TEXEL, (STAR_GLOW_TILES * TILE_SIZE) / TEXEL);
     }
 
     let halos = 0;
@@ -148,7 +174,13 @@ export class NightLayer {
       // Le brouillard de guerre : un halo trahirait un mutant qu'on ne voit pas.
       if (mobile.kind !== 'mutant' || !this.world.sees(mobile.x, mobile.y)) continue;
 
+      const hx = mobile.x / TILE_SIZE;
+      const hy = mobile.y / TILE_SIZE;
+
+      if (!boxInSight(hx - NIGHT_TINT.haloRadius, hy - NIGHT_TINT.haloRadius, hx + NIGHT_TINT.haloRadius, hy + NIGHT_TINT.haloRadius, sight)) continue;
+
       place(
+        next,
         this.halos,
         this.haloTexture,
         halos++,
@@ -160,7 +192,12 @@ export class NightLayer {
 
     hideFrom(this.lamps, lamps);
     hideFrom(this.halos, halos);
+    // Le nombre de lampes sépare les lampes des halos : une lampe qui s'éteint quand un halo paraît change l'image.
+    next.push(lamps);
 
+    if (sameNumbers(next, this.drawn)) return;
+    this.next = this.drawn;
+    this.drawn = next;
     this.renderer.render({ container: this.scene, target: this.target, clear: true });
   }
 
@@ -174,8 +211,8 @@ export class NightLayer {
   }
 }
 
-/** Pose la lumière numéro `index` du groupe, en la créant au besoin : les sprites sont recyclés. */
-function place(group: Container, texture: Texture, index: number, x: number, y: number, radius: number): void {
+/** Pose la lumière numéro `index` du groupe, en la créant au besoin : les sprites sont recyclés. Elle s'inscrit dans `shown`. */
+function place(shown: number[], group: Container, texture: Texture, index: number, x: number, y: number, radius: number): void {
   let sprite = group.children[index] as Sprite | undefined;
 
   if (!sprite) {
@@ -187,6 +224,13 @@ function place(group: Container, texture: Texture, index: number, x: number, y: 
   sprite.visible = true;
   sprite.position.set(x, y);
   sprite.scale.set(radius / LIGHT_PIXELS);
+  shown.push(x, y, radius);
+}
+
+function sameNumbers(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 function hideFrom(group: Container, count: number): void {
