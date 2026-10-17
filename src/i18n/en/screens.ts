@@ -37,6 +37,8 @@ export const screens: Messages['screens'] = {
     title: 'Paused',
     text: 'The mutants are waiting too.',
     resume: 'Resume',
+    settings: 'Settings',
+    titleScreen: 'Title screen',
     restart: 'Start over',
   },
   confirmRestart: {

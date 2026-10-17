@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shortcutOf } from './shortcuts.ts';
+import { ESCAPE_REPEAT_MS, escapeRepeats, shortcutOf } from './shortcuts.ts';
 
 describe('shortcutOf', () => {
   it('P met en pause, Échap ferme ou met en pause, I ouvre le sac', () => {
@@ -44,5 +44,12 @@ describe('shortcutOf', () => {
     for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'Space', 'Enter']) {
       expect(shortcutOf({ code, key: '' })).toBeNull();
     }
+  });
+
+  it('un Échap qui suit de près une fermeture est une répétition : pas de pause', () => {
+    expect(escapeRepeats(null, 1000)).toBe(false);
+    expect(escapeRepeats(1000, 1000 + ESCAPE_REPEAT_MS - 1)).toBe(true);
+    expect(escapeRepeats(1000, 1000 + ESCAPE_REPEAT_MS)).toBe(false);
+    expect(escapeRepeats(1000, 5000)).toBe(false);
   });
 });

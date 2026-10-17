@@ -45,6 +45,8 @@ export const screens = {
     title: 'Pause',
     text: 'Les mutants attendent, eux aussi.',
     resume: 'Reprendre',
+    settings: 'Réglages',
+    titleScreen: 'Écran titre',
     restart: 'Recommencer',
   },
   confirmRestart: {
