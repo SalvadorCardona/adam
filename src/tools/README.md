@@ -9,6 +9,7 @@ Node exécute le TypeScript tel quel (il efface les types) : rien à compiler.
 | `npm run art:brand` | `brand.ts` | l'icône, le favicon et la bannière |
 | `npm run music:night -- <dossier>` | `music.ts` | les boucles de la nuit et du combat |
 | `npm run playtest -- --seeds 50 --minutes 60` | `playtest.ts` | le joueur simulé, en série |
+| `npm run bench:sim -- --runs 5` | `simBench.ts` | le banc de la simulation : ms par tick, réveils, empreinte du rejeu |
 
 ## Le joueur simulé
 
@@ -87,3 +88,15 @@ et vérifie des invariants de la stratégie de base : la mairie bâtie, pas de
 mort de soif avec un puits plein, le chapitre 2 fini avant la nuit 4, la
 mairie debout à la nuit 5. Il tourne dans `npm test`, en une dizaine de
 secondes.
+
+## Le banc de la simulation
+
+`npm run bench:sim -- --runs 5 [--ticks 12200]` rejoue une ville de 60
+habitants (la petite base, quatre Maisons, trois tours, une caserne qui
+recrute) du matin du jour 6 à travers deux nuits de vague, sans rendu. Il
+donne les ms par tick — moyenne, de jour, de nuit — et les réveils du
+scheduler par tick (`World.wakesLastTick`), comme le compteur de
+performances du jeu ; on compare le meilleur passage, la machine fait du
+bruit. La dernière ligne est l'empreinte du rejeu : `World.checksum` de
+chaque tick, les événements émis et la sauvegarde finale. Une optimisation
+qui ne change rien au jeu la laisse identique.

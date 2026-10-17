@@ -118,14 +118,17 @@ import { BrowserVoiceEnv } from './net/voiceBrowser.ts';
 import { VoicePanel } from './ui/voicePanel.ts';
 
 /**
- * Clamp anti-spirale de la mort.
+ * Clamp anti-spirale de la mort, en pas de simulation par frame.
  *
  * Critique sur mobile : revenir sur l'onglet après deux minutes en arrière-plan
  * demanderait 2 400 ticks en une frame, ce qui gèle l'application — et comme le
- * gel rallonge le retard, elle ne s'en remet jamais. Au-delà de 250 ms, on
- * saute le temps perdu au lieu de le rattraper.
+ * gel rallonge le retard, elle ne s'en remet jamais. Au-delà de ce nombre de
+ * ticks, on saute le temps perdu au lieu de le rattraper. Un plafond en ticks
+ * et non en durée : « Passer la nuit » (×4) ne fait pas enchaîner une seconde
+ * de simulation à une frame lente — 8 ticks, c'est 400 ms de jeu, assez pour
+ * suivre ×4 jusqu'à 20 images par seconde.
  */
-const MAX_FRAME_MS = 250;
+const MAX_STEPS_PER_FRAME = 8;
 
 /** Hauteur du bouton « Bâtir » et de sa marge, en pixels écran : le minimum réservé en bas. */
 const HUD_BOTTOM_INSET = 84;
@@ -1238,12 +1241,19 @@ async function main(): Promise<void> {
       accumulator = (guest.session.sync?.alpha ?? 0) * STEP_MS;
     } else if (running && !celebrating) {
       // Une nuit calme que le joueur fait passer : plus de ticks par image, la simulation n'en sait rien.
-      accumulator +=
-        Math.min(ticker.deltaMS, MAX_FRAME_MS) * (hud.hastening && world.calmNight() ? HASTEN.speed : 1) * dilation.scale(ticker.deltaMS);
+      accumulator += ticker.deltaMS * (hud.hastening && world.calmNight() ? HASTEN.speed : 1) * dilation.scale(ticker.deltaMS);
       audio.setDanger(hallDanger(world));
     }
 
+    let steps = 0;
+
     while (!guest && accumulator >= STEP_MS && !celebrating) {
+      // Plafond atteint : le retard est perdu, seule la fraction du pas en cours reste à interpoler.
+      if (steps === MAX_STEPS_PER_FRAME) {
+        accumulator %= STEP_MS;
+        break;
+      }
+      steps += 1;
       pushAxisIfChanged();
       const tickStart = perfOn ? performance.now() : 0;
 

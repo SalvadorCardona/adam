@@ -173,9 +173,14 @@ export function currentChapter(world: World): ChapterProto | null {
 }
 
 /** Les objectifs du chapitre en cours, dans l'ordre du panneau — vide après le Signal. */
-export function chapterObjectives(world: World): (ObjectiveProto & { id: ObjectiveId })[] {
-  return OBJECTIVES.filter((objective) => objective.chapter === world.chapter);
+export function chapterObjectives(world: World): readonly (ObjectiveProto & { id: ObjectiveId })[] {
+  return BY_CHAPTER.get(world.chapter) ?? [];
 }
+
+/** Les objectifs de chaque chapitre, rangés une fois dans l'ordre d'`OBJECTIVES` : le monde les relit à chaque tick. */
+const BY_CHAPTER: ReadonlyMap<number, readonly (ObjectiveProto & { id: ObjectiveId })[]> = new Map(
+  [...new Set(OBJECTIVES.map((objective) => objective.chapter))].map((chapter) => [chapter, OBJECTIVES.filter((objective) => objective.chapter === chapter)]),
+);
 
 /** Les objectifs du chapitre en cours qui restent à réussir. */
 export function openObjectives(world: World): (ObjectiveProto & { id: ObjectiveId })[] {

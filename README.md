@@ -213,8 +213,9 @@ src/
 
 ## Quelques décisions
 
-**Boucle à pas fixe.** La simulation avance à 20 TPS, le rendu interpole. Un
-accumulateur clampé à 250 ms empêche la spirale de la mort : sans lui, revenir
+**Boucle à pas fixe.** La simulation avance à 20 TPS, le rendu interpole. Au
+plus 8 ticks par frame : ce plafond en pas, et non en durée, empêche la spirale
+de la mort, « Passer la nuit » (×4) compris. Sans lui, revenir
 sur l'onglet après deux minutes en arrière-plan tenterait de rattraper 2 400
 ticks en une frame et gèlerait l'application.
 
