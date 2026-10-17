@@ -35,6 +35,14 @@ export class Emitter<Events extends Record<string, unknown>> {
     }
   }
 
+  /** Combien d'écouteurs sont branchés, tous événements confondus : un composant défait n'en laisse aucun. */
+  public listenerCount(): number {
+    let count = 0;
+
+    for (const set of this.listeners.values()) count += set.size;
+    return count;
+  }
+
   public clear(): void {
     this.listeners.clear();
   }

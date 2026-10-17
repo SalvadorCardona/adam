@@ -18,6 +18,7 @@ import type { ItemId } from '../data/items.ts';
 import { locale, onLocale, t } from '../i18n/locale.ts';
 import type { Barracks } from '../sim/types.ts';
 import { TICKS_PER_SECOND, type World } from '../sim/world.ts';
+import { Disposer } from './disposer.ts';
 import { creatureIconUrl, itemAmount } from './icons.ts';
 
 interface Card {
@@ -43,6 +44,8 @@ export class BarracksPanel {
   private lastLocale = '';
 
   private readonly world: World;
+  /** Ce qu'il a branché hors de lui : la langue. */
+  private readonly disposer = new Disposer();
 
   public constructor(world: World) {
     this.world = world;
@@ -63,7 +66,12 @@ export class BarracksPanel {
     }
 
     this.root.append(this.army, this.training, classes, this.rosterTitle, this.roster);
-    onLocale(() => this.reset());
+    this.disposer.add(onLocale(() => this.reset()));
+  }
+
+  /** Ne suit plus la langue ; la fenêtre du bâtiment l'appelle en se défaisant. */
+  public dispose(): void {
+    this.disposer.dispose();
   }
 
   private card(role: CompanionClassId): Card {

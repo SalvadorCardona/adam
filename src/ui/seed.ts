@@ -9,6 +9,7 @@
  */
 
 import { onLocale, t } from '../i18n/locale.ts';
+import type { Disposer } from './disposer.ts';
 
 /** Le paramètre d'URL qui porte la seed. */
 const SEED_PARAM = 'seed';
@@ -53,9 +54,10 @@ export function shareUrl(href: string, seed: number): string {
 
 /**
  * « Carte n° 1 234 567 · Partager cette carte » : la ligne discrète des
- * écrans pause et défaite.
+ * écrans pause et défaite. `disposer` : qui rend son abonnement à la langue
+ * quand l'écran est défait ; sans lui, la ligne suit la langue pour toujours.
  */
-export function seedLine(seed: number): HTMLElement {
+export function seedLine(seed: number, disposer?: Disposer): HTMLElement {
   const line = document.createElement('div');
 
   line.className = 'seed-line';
@@ -80,10 +82,12 @@ export function seedLine(seed: number): HTMLElement {
     });
   });
   // La ligne vit aussi longtemps que son écran (pause, défaite) : elle suit la langue.
-  onLocale(() => {
+  const unsubscribe = onLocale(() => {
     label.textContent = t().screens.seed.map(formatSeed(seed));
     share.textContent = t().screens.seed.share;
   });
+
+  disposer?.add(unsubscribe);
 
   line.append(label, share);
   return line;

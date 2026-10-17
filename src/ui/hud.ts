@@ -54,331 +54,120 @@
  * - les statistiques de debug, seulement avec `?debug` (ou la touche `²`/`` ` ``).
  */
 
-import { TILE_SIZE } from '../core/grid.ts';
-import { BUILDINGS, type BuildingId } from '../data/buildings.ts';
-import { NIGHT_STAKES } from '../data/dayNight.ts';
-import { hallDanger } from '../render/hallDanger.ts';
-import { reducedMotion } from '../render/motion.ts';
-import { COMPANIONS, COMPANION_CLASSES } from '../data/companions.ts';
+import type { ObjectiveId } from '../data/objectives.ts';
 import type { ItemId } from '../data/items.ts';
-import { NEEDS, NEED_IDS, type NeedId } from '../data/needs.ts';
-import { BIOMES } from '../data/regions.ts';
-import { SIGNAL_WAVES } from '../data/artDirection.ts';
-import { CHAPTERS, objectiveProto, type Goal, type ObjectiveId } from '../data/objectives.ts';
-import { seedsFor } from '../data/perks.ts';
-import { QUESTS, type QuestReward } from '../data/quests.ts';
-import { RESEARCH, type ResearchId } from '../data/research.ts';
-import { WEATHER, WEATHER_CALENDAR } from '../data/weather.ts';
-import { dayDialSvg, type UiIcon } from '../art/ui.ts';
-import { BOONS } from '../data/boons.ts';
-import { CHALLENGES, type ChallengeId } from '../data/challenges.ts';
+import type { ResearchId } from '../data/research.ts';
 import type { AtlasStats } from '../render/spriteLibrary.ts';
 import type { WaterStats } from '../render/waterLayer.ts';
-import type { Compass } from '../sim/enemies.ts';
-import type { Trend } from '../sim/flows.ts';
-import type { Entity, Mobile, MobileId } from '../sim/types.ts';
-import { DIAL_ARCS } from '../sim/dayNight.ts';
-import { currentQuest, questProgress } from '../sim/eve.ts';
-import { moodOf } from '../sim/housing.ts';
-import { researchCost } from '../sim/research.ts';
-import { chapterObjectives, currentChapter, firstOpenObjective, goalProgress, goalWait, labSpot, objectiveLock, openObjectives, type GoalWait, type ObjectiveLock } from '../sim/objectives.ts';
-import { COMBO } from '../data/skills.ts';
-import { TICKS_PER_SECOND, type Inhabitant, type Workforce, type World } from '../sim/world.ts';
-import { locale, onLocale, t } from '../i18n/locale.ts';
-import { carriesWanted, harvestRefusedText, tutorialAdvice, type Advice } from './hint.ts';
-import { MAX_LEVEL } from '../data/levels.ts';
-import { levelProgress } from '../sim/levels.ts';
-import { COMBO_SHOWN, HarvestCombo } from './harvestCombo.ts';
-import { buildingIcon, dayDialUrl, itemAmount, itemIcon, prestigeIcon, uiIcon } from './icons.ts';
-import { effectLine } from './researchText.ts';
-import { moodMeter } from './moodMeter.ts';
-import { needMeter } from './needMeter.ts';
-import { personText } from './personText.ts';
-import type { PerfReading } from './perfMeter.ts';
-import { haptics } from './haptics.ts';
-import { footingText } from './placementReason.ts';
-import { mapUrl, seedLine } from './seed.ts';
-import { EventStack } from './eventStack.ts';
-import { setTip, Tooltips } from './tooltip.ts';
+import type { MobileId } from '../sim/types.ts';
+import type { World } from '../sim/world.ts';
 import type { SaveStats } from '../storage/localSave.ts';
+import { Disposer } from './disposer.ts';
+import { EventStack } from './eventStack.ts';
+import { haptics } from './haptics.ts';
+import type { PerfReading } from './perfMeter.ts';
+import { Tooltips } from './tooltip.ts';
+import { Advice } from './hud/advice.ts';
+import { BagButton } from './hud/bag.ts';
+import { WaveBanner } from './hud/banner.ts';
+import { ControlButtons } from './hud/buttons.ts';
+import { Celebration } from './hud/celebration.ts';
+import type { HudContext, Projector } from './hud/context.ts';
+import { DayClock } from './hud/dayClock.ts';
+import { Death } from './hud/death.ts';
+import { DebugStats } from './hud/debug.ts';
+import { Defeat } from './hud/defeat.ts';
+import { element } from './hud/dom.ts';
+import { EveSpeech } from './hud/eve.ts';
+import { Favors } from './hud/favors.ts';
+import { Floats } from './hud/floats.ts';
+import { HungerAlert } from './hud/hunger.ts';
+import { NightControls } from './hud/night.ts';
+import { People } from './hud/people.ts';
+import { PersonTip } from './hud/person.ts';
+import { Quest } from './hud/quest.ts';
+import { Reactions } from './hud/reactions.ts';
+import { Toasts, type ToastTone } from './hud/toasts.ts';
+import { TownBanner } from './hud/town.ts';
+import { Victory } from './hud/victory.ts';
+import { WaveWatch } from './hud/wave.ts';
+import { WeatherChip } from './hud/weather.ts';
+
+export type { Projector } from './hud/context.ts';
+export { clock } from './hud/dom.ts';
+export { defeatRows } from './hud/defeat.ts';
 
 /** Durée de l'alarme après le dernier coup reçu par la mairie hors de l'écran, en ms. */
 const ALARM_MS = 2500;
 
-/** Durée de vie d'un « +N Prestige », en ms (cf. `.hud-float-prestige` dans le CSS). */
-const PRESTIGE_FLOAT_MS = 1600;
-
-/** Le vol d'un objet trouvé vers le sac, en ms, et l'écart entre deux objets. */
-const FIND_FLY_MS = 900;
-const FLY_STAGGER_MS = 110;
-
-/** Durée de vie d'un gain flottant, en ms (cf. `hud-float-up` dans le CSS). */
-const FLOAT_MS = 1000;
-
-/** Vol d'un objet récolté jusqu'au sac, en ms ; au plus `MAX_FLYERS` en l'air, la récolte en lâche quatre par demi-seconde. */
-const FLY_MS = 550;
-const MAX_FLYERS = 8;
-
-/** Le temps où la flèche de l'aube reste à côté du Bonheur de la ville, en ms. */
-const MOOD_TREND_MS = 6000;
-
-/** Durée de vie du « Mairie bâtie ! » qui monte d'un bâtiment achevé, en ms (cf. `hud-built-up` dans le CSS). */
-const BUILT_MS = 1800;
-
-/** Durée d'affichage d'une bulle, et combien peuvent s'empiler. */
-const TOAST_MS = 2600;
-const MAX_TOASTS = 3;
-
-/** Durée d'une réplique d'Ève : un socle, plus le temps de lire. */
-const SPEECH_BASE_MS = 1600;
-const SPEECH_PER_CHAR_MS = 45;
-/** Sous la quête, la bulle garde ce jeu (ses 10 px de flottement compris). */
-const SPEECH_GAP = 14;
-/** Le temps de lire l'infobulle d'un habitant, en ms. */
-const PERSON_MS = 4200;
-
 /**
- * Un conseil inchangé se replie au bout de ce délai, compté en ticks : il ne
- * se replie ni derrière l'écran titre ni pendant la pause.
+ * La racine du HUD : elle crée les composants (`hud/`), les range dans le
+ * DOM, relit la mise en page du haut et leur délègue tout le reste. Chaque
+ * composant tient sa section — son DOM, ses caches, ce qu'il a branché hors
+ * de lui — et `dispose()` les défait tous.
  */
-const HINT_FOLD_TICKS = 5 * TICKS_PER_SECOND;
-
-/** Le détail des ouvriers se replie seul au bout de ce délai, compté en ticks comme le conseil. */
-const CREW_FOLD_TICKS = 5 * TICKS_PER_SECOND;
-
-/**
- * Sur un téléphone, la quête dépliée d'un tap se replie au bout de ce délai
- * sans qu'on la touche ; dépliée d'elle-même (objectif, vague, mairie
- * abîmée), au bout du second. Comptés en ticks comme le conseil.
- */
-const QUEST_TAP_TICKS = 6 * TICKS_PER_SECOND;
-
-/** Le détail de l'horloge (« Jour 2 · nuit dans 1:31 ») reste affiché ce temps-là après un tap. */
-const CLOCK_TIP_TICKS = 4 * TICKS_PER_SECOND;
-
-/** Le cadran de l'horloge à l'écran, en pixels CSS : il déborde à peine de la ligne de 24 px. */
-const CLOCK_SIZE = 28;
-
-/** Crans de l'aiguille sur un tour : le cadran ne se redessine qu'en changeant de cran. */
-const DIAL_STEPS = 240;
-const QUEST_ALERT_TICKS = 4 * TICKS_PER_SECOND;
-
-/** Sous cette part de ses PV, la mairie déplie la quête repliée. */
-const QUEST_ALERT_HP = 0.5;
-
-/** Largeur du bandeau d'objectif réussi rangé sous la barre, en px. */
-const CELEBRATION_WIDTH = 380;
-
-/** Durée du bandeau d'objectif réussi, en ms (cf. `celebration-in` dans le CSS). */
-const CELEBRATION_MS = 4200;
-/** Le rebond menthe de la case de la barre, pour un objectif réussi en cours de chapitre. */
-const OBJECTIVE_DONE_MS = 1800;
-/** Rangé sous la quête quand une fenêtre est ouverte, le bandeau en garde ce jeu. */
-const CELEBRATION_GAP = 8;
-
-/** Feuilles de la pluie de confettis, et combien il en tombe. */
-const CONFETTI: readonly UiIcon[] = ['leafMint', 'leafMint', 'leafYellow', 'petal'];
-const CONFETTI_COUNT = 36;
-const CONFETTI_MS = 3200;
-
-/** Le bandeau d'une vague reste le temps de l'annonce, et s'efface quand les flaques bouillonnent ; celui de la victoire, un peu moins. */
-const BANNER_WAVE_MS = 4200;
-
-/** Où le bord pulse, en % de l'écran, pour chaque point de la boussole : du côté de la base de tête. */
-const EDGE_SPOTS: Readonly<Record<Compass, readonly [number, number]>> = {
-  east: [100, 50],
-  southEast: [100, 100],
-  south: [50, 100],
-  southWest: [0, 100],
-  west: [0, 50],
-  northWest: [0, 0],
-  north: [50, 0],
-  northEast: [100, 0],
-};
-const BANNER_CLEARED_MS = 3200;
-
-type ToastTone = 'info' | 'good' | 'bad';
-
-/** Projette un point monde en pixels écran — fourni par le renderer, via `main.ts`. */
-export type Projector = (x: number, y: number) => { x: number; y: number };
-
 export class Hud {
   public readonly root: HTMLElement;
 
-  private readonly top: HTMLElement;
-  private readonly quest: HTMLElement;
-  private readonly questTitle: HTMLElement;
-  private readonly questBody: HTMLElement;
-  /** L'objectif dans la barre du haut, tout à droite : icône, progression (et intitulé court dès 600 px). Un tap ouvre la quête. */
-  private readonly objective: HTMLButtonElement;
-  private readonly questStrip: HTMLElement;
-  /** Les lignes des objectifs du chapitre, dans la fenêtre de la quête. */
-  private readonly objectiveList: HTMLElement;
-  private readonly objectiveRows = new Map<ObjectiveId, ObjectiveRowView>();
-  /** L'objectif touché dans le panneau ; `null` : le premier qui reste. Rien de la simulation. */
-  private chosenObjective: ObjectiveId | null = null;
-  /** Tick jusqu'auquel la quête reste ouverte (en fenêtre sous la barre) ; fermée au-delà. */
-  private questOpenUntil = 0;
-  /** La mairie est déjà sous `QUEST_ALERT_HP` : elle ne déplie la quête qu'en y passant. */
-  private hallLow = false;
-  private readonly hint: HTMLElement;
-  private readonly hintText: HTMLElement;
-  private readonly hintBulb: HTMLButtonElement;
-  /** L'horloge du jour et de la nuit, dans la tête de la quête : cadran, numéro du jour, détail au tap. */
-  private readonly dayClock: HTMLButtonElement;
-  /** « Passer la nuit » : visible par nuit calme, il hâte l'aube (`HASTEN`). */
-  private readonly hastenButton: HTMLButtonElement;
-  private hastenKey = '';
   /** La Volée d'Adam : un bouton du groupe `.hud-actions` (`main.ts`), recharge en anneau ; visible du crépuscule à l'aube. */
   public readonly skillButton: HTMLButtonElement;
-  private skillKey = '';
-  /** Le combo de nuit, à côté de la capsule de vague. */
-  private readonly comboChip: HTMLElement;
-  private comboKey = '';
-  /** Le joueur a demandé de hâter l'aube ; `main.ts` le lit à chaque image. */
-  public hastening = false;
-  /** La faveur de l'aube : la capsule qui l'attend, puis le coup de pouce qui court. */
-  private readonly boonButton: HTMLButtonElement;
-  private boonKey = '';
   /** Ouvre les cartes de l'aube ; `main.ts` y branche `BoonPanel`. */
   public onBoonOpen: () => void = () => undefined;
   /** Ouvre les talents d'Adam ; `main.ts` y branche `TalentPanel`. */
   public onTalentOpen: () => void = () => undefined;
-  private readonly talentButton: HTMLButtonElement;
-  private talentKey = '';
-  private readonly dayClockDial: HTMLImageElement;
-  private readonly dayClockDay: HTMLElement;
-  private readonly dayClockTip: HTMLElement;
-  private lastClock = '';
-  private clockTipUntil = 0;
   /** Le groupe des boutons du joueur, en haut à droite : l'habillage, le sac, « Bâtir ». */
   public readonly actions: HTMLElement;
-  /** La rangée des contrôles (Pause, Réglages, carte, zoom), posée dans le haut par `mountControls`. */
-  private controls: HTMLElement = document.createElement('div');
   /** Le sac, compact : un bouton qui ouvre le panneau inventaire. */
   public readonly bag: HTMLButtonElement;
   /** Au bout du bandeau de la ville : ouvre le panneau des ressources (`main.ts` le branche). */
   public readonly resourcesButton: HTMLButtonElement;
-  /** Le stock de la ville, compact. */
-  private readonly town: HTMLElement;
-  /** Son titre (la maison) et la liste de ses objets, gardés d'une mise à jour à l'autre. */
-  private readonly townTitle = element('div', 'hud-bag-title');
-  private readonly townList = element('div', 'hud-stock-items');
-  /** Le Prestige de la colonie : son icône et son compte, en haut à gauche. */
-  private readonly prestige: HTMLElement;
-  /** Le niveau d'Adam et sa barre d'XP, en tête du bandeau de la ville. */
-  private readonly level: HTMLElement;
-  /** À gauche de la barre (ou sous elle, sur un téléphone) : le Prestige, la ville et son alerte de vivres. */
-  private readonly left: HTMLElement;
-  /** À droite de la barre (ou sous elle) : la météo et l'horloge du jour. */
-  private readonly events: EventStack;
-  private lastPrestige = '';
-  private lastLevel = '';
-  /** La population de la ville : au travail, inactifs, enfants. */
-  private readonly people: HTMLElement;
-  private lastPeople = '';
-  /** Le sens où l'aube a fait bouger le Bonheur de la ville, et jusqu'à quand la flèche le montre. */
-  private moodTrend: { up: boolean; until: number } | null = null;
-  /** Rang, dans `World.idleWorkers()`, du prochain inactif que montre un tap sur leur compteur. */
-  private idleCursor = 0;
-  /** L'alerte de nourriture : la ville va en manquer. Un tap montre qui a faim, puis le suivant. */
-  private readonly hunger: HTMLButtonElement;
-  /** « Vague dans 2:30 » : l'annonce de la prochaine vague (`World.waveForecast`). */
-  private readonly waveSoon: HTMLButtonElement;
-  /** Les mutants abattus sur les mutants sortis cette nuit, à côté de la capsule de vague. */
-  private readonly tally: HTMLElement;
-  /** Le bord de l'écran qui pulse en corail du côté de la base de tête, puis la vignette de la mairie en danger. */
-  private readonly edge: HTMLElement;
-  private readonly vignette: HTMLElement;
-  private edgeTimer = 0;
-  private sent = 0;
-  private downed = 0;
-  private lastDanger = -1;
-
-  private lastWave = '';
-  private waveOrigin: { x: number; y: number } | null = null;
-  private lastHunger = '';
-  /** Le besoin que dit l'alerte : son tap montre qui en manque. */
-  private hungerNeed: NeedId | undefined = undefined;
-  private hungryCursor = 0;
-  /** L'infobulle d'un habitant : son id, et l'heure (`performance.now()`) où elle s'efface. */
-  private readonly person: HTMLElement;
-  private personId: MobileId | null = null;
-  private personUntil = 0;
-  private personHeight = 0;
-  private personKey = '';
-  private onFocus: (x: number, y: number) => void = () => {};
-  private readonly bar: HTMLElement;
-  private readonly floats: HTMLElement;
-  private readonly stats: HTMLElement;
-  /** Le compteur de performances (réglage), caché par défaut. */
-  private readonly perf: HTMLElement;
-  private readonly toasts: HTMLElement;
-  /** Le libellé des icônes, au survol, au focus et à l'appui long (`tooltip.ts`). */
-  private readonly tips: Tooltips;
-  private readonly countdown: HTMLElement;
-  private readonly banner: HTMLElement;
-  private readonly bannerArrow: HTMLElement;
-  private readonly bannerTitle: HTMLElement;
-  private readonly bannerText: HTMLElement;
-  /** Le point monde que la flèche du bandeau montre ; `null` sans flèche. */
-  private bannerTarget: { x: number; y: number } | null = null;
-  private bannerTimer = 0;
-  /** La vague déjà annoncée (nuit et rang) : le bandeau ne repart pas à chaque seconde du compte à rebours. */
-  private announced = '';
-  private readonly weather: HTMLElement;
-  private readonly defeat: HTMLElement;
-  private readonly death: HTMLElement;
-  private readonly deathCount: HTMLElement;
-  private lastDeathSeconds = -1;
-  private readonly defeatStats: HTMLElement;
-  private readonly victory: HTMLElement;
-  private readonly victoryStats: HTMLElement;
-  private readonly victorySeeds: HTMLElement;
-  private readonly celebration: HTMLElement;
-  private readonly confetti: HTMLElement;
-  private objectiveDoneTimer = 0;
-  private celebrationTimer = 0;
-  private onContinue: () => void = () => {};
-  private onRefound: () => void = () => {};
-  private readonly speech: HTMLElement;
-  private readonly defeatSeeds: HTMLElement;
   /** L'engrenage : il ouvre le menu des réglages (`settingsPanel.ts`). */
   public readonly settingsButton: HTMLButtonElement;
   public readonly pauseButton: HTMLButtonElement;
   /** « Inviter un ami », à portée de doigt sans passer par la pause (`main.ts` le pose s'il y a un serveur). */
   public readonly inviteButton: HTMLButtonElement;
-  private lastBag = '';
-  private lastTown = '';
-  private readonly harvestCombo = new HarvestCombo();
-  private lastQuest = '';
-  /** Le détail des ouvriers, déplié d'un tap sur leur compteur. */
-  private crewOpen = false;
-  /** Tick où le détail des ouvriers a été déplié. */
-  private crewSince = 0;
-  /** Un toucher hors du compteur replie le détail des ouvriers. */
-  private readonly foldCrewOnTouch = (event: PointerEvent): void => {
-    if (!this.crewOpen) return;
-    if (event.target instanceof Element && event.target.closest('.hud-quest-crew')) return;
-    this.crewOpen = false;
-  };
-  private lastHint = '';
-  /** La langue du conseil affiché : en changer réécrit le conseil sans le relancer. */
-  private hintLocale = locale();
-  /** Tick où le conseil a été montré (ou déplié) : il se replie `HINT_FOLD_TICKS` plus tard. */
-  private hintSince = 0;
-  private wanted: ItemId | null = null;
-  private pointed: ItemId | null = null;
-  private advisedResearch: ResearchId | null = null;
 
-  /** Les répliques d'Ève en attente, et l'heure où la réplique affichée s'en va. */
-  private readonly speechQueue: string[] = [];
-  private speechUntil = 0;
-  /** Ce qu'elle a déjà dit quand on la tape : elle ne radote pas. */
-  private chatterIndex = 0;
-  private talks = 0;
-  /** Hauteur de la bulle, lue une fois par réplique : son texte ne change pas entre-temps. */
-  private speechHeight = 0;
+  private readonly top: HTMLElement;
+  private readonly bar: HTMLElement;
+  /** À gauche de la barre (ou sous elle, sur un téléphone) : le Prestige, la ville et son alerte de vivres. */
+  private readonly left: HTMLElement;
+  /** La rangée des contrôles (Pause, Réglages, carte, zoom), posée dans le haut par `mountControls`. */
+  private controls: HTMLElement = document.createElement('div');
+  /** À droite de la barre (ou sous elle) : la météo et l'horloge du jour. */
+  private readonly events: EventStack;
+  /** Le bandeau de la ville, la population et l'horloge du jour : les trois premiers blocs du groupe de gauche. */
+  private readonly town: HTMLElement;
+  private readonly people: HTMLElement;
+  private readonly dayClock: HTMLElement;
+  /** Le libellé des icônes, au survol, au focus et à l'appui long (`tooltip.ts`). */
+  private readonly tips: Tooltips;
+
+  private readonly quest: Quest;
+  private readonly advice: Advice;
+  private readonly dial: DayClock;
+  private readonly night: NightControls;
+  private readonly favors: Favors;
+  private readonly bagButton: BagButton;
+  private readonly stock: TownBanner;
+  private readonly census: People;
+  private readonly hunger: HungerAlert;
+  private readonly wave: WaveWatch;
+  private readonly weather: WeatherChip;
+  private readonly person: PersonTip;
+  private readonly eve: EveSpeech;
+  private readonly banner: WaveBanner;
+  private readonly toasts: Toasts;
+  private readonly floats: Floats;
+  private readonly debug: DebugStats;
+  private readonly celebration: Celebration;
+  private readonly victory: Victory;
+  private readonly death: Death;
+  private readonly defeat: Defeat;
+  private readonly buttons: ControlButtons;
+  private readonly reactions: Reactions;
+  /** Ce que la racine a branché hors d'elle : le redimensionnement de la fenêtre. */
+  private readonly disposer = new Disposer();
+
   /**
    * La mise en page du haut, relue seulement quand un de ses blocs change de
    * taille (`ResizeObserver`) ou que l'écran tourne — jamais à chaque frame :
@@ -390,280 +179,72 @@ export class Hud {
   private topInsetPx = 0;
   /** La largeur de l'écran, relue au redimensionnement : les bulles qui suivent la caméra s'y bornent sans la relire à chaque frame. */
   private viewWidth = window.innerWidth;
-  /** Le contenu du bandeau de la ville a changé : son bord estompé est à relire. */
-  private townOverflowDirty = false;
   private obstacleRects: DOMRect[] = [];
   private barRect: DOMRect | null = null;
   private topRowBottom = 0;
-  /** Le bandeau de célébration rangé sous la barre (une fenêtre ouverte) ; sa hauteur, donnée par le `ResizeObserver`. */
-  private docked = false;
-  private celebrationHeight = 0;
   /** Le nombre de mutants, compté une fois par tick de simulation (`countedTick`), pas à chaque lecture. */
   private mutants = 0;
   private countedTick = -1;
-  private lastWeather = '';
-  private debug: boolean;
-
-  /** Ce que le joueur a déjà fait : un conseil compris ne revient pas. */
-  private harvestedWood = false;
-  private harvestedStone = false;
-  private delivered = false;
-  private repaired = false;
 
   /** Fin de l'alarme en cours, en ms (`performance.now()`). */
   private alarmUntil = 0;
-  /** Objets en vol vers le sac (`flyToBag`). */
-  private flyers = 0;
 
   private project: Projector = (x, y) => ({ x, y });
+  private onFocus: (x: number, y: number) => void = () => {};
 
   private readonly world: World;
-  /** Ce qu'a coûté la dernière sauvegarde automatique, pour le panneau de debug. */
-  private readonly saveStats: () => SaveStats | null;
 
   public constructor(world: World, debug = false, saveStats: () => SaveStats | null = () => null) {
     this.world = world;
-    this.debug = debug;
-    this.saveStats = saveStats;
     this.root = element('div', 'hud');
 
-    this.quest = element('div', 'panel hud-quest');
-    this.questTitle = element('div', 'hud-quest-title');
-    this.questBody = element('div', 'hud-quest-body');
+    const ctx: HudContext = {
+      world,
+      project: (x, y) => this.project(x, y),
+      focus: (x, y) => this.onFocus(x, y),
+      topInset: () => this.topInsetPx,
+      viewWidth: () => this.viewWidth,
+      mutantCount: () => this.mutantCount(),
+    };
+    const openTalent = (): void => this.onTalentOpen();
 
-    // Replié, le conseil n'est plus qu'une ampoule à côté du titre : un tap le déplie.
-    this.hintBulb = element('button', 'hud-hint-bulb');
-    this.hintBulb.type = 'button';
-    this.hintBulb.append(uiIcon('hint', 20));
-    this.hintBulb.addEventListener('click', () => this.unfoldHint());
-
-    this.questStrip = element('div', 'hud-quest-strip');
-    this.objectiveList = element('div', 'hud-objectives');
-    this.objective = element('button', 'hud-objective');
-    this.objective.type = 'button';
-    this.objective.setAttribute('aria-haspopup', 'true');
-    this.objective.setAttribute('aria-expanded', 'false');
-    this.objective.append(this.questStrip, element('span', 'hud-objective-chevron'));
-    this.objective.lastElementChild?.append(uiIcon('chevron', 16));
-    this.objective.addEventListener('click', () => this.toggleQuest());
-
-    // La quête est une fenêtre sous la barre : son objectif la rouvre, sa tête la referme.
-    const head = element('div', 'hud-quest-head');
-
-    // L'horloge : un tap dit l'heure en toutes lettres, sans déplier la quête.
-    this.dayClock = element('button', 'hud-clock');
-    this.dayClock.type = 'button';
-    this.dayClock.hidden = true;
-    this.dayClockDial = element('img', 'hud-clock-dial');
-    this.dayClockDial.width = this.dayClockDial.height = CLOCK_SIZE;
-    this.dayClockDial.alt = '';
-    this.dayClockDial.draggable = false;
-    this.dayClockDay = text('hud-clock-day', '');
-    this.dayClockTip = text('hud-clock-tip', '');
-    this.dayClockTip.setAttribute('aria-hidden', 'true');
-    this.dayClock.append(this.dayClockDial, this.dayClockDay, this.dayClockTip);
-    this.dayClock.addEventListener('click', () => {
-      this.clockTipUntil = this.world.tickCount < this.clockTipUntil ? 0 : this.world.tickCount + CLOCK_TIP_TICKS;
-      this.updateClock();
-    });
-
-    head.append(this.questTitle, this.hintBulb);
-    head.addEventListener('click', (event) => {
-      if (event.target instanceof Element && event.target.closest('.hud-hint-bulb')) return;
-      this.toggleQuest();
-    });
-    this.quest.append(head, this.questBody);
-    this.quest.dataset['hint'] = 'none';
-
-    // Le conseil s'ouvre et se referme en douceur dans son pli : la quête
-    // grandit sans à-coup, et rien n'est posé dessous qui puisse sauter.
-    const fold = element('div', 'hud-hint-fold');
-
-    this.hint = element('div', 'hud-hint');
-    this.hintText = element('span', 'hud-hint-text');
-    this.hint.append(uiIcon('eve', 22), this.hintText);
-    const clip = element('div', 'hud-hint-clip');
-
-    clip.append(this.hint);
-    fold.append(clip);
+    this.quest = new Quest(ctx);
+    this.advice = new Advice(ctx, this.quest);
+    this.quest.onChosen = () => {
+      this.advice.update();
+      this.advice.unfold();
+    };
+    this.dial = new DayClock(ctx, () => this.updateClock());
 
     // Les boutons du joueur, en bas à droite : le sac (inventaire et habillement) et « Bâtir » (`main.ts`).
     this.actions = element('div', 'hud-actions');
-    this.bag = element('button', 'hud-bag');
-    this.bag.type = 'button';
-    this.bag.setAttribute('aria-keyshortcuts', 'I');
-    this.town = element('div', 'panel hud-stock hud-town');
-    // Le bandeau d'un écran large défile de côté : la molette aussi, et son
-    // bord droit s'estompe tant qu'il reste des objets cachés.
-    this.town.addEventListener('wheel', (event) => {
-      const items = this.townItems();
+    this.bagButton = new BagButton(ctx);
+    this.bag = this.bagButton.root;
+    this.stock = new TownBanner(ctx, openTalent);
+    this.resourcesButton = this.stock.resourcesButton;
+    this.person = new PersonTip(ctx);
+    this.census = new People(ctx, (id) => this.showPerson(id));
+    this.hunger = new HungerAlert(ctx, (id) => this.showPerson(id));
+    this.wave = new WaveWatch(ctx);
+    this.night = new NightControls(ctx);
+    this.skillButton = this.night.skillButton;
+    this.favors = new Favors(ctx, this.stock.level, () => this.onBoonOpen(), openTalent);
+    this.toasts = new Toasts();
+    this.floats = new Floats(ctx, this.bag, this.stock.root);
+    this.debug = new DebugStats(world, debug, saveStats);
+    this.banner = new WaveBanner(ctx);
+    this.eve = new EveSpeech(ctx);
+    this.weather = new WeatherChip(ctx);
 
-      if (!items || items.scrollWidth <= items.clientWidth) return;
-      event.preventDefault();
-      items.scrollLeft += event.deltaX + event.deltaY;
-    }, { passive: false });
-    this.town.addEventListener('scroll', () => this.markTownOverflow(), true);
-    this.resourcesButton = element('button', 'hud-resources');
-    this.resourcesButton.type = 'button';
-    this.resourcesButton.setAttribute('aria-haspopup', 'dialog');
-    this.resourcesButton.append(uiIcon('stats', 20));
-    onLocale(() => setTip(this.resourcesButton, t().resourcePanel.open));
-    window.addEventListener('resize', () => this.markTownOverflow());
-    this.prestige = element('div', 'hud-prestige');
-    this.prestige.hidden = true;
-    this.prestige.setAttribute('role', 'status');
-    // Le niveau d'Adam se touche : il ouvre ses talents, la fiche et le choix qui attend.
-    this.level = element('div', 'hud-level');
-    this.level.setAttribute('role', 'button');
-    this.level.tabIndex = 0;
-    this.level.addEventListener('click', () => this.onTalentOpen());
-    this.level.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      this.onTalentOpen();
-    });
-    this.people = element('div', 'panel hud-people');
-    this.people.hidden = true;
-    this.person = element('div', 'hud-speech hud-person');
-    this.person.hidden = true;
-    this.hunger = element('button', 'panel hud-hunger');
-    this.hunger.type = 'button';
-    this.hunger.hidden = true;
-    this.hunger.addEventListener('click', () => this.focusHungry());
-    this.waveSoon = element('button', 'panel hud-wave');
-    this.waveSoon.type = 'button';
-    this.waveSoon.hidden = true;
-    this.waveSoon.addEventListener('click', () => {
-      if (this.waveOrigin) this.onFocus(this.waveOrigin.x, this.waveOrigin.y);
-    });
-    this.tally = element('div', 'panel hud-wave hud-tally');
-    this.tally.hidden = true;
-    this.edge = element('div', 'hud-edge');
-    this.vignette = element('div', 'hud-vignette');
-    this.hastenButton = element('button', 'panel hud-wave hud-hasten');
-    this.hastenButton.type = 'button';
-    this.hastenButton.hidden = true;
-    this.hastenButton.addEventListener('click', () => {
-      this.hastening = !this.hastening;
-      this.updateHasten();
-    });
-    this.skillButton = element('button', 'hud-skill');
-    this.skillButton.type = 'button';
-    this.skillButton.hidden = true;
-    this.skillButton.setAttribute('aria-keyshortcuts', 'Space');
-    this.skillButton.addEventListener('click', () => this.world.push({ type: 'castSkill', dx: 0, dy: 0 }));
-    this.comboChip = element('div', 'panel hud-wave hud-combo');
-    this.comboChip.hidden = true;
-    this.comboChip.setAttribute('role', 'status');
-    this.boonButton = element('button', 'panel hud-wave hud-boon');
-    this.boonButton.type = 'button';
-    this.boonButton.hidden = true;
-    this.boonButton.addEventListener('click', () => {
-      if (this.world.boonOffer()) this.onBoonOpen();
-    });
-    this.talentButton = element('button', 'panel hud-wave hud-boon hud-talent');
-    this.talentButton.type = 'button';
-    this.talentButton.hidden = true;
-    this.talentButton.dataset['state'] = 'offer';
-    this.talentButton.addEventListener('click', () => this.onTalentOpen());
-    this.floats = element('div', 'hud-floats');
-    this.stats = element('div', 'panel hud-stats');
-    this.stats.hidden = !debug;
-    this.perf = element('div', 'hud-perf');
-    this.perf.hidden = true;
-    this.toasts = element('div', 'hud-toasts');
-    this.toasts.setAttribute('aria-live', 'polite');
-    this.countdown = element('div', 'hud-countdown');
-    this.speech = element('div', 'hud-speech');
-    this.speech.hidden = true;
-    this.speech.setAttribute('aria-live', 'polite');
-    this.weather = element('div', 'hud-weather');
-    this.weather.hidden = true;
+    this.buttons = new ControlButtons();
+    this.pauseButton = this.buttons.pause;
+    this.settingsButton = this.buttons.settings;
+    this.inviteButton = this.buttons.invite;
 
-    this.banner = element('div', 'hud-banner');
-    this.banner.hidden = true;
-    this.banner.setAttribute('role', 'status');
-    this.bannerArrow = element('div', 'hud-banner-arrow');
-    this.bannerArrow.append(uiIcon('direction', 26));
-
-    const bannerBody = element('div', 'hud-banner-body');
-
-    this.bannerTitle = element('div', 'hud-banner-title');
-    this.bannerText = element('div', 'hud-banner-text');
-    bannerBody.append(this.bannerTitle, this.bannerText);
-    this.banner.append(this.bannerArrow, bannerBody);
-
-    // Pause et Réglages : les deux premiers disques de la rangée des contrôles, en haut à droite (`main.ts`).
-    this.pauseButton = element('button', 'hud-button hud-pause');
-    this.pauseButton.type = 'button';
-    this.pauseButton.append(uiIcon('pause'));
-
-    this.settingsButton = element('button', 'hud-button hud-settings');
-    this.settingsButton.type = 'button';
-    this.settingsButton.setAttribute('aria-haspopup', 'dialog');
-    this.settingsButton.append(uiIcon('settings'));
-    onLocale(() => setTip(this.settingsButton, t().settings.title));
-
-    this.inviteButton = element('button', 'hud-button hud-invite');
-    this.inviteButton.type = 'button';
-    this.inviteButton.setAttribute('aria-haspopup', 'dialog');
-    this.inviteButton.append(uiIcon('invite'));
-    onLocale(() => setTip(this.inviteButton, t().party.invite));
-
-    this.defeat = element('div', 'overlay hud-defeat');
-    this.defeat.hidden = true;
-
-    const defeatPanel = element('div', 'panel overlay-panel');
-    const defeatTitle = element('h2', 'overlay-title');
-    const defeatText = element('p', 'overlay-text');
-    const replay = element('button', 'button-primary');
-    const fresh = element('button', 'button-secondary');
-
-    this.defeatStats = element('dl', 'overlay-stats');
-    this.defeatSeeds = element('div', 'overlay-seeds');
-    // La sauvegarde est déjà effacée : l'adresse seule décide de la carte.
-    replay.type = 'button';
-    replay.addEventListener('click', () => window.location.assign(mapUrl(window.location.href, world.seed)));
-    fresh.type = 'button';
-    fresh.addEventListener('click', () => window.location.assign(mapUrl(window.location.href, null)));
-    defeatPanel.append(defeatTitle, defeatText, this.defeatStats, this.defeatSeeds, replay, fresh, seedLine(world.seed));
-    this.defeat.append(defeatPanel);
-
-    // « Vous êtes mort » : plein écran, sans bouton — le décompte de la sim décide seul.
-    this.death = element('div', 'overlay hud-death');
-    this.death.hidden = !world.dead;
-    this.death.setAttribute('role', 'alert');
-
-    const deathTitle = element('h2', 'death-title');
-
-    this.deathCount = element('p', 'death-count');
-    this.death.append(deathTitle, this.deathCount);
-
-    this.victory = element('div', 'overlay hud-victory');
-    this.victory.hidden = true;
-
-    const victoryPanel = element('div', 'panel overlay-panel');
-    const victoryTitle = element('h2', 'overlay-title');
-    const victoryText = element('p', 'overlay-text');
-    const refound = element('button', 'button-primary');
-    const endless = element('button', 'button-secondary');
-
-    this.victoryStats = element('dl', 'overlay-stats');
-    endless.type = 'button';
-    endless.addEventListener('click', () => {
-      this.victory.hidden = true;
-      this.onContinue();
-    });
-    this.victorySeeds = element('div', 'overlay-seeds');
-    refound.type = 'button';
-    refound.addEventListener('click', () => this.onRefound());
-    victoryPanel.append(uiIcon('goal', 56), victoryTitle, victoryText, this.victoryStats, this.victorySeeds, refound, endless);
-    this.victory.append(victoryPanel);
-
-    this.celebration = element('div', 'hud-celebration');
-    this.celebration.hidden = true;
-    this.celebration.setAttribute('role', 'status');
-    this.confetti = element('div', 'hud-confetti');
+    this.defeat = new Defeat(world);
+    this.death = new Death(world);
+    this.celebration = new Celebration(this.root, this.quest.objective, this.toasts, () => ({ bar: this.barRect, topRowBottom: this.topRowBottom }));
+    this.victory = new Victory(world, () => this.celebration.rainLeaves());
 
     // Le haut de l'écran : une seule rangée, collée en haut, de blocs de même
     // hauteur (`--hud-h`) — à gauche la ville (le Prestige en tête), la
@@ -674,441 +255,104 @@ export class Hud {
 
     // La barre : l'objectif ; la quête s'ouvre en fenêtre sous lui.
     this.bar = element('div', 'panel hud-topbar');
-    this.bar.append(this.objective);
+    this.bar.append(this.quest.objective);
 
     const main = element('div', 'hud-main');
 
-    this.quest.append(fold);
-    main.append(this.bar, this.quest);
+    main.append(this.bar, this.quest.root);
     this.left = element('div', 'hud-left');
     // L'horloge du jour juste à droite de la population.
     // Faveur, vague, vivres, météo, combo, « Passer la nuit » : une pile, le plus pressant devant.
     this.events = new EventStack();
-    this.events.add('hasten', this.hastenButton);
-    this.events.add('combo', this.comboChip);
-    this.events.add('boon', this.boonButton);
-    this.events.add('talent', this.talentButton);
-    this.events.add('wave', this.waveSoon);
-    this.events.add('hunger', this.hunger);
-    this.events.add('weather', this.weather);
+    this.events.add('hasten', this.night.hastenButton);
+    this.events.add('combo', this.night.comboChip);
+    this.events.add('boon', this.favors.boonButton);
+    this.events.add('talent', this.favors.talentButton);
+    this.events.add('wave', this.wave.soon);
+    this.events.add('hunger', this.hunger.root);
+    this.events.add('weather', this.weather.root);
+    this.town = this.stock.root;
+    this.people = this.census.root;
+    this.dayClock = this.dial.root;
     this.left.append(this.town, this.people, this.dayClock, this.events.root);
     // Le compteur abattus/sortis suit la pile, à côté de la capsule de vague.
-    this.left.append(this.tally);
+    this.left.append(this.wave.tally);
     this.top.append(this.left, main);
 
     this.root.append(
       // Les confettis d'abord : ils tombent derrière les cartes du HUD et les fenêtres.
-      this.confetti,
-      this.vignette,
-      this.edge,
+      this.celebration.confetti,
+      this.wave.vignette,
+      this.wave.edge,
       this.top,
       this.actions,
-      this.countdown,
-      this.speech,
-      this.person,
-      this.banner,
-      this.toasts,
-      this.floats,
-      this.stats,
-      this.perf,
-      this.celebration,
-      this.victory,
-      this.death,
-      this.defeat,
+      this.banner.countdown,
+      this.eve.root,
+      this.person.root,
+      this.banner.root,
+      this.toasts.root,
+      this.floats.root,
+      this.debug.stats,
+      this.debug.perf,
+      this.celebration.root,
+      this.victory.root,
+      this.death.root,
+      this.defeat.root,
     );
     this.resize = new ResizeObserver((entries) => {
       this.layoutDirty = true;
       for (const entry of entries) {
         // L'infobulle d'un habitant : sa hauteur, sans la relire à chaque nouveau contenu.
-        if (entry.target === this.person) this.personHeight = entry.borderBoxSize[0]?.blockSize ?? this.personHeight;
-        if (entry.target !== this.celebration) continue;
+        if (entry.target === this.person.root) this.person.height = entry.borderBoxSize[0]?.blockSize ?? this.person.height;
+        if (entry.target !== this.celebration.root) continue;
         // La hauteur sans l'animation (qui le fait rebondir) : la fenêtre ne bouge pas avec.
-        this.celebrationHeight = entry.borderBoxSize[0]?.blockSize ?? this.celebration.offsetHeight;
-        if (this.docked) this.dockCelebration();
+        this.celebration.resized(entry.borderBoxSize[0]?.blockSize ?? this.celebration.root.offsetHeight);
       }
     });
-    for (const node of [this.top, this.quest, this.bar, this.left, this.actions, this.celebration, this.person]) this.resize.observe(node);
-    window.addEventListener('resize', () => {
+    for (const node of [this.top, this.quest.root, this.bar, this.left, this.actions, this.celebration.root, this.person.root]) this.resize.observe(node);
+    this.disposer.listen(window, 'resize', () => {
       this.layoutDirty = true;
       this.viewWidth = window.innerWidth;
     });
 
     // Une infobulle ne recouvre jamais la bulle d'Ève (ni celle d'un habitant) : elle se décale.
-    this.tips = new Tooltips(this.root, () => [this.speech, this.person].filter((node) => !node.hidden).map((node) => node.getBoundingClientRect()));
+    this.tips = new Tooltips(this.root, () => [this.eve.root, this.person.root].filter((node) => !node.hidden).map((node) => node.getBoundingClientRect()));
 
-    // Les libellés fixes se réécrivent au changement de langue ; les rendus
-    // en cache repartent de zéro, et un écran de fin ouvert se réécrit.
-    onLocale(() => {
-      const text = t().hud;
+    this.reactions = new Reactions(world, {
+      toasts: this.toasts,
+      floats: this.floats,
+      advice: this.advice,
+      quest: this.quest,
+      banner: this.banner,
+      wave: this.wave,
+      people: this.census,
+      eve: this.eve,
+      celebration: this.celebration,
+      town: this.stock,
+      death: this.death,
+      defeat: this.defeat,
+      victory: this.victory,
+      openTalent,
+    });
+  }
 
-      setTip(this.hintBulb, text.hintBulb);
-      setTip(this.pauseButton, text.pause);
-      deathTitle.textContent = text.death.title;
-      this.lastDeathSeconds = -1;
-      defeatTitle.textContent = text.defeat.title;
-      defeatText.textContent = text.defeat.text;
-      replay.textContent = text.defeat.replay;
-      fresh.textContent = text.defeat.fresh;
-      victoryTitle.textContent = t().lore.signal.title;
-      victoryText.textContent = t().lore.signal.text;
-      refound.textContent = text.victory.refound;
-      endless.textContent = text.victory.endless;
-      this.lastQuest = '';
-      this.lastClock = '';
-      this.lastBag = '';
-      this.lastTown = '';
-      this.lastPrestige = '';
-      this.lastLevel = '';
-      this.lastPeople = '';
-      this.lastWeather = '';
-      if (!this.defeat.hidden) this.renderDefeat();
-      if (!this.victory.hidden) this.renderVictory();
-    });
+  /** Le joueur a demandé de hâter l'aube ; `main.ts` le lit à chaque image. */
+  public get hastening(): boolean {
+    return this.night.hastening;
+  }
 
-    document.addEventListener('pointerdown', this.foldCrewOnTouch, { capture: true });
-
-    world.mine('placementRejected', ({ reason, ore }) =>
-      this.notify(reason === 'footing' ? footingText(ore) : t().hud.rejection[reason], 'bad'),
-    );
-    world.mine('resourceHarvested', ({ item, amount }) => {
-      if (item === 'wood') this.harvestedWood = true;
-      if (item === 'stone') this.harvestedStone = true;
-      this.float(item, amount, this.harvestCombo.hit(performance.now()));
-      this.flyToBag(item);
-    });
-    world.mine('siteDelivered', ({ item, amount, source }) => {
-      this.delivered = true;
-      // Ce que la ville donne ne sort pas du sac : rien ne tombe de la tête d'Adam.
-      if (source === 'bag') this.float(item, -amount);
-    });
-    world.mine('townDeposited', ({ item, amount }) => this.float(item, -amount));
-    world.mine('itemDropped', ({ item, amount }) => this.float(item, -amount));
-    world.mine('depositRejected', ({ reason }) => {
-      if (reason === 'outOfReach') this.notify(t().hud.toast.depositFar, 'bad');
-      if (reason === 'noTown') this.notify(t().hud.toast.depositNoTown, 'bad');
-    });
-    world.mine('siteRejected', ({ reason }) => {
-      if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
-      if (reason === 'nothingToGive') this.notify(t().hud.toast.siteNothing, 'bad');
-    });
-    world.mine('storeTaken', ({ item, amount }) => this.float(item, amount));
-    world.mine('buildingSupplied', ({ item, amount, source }) => {
-      if (source === 'bag') this.float(item, -amount);
-    });
-    world.mine('supplyRejected', ({ reason }) => {
-      if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
-      if (reason === 'nothingToGive') this.notify(t().hud.toast.supplyNothing, 'bad');
-    });
-    world.events.on('nurseryHungry', () => this.notify(t().hud.toast.nurseryHungry, 'bad'));
-    world.mine('takeRejected', ({ reason }) => {
-      if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
-      if (reason === 'empty') this.notify(t().hud.toast.chestEmpty, 'bad');
-      if (reason === 'bagFull') this.notify(t().hud.toast.bagFullTake, 'bad');
-    });
-    world.mine('transferRejected', ({ reason }) => {
-      if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
-      if (reason === 'bagFull') this.notify(t().hud.toast.bagFullTake, 'bad');
-    });
-    world.mine('inventoryFull', () => this.notify(this.bagFullMessage(), 'bad'));
-    world.mine('harvestRefused', ({ item, wanted, plenty }) => {
-      this.refused(item);
-      this.notify(harvestRefusedText(item, wanted, plenty), 'info');
-    });
-    world.events.on('buildingCompleted', ({ id }) => {
-      const entity = world.entities.get(id);
-
-      if (entity) this.celebrate(entity, t().hud.float.built(t().buildings[entity.proto].label));
-    });
-    // Le cochon : apprivoisé, effrayé, entré à l'élevage, échappé.
-    world.events.on('pigTamed', () => this.notify(t().hud.pigs.tamed, 'good'));
-    world.events.on('pigFled', ({ reason }) => this.notify(reason === 'scare' ? t().hud.pigs.fledScare : t().hud.pigs.fledLost, 'bad'));
-    world.events.on('pigPenned', ({ id, pigs }) => {
-      const pen = world.entities.get(id);
-
-      if (pen) this.celebrate(pen, t().hud.pigs.penned(pigs));
-    });
-    // Les rencontres de la route : le blessé qui suit, qui fuit, qui arrive ; la biche qui se laisse approcher.
-    world.events.on('woundedFollowing', () => this.notify(t().hud.encounters.following, 'good'));
-    world.events.on('woundedFled', ({ reason }) => this.notify(reason === 'scare' ? t().hud.encounters.fledScare : t().hud.encounters.fledLost, 'bad'));
-    world.events.on('survivorJoined', ({ name }) => this.notify(t().hud.encounters.joined(name), 'good'));
-    world.events.on('deerCaught', () => this.notify(t().hud.encounters.deerCaught, 'good'));
-    world.events.on('pigsEscaped', ({ count }) => this.notify(t().hud.pigs.escaped(count), 'bad'));
-    // Un coffre ouvert : « Coffre ouvert ! » monte au-dessus de lui.
-    world.events.on('chestOpened', ({ tx, ty }) => this.celebrate({ tx, ty, width: 1, height: 1 }, t().wardrobe.chestOpened));
-    // Une ruine fouillée, un secret trouvé : le mot monte du lieu, et le butin vole vers le sac.
-    world.mine('discoveryFound', ({ kind, tx, ty, x, y, items, plan }) => {
-      if (kind !== 'chest') this.celebrate({ tx, ty, width: 1, height: 1 }, t().hud.discovery[kind]);
-      if (plan) this.notify(t().hud.discovery.plan(t().buildings[plan].label), 'good');
-      this.flyFindsToBag(items, x, y);
-    });
-    // Le colis d'une faveur de l'aube, la récompense d'un défi du jour : ils volent d'Adam jusqu'à la ville (ou au sac).
-    world.events.on('boonChosen', ({ reward, to }) => this.flyFindsToBag(reward, world.player.x, world.player.y, to));
-    world.events.on('challengeCompleted', ({ reward, to }) => this.flyFindsToBag(reward, world.player.x, world.player.y, to));
-    world.events.on('prestigeGained', ({ amount, x, y }) => this.floatPrestige(amount, x, y));
-    world.events.on('xpGained', ({ amount, x, y }) => this.floatXp(amount, x, y));
-    world.events.on('levelUp', ({ level, maxHp }) => {
-      this.notify(t().hud.toast.levelUp(level, maxHp), 'good', { label: t().hud.talent.see, run: () => this.onTalentOpen() });
-      this.level.dataset['up'] = 'true';
-      window.setTimeout(() => delete this.level.dataset['up'], 1400);
-    });
-    world.events.on('buildingUpgraded', ({ id, level, fromBag }) => {
-      const entity = world.entities.get(id);
-
-      for (const [item, amount] of fromBag) this.float(item, -amount);
-      if (entity) this.celebrate(entity, t().hud.float.upgraded(levelLabel(entity.proto, level)));
-    });
-    world.events.on('enemyBaseResisted', ({ level }) =>
-      this.notify(t().hud.toast.betterGear(t().gear[Math.min(level, t().gear.length - 1)] ?? '', level), 'bad'),
-    );
-    world.events.on('enemyBaseShielded', () => this.notify(t().hud.toast.baseShielded, 'bad'));
-    world.events.on('enemyChiefDefeated', ({ prestige }) => this.notify(t().hud.toast.chiefDefeated(prestige), 'good'));
-    world.events.on('enemyZoneEntered', ({ level }) => this.notify(t().hud.toast.enemyZone(level), 'info'));
-    world.events.on('regionEntered', ({ id, biome, state, era }) => {
-      const guardian = BIOMES[biome].guardian;
-      const name = t().biomes[biome];
-
-      if (state === 'locked') this.notify(t().hud.toast.regionLocked(name, t().eras[era]?.label ?? ''), 'info');
-      else if (guardian && world.regions[id]?.lair) this.notify(t().hud.toast.regionOpen(name, t().wildlife[guardian]), 'info');
-    });
-    world.events.on('regionConquered', ({ biome, prestige }) => this.notify(t().hud.toast.regionConquered(t().biomes[biome], prestige), 'good'));
-    world.mine('specialtyFound', ({ item, amount }) => this.float(item, amount));
-    // Le « +N Prestige » monte déjà de la base (`prestigeGained`) : il ne reste que le bandeau.
-    world.events.on('enemyBaseDestroyed', ({ prestige }) => this.notify(t().hud.toast.baseDestroyed(prestige), 'good'));
-    world.events.on('gearCrafted', ({ level, fromBag }) => {
-      for (const [item, amount] of fromBag) this.float(item, -amount);
-      this.notify(t().hud.toast.gearCrafted(t().gear[level] ?? '', level), 'good');
-    });
-    world.events.on('toolCrafted', ({ slot, level, fromBag }) => {
-      for (const [item, amount] of fromBag) this.float(item, -amount);
-      this.notify(t().hud.toast.toolCrafted(t().toolGear[slot][level - 1] ?? ''), 'good');
-    });
-    world.events.on('companionTraining', ({ role, endTick, fromBag }) => {
-      for (const [item, amount] of fromBag) this.float(item, -amount);
-      this.notify(t().hud.toast.companionTraining(t().companionClasses[role].label, Math.ceil((endTick - world.tickCount) / TICKS_PER_SECOND)), 'info');
-    });
-    world.events.on('companionJoined', ({ role }) => this.notify(t().hud.toast.companionJoined(t().companionClasses[role].label), 'good'));
-    world.events.on('companionDied', ({ role }) => this.notify(t().hud.toast.companionDied(t().companionClasses[role].label), 'bad'));
-    world.mine('recruitRejected', ({ reason }) => {
-      if (reason !== 'missing') this.notify(t().hud.recruit[reason], 'bad');
-    });
-    world.mine('gearRejected', ({ reason }) => {
-      if (reason !== 'missing') this.notify(t().hud.gear[reason], 'bad');
-    });
-    world.mine('upgradeRejected', ({ reason }) => {
-      if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
-      if (reason === 'missingItems') this.notify(t().hud.toast.upgradeMissing, 'bad');
-      if (reason === 'locked') this.notify(t().hud.toast.upgradeLocked, 'bad');
-    });
-    world.mine('playerRepaired', ({ item, amount, fromBag }) => {
-      this.repaired = true;
-      if (fromBag > 0) this.float(item, -fromBag);
-      if (amount > fromBag) this.notify(t().hud.toast.repairedFromTown(amount - fromBag, t().items[item]), 'good');
-    });
-    world.mine('repairRejected', ({ reason }) => {
-      if (reason !== 'missing') this.notify(t().hud.repair[reason], 'bad');
-    });
-    world.events.on('waveCountdown', ({ seconds, night, wave, count, bases, boss, queen, from, targetProto, x, y }) => {
-      this.showCountdown(String(seconds));
-      this.announce(night, wave, count, bases, boss, queen, from, targetProto, { x, y });
-    });
-    // La veille au soir : Ève prévient, dans sa bulle — ou par radio si elle n'est pas là.
-    world.events.on('queenAnnounced', () => {
-      if (world.eve()) this.say([t().eve.queen]);
-      else this.notify(t().hud.toast.eveRadio(t().eve.queen), 'bad');
-    });
-    world.events.on('queenSlain', ({ night }) =>
-      this.showBanner('cleared', t().hud.wave.queenSlain, t().hud.wave.queenSlainText(night), null, BANNER_CLEARED_MS),
-    );
-    world.events.on('duskFell', () => this.notify(t().hud.toast.dusk, 'bad'));
-    // Une vague qui n'a pas eu son compte à rebours (partie reprise pile avant) s'annonce quand même.
-    world.events.on('waveStarted', ({ night, wave, count, bases, boss, queen, from, targetProto, x, y }) => {
-      this.announce(night, wave, count, bases, boss, queen, from, targetProto, { x, y });
-      this.unfoldQuest(QUEST_ALERT_TICKS);
-    });
-    world.events.on('buildingDamaged', ({ id, hp }) => {
-      const hall = world.entities.get(id);
-
-      if (id !== world.townHallId || !hall) return;
-
-      const low = hp / BUILDINGS[hall.proto].hp < QUEST_ALERT_HP;
-
-      if (low && !this.hallLow) this.unfoldQuest(QUEST_ALERT_TICKS);
-      this.hallLow = low;
-    });
-    world.events.on('waveStarted', ({ wave, count, from }) => {
-      if (wave === 1) {
-        this.sent = 0;
-        this.downed = 0;
-      }
-      this.sent += count;
-      this.updateTally();
-      this.pulseEdge(from);
-    });
-    for (const kill of ['mutantDied', 'mutantStunned'] as const) {
-      world.events.on(kill, () => {
-        if (this.sent === 0) return;
-        this.downed += 1;
-        // Les larves de la Reine ne sont pas annoncées : le compteur ne reste jamais en retard.
-        this.sent = Math.max(this.sent, this.downed);
-        this.updateTally();
-      });
-    }
-    world.events.on('dawnBroke', () => {
-      this.sent = 0;
-      this.downed = 0;
-      this.updateTally();
-    });
-    // Le dernier mutant tombe : le ralenti court d'abord, le grand bandeau suit.
-    world.events.on('waveCleared', ({ night }) => {
-      window.setTimeout(
-        () => this.showBanner('cleared', t().hud.wave.cleared(night), t().hud.wave.clearedText, null, BANNER_CLEARED_MS),
-        reducedMotion() ? 0 : NIGHT_STAKES.slowMoMs,
-      );
-    });
-    world.events.on('waveAnnounced', ({ ticks, count, from }) =>
-      this.notify(t().hud.wave.announced(clock(Math.ceil(ticks / TICKS_PER_SECOND)), count, t().hud.from[from]), 'bad'),
-    );
-    world.events.on('waveRewarded', ({ night, reward }) => {
-      if (reward.length === 0) return;
-      for (const [item, amount] of reward) this.float(item, amount);
-      this.notify(t().hud.wave.bounty(night, reward.map(([item, amount]) => t().hud.toast.storedItem(amount, t().items[item])).join(', ')), 'good');
-    });
-    world.mine('lootPicked', ({ item, amount }) => {
-      this.float(item, amount);
-      this.flyToBag(item);
-    });
-    world.events.on('comboBroken', ({ count }) => this.notify(t().hud.skill.comboBroken(count), 'bad'));
-    world.events.on('nightShortened', ({ ticks }) => this.notify(t().hud.skill.cleanNight(Math.ceil(ticks / TICKS_PER_SECOND)), 'good'));
-    world.events.on('comboPaid', ({ prestige, clean }) => {
-      if (prestige > 0) this.notify(clean ? `${t().hud.skill.cleanPaid} · ${t().hud.skill.comboPaid(prestige)}` : t().hud.skill.comboPaid(prestige), 'good');
-    });
-    world.events.on('happinessChanged', ({ from, to }) => {
-      this.moodTrend = to === from ? null : { up: to > from, until: performance.now() + MOOD_TREND_MS };
-    });
-    world.events.on('dawnBroke', ({ night, reward }) => {
-      this.notify(t().hud.toast.dawn(night), 'good');
-      for (const [item, amount] of reward) this.float(item, amount);
-    });
-    world.events.on('buildingDestroyed', ({ proto }) => this.notify(t().hud.toast.destroyed(t().buildings[proto].label), 'bad'));
-    world.events.on('decorRemoved', ({ proto, toTown }) => this.notify(t().hud.toast.decorRemoved(t().buildings[proto].label, toTown), 'info'));
-    world.events.on('siteCancelled', ({ proto, toTown }) =>
-      this.notify(t().hud.toast.siteCancelled(t().buildings[proto].label, toTown), 'info'),
-    );
-    world.events.on('childBorn', ({ name }) => this.notify(t().hud.toast.childBorn(name), 'good'));
-    world.events.on('mutantStunned', () => this.notify(t().hud.toast.mutantStunned, 'good'));
-    world.events.on('patientFollowing', () => this.notify(t().hud.toast.patientFollowing, 'good'));
-    world.events.on('patientAdmitted', () => this.notify(t().hud.toast.patientAdmitted, 'good'));
-    world.events.on('mutantHealed', () => this.notify(t().hud.toast.mutantHealed, 'good'));
-    world.events.on('kidGrewUp', ({ name }) => this.notify(t().hud.toast.kidGrewUp(name), 'good'));
-    world.events.on('starving', ({ name, need, seconds }) => this.notify(t().hud.toast.starving[need](name, seconds), 'bad'));
-    world.events.on('workerStarved', ({ name, need }) => this.notify(t().hud.toast.workerStarved[need](name), 'bad'));
-    world.events.on('growthStunted', ({ name, need }) => this.notify(t().hud.toast.growthStunted[need](name), 'bad'));
-    world.events.on('townHallDestroyed', () => this.showDefeat());
-    world.events.on('playerKnockedOut', () => (this.death.hidden = false));
-    world.events.on('playerRespawned', () => (this.death.hidden = true));
-    world.events.on('weatherAnnounced', ({ id, seconds }) => {
-      const { label, advice } = t().weather[id];
-
-      this.notify(t().hud.toast.weatherSoon(label, seconds, advice), WEATHER[id].harsh ? 'bad' : 'info');
-    });
-    world.events.on('weatherEnded', ({ id }) => this.notify(t().hud.toast.weatherEnded(t().weather[id].label), 'good'));
-    world.events.on('playerKnockedOut', () => this.notify(t().hud.toast.knockedOut, 'bad'));
-    world.events.on('eveArriving', () => this.notify(t().hud.toast.eveArriving, 'good'));
-    world.events.on('caravanArriving', () => {
-      this.notify(t().hud.toast.caravanArriving, 'good');
-      this.say([t().eve.caravan]);
-    });
-    world.events.on('caravanLeaving', () => this.notify(t().hud.toast.caravanLeaving, 'info'));
-    world.mine('traded', ({ fromBag, stored }) => {
-      for (const [item, amount] of fromBag) this.float(item, -amount);
-      for (const [item, amount] of Object.entries(stored) as [ItemId, number][]) {
-        if (amount > 0) this.notify(t().hud.toast.storedAtHall(t().hud.toast.storedItem(amount, t().items[item])), 'info');
-      }
-    });
-    world.mine('tradeRejected', ({ reason }) => {
-      if (reason === 'outOfReach') this.notify(t().hud.toast.tradeFar, 'bad');
-      if (reason === 'missingItems') this.notify(t().hud.toast.tradeMissing, 'bad');
-      if (reason === 'done') this.notify(t().hud.toast.tradeDone, 'bad');
-      if (reason === 'missing') this.notify(t().hud.toast.tradeGone, 'bad');
-    });
-    world.events.on('eveArrived', () => {
-      this.notify(t().hud.toast.eveArrived, 'good');
-      this.say(t().eve.arrival);
-    });
-    world.events.on('questStarted', ({ quest }) => this.say([t().quests[quest].give]));
-    world.events.on('questCompleted', ({ quest }) => {
-      this.say([t().quests[quest].done]);
-      this.notify(rewardLabel(QUESTS[quest].reward), 'good');
-    });
-    world.events.on('labSupplied', ({ item, amount, source }) => {
-      if (source === 'bag') this.float(item, -amount);
-    });
-    world.events.on('researchStarted', ({ research }) => this.notify(t().hud.toast.researchStarted(t().research[research].label), 'info'));
-    world.events.on('researchCompleted', ({ research }) =>
-      this.notify(
-        t().hud.toast.researchCompleted(
-          RESEARCH[research].effect === null ? t().research[research].label : effectLine(research, world.researchDone, world.perks),
-        ),
-        'good',
-      ),
-    );
-    world.events.on('buildingsUnlocked', ({ buildings }) => {
-      const labels = buildings.map((building) => t().buildings[building].label).join(', ');
-
-      this.notify(t().hud.toast.buildingsUnlocked(buildings.length, labels), 'good');
-    });
-    world.events.on('eraRejected', () => this.notify(t().eraPanel.rejected, 'bad'));
-    world.events.on('researchRejected', ({ reason }) => {
-      if (reason === 'busy') this.notify(t().hud.toast.researchBusy, 'bad');
-      if (reason === 'taken') this.notify(t().hud.toast.researchTaken, 'bad');
-      if (reason === 'locked') this.notify(t().hud.toast.researchLocked, 'bad');
-      if (reason === 'outOfReach') this.notify(t().hud.rejection.outOfReach, 'bad');
-      if (reason === 'nothingToGive') this.notify(t().hud.toast.researchNothing, 'bad');
-    });
-    world.events.on('objectiveCompleted', ({ id, stored, closing }) => {
-      // Le dernier objectif d'un chapitre, c'est la fin du chapitre qui le fête, en grand.
-      if (!closing) this.celebrateObjective(id);
-      this.unfoldQuest(QUEST_ALERT_TICKS);
-      this.notifyStored(stored);
-    });
-    world.events.on('chapterCompleted', ({ index, stored }) => {
-      // Le dernier chapitre, c'est l'écran de victoire qui le fête.
-      if (index < CHAPTERS.length - 1) this.celebrateChapter(index);
-      this.unfoldQuest(QUEST_ALERT_TICKS);
-      this.notifyStored(stored);
-    });
-    // L'antenne s'allume d'abord, ses ondes couvrent l'écran : l'écran du Signal vient après.
-    world.events.on('victory', () => window.setTimeout(() => this.showVictory(), SIGNAL_WAVES.durationMs));
-    world.events.on('antennaRaised', ({ floor, lureNight }) => {
-      this.notify(t().hud.toast.antennaRaised(floor, lureNight), 'info');
-    });
-    world.events.on('antennaFell', ({ floor }) => this.notify(t().hud.toast.antennaFell(floor), 'bad'));
-    world.events.on('signalSent', () => {
-      // Ève le dit tout de suite, à la place de ce qu'elle disait.
-      this.speechQueue.length = 0;
-      this.speechQueue.push(t().lore.signal.answer);
-      this.speechUntil = 0;
-    });
-    world.events.on('survivorsArrived', ({ count }) =>
-      this.notify(t().hud.toast.survivors(count), 'good'),
-    );
+  public set hastening(on: boolean) {
+    this.night.hastening = on;
   }
 
   /** Ce que fait « Continuer sans fin » : `main.ts` relance l'horloge. */
   /** « Fonder une nouvelle colonie » : `main.ts` verse les graines au jardin et repart sur une carte neuve. */
   public setOnRefound(onRefound: () => void): void {
-    this.onRefound = onRefound;
+    this.victory.onRefound = onRefound;
   }
 
   public setOnContinue(onContinue: () => void): void {
-    this.onContinue = onContinue;
-  }
-
-  /* -------------------------------------------------------------------- Ève */
-
-  /** Des répliques à la suite dans la bulle d'Ève. */
-  private say(lines: readonly string[]): void {
-    this.speechQueue.push(...lines);
+    this.victory.onContinue = onContinue;
   }
 
   /**
@@ -1117,63 +361,7 @@ export class Hud {
    * rappelle la quête, l'autre elle dit ce qui lui passe par la tête.
    */
   public talkToEve(): void {
-    const quest = currentQuest(this.world.questsDone);
-    let line: string;
-
-    if (this.mutantCount() > 0) {
-      line = t().eve.busy;
-    } else if (this.talks++ % 2 === 0) {
-      line = quest ? t().quests[quest].give : t().eve.allDone;
-    } else {
-      const { chatter } = t().eve;
-
-      line = chatter[this.chatterIndex++ % chatter.length]!;
-    }
-
-    this.speechQueue.length = 0;
-    this.speechQueue.push(line);
-    this.speechUntil = 0;
-  }
-
-  /** La bulle suit Ève à l'écran ; elle passe à la réplique suivante quand le temps de lecture est écoulé. */
-  private updateSpeech(): void {
-    const eve = this.world.eve();
-    const now = performance.now();
-
-    if (!eve) {
-      this.speech.hidden = true;
-      return;
-    }
-
-    if (now >= this.speechUntil) {
-      const line = this.speechQueue.shift();
-
-      if (line === undefined) {
-        this.speech.hidden = true;
-        return;
-      }
-      this.speech.textContent = line;
-      this.speech.hidden = false;
-      this.speechUntil = now + SPEECH_BASE_MS + line.length * SPEECH_PER_CHAR_MS;
-
-      // Relance l'animation d'entrée à chaque réplique ; le reflow qu'il faut
-      // pour ça donne aussi la hauteur de la bulle.
-      this.speech.style.animation = 'none';
-      this.speechHeight = this.speech.offsetHeight;
-      this.speech.style.animation = '';
-    }
-
-    // La quête grandit pendant qu'Ève parle (une quête commence, un conseil
-    // s'ouvre) : son bas se relit à chaque frame où la bulle est là.
-    const questBottom = this.topInset();
-    // Au-dessus de la tête — plus haut en selle —, sans sortir de l'écran.
-    const head = eve.state === 'arriving' ? 62 : 50;
-    const { x, y } = this.project(eve.x, eve.y - head);
-    const margin = Math.min(130, this.viewWidth / 2);
-
-    this.speech.style.left = `${Math.round(Math.min(Math.max(x, margin), this.viewWidth - margin))}px`;
-    // `top` est le bas de la bulle, qui flotte 10 px au-dessus : tout entière sous la quête.
-    this.speech.style.top = `${Math.round(Math.max(y, questBottom + this.speechHeight + SPEECH_GAP))}px`;
+    this.eve.talk();
   }
 
   /** Le renderer sait centrer la caméra ; le HUD non. `main.ts` fait le lien. */
@@ -1186,250 +374,7 @@ export class Hud {
    * lui, le temps de la lire. Elle le suit s'il marche.
    */
   public showPerson(id: MobileId): void {
-    this.personId = id;
-    this.personUntil = performance.now() + PERSON_MS;
-    this.person.style.animation = 'none';
-    this.person.replaceChildren();
-    this.personKey = '';
-    this.person.hidden = false;
-    void this.person.offsetWidth;
-    this.person.style.animation = '';
-  }
-
-  private updatePerson(): void {
-    const mobile = this.personId === null ? undefined : this.world.mobiles.get(this.personId);
-
-    if (!mobile || !isInhabitant(mobile) || (mobile.kind !== 'kid' && mobile.inside) || performance.now() >= this.personUntil) {
-      this.personId = null;
-      this.person.hidden = true;
-      return;
-    }
-
-    const line = personText(this.world.nameFor(mobile), mobile.age, this.world.occupation(mobile));
-    // La jauge avance par centièmes : l'infobulle ne se refait pas à chaque tick.
-    const gauges = NEED_IDS.map((need) => Math.round(mobile.needs[need] * 100));
-    const happiness = mobile.kind === 'kid' ? null : mobile.happiness;
-    const key = `${line}|${gauges.join(':')}|${happiness === null ? '' : Math.round(happiness)}`;
-
-    if (key !== this.personKey) {
-      this.personKey = key;
-      this.person.replaceChildren(
-        text('hud-person-line', line),
-        ...NEED_IDS.map((need) => needMeter(need, mobile.needs[need])),
-        ...(happiness === null ? [] : [moodMeter(happiness)]),
-      );
-    }
-
-    const { x, y } = this.project(mobile.x, mobile.y - (mobile.kind === 'kid' ? 30 : 40));
-    const margin = Math.min(130, this.viewWidth / 2);
-
-    this.person.style.left = `${Math.round(Math.min(Math.max(x, margin), this.viewWidth - margin))}px`;
-    this.person.style.top = `${Math.round(Math.max(y, this.topInset() + this.personHeight + SPEECH_GAP))}px`;
-  }
-
-  /**
-   * La population de la ville : au travail, inactifs, enfants. Les inactifs
-   * sont un bouton, en corail dès qu'il y en a un : un tap centre la caméra
-   * sur l'un d'eux, le tap suivant sur le suivant.
-   */
-  private updatePeople(): void {
-    const { working, idle, resting, children } = this.world.census();
-    const { housed, population } = this.world.housing();
-    const mood = this.world.happiness();
-
-    if (this.moodTrend && performance.now() >= this.moodTrend.until) this.moodTrend = null;
-    const trend = this.moodTrend ? (this.moodTrend.up ? 'up' : 'down') : '';
-    const troop = this.world.companions();
-    const training = this.world.companionCount() - troop.length;
-    const troopHp = troop.reduce((sum, companion) => sum + companion.hp, 0);
-    const troopMax = troop.reduce((sum, companion) => sum + COMPANION_CLASSES[companion.role].hp, 0);
-    const key = `${working}:${idle}:${resting}:${children}:${housed}/${population}:${mood.total}:${mood.unhappy}:${trend}:${troop.length}/${training}/${troopHp}/${troopMax}`;
-
-    if (key === this.lastPeople) return;
-    const label = t().hud.people;
-
-    this.lastPeople = key;
-
-    const count = (icon: 'toil' | 'child' | 'moon', value: number, label: string): HTMLElement => {
-      const node = text('hud-people-count', String(value));
-
-      node.prepend(uiIcon(icon, 18));
-      setTip(node, label);
-      return node;
-    };
-    const lazy = text('hud-people-count hud-people-idle', String(idle), 'button');
-
-    lazy.setAttribute('type', 'button');
-    lazy.dataset['alert'] = String(idle > 0);
-    lazy.prepend(uiIcon('idle', 18));
-    setTip(lazy, label.idle(idle));
-    lazy.addEventListener('click', () => this.focusIdle());
-
-    // L'Habitation, logés / habitants : en corail dès que quelqu'un dort dehors.
-    const housing = text('hud-people-count hud-people-housing', `${housed}/${population}`);
-
-    housing.dataset['alert'] = String(housed < population);
-    housing.prepend(uiIcon('home', 18));
-    setTip(housing, label.housing(housed, population));
-
-    // Le Bonheur de la ville, à côté : la note moyenne sur 100, la même jauge que la fiche d'un habitant ; en corail quand l'habitant moyen est malheureux.
-    // L'aube qui le fait bouger y pose une flèche, le temps de la voir.
-    const happiness = text('hud-people-count hud-people-happiness', String(mood.average));
-
-    happiness.dataset['alert'] = String(population > 0 && moodOf(mood.average) === 'unhappy');
-    happiness.prepend(uiIcon('townMood', 18));
-    if (trend) {
-      happiness.dataset['trend'] = trend;
-      happiness.append(uiIcon(trend === 'up' ? 'trendUp' : 'trendDown', 14));
-    }
-    setTip(happiness, label.happiness(mood.total, mood.average, mood.unhappy));
-
-    // L'armée : compagnons / plafond, et une jauge de leur santé réunie — en corail dès qu'ils sont à moins du tiers.
-    const army = text('hud-people-count hud-people-army', `${troop.length}/${COMPANIONS.max}`);
-    const health = document.createElement('span');
-    const fill = document.createElement('span');
-
-    health.className = 'hud-army-bar';
-    fill.className = 'hud-army-fill';
-    fill.style.width = `${troopMax > 0 ? Math.round((troopHp / troopMax) * 100) : 0}%`;
-    health.append(fill);
-    army.dataset['alert'] = String(troopMax > 0 && troopHp / troopMax < 1 / 3);
-    army.prepend(uiIcon('army', 18));
-    army.append(health);
-    setTip(army, t().hud.army.label(troop.length, COMPANIONS.max, troopHp, troopMax, training));
-
-    const hasArmy = troop.length + training > 0;
-
-    this.people.hidden = working + idle + resting + children === 0 && !hasArmy;
-    this.people.setAttribute('aria-label', label.summary(working, idle, resting));
-    this.people.replaceChildren(
-      count('toil', working, label.working(working)),
-      lazy,
-      ...(resting > 0 ? [count('moon', resting, label.resting(resting))] : []),
-      count('child', children, label.children(children)),
-      housing,
-      happiness,
-      ...(hasArmy ? [army] : []),
-    );
-  }
-
-  /**
-   * L'alerte de nourriture ou d'eau, sous la population : la ville va en manquer —
-   * « 3 min » de stock au rythme où il fond, ou plus rien —, en corail. Elle
-   * disparaît quand le stock tient.
-   */
-  private updateHunger(): void {
-    const alert = this.world.needAlert();
-    const key = alert ? `${alert.item}:${alert.minutes}:${alert.wanting}:${locale()}` : '';
-
-    if (key === this.lastHunger) return;
-    this.lastHunger = key;
-    this.hungerNeed = alert?.need;
-    this.hunger.hidden = alert === null;
-    if (!alert) return;
-
-    const words = t().hud.needAlert;
-    const item = t().items[alert.item];
-    const who = alert.wanting > 0 ? words.wanting[alert.need](alert.wanting) : '';
-    const label = alert.minutes === 0 ? words.out(item, who) : words.soon(item, alert.minutes, who);
-
-    this.hunger.title = label;
-    this.hunger.setAttribute('aria-label', label);
-    this.hunger.replaceChildren(itemIcon(alert.item, 18), text('hud-hunger-text', alert.minutes === 0 ? words.outShort : words.soonShort(alert.minutes)));
-  }
-
-  /**
-   * L'annonce de la vague, à droite de l'horloge : « Vague dans 2:30 » et son
-   * effectif, toute la fenêtre `WAVE_WARNING.leadTicks` ; en corail et qui bat
-   * sous `urgentTicks`. Le détail — d'où, combien de bases, un chef — au tap
-   * long et pour les lecteurs d'écran ; un tap montre la base de tête.
-   */
-  private updateWave(): void {
-    const forecast = this.world.waveForecast();
-    const seconds = forecast ? Math.ceil(forecast.ticks / TICKS_PER_SECOND) : 0;
-    const key = forecast ? `${seconds}:${forecast.count}:${forecast.boss}:${forecast.queen}:${forecast.urgent}:${forecast.from}:${locale()}` : '';
-
-    this.waveOrigin = forecast && { x: forecast.x, y: forecast.y };
-    if (key === this.lastWave) return;
-    this.lastWave = key;
-    this.waveSoon.hidden = forecast === null;
-    if (!forecast) return;
-
-    const words = t().hud.wave;
-    const time = clock(seconds);
-    const label = words.soon(time, forecast.count, forecast.bases, t().hud.from[forecast.from], forecast.queen ? 'queen' : forecast.boss ? 'boss' : null);
-
-    this.waveSoon.dataset['urgent'] = String(forecast.urgent);
-    this.waveSoon.setAttribute('aria-label', label);
-    setTip(this.waveSoon, label);
-    this.waveSoon.replaceChildren(
-      uiIcon(forecast.boss || forecast.queen ? 'shield' : 'mutant', 18),
-      text('hud-wave-text', words.soonShort(time)),
-      text('hud-wave-count', `×${forecast.count}`),
-    );
-  }
-
-  private updateTally(): void {
-    this.tally.hidden = this.sent === 0;
-    if (this.sent === 0) return;
-
-    const label = t().hud.wave.tally(this.downed, this.sent);
-
-    this.tally.setAttribute('aria-label', label);
-    setTip(this.tally, label);
-    this.tally.replaceChildren(uiIcon('mutant', 18), text('hud-wave-text', `${this.downed}/${this.sent}`));
-  }
-
-  /** Le bord de l'écran pulse en corail du côté d'où la vague arrive, `edgePulseMs`. */
-  private pulseEdge(from: Compass): void {
-    if (reducedMotion()) return;
-
-    const [x, y] = EDGE_SPOTS[from];
-
-    this.edge.style.setProperty('--edge-x', `${x}%`);
-    this.edge.style.setProperty('--edge-y', `${y}%`);
-    this.edge.dataset['on'] = 'true';
-    window.clearTimeout(this.edgeTimer);
-    this.edgeTimer = window.setTimeout(() => {
-      this.edge.dataset['on'] = 'false';
-    }, NIGHT_STAKES.edgePulseMs);
-  }
-
-  /** La mairie sous la moitié de ses PV : la vignette corail bat, d'autant plus vite que les PV baissent. */
-  private updateVignette(): void {
-    const danger = Math.round(hallDanger(this.world) * 20) / 20;
-
-    if (danger === this.lastDanger) return;
-    this.lastDanger = danger;
-    this.vignette.dataset['on'] = String(danger > 0);
-    this.vignette.style.setProperty('--hall-danger', String(danger));
-    this.vignette.style.setProperty('--beat', `${(NIGHT_STAKES.beatSlowS - (NIGHT_STAKES.beatSlowS - NIGHT_STAKES.beatFastS) * danger).toFixed(2)}s`);
-  }
-
-  /** Centre la caméra sur un habitant qui a faim (ou soif) — au tap suivant, sur le suivant — et dit qui il est. */
-  private focusHungry(): void {
-    const hungry = this.world.wantingInhabitants(this.hungerNeed);
-
-    if (hungry.length === 0) return;
-
-    const mobile = hungry[this.hungryCursor % hungry.length]!;
-
-    this.hungryCursor = (this.hungryCursor + 1) % hungry.length;
-    this.onFocus(mobile.x, mobile.y);
-    this.showPerson(mobile.id);
-  }
-
-  /** Centre la caméra sur un ouvrier qui glande — au tap suivant, sur le suivant — et dit qui il est. */
-  private focusIdle(): void {
-    const idle = this.world.idleWorkers();
-
-    if (idle.length === 0) return;
-
-    const worker = idle[this.idleCursor % idle.length]!;
-
-    this.idleCursor = (this.idleCursor + 1) % idle.length;
-    this.onFocus(worker.x, worker.y);
-    this.showPerson(worker.id);
+    this.person.show(id);
   }
 
   /** Le renderer sait où est Adam à l'écran ; le HUD non. `main.ts` fait le lien. */
@@ -1456,17 +401,14 @@ export class Hud {
 
       const bar = this.topBottom();
 
-      this.topInsetPx = this.quest.dataset['folded'] === 'false' ? Math.max(bar, this.quest.getBoundingClientRect().bottom) : bar;
+      this.topInsetPx = this.quest.root.dataset['folded'] === 'false' ? Math.max(bar, this.quest.root.getBoundingClientRect().bottom) : bar;
       this.obstacleRects = [this.bar, this.left, this.controls, this.actions].map((node) => node.getBoundingClientRect());
       this.barRect = this.bar.getBoundingClientRect();
       this.topRowBottom = this.top.getBoundingClientRect().bottom;
     }
     // Les écritures après les lectures.
-    if (this.townOverflowDirty) {
-      this.townOverflowDirty = false;
-      this.markTownOverflow();
-    }
-    if (measured && this.docked) this.dockCelebration();
+    this.stock.measureOverflow();
+    if (measured) this.celebration.redock();
     return measured;
   }
 
@@ -1499,83 +441,48 @@ export class Hud {
   /** La ressource que le conseil envoie chercher, ou `null` : le renderer y pointe un repère. */
   /** La recherche que le conseil envoie lancer au labo, ou `null`. */
   public adviceResearch(): ResearchId | null {
-    return this.advisedResearch;
+    return this.advice.advisedResearch();
   }
 
   public wantedItem(): ItemId | null {
-    return this.wanted;
+    return this.advice.wantedItem();
   }
 
   /** Ce que le repère de bord montre : ce qu'on récolte, ou l'eau où poser le puits. */
   public pointedItem(): ItemId | null {
-    return this.pointed;
+    return this.advice.pointedItem();
+  }
+
+  /** Le bandeau de la ville : là où volent les gains du récap hors ligne. */
+  public get townBanner(): HTMLElement {
+    return this.stock.root;
   }
 
   /** Le panneau de debug est-il ouvert ? Ses raccourcis (brouillard) n'agissent qu'alors. */
-  /** Le bandeau de la ville : là où volent les gains du récap hors ligne. */
-  public get townBanner(): HTMLElement {
-    return this.town;
-  }
-
   public get debugOn(): boolean {
-    return this.debug;
+    return this.debug.open;
   }
 
   public toggleDebug(): void {
-    this.debug = !this.debug;
-    this.stats.hidden = !this.debug;
+    this.debug.toggle();
   }
 
   /** Affiche ou masque le compteur de performances ; il attend sa première mesure. */
   public setPerf(on: boolean): void {
-    this.perf.hidden = !on;
-    if (on) this.perf.textContent = '';
+    this.debug.setPerf(on);
   }
 
   /** La moyenne de la dernière fenêtre du compteur (`PerfSampler`). */
   public showPerf(reading: PerfReading): void {
-    this.perf.textContent = t().hud.perf(reading.fps, reading.tickMs, reading.wakes);
+    this.debug.showPerf(reading);
   }
 
-  /** Une bulle empilée ; la plus ancienne part quand il y en a trop. */
   /**
    * Une bulle qui monte puis s'en va. `action` : un bouton dans la bulle —
    * « Essayer » sur une pièce de garde-robe trouvée — qui la ferme en servant.
    */
   public notify(message: string, tone: ToastTone = 'info', action?: { label: string; run: () => void }): void {
-    // Deux fois le même message d'affilée : on relance la bulle au lieu d'en empiler une deuxième.
-    const last = this.toasts.lastElementChild as HTMLElement | null;
-
-    if (last?.textContent === message && last.dataset['leaving'] !== 'true') {
-      last.style.animation = 'none';
-      void last.offsetWidth;
-      last.style.animation = '';
-      return;
-    }
-
-    const toast = element('div', 'hud-toast');
-
-    toast.textContent = message;
-    toast.dataset['tone'] = tone;
-    if (action) {
-      const button = element('button', 'hud-toast-action');
-
-      button.type = 'button';
-      button.textContent = action.label;
-      button.addEventListener('click', () => {
-        toast.remove();
-        action.run();
-      });
-      toast.append(button);
-    }
-    this.toasts.append(toast);
-
-    while (this.toasts.childElementCount > MAX_TOASTS) this.toasts.firstElementChild?.remove();
-
-    window.setTimeout(() => {
-      toast.dataset['leaving'] = 'true';
-      window.setTimeout(() => toast.remove(), 240);
-    }, TOAST_MS);
+    this.toasts.notify(message, tone, action);
   }
 
   /**
@@ -1583,59 +490,7 @@ export class Hud {
    * qui rebondit et un reflet qui la traverse. Elle reste un peu plus longtemps.
    */
   public notifyAchievement(title: string, label: string, reward: string | null): void {
-    const toast = element('div', 'hud-toast hud-toast-achievement');
-    const text = element('div', 'hud-toast-text');
-    const kicker = element('span', 'hud-toast-kicker');
-    const name = element('strong', 'hud-toast-name');
-
-    toast.dataset['tone'] = 'trophy';
-    kicker.textContent = title;
-    name.textContent = label;
-    text.append(kicker, name);
-    if (reward) text.append(Object.assign(element('span', 'hud-toast-reward'), { textContent: reward }));
-    toast.append(uiIcon('trophy', 34), text);
-    this.toasts.append(toast);
-
-    while (this.toasts.childElementCount > MAX_TOASTS) this.toasts.firstElementChild?.remove();
-
-    window.setTimeout(() => {
-      toast.dataset['leaving'] = 'true';
-      window.setTimeout(() => toast.remove(), 240);
-    }, TOAST_MS * 1.5);
-  }
-
-  /**
-   * Le bandeau d'une vague, une seule fois par vague ; `boss` : un gros
-   * mutant ou la Reine (`queen`) mène la charge. Il dit ce qu'elle vise : la
-   * mairie, ou l'usine.
-   */
-  private announce(
-    night: number,
-    wave: number,
-    count: number,
-    bases: number,
-    boss: boolean,
-    queen: boolean,
-    from: Compass,
-    target: BuildingId,
-    origin: { x: number; y: number },
-  ): void {
-    const key = `${night}:${wave}`;
-
-    if (key === this.announced) return;
-    this.announced = key;
-
-    const text = t().hud.wave;
-    const direction = t().hud.from[from];
-    const aim = t().buildings[target].label;
-
-    this.showBanner(
-      'wave',
-      wave === 1 ? text.night(night) : text.reinforcements,
-      queen ? text.queen(direction) : boss ? text.boss(direction, aim) : text.mutants(count, bases, direction, aim),
-      origin,
-      BANNER_WAVE_MS,
-    );
+    this.toasts.notifyAchievement(title, label, reward);
   }
 
   /**
@@ -1654,243 +509,17 @@ export class Hud {
   }
 
   /**
-   * Le soir d'une nuit de Reine, le bandeau compte jusqu'à sa sortie, du
-   * crépuscule à sa vague. Un autre bandeau (une vague, une victoire) passe
-   * devant le temps de se lire ; le compte revient ensuite.
+   * L'objectif choisi dans le panneau : celui que le joueur a touché, tant
+   * qu'il reste à réussir ; sinon le premier qui reste. Son conseil passe
+   * à l'ampoule, ses jauges se déplient sous sa ligne.
    */
-  private updateQueenBanner(): void {
-    const ticks = this.world.queenCountdown();
-    const counting = this.banner.dataset['tone'] === 'queen';
-
-    if (ticks === null) {
-      if (counting) this.banner.hidden = true;
-      return;
-    }
-    if (!this.banner.hidden && !counting) return;
-
-    const seconds = Math.ceil(ticks / TICKS_PER_SECOND);
-    const text = t().hud.wave.queenIn(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`);
-    const title = t().hud.wave.queenNight(this.world.clock()!.cycle);
-
-    if (this.banner.hidden) {
-      this.showBanner('queen', title, text, null, Infinity);
-    } else {
-      // Le titre ne change qu'avec la langue.
-      if (this.bannerTitle.textContent !== title) this.bannerTitle.textContent = title;
-      if (this.bannerText.textContent !== text) this.bannerText.textContent = text;
-    }
+  public selectedObjective(): ObjectiveId | null {
+    return this.quest.selected();
   }
 
-  /** Le bandeau, au-dessus du compte à rebours ; sa flèche suit `target` tant qu'il est là. */
-  private showBanner(tone: 'wave' | 'cleared' | 'queen', title: string, body: string, target: { x: number; y: number } | null, ms: number): void {
-    this.banner.dataset['tone'] = tone;
-    this.bannerTitle.textContent = title;
-    this.bannerText.textContent = body;
-    this.bannerTarget = target;
-    this.bannerArrow.hidden = target === null;
-    this.banner.hidden = false;
-    this.aimBanner();
-
-    // Relance l'animation d'entrée.
-    this.banner.style.animation = 'none';
-    void this.banner.offsetWidth;
-    this.banner.style.animation = '';
-
-    window.clearTimeout(this.bannerTimer);
-    // `Infinity` : il reste jusqu'à ce qu'un autre le remplace (le compte à rebours de la Reine).
-    if (!Number.isFinite(ms)) return;
-    this.bannerTimer = window.setTimeout(() => {
-      this.banner.hidden = true;
-      this.bannerTarget = null;
-    }, ms);
-  }
-
-  /** Tourne la flèche du bandeau d'Adam vers le point d'apparition, à l'écran. */
-  private aimBanner(): void {
-    if (!this.bannerTarget) return;
-
-    const { player } = this.world;
-    const from = this.project(player.x, player.y);
-    const to = this.project(this.bannerTarget.x, this.bannerTarget.y);
-
-    this.bannerArrow.style.transform = `rotate(${Math.atan2(to.y - from.y, to.x - from.x).toFixed(3)}rad)`;
-  }
-
-  /** Un chiffre géant au centre, qui frappe et s'efface — le rythme de l'alarme. */
-  private showCountdown(label: string): void {
-    this.countdown.textContent = label;
-    this.countdown.style.animation = 'none';
-    void this.countdown.offsetWidth;
-    this.countdown.style.animation = '';
-  }
-
-  /**
-   * Le butin d'un point d'intérêt, objet par objet, qui s'envole de (x, y) — pixels monde — vers le
-   * bouton du sac, qui rebondit à chaque arrivée. Sous `prefers-reduced-motion`, il monte sur place
-   * comme un gain ordinaire.
-   */
-  private flyFindsToBag(items: readonly [ItemId, number][], worldX: number, worldY: number, to: 'bag' | 'town' = 'bag'): void {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const origin = this.project(worldX, worldY - 16);
-    const field = this.floats.getBoundingClientRect();
-    const goal = to === 'bag' ? this.bag : this.town;
-    const target = goal.getBoundingClientRect();
-    const dx = target.left + target.width / 2 - field.left - origin.x;
-    const dy = target.top + target.height / 2 - field.top - origin.y;
-
-    for (const [index, [item, amount]] of items.entries()) {
-      if (reduced) {
-        this.float(item, amount);
-        continue;
-      }
-
-      const flier = element('span', 'hud-fly');
-      const delay = index * FLY_STAGGER_MS;
-
-      flier.style.left = `${Math.round(origin.x)}px`;
-      flier.style.top = `${Math.round(origin.y)}px`;
-      flier.append(itemIcon(item, 22), `${amount}`);
-      this.floats.append(flier);
-
-      const flight = flier.animate(
-        [
-          { transform: 'translate(-50%, -50%) scale(0.4)', opacity: 0, offset: 0 },
-          { transform: 'translate(-50%, calc(-50% - 26px)) scale(1.25)', opacity: 1, offset: 0.25 },
-          { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px)) scale(0.55)`, opacity: 1, offset: 0.95 },
-          { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px)) scale(0.3)`, opacity: 0, offset: 1 },
-        ],
-        { duration: FIND_FLY_MS, delay, easing: 'cubic-bezier(0.4, 0, 0.6, 1)', fill: 'backwards' },
-      );
-
-      flight.onfinish = () => {
-        flier.remove();
-        if (to === 'town') {
-          goal.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)', offset: 0.4 }, { transform: 'scale(1)' }], { duration: 240, easing: 'ease-out' });
-          return;
-        }
-        this.bag.dataset['bump'] = 'true';
-        window.setTimeout(() => delete this.bag.dataset['bump'], 260);
-      };
-    }
-  }
-
-  /** Une icône et un delta qui montent de la tête d'Adam et s'effacent. */
-  private float(item: ItemId, delta: number, streak = 0): void {
-    const { player } = this.world;
-    const { x, y } = this.project(player.x, player.y - 44);
-    const floater = element('span', 'hud-float');
-
-    floater.dataset['out'] = String(delta < 0);
-    floater.style.left = `${Math.round(x + (Math.random() - 0.5) * 18)}px`;
-    floater.style.top = `${Math.round(y)}px`;
-    floater.append(`${delta > 0 ? '+' : '−'}${Math.abs(delta)}`, itemIcon(item, 18));
-    // Le combo de récolte : le chiffre grossit avec la série, qui s'écrit au bout.
-    if (streak >= COMBO_SHOWN) {
-      floater.dataset['combo'] = 'true';
-      floater.style.setProperty('--combo', String(Math.min(1.5, 1 + (streak - COMBO_SHOWN) * 0.05)));
-      floater.append(text('hud-float-combo', `×${streak}`));
-    }
-    this.floats.append(floater);
-    window.setTimeout(() => floater.remove(), FLOAT_MS);
-  }
-
-  /**
-   * L'objet récolté part de la tête d'Adam et file dans le bouton du sac, qui
-   * fait « pop » à l'arrivée. Animation du navigateur, sur `transform` et
-   * `opacity` seulement ; au plus `MAX_FLYERS` à la fois, et rien sous
-   * `prefers-reduced-motion`.
-   */
-  private flyToBag(item: ItemId): void {
-    if (this.flyers >= MAX_FLYERS || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-
-    const { player } = this.world;
-    const start = this.project(player.x, player.y - 44);
-    const home = this.floats.getBoundingClientRect();
-    const target = this.bag.getBoundingClientRect();
-    const flyer = element('span', 'hud-flyer');
-
-    flyer.append(itemIcon(item, 20));
-    flyer.style.left = `${Math.round(start.x)}px`;
-    flyer.style.top = `${Math.round(start.y)}px`;
-    this.floats.append(flyer);
-    this.flyers += 1;
-
-    const dx = target.left + target.width / 2 - home.left - start.x;
-    const dy = target.top + target.height / 2 - home.top - start.y;
-    const flight = flyer.animate(
-      [
-        { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
-        { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px)) scale(0.5)`, opacity: 0.9 },
-      ],
-      { duration: FLY_MS, easing: 'cubic-bezier(0.5, 0, 0.8, 0.4)', fill: 'forwards' },
-    );
-
-    flight.onfinish = () => {
-      flyer.remove();
-      this.flyers -= 1;
-      this.bag.animate(
-        [{ transform: 'scale(1)' }, { transform: 'scale(1.18)', offset: 0.4 }, { transform: 'scale(1)' }],
-        { duration: 220, easing: 'ease-out' },
-      );
-    };
-  }
-
-  /** « +N Prestige » qui monte du bâtiment achevé ou de l'ennemi vaincu, en `x`, `y` pixels monde. */
-  private floatPrestige(amount: number, worldX: number, worldY: number): void {
-    const { x, y } = this.project(worldX, worldY - 28);
-    const floater = element('span', 'hud-float hud-float-prestige');
-
-    floater.style.left = `${Math.round(x)}px`;
-    floater.style.top = `${Math.round(y)}px`;
-    floater.append(t().hud.float.prestige(amount), prestigeIcon(18));
-    this.floats.append(floater);
-    window.setTimeout(() => floater.remove(), PRESTIGE_FLOAT_MS);
-  }
-
-  /** « +N XP » qui monte de l'ennemi abattu. */
-  private floatXp(amount: number, worldX: number, worldY: number): void {
-    const { x, y } = this.project(worldX, worldY - 20);
-    const floater = element('span', 'hud-float hud-float-prestige hud-float-xp');
-
-    floater.style.left = `${Math.round(x)}px`;
-    floater.style.top = `${Math.round(y)}px`;
-    floater.append(t().hud.float.xp(amount));
-    this.floats.append(floater);
-    window.setTimeout(() => floater.remove(), PRESTIGE_FLOAT_MS);
-  }
-
-  /** L'icône de l'objet refusé, qui tressaute au-dessus d'Adam : il n'en prend plus. */
-  private refused(item: ItemId): void {
-    const { player } = this.world;
-    const { x, y } = this.project(player.x, player.y - 44);
-    const floater = element('span', 'hud-float');
-
-    floater.dataset['refused'] = 'true';
-    floater.style.left = `${Math.round(x)}px`;
-    floater.style.top = `${Math.round(y)}px`;
-    floater.append(itemIcon(item, 18), t().hud.float.enough);
-    this.floats.append(floater);
-    window.setTimeout(() => floater.remove(), FLOAT_MS);
-  }
-
-  /** « Sac plein » dit où vider : la ville, le chantier qui attend ce qu'Adam porte, ou le sol. */
-  private bagFullMessage(): string {
-    const text = t().hud.toast;
-
-    if (this.world.townStock()) return text.bagFullTown;
-    return carriesWanted(this.world) ? text.bagFullSite : text.bagFullDrop;
-  }
-
-  /** « Mairie bâtie ! » qui monte du toit d'un bâtiment achevé et s'efface. */
-  private celebrate(entity: Pick<Entity, 'tx' | 'ty' | 'width' | 'height'>, message: string): void {
-    const { x, y } = this.project((entity.tx + entity.width / 2) * TILE_SIZE, (entity.ty - 1) * TILE_SIZE);
-    const floater = element('span', 'hud-built');
-
-    floater.style.left = `${Math.round(x)}px`;
-    floater.style.top = `${Math.round(y)}px`;
-    floater.textContent = message;
-    this.floats.append(floater);
-    window.setTimeout(() => floater.remove(), BUILT_MS);
+  /** Des feuilles, des pétales : la pluie de confettis, en CSS. Chacune part au bout de sa chute. */
+  public rainLeaves(): void {
+    this.celebration.rainLeaves();
   }
 
   /**
@@ -1900,9 +529,9 @@ export class Hud {
    */
   public frame(): void {
     this.tips.refresh();
-    this.updateSpeech();
-    this.updatePerson();
-    if (!this.banner.hidden) this.aimBanner();
+    this.eve.frame();
+    this.person.frame();
+    this.banner.frame();
   }
 
   /**
@@ -1910,23 +539,20 @@ export class Hud {
    * `atlas` et `water` viennent du renderer : le monde ne les connaît pas.
    */
   public update(fps: number, chunks: number, atlas: AtlasStats, water: WaterStats, weatherParticles = 0): void {
-    this.updateQuest();
+    this.quest.update();
     this.updateClock();
-    this.updateFold();
-    this.updateHint();
-    this.updateBag();
-    this.updateTown();
-    this.updatePrestige();
-    this.updateLevel();
-    this.updatePeople();
-    this.updateHunger();
-    this.updateWave();
-    this.updateVignette();
-    this.updateWeather();
+    this.quest.updateFold();
+    this.advice.update();
+    this.bagButton.update(this.advice.wantedItem());
+    this.stock.update();
+    this.census.update();
+    this.hunger.update();
+    this.wave.update();
+    this.weather.update();
     this.events.update();
-    this.updateDeath();
-    this.placeCelebration();
-    this.updateQueenBanner();
+    this.death.update();
+    this.celebration.place();
+    this.banner.updateQueen();
     const danger = String(this.mutantCount() > 0 && !this.world.defeated);
 
     if (this.root.dataset['danger'] !== danger) this.root.dataset['danger'] = danger;
@@ -1934,7 +560,16 @@ export class Hud {
       this.root.dataset['alarm'] = 'false';
     }
 
-    if (this.debug) this.updateStats(fps, chunks, atlas, water, weatherParticles);
+    this.debug.update(fps, chunks, atlas, water, weatherParticles);
+  }
+
+  /** L'horloge, et les capsules qui la suivent : la Volée, « Passer la nuit », la faveur, le talent. */
+  private updateClock(): void {
+    this.night.updateSkill();
+    this.night.updateHasten();
+    this.favors.updateBoon();
+    this.favors.updateTalent();
+    this.dial.update();
   }
 
   private mutantCount(): number {
@@ -1950,1190 +585,47 @@ export class Hud {
     return count;
   }
 
-  /* ----------------------------------------------------------------- quête */
-
-  private updateQuest(): void {
-    const { world } = this;
-    const hall = world.entities.get(world.townHallId);
-    const name = t().buildings.townHall.label;
-    const words = t().hud.quest;
-    let key: string;
-
-    if (!hall) {
-      key = 'fallen';
-      if (key === this.lastQuest) return;
-      this.lastQuest = key;
-      this.quest.dataset['mode'] = 'fallen';
-      this.questTitle.textContent = words.defeat;
-      this.questBody.replaceChildren(text('hud-quest-goal', words.hallFallen));
-      this.questStrip.replaceChildren(uiIcon('heart', 18), text('hud-strip-title', words.hallFallen));
-      return;
-    }
-
-    // Les objectifs du chapitre : une ligne chacun, le choisi déplié en jauges.
-    const objectives = chapterObjectives(world);
-    const selected = this.selectedObjective();
-    const lines = objectives.map((objective) => objectiveLine(world, objective.id, objective.goals));
-    const chapter = currentChapter(world);
-    const done = objectives.filter(({ id }) => world.objectivesDone.has(id)).length;
-    const detail = selected ? objectiveDetail(world, selected) : [];
-    const progressKey = lines.map((line) => `${line.done}:${line.have}/${line.need}`).join(',');
-    const detailKey = detail.map((row) => row.key).join(',');
-
-    if (hall.kind === 'site') {
-      key = `site:${progressKey}:${detailKey}:${selected}`;
-      if (key === this.lastQuest) return;
-      this.lastQuest = key;
-      this.quest.dataset['mode'] = 'build';
-      this.questTitle.textContent = chapterLabel(world.chapter);
-      this.renderObjectives(lines, selected);
-      this.questBody.replaceChildren(chapterHead(world.chapter, done, objectives.length), this.objectiveList, ...detail.map((row) => row.node()));
-      this.questStrip.dataset['urgent'] = 'false';
-      this.questStrip.replaceChildren(...chapterStrip(world.chapter, done, objectives.length));
-      return;
-    }
-
-    const max = BUILDINGS[hall.proto].hp;
-
-    this.hallLow = hall.hp / max < QUEST_ALERT_HP;
-
-    const mutants = this.mutantCount();
-    const { adults, children, workers } = world.population();
-    const people = adults + children;
-    const crew = world.workforce();
-    if (this.crewOpen && world.tickCount - this.crewSince >= CREW_FOLD_TICKS) this.crewOpen = false;
-
-    // L'heure est à l'horloge de la tête ; la ligne ne parle que de l'attaque.
-    const status = mutants > 0 ? words.status(world.night, mutants) : '';
-
-    const quest = world.eve()?.state === 'idle' || world.eve()?.state === 'repair' ? currentQuest(world.questsDone) : null;
-    const progress = quest ? questProgress(quest, world.entities.values()) : null;
-
-    const daily = world.challenge();
-
-    key = `hall:${world.chapter}:${progressKey}:${detailKey}:${selected}:${hall.hp}:${status}:${people}:${workers}:${world.kills}:${quest}:${progress?.have}:${this.crewOpen && JSON.stringify(crew)}:${daily && `${daily.id}:${daily.have}:${daily.done}:${daily.streak}`}`;
-    if (key === this.lastQuest) return;
-    this.lastQuest = key;
-
-    // Les objectifs restent affichés pendant l'attaque : seul le titre crie.
-    this.quest.dataset['mode'] = mutants > 0 ? 'wave' : 'defend';
-    this.questTitle.textContent = mutants > 0 ? words.attack : chapterLabel(world.chapter);
-
-    const hp = element('div', 'hud-meter hud-meter-hp');
-    const hpLabel = text('hud-meter-label', name);
-
-    hpLabel.prepend(uiIcon('heart', 18));
-    const hpBar = bar(hall.hp / max);
-    const hpValue = text('hud-meter-value', `${hall.hp}/${max}`);
-
-    hp.dataset['low'] = String(hall.hp / max < 0.35);
-    hp.append(hpLabel, hpBar, hpValue);
-
-    const line = element('div', 'hud-quest-line');
-    const chips = element('div', 'hud-quest-chips');
-
-    chips.append(chip('people', people + workers, words.inhabitants), this.crewChip(crew.free, crew.total), chip('mutant', world.kills, words.kills));
-    if (status) line.append(text('hud-quest-wave', status));
-    line.append(chips);
-    this.renderObjectives(lines, selected);
-    this.questBody.replaceChildren(
-      ...(chapter
-        ? [chapterHead(world.chapter, done, objectives.length), this.objectiveList, ...detail.map((row) => row.node())]
-        : [text('hud-quest-goal', words.endless)]),
-      hp,
-      line,
-    );
-    if (this.crewOpen) this.questBody.append(crewDetail(crew));
-    if (daily) this.questBody.append(dailyRow(daily));
-
-    if (quest && progress) {
-      const row = element('div', 'hud-quest-eve');
-
-      row.append(uiIcon('eve', 18), text('hud-quest-eve-label', t().quests[quest].label), text('hud-meter-value', `${progress.have}/${progress.need}`));
-      this.questBody.append(row);
-    }
-
-    // La ligne repliée : le chapitre et son avancement, l'attaque si elle crie.
-    const stripHp = element('div', 'hud-strip-hp');
-
-    stripHp.append(bar(hall.hp / max));
-    setTip(stripHp, `${name} ${hall.hp}/${max}`);
-    stripHp.dataset['low'] = hp.dataset['low'];
-    this.questStrip.dataset['urgent'] = String(mutants > 0);
-    this.questStrip.replaceChildren(
-      ...(mutants > 0
-        ? [uiIcon('mutant', 20), text('hud-strip-title', words.attack)]
-        : chapter
-          ? chapterStrip(world.chapter, done, objectives.length)
-          : [uiIcon('goal', 20), text('hud-strip-title', words.afterSignal)]),
-      stripHp,
-    );
-  }
-
   /**
-   * L'objectif choisi dans le panneau : celui que le joueur a touché, tant
-   * qu'il reste à réussir ; sinon le premier qui reste. Son conseil passe
-   * à l'ampoule, ses jauges se déplient sous sa ligne.
+   * Défait le HUD : chaque composant débranche ce qu'il a branché hors de lui
+   * (événements du monde, langue, fenêtre, document, minuteurs), puis la
+   * racine quitte le DOM. Une partie quittée sans recharger n'écoute plus rien.
    */
-  public selectedObjective(): ObjectiveId | null {
-    const { world } = this;
-    const open = openObjectives(world);
-    const chosen = this.chosenObjective;
-
-    if (chosen && open.some(({ id }) => id === chosen)) return chosen;
-    return firstOpenObjective(world);
-  }
-
-  /** Les lignes des objectifs, gardées d'une mise à jour à l'autre : le focus de la manette ne saute pas. */
-  private renderObjectives(lines: ObjectiveLine[], selected: ObjectiveId | null): void {
-    const ids = lines.map((line) => line.id).join(',');
-
-    if (this.objectiveList.dataset['ids'] !== ids) {
-      this.objectiveList.dataset['ids'] = ids;
-      this.objectiveRows.clear();
-      this.objectiveList.replaceChildren(
-        ...lines.map((line) => {
-          const row = objectiveRow(line.id, () => this.chooseObjective(line.id));
-
-          this.objectiveRows.set(line.id, row);
-          return row.node;
-        }),
-      );
+  public dispose(): void {
+    this.reactions.dispose();
+    this.events.dispose();
+    this.disposer.dispose();
+    this.resize.disconnect();
+    for (const part of [
+      this.quest,
+      this.advice,
+      this.dial,
+      this.night,
+      this.favors,
+      this.bagButton,
+      this.stock,
+      this.census,
+      this.hunger,
+      this.wave,
+      this.weather,
+      this.person,
+      this.eve,
+      this.banner,
+      this.toasts,
+      this.floats,
+      this.debug,
+      this.celebration,
+      this.victory,
+      this.death,
+      this.defeat,
+      this.buttons,
+    ]) {
+      part.dispose();
     }
-    for (const line of lines) this.objectiveRows.get(line.id)?.update(line, line.id === selected);
-  }
-
-  /** Un tap sur la ligne d'un objectif le choisit : ses jauges, et son conseil à l'ampoule. */
-  private chooseObjective(id: ObjectiveId): void {
-    this.chosenObjective = id;
-    // Fermé au menu : le doigt va au labo — ou à son chantier — où la recherche se lance.
-    const lab = objectiveLock(this.world, id) ? labSpot(this.world) : null;
-
-    if (lab) this.onFocus((lab.tx + lab.width / 2) * TILE_SIZE, (lab.ty + lab.height / 2) * TILE_SIZE);
-    this.unfoldQuest(QUEST_TAP_TICKS);
-    this.updateQuest();
-    this.updateHint();
-    this.unfoldHint();
-  }
-
-  /**
-   * L'horloge : le cadran (`World.dayDial`) et « J2 » d'un coup d'œil, le
-   * détail en toutes lettres au tap et pour les lecteurs d'écran. Cachée tant
-   * que la mairie est en chantier — le cycle n'a pas commencé.
-   */
-  /**
-   * « Passer la nuit » : le bouton n'existe que par nuit calme ; actif, il dit
-   * le temps jusqu'à l'aube. Un mutant qui reparaît, l'aube, la défaite : le
-   * bouton disparaît et le temps reprend son pas.
-   */
-  private updateHasten(): void {
-    const calm = this.world.calmNight();
-
-    if (!calm) this.hastening = false;
-    if (this.hastenButton.hidden !== !calm) this.hastenButton.hidden = !calm;
-    if (!calm) return;
-
-    const dial = this.world.dayDial();
-    const words = t().hud.hasten;
-    const label = this.hastening && dial ? words.active(clock(Math.ceil(dial.left / TICKS_PER_SECOND))) : words.idle;
-    const key = `${locale()}|${label}`;
-
-    if (key === this.hastenKey) return;
-    this.hastenKey = key;
-    this.hastenButton.dataset['active'] = String(this.hastening);
-    this.hastenButton.setAttribute('aria-pressed', String(this.hastening));
-    this.hastenButton.replaceChildren(uiIcon('hasten', 18), text('hud-wave-text', label));
-    setTip(this.hastenButton, label);
-  }
-
-  /**
-   * La capsule de la faveur : « Faveur de l'aube » qui bat tant qu'une carte
-   * attend ; puis l'icône du coup de pouce et le temps qui lui reste. Un colis
-   * pris ne laisse rien : il est déjà en ville.
-   */
-  private updateBoon(): void {
-    const offer = this.world.boonOffer();
-    const active = this.world.activeBoon();
-    const visible = offer !== null || active !== null;
-
-    if (this.boonButton.hidden !== !visible) this.boonButton.hidden = !visible;
-    if (!visible) return;
-
-    const words = t().hud.boon;
-    const seconds = active ? Math.ceil(active.left / TICKS_PER_SECOND) : 0;
-    const key = offer ? `offer|${locale()}` : `active|${active!.id}|${locale()}|${seconds}`;
-
-    if (key === this.boonKey) return;
-    this.boonKey = key;
-    this.boonButton.dataset['state'] = offer ? 'offer' : 'active';
-    if (offer) {
-      this.boonButton.replaceChildren(uiIcon('gift', 18), text('hud-wave-text', words.offer));
-      setTip(this.boonButton, words.offer);
-      return;
-    }
-
-    const { icon } = BOONS[active!.id];
-    const label = t().boons[active!.id];
-
-    this.boonButton.replaceChildren('item' in icon ? itemIcon(icon.item, 18) : uiIcon(icon.ui, 18), text('hud-wave-text', clock(seconds)));
-    setTip(this.boonButton, `${label.label} — ${label.description}`);
-  }
-
-  /** La capsule du talent : « Talent à choisir » qui bat tant qu'un niveau attend son talent. */
-  private updateTalent(): void {
-    const pending = this.world.talentOffer()?.pending ?? 0;
-
-    if (this.talentButton.hidden !== (pending === 0)) this.talentButton.hidden = pending === 0;
-    this.level.dataset['pending'] = String(pending > 0);
-    if (pending === 0) return;
-
-    const key = `${pending}|${locale()}`;
-
-    if (key === this.talentKey) return;
-    this.talentKey = key;
-
-    const label = t().hud.talent.offer;
-
-    this.talentButton.replaceChildren(uiIcon('trophy', 18), text('hud-wave-text', pending > 1 ? `${label} ×${pending}` : label));
-    setTip(this.talentButton, label);
-  }
-
-  /**
-   * La Volée : visible du crépuscule à l'aube (ou tant qu'un mutant rôde), un
-   * anneau de recharge qui se vide ; le combo de nuit dans sa capsule. Le DOM
-   * n'est refait que si la clé change.
-   */
-  private updateSkill(): void {
-    const on = this.world.skillOn();
-    const skill = this.world.skill();
-
-    if (this.skillButton.hidden !== !on) this.skillButton.hidden = !on;
-    if (on) {
-      const seconds = Math.ceil(skill.left / TICKS_PER_SECOND);
-      const key = `${seconds}|${skill.ready}|${locale()}`;
-
-      this.skillButton.style.setProperty('--charge', `${Math.round((1 - skill.left / skill.total) * 100)}%`);
-      if (key !== this.skillKey) {
-        this.skillKey = key;
-        this.skillButton.dataset['ready'] = String(skill.ready);
-        this.skillButton.replaceChildren(uiIcon('volley', 28), ...(skill.ready ? [] : [text('hud-skill-left', String(seconds))]));
-        const label = skill.ready ? t().hud.skill.ready(t().menu.keys.space) : t().hud.skill.cooling(seconds);
-
-        setTip(this.skillButton, label);
-        this.skillButton.setAttribute('aria-label', label);
-      }
-    }
-
-    const combo = this.world.combo();
-
-    if (this.comboChip.hidden !== !combo) this.comboChip.hidden = !combo;
-    if (!combo) return;
-
-    const multiplier = String(combo.multiplier);
-    const key = `${combo.count}|${multiplier}|${locale()}`;
-
-    this.comboChip.style.setProperty('--fill', `${Math.round((combo.ticksLeft / COMBO.windowTicks) * 100)}%`);
-    if (key === this.comboKey) return;
-    this.comboKey = key;
-    this.comboChip.dataset['hot'] = String(combo.multiplier > 1);
-    this.comboChip.replaceChildren(uiIcon('volley', 18), text('hud-wave-text', t().hud.skill.combo(combo.count, multiplier)));
-    setTip(this.comboChip, t().hud.skill.comboTip);
-  }
-
-  private updateClock(): void {
-    this.updateSkill();
-    this.updateHasten();
-    this.updateBoon();
-    this.updateTalent();
-    const dial = this.world.dayDial();
-
-    if (this.dayClock.hidden !== !dial) this.dayClock.hidden = !dial;
-    if (!dial) return;
-
-    const left = clock(Math.ceil(dial.left / TICKS_PER_SECOND));
-    const detail = dial.night ? t().hud.clock.night(dial.day, left) : t().hud.clock.day(dial.day, left);
-    const tip = this.world.tickCount < this.clockTipUntil;
-    const step = Math.round(dial.progress * DIAL_STEPS) % DIAL_STEPS;
-    const key = `${step}:${dial.night}:${dial.warning}:${detail}:${tip}`;
-
-    if (key === this.lastClock) return;
-
-    const [lastStep, lastNight, lastWarning] = this.lastClock.split(':');
-
-    this.lastClock = key;
-    if (String(step) !== lastStep || String(dial.night) !== lastNight || String(dial.warning) !== lastWarning) {
-      this.dayClockDial.src = dayDialUrl(dayDialSvg(DIAL_ARCS, step / DIAL_STEPS, dial.night, dial.warning));
-    }
-    this.dayClockDay.textContent = t().hud.clock.short(dial.day);
-    this.dayClockTip.textContent = detail;
-    this.dayClock.dataset['phase'] = dial.phase;
-    this.dayClock.dataset['warning'] = String(dial.warning);
-    this.dayClock.dataset['tip'] = String(tip);
-    setTip(this.dayClock, detail);
-  }
-
-  /** Déplie la quête repliée pour `ticks`, sans raccourcir un dépliage plus long. */
-  private unfoldQuest(ticks: number): void {
-    this.questOpenUntil = Math.max(this.questOpenUntil, this.world.tickCount + ticks);
-    this.updateFold();
-  }
-
-  /** Ouverte ou fermée : la quête n'est une fenêtre sous la barre que le temps de la lire (cf. `style.css`). */
-  private updateFold(): void {
-    const folded = String(this.world.tickCount >= this.questOpenUntil);
-
-    if (this.quest.dataset['folded'] !== folded) {
-      this.quest.dataset['folded'] = folded;
-      this.objective.setAttribute('aria-expanded', String(folded === 'false'));
-    }
-  }
-
-  /** Un tap sur l'objectif ouvre la quête ; un autre, ou un tap sur sa tête, la ferme. */
-  private toggleQuest(): void {
-    this.questOpenUntil = this.quest.dataset['folded'] === 'false' ? 0 : this.world.tickCount + QUEST_TAP_TICKS;
-    this.updateFold();
-  }
-
-  /**
-   * Le compteur d'ouvriers, « libres/total » : ce qui reste pour pourvoir un
-   * bâtiment. Un tap déplie leur détail sous la ligne, un autre le replie — le temps s'en charge sinon.
-   */
-  private crewChip(free: number, total: number): HTMLElement {
-    const node = text('hud-quest-chip hud-quest-crew', `${free}/${total}`, 'button');
-
-    node.setAttribute('type', 'button');
-    node.setAttribute('aria-expanded', String(this.crewOpen));
-    node.prepend(uiIcon('worker', 18));
-    setTip(node, t().hud.quest.crew(free, total));
-    node.addEventListener('click', () => {
-      this.crewOpen = !this.crewOpen;
-      this.crewSince = this.world.tickCount;
-      this.unfoldQuest(QUEST_TAP_TICKS);
-      this.updateQuest();
-    });
-    return node;
-  }
-
-  /* --------------------------------------------------------------- conseil */
-
-  /** Le conseil sous la quête, cf. `hint.ts`. */
-  private currentAdvice(): Advice | null {
-    const { world } = this;
-    const towers = [...world.entities.values()].some((entity) => entity.kind === 'tower');
-
-    return tutorialAdvice(
-      world,
-      {
-        harvestedWood: this.harvestedWood,
-        harvestedStone: this.harvestedStone,
-        delivered: this.delivered,
-        repaired: this.repaired,
-      },
-      towers,
-      this.mutantCount(),
-      this.selectedObjective(),
-    );
-  }
-
-  private updateHint(): void {
-    const advice = this.currentAdvice();
-    const hint = advice?.text ?? '';
-
-    this.wanted = advice?.wants ?? null;
-    this.pointed = advice?.pointTo ?? this.wanted;
-    this.advisedResearch = advice?.research ?? null;
-    this.hint.dataset['urgent'] = String(advice?.urgent === true);
-
-    // La langue vient de changer : le même conseil, dans l'autre langue, sans le relancer ni le déplier.
-    if (hint !== this.lastHint && this.hintLocale !== locale()) {
-      this.hintLocale = locale();
-      this.lastHint = hint;
-      if (hint !== '') this.hintText.textContent = hint;
-    } else if (hint !== this.lastHint) {
-      this.lastHint = hint;
-      this.hintSince = this.world.tickCount;
-      if (hint !== '') this.unfoldQuest(HINT_FOLD_TICKS);
-      // Le texte reste en place quand le conseil se tait : il part en se repliant.
-      if (hint !== '') this.hintText.textContent = hint;
-
-      // Relance l'animation d'entrée à chaque nouveau conseil.
-      this.hint.style.animation = 'none';
-      void this.hint.offsetWidth;
-      this.hint.style.animation = '';
-    }
-
-    const folded = this.world.tickCount - this.hintSince >= HINT_FOLD_TICKS;
-    const state = hint === '' ? 'none' : folded ? 'folded' : 'open';
-
-    if (this.quest.dataset['hint'] !== state) this.quest.dataset['hint'] = state;
-  }
-
-  /** Le tap sur l'ampoule : le conseil revient pour cinq secondes. */
-  private unfoldHint(): void {
-    this.hintSince = this.world.tickCount;
-    this.quest.dataset['hint'] = this.lastHint === '' ? 'none' : 'open';
-    this.unfoldQuest(HINT_FOLD_TICKS);
-  }
-
-  /* ----------------------------------------------------------------- météo */
-
-  /** La capsule météo : l'annonce et son compte à rebours, puis le temps qu'il reste. */
-  private updateWeather(): void {
-    const { world } = this;
-    const spell = world.weather();
-    const next = spell ? null : world.nextWeather();
-    const coming = next && next.start - world.tickCount <= WEATHER_CALENDAR.announceTicks ? next : null;
-    const shown = spell ?? coming;
-    let label = '';
-
-    if (shown) {
-      const seconds = Math.ceil(((spell ? shown.end : shown.start) - world.tickCount) / TICKS_PER_SECOND);
-      const name = t().weather[shown.id].label;
-
-      label = spell ? `${name} · ${clock(seconds)}` : t().hud.weather.soon(name, seconds);
-    }
-
-    if (label === this.lastWeather) return;
-    this.lastWeather = label;
-    this.weather.hidden = !shown;
-    if (!shown) return;
-
-    this.weather.dataset['soon'] = String(!spell);
-    this.weather.dataset['harsh'] = String(WEATHER[shown.id].harsh);
-    this.weather.textContent = label;
-  }
-
-  /* ------------------------------------------------------------------- sac */
-
-  /**
-   * Le sac : un gros bouton violet en bas à gauche, le pendant de « Bâtir » —
-   * son pictogramme, « Sac », « 7/60 » dans une capsule qui se remplit,
-   * l'objet que le conseil réclame et la touche I. Le détail est dans le
-   * panneau qu'il ouvre. Le DOM n'est reconstruit que si le contenu change —
-   * comparer une clé texte coûte moins qu'un diff.
-   */
-  private updateBag(): void {
-    const { inventory } = this.world.player;
-    const entries = inventory.entries();
-    const stock = this.world.townStock();
-    const town = stock?.entries().reduce((sum, [, amount]) => sum + amount, 0) ?? null;
-    const wanted = this.wanted;
-    const key = `${inventory.total()}/${inventory.capacity}|${entries.map(([item, amount]) => `${item}:${amount}`).join(',')}|${town}|${wanted}|${locale()}`;
-
-    if (key === this.lastBag) return;
-    this.lastBag = key;
-
-    const label = t().hud.stock;
-    const full = inventory.freeSpace() <= 0;
-    const count = text('hud-bag-count', `${inventory.total()}/${inventory.capacity}`);
-    const hint = element('kbd', 'key-hint');
-
-    count.dataset['full'] = String(full);
-    count.style.setProperty('--fill', `${Math.round((inventory.total() / inventory.capacity) * 100)}%`);
-    hint.textContent = t().menu.keys.inventory;
-    this.bag.replaceChildren(uiIcon('bagButton', 28), count);
-    if (wanted) {
-      const chip = itemAmount(wanted, inventory.count(wanted));
-
-      chip.classList.add('hud-bag-wanted');
-      chip.lastElementChild!.textContent = `×${inventory.count(wanted)}`;
-      chip.dataset['empty'] = String(inventory.count(wanted) === 0);
-      setTip(chip, label.wanted(t().items[wanted], inventory.count(wanted)));
-      this.bag.append(chip);
-    }
-    this.bag.append(hint);
-    this.bag.dataset['full'] = String(full);
-    setTip(this.bag, label.bagTip(inventory.total(), inventory.capacity));
-    this.bag.setAttribute(
-      'aria-label',
-      town === null ? label.bagLabel(inventory.total(), inventory.capacity) : label.bagLabelTown(inventory.total(), inventory.capacity, town),
-    );
-  }
-
-  /**
-   * La ville : le stock commun, ce que les chantiers et les porteurs
-   * consomment. Tant que la mairie est en chantier, il n'y a pas de ville —
-   * la carte le dit au lieu de montrer un stock vide. À côté de chaque objet,
-   * sa tendance sur la dernière minute de jeu (`TownFlows.trend`) : une
-   * flèche menthe s'il monte, corail s'il baisse, rien s'il stagne. Au bout
-   * du bandeau, le bouton du panneau des ressources. Un objet d'un besoin
-   * (nourriture, eau) y reste à 0, en corail, une fois la mairie bâtie ; les
-   * autres disparaissent à zéro.
-   */
-  private updateTown(): void {
-    const stock = this.world.townStock();
-    const entries = stock ? withVitals(stock.entries()) : [];
-    const { flows } = this.world;
-    const key = stock ? entries.map(([item, amount]) => `${item}:${amount}:${flows.trend(item)}:${this.world.townHasPlenty(item)}`).join(',') : 'none';
-
-    if (key === this.lastTown) return;
-    this.lastTown = key;
-
-    const title = this.townTitle;
-    const label = t().hud.stock;
-
-    title.replaceChildren(uiIcon('town', 20));
-    if (!stock) title.append(text('hud-town-state', label.toBuild));
-    setTip(title, label.townTitle);
-
-    // La liste reste le même nœud : son défilement tient sans le relire.
-    this.townList.replaceChildren(...entries.map(([item, amount]) => townEntry(item, amount, flows.trend(item), this.world.townHasPlenty(item))));
-    this.town.dataset['empty'] = String(entries.length === 0);
-    this.resourcesButton.hidden = !stock;
-    // Le niveau d'Adam et le Prestige ouvrent le bandeau, avant la ville et ses objets ; le bouton des ressources le ferme.
-    if (this.townList.parentNode !== this.town) this.town.replaceChildren(this.level, this.prestige, title, this.townList, this.resourcesButton);
-    // Le bord qui s'estompe se relit en tête de la frame suivante (`measureLayout`), sans forcer la mise en page.
-    this.townOverflowDirty = true;
-  }
-
-  private townItems(): HTMLElement | null {
-    return this.townList.isConnected ? this.townList : null;
-  }
-
-  /** Le bandeau de la ville cache-t-il encore des objets à droite ? */
-  private markTownOverflow(): void {
-    const items = this.townItems();
-
-    if (!items) return;
-    const more = String(items.scrollLeft + items.clientWidth < items.scrollWidth - 1);
-
-    if (items.dataset['more'] !== more) items.dataset['more'] = more;
-  }
-
-  /** Le Prestige : caché tant que la colonie n'en a pas, puis toujours là, en tête du bandeau de la ville. */
-  private updatePrestige(): void {
-    const { prestige } = this.world;
-    const key = String(prestige);
-
-    if (key === this.lastPrestige) return;
-    this.lastPrestige = key;
-
-    const label = t().hud.stock;
-
-    this.prestige.hidden = prestige <= 0;
-    this.prestige.replaceChildren(prestigeIcon(18), text('hud-prestige-count', key));
-    setTip(this.prestige, label.prestigeLabel(prestige));
-  }
-
-  /** Le niveau d'Adam : « Niv. 3 » et une fine barre d'XP dessous, en tête du bandeau de la ville. */
-  private updateLevel(): void {
-    const { level, into, needed } = levelProgress(this.world.player.xp);
-    const max = level >= MAX_LEVEL;
-    const key = `${level}:${into}`;
-
-    if (key === this.lastLevel) return;
-    this.lastLevel = key;
-
-    const label = t().hud.stock;
-    const bar = element('span', 'hud-level-bar');
-    const fill = element('span', 'hud-level-fill');
-
-    fill.style.width = `${Math.round((into / needed) * 100)}%`;
-    bar.append(fill);
-    this.level.replaceChildren(text('hud-level-label', label.level(level)), bar);
-    setTip(this.level, label.levelTip(level, into, needed, max));
-  }
-
-  /* ------------------------------------------------------------ célébration */
-
-  /** Ce qu'une récompense n'a pas pu mettre dans le sac attend à la mairie : le joueur le sait. */
-  private notifyStored(stored: Partial<Record<ItemId, number>>): void {
-    const kept = (Object.entries(stored) as [ItemId, number][]).filter(([, amount]) => amount > 0);
-
-    if (kept.length === 0) return;
-
-    const list = kept.map(([item, amount]) => t().hud.toast.storedItem(amount, t().items[item])).join(', ');
-
-    this.notify(t().hud.toast.storedAtHall(list), 'info');
-  }
-
-  /** Un objectif réussi, le chapitre continue : la case de la barre rebondit en menthe, un toast dit ce qu'il rapporte. */
-  private celebrateObjective(id: ObjectiveId): void {
-    const words = t().objectives[id];
-
-    this.notify(t().hud.toast.objectiveDone(words.title, words.celebration), 'good');
-    this.objective.dataset['done'] = 'true';
-    window.clearTimeout(this.objectiveDoneTimer);
-    this.objectiveDoneTimer = window.setTimeout(() => {
-      if (this.celebration.hidden) delete this.objective.dataset['done'];
-    }, OBJECTIVE_DONE_MS);
-  }
-
-  /** Un chapitre fini : un bandeau qui dit ce qu'il rapporte, et des feuilles qui pleuvent. */
-  private celebrateChapter(index: number): void {
-    const words = t().chapters[index];
-
-    if (!words) return;
-
-    const title = text('hud-celebration-title', words.banner || t().hud.chapterDone);
-
-    title.prepend(uiIcon('goal', 28));
-    this.celebration.replaceChildren(
-      title,
-      text('hud-celebration-goal', words.title),
-      text('hud-celebration-text', words.celebration),
-    );
-    this.celebration.hidden = false;
-    this.objective.dataset['done'] = 'true';
-    this.celebration.style.animation = 'none';
-    void this.celebration.offsetWidth;
-    this.celebration.style.animation = '';
-
-    window.clearTimeout(this.celebrationTimer);
-    this.celebrationTimer = window.setTimeout(() => {
-      this.celebration.hidden = true;
-      delete this.objective.dataset['done'];
-    }, CELEBRATION_MS);
-
-    this.rainLeaves();
-  }
-
-  /**
-   * Une fenêtre ouverte (bâtiment ou sac) : le bandeau ne se pose pas dessus.
-   * Il se range sous la barre, à sa largeur, et la fenêtre se tasse sous lui
-   * (`--celebration-bottom`, cf. le CSS) — jamais deux cartes l'une sur l'autre.
-   * Rien ne se relit ici : la place se refait à l'ouverture ou à la fermeture
-   * d'une fenêtre, et quand la mise en page change (`measureLayout`).
-   */
-  private placeCelebration(): void {
-    const docked = !this.celebration.hidden && this.root.querySelector('.building-panel:not([hidden])') !== null;
-
-    if (docked === this.docked) return;
-    this.docked = docked;
-    this.dockCelebration();
-  }
-
-  /** Écrit la place du bandeau d'après la mise en page en cache : sous `.hud-top`, centré sur la barre. */
-  private dockCelebration(): void {
-    if (!this.docked || !this.barRect) {
-      if (this.root.dataset['celebration'] !== 'docked') return;
-      delete this.root.dataset['celebration'];
-      this.celebration.style.removeProperty('top');
-      this.celebration.style.removeProperty('left');
-      this.celebration.style.removeProperty('width');
-      return;
-    }
-
-    const bar = this.barRect;
-    // Sur un téléphone, le Prestige, la ville et l'horloge font une rangée sous la barre.
-    const top = Math.round(this.topRowBottom + CELEBRATION_GAP);
-
-    this.root.dataset['celebration'] = 'docked';
-    this.celebration.style.top = `${top}px`;
-    this.celebration.style.left = `${Math.round(bar.left + bar.width / 2)}px`;
-    this.celebration.style.width = `${Math.round(Math.min(bar.width, CELEBRATION_WIDTH))}px`;
-    this.root.style.setProperty('--celebration-bottom', `${top + Math.round(this.celebrationHeight)}px`);
-  }
-
-  /** Des feuilles, des pétales : la pluie de confettis, en CSS. Chacune part au bout de sa chute. */
-  public rainLeaves(): void {
-    for (let i = 0; i < CONFETTI_COUNT; i += 1) {
-      const leaf = uiIcon(CONFETTI[i % CONFETTI.length]!, 18 + Math.round(Math.random() * 12));
-
-      leaf.classList.add('hud-leaf');
-      leaf.style.left = `${Math.round(Math.random() * 100)}%`;
-      leaf.style.setProperty('--delay', `${Math.round(Math.random() * 900)}ms`);
-      leaf.style.setProperty('--drift', `${Math.round((Math.random() - 0.5) * 120)}px`);
-      leaf.style.setProperty('--spin', `${Math.round((Math.random() - 0.5) * 900)}deg`);
-      this.confetti.append(leaf);
-      window.setTimeout(() => leaf.remove(), CONFETTI_MS + 1000);
-    }
-  }
-
-  /* ---------------------------------------------------------------- victoire */
-
-  private showVictory(): void {
-    this.renderVictory();
-    this.victory.hidden = false;
-    this.rainLeaves();
-  }
-
-  /** Le bilan de la victoire, dans la langue du moment. */
-  private renderVictory(): void {
-    const { world } = this;
-    const label = t().hud.victory;
-    const { adults, children, workers } = world.population();
-    let buildings = 0;
-
-    for (const entity of world.entities.values()) if (entity.kind !== 'site') buildings += 1;
-
-    const rows: [string, string][] = [
-      [label.nights, String(world.stats.nightsSurvived)],
-      [label.kills, String(world.kills)],
-      [label.inhabitants, String(adults + children + workers)],
-      [label.buildings, String(buildings)],
-      [label.playTime, clock(Math.floor(world.victoryTick / TICKS_PER_SECOND))],
-    ];
-
-    this.victoryStats.replaceChildren(
-      ...rows.flatMap(([name, value]) => [text('', name, 'dt'), text('', value, 'dd')]),
-    );
-
-    // Les mêmes graines que `main.ts` verse au jardin à la refondation.
-    const amount = text('overlay-seeds-amount', label.seeds(seedsFor(world.colonyScore())));
-
-    amount.prepend(uiIcon('seed', 28));
-    this.victorySeeds.replaceChildren(amount, text('overlay-seeds-hint', label.seedsHint));
-  }
-
-  /* ------------------------------------------------------------------ mort */
-
-  /** Le compte à rebours de la mort, réécrit seulement quand la seconde change. */
-  private updateDeath(): void {
-    if (this.death.hidden) return;
-
-    const seconds = this.world.respawnSeconds();
-
-    if (seconds === this.lastDeathSeconds) return;
-    this.lastDeathSeconds = seconds;
-    this.deathCount.textContent = t().hud.death.countdown(seconds);
-  }
-
-  /* ---------------------------------------------------------------- défaite */
-
-  private showDefeat(): void {
-    this.renderDefeat();
-    this.defeat.hidden = false;
-  }
-
-  /** Le bilan de la défaite et ses graines, dans la langue du moment. */
-  private renderDefeat(): void {
-    const { world } = this;
-    const rows = defeatRows(world);
-
-    this.defeatStats.replaceChildren(
-      ...rows.flatMap(([label, value]) => [text('', label, 'dt'), text('', value, 'dd')]),
-    );
-
-    // Les mêmes graines que `main.ts` verse au jardin : le barème est une fonction pure du bilan.
-    const seeds = seedsFor(world.colonyScore());
-    const amount = text('overlay-seeds-amount', t().hud.defeat.seeds(seeds));
-
-    amount.prepend(uiIcon('seed', 28));
-    this.defeatSeeds.replaceChildren(amount, text('overlay-seeds-hint', t().hud.defeat.seedsHint));
-  }
-
-  /* ------------------------------------------------------------------ debug */
-
-  private updateStats(fps: number, chunks: number, atlas: AtlasStats, water: WaterStats, weatherParticles: number): void {
-    const { cx, cy } = this.world.playerChunk();
-    const lines = [
-      `tick ${this.world.tickCount}   ${fps.toFixed(0)} fps   seed ${this.world.seed}`,
-      `chunk ${cx},${cy}   ${chunks} blocs de sol   ${this.world.resources.size()} tuiles entamées`,
-      `eau ${water.blocks} bloc(s) à l'écran, ${water.tiles} tuile(s) au shader`,
-      `atlas ${atlas.images} images → ${atlas.pages} texture(s), ${atlas.megapixels.toFixed(1)} Mpx @${atlas.resolution}x, ${atlas.ms} ms`,
-      `${this.world.entities.size} bâtiment(s)   ${this.world.mobiles.size} mobile(s)   ${this.world.pendingWakes()} réveil(s)`,
-      `météo ${this.world.weather()?.id ?? 'calme'}   ${weatherParticles} particule(s)`,
-      `brouillard ${this.world.fog.enabled ? 'oui' : 'levé'} (F)   ${this.world.fog.exploredCount()} case(s) explorée(s), ${this.world.fog.sourceCount} source(s)`,
-      saveLine(this.saveStats()),
-    ];
-
-    for (const entity of this.world.entities.values()) {
-      if (entity.kind === 'site') continue;
-
-      const contents = entity.store
-        .entries()
-        .map(([item, amount]) => `${t().items[item]} ${amount}`)
-        .join(', ');
-      const stopped = (entity.kind === 'drill' || entity.kind === 'forge') && entity.blocked ? ' — arrêtée' : '';
-
-      lines.push(`#${entity.id} ${t().buildings[entity.proto].label} : ${contents || 'vide'}${stopped}`);
-    }
-
-    this.stats.textContent = lines.join('\n');
-  }
-
-  public destroy(): void {
-    document.removeEventListener('pointerdown', this.foldCrewOnTouch, { capture: true });
     this.root.remove();
   }
-}
 
-/* ------------------------------------------------------------------ outils */
-
-/** La ligne du panneau de debug sur la sauvegarde : taille, temps de chaque étape, pics de la session. */
-function saveLine(stats: SaveStats | null): string {
-  if (!stats) return 'sauvegarde : aucune écriture encore';
-
-  const ko = (chars: number): string => `${(chars / 1024).toFixed(1)} ko`;
-  const ms = (value: number): string => value.toFixed(1);
-  const total = stats.snapshotMs + stats.stringifyMs + stats.writeMs;
-
-  return `sauvegarde ${ko(stats.bytes)}   ${ms(total)} ms (état ${ms(stats.snapshotMs)} + JSON ${ms(stats.stringifyMs)} + écriture ${ms(stats.writeMs)})   pic ${ko(stats.peakBytes)}, ${ms(stats.peakMs)} ms   ${stats.writes} écriture(s)`;
-}
-
-function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-
-  if (className) node.className = className;
-  return node;
-}
-
-function text(className: string, content: string, tag: keyof HTMLElementTagNameMap = 'span'): HTMLElement {
-  const node = element(tag, className);
-
-  node.textContent = content;
-  return node;
-}
-
-function bar(ratio: number): HTMLElement {
-  const track = element('div', 'hud-bar');
-  const fill = element('div', 'hud-bar-fill');
-
-  fill.style.width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
-  track.append(fill);
-  return track;
-}
-
-/** Une pastille « pictogramme + nombre » : habitants, mutants abattus. */
-function chip(icon: 'people' | 'mutant', value: number, label: string): HTMLElement {
-  const node = text('hud-quest-chip', String(value));
-
-  node.prepend(uiIcon(icon, 18));
-  setTip(node, label);
-  return node;
-}
-
-/** `node`, avec son libellé (`setTip`). */
-/** Le stock de la ville, plus à 0 les objets des besoins (`NEEDS`) qu'il n'a plus, ceux à sec en tête. */
-function withVitals(entries: [ItemId, number][]): [ItemId, number][] {
-  const vitals: ItemId[] = NEED_IDS.map((need) => NEEDS[need].item);
-  const missing = vitals.filter((item) => !entries.some(([owned]) => owned === item));
-  const all = [...entries, ...missing.map((item): [ItemId, number] => [item, 0])];
-
-  // Un objet vital à sec passe en tête du bandeau : c'est ce qui presse, et il ne doit pas défiler hors de vue.
-  return [...all.filter(([item, amount]) => amount === 0 && vitals.includes(item)), ...all.filter(([item, amount]) => !(amount === 0 && vitals.includes(item)))];
-}
-
-/** Un objet du bandeau de la ville : son icône, sa quantité, et sa flèche s'il monte ou baisse. */
-function townEntry(item: ItemId, amount: number, trend: Trend, plenty: boolean): HTMLElement {
-  const label = t().hud.stock;
-  const name = t().items[item];
-  const entry = itemAmount(item, amount);
-
-  if (amount === 0) entry.dataset['empty'] = 'true';
-  // La coche : la ville en a assez, Adam n'en ramasse plus en passant.
-  if (plenty) {
-    const tick = uiIcon('check', 12);
-
-    tick.classList.add('hud-plenty');
-    entry.append(tick);
-    entry.dataset['plenty'] = 'true';
+  /** L'ancien nom de `dispose()`. */
+  public destroy(): void {
+    this.dispose();
   }
-  if (trend === 'flat') return tipped(entry, plenty ? label.inTownPlenty(name, amount) : label.inTown(name, amount));
-
-  const arrow = uiIcon(trend === 'up' ? 'trendUp' : 'trendDown', 12);
-
-  arrow.classList.add('hud-trend');
-  entry.dataset['trend'] = trend;
-  entry.append(arrow);
-  return tipped(entry, plenty ? label.inTownPlenty(name, amount) : trend === 'up' ? label.inTownUp(name, amount) : label.inTownDown(name, amount));
-}
-
-function tipped(node: HTMLElement, label: string): HTMLElement {
-  setTip(node, label);
-  return node;
-}
-
-/** Le détail des ouvriers : une ligne par bâtiment qui emploie, affectés et libres, puis ce que font les porteurs. */
-function crewDetail({ byBuilding, porters, assigned, free, missing }: Workforce): HTMLElement {
-  const detail = element('div', 'hud-quest-crew-detail');
-  const row = (icon: HTMLElement, label: string, count: number): HTMLElement => {
-    const node = element('div', 'hud-quest-crew-row');
-
-    node.append(icon, text('hud-quest-crew-label', label), text('hud-quest-crew-count', String(count)));
-    return node;
-  };
-
-  const label = t().hud.quest;
-
-  if (byBuilding.length === 0 && free === 0) detail.append(text('hud-quest-crew-label', label.noCrew, 'div'));
-  for (const { proto, count } of byBuilding) detail.append(row(buildingIcon(proto, 22), t().buildings[proto].label, count));
-  if (byBuilding.length > 0) detail.append(row(uiIcon('worker', 22), label.assigned, assigned));
-  // Les ouvriers de la colonie qu'aucun bâtiment n'emploie : dès le départ, les dix.
-  if (byBuilding.length > 0 || free > 0) detail.append(row(uiIcon('worker', 22), label.free, free));
-  if (missing > 0) detail.append(row(uiIcon('worker', 22), label.emptyPosts, missing));
-  if (porters.busy + porters.idle > 0) {
-    detail.append(
-      row(uiIcon('worker', 22), label.portersBusy, porters.busy),
-      row(uiIcon('worker', 22), label.portersIdle, porters.idle),
-    );
-  }
-  return detail;
-}
-
-/** Un enfant, un ouvrier, un bûcheron, un forestier : ce qui a un prénom et une infobulle. */
-function isInhabitant(mobile: Mobile): mobile is Inhabitant {
-  return mobile.kind === 'kid' || mobile.kind === 'worker' || mobile.kind === 'lumberjack' || mobile.kind === 'forester' || mobile.kind === 'farmer';
-}
-
-/** « Chapitre 3/10 », ou « Après le Signal » une fois la partie bouclée : la partie sans fin. */
-function chapterLabel(index: number): string {
-  return index < CHAPTERS.length ? t().hud.quest.chapter(index + 1, CHAPTERS.length) : t().hud.quest.afterSignal;
-}
-
-/** La case de la barre : la vignette du chapitre, son nom, ses objectifs réussis sur le total. */
-function chapterStrip(index: number, done: number, total: number): HTMLElement[] {
-  const proto = CHAPTERS[index];
-
-  if (!proto) return [uiIcon('goal', 20), text('hud-strip-title', t().hud.quest.afterSignal)];
-  return [buildingIcon(proto.icon, 22), text('hud-strip-title', t().chapters[index]!.title), text('hud-strip-value', `${done}/${total}`)];
-}
-
-/** La tête de la liste, dans la fenêtre : la vignette du chapitre, son nom, « 2/4 ». */
-function chapterHead(index: number, done: number, total: number): HTMLElement {
-  const head = element('div', 'hud-quest-goal hud-chapter-head');
-
-  head.append(...chapterStrip(index, done, total));
-  return head;
-}
-
-/** Où en est un objectif, pour sa ligne : réussi, et sa jauge — la condition seule, ou les conditions remplies. */
-interface ObjectiveLine {
-  id: ObjectiveId;
-  done: boolean;
-  have: number;
-  need: number;
-  icon: Goal;
-  /** Le bâtiment qu'il demande n'est pas au menu : la recherche du labo qui l'ouvre. */
-  lock: ObjectiveLock | null;
-}
-
-function objectiveLine(world: World, id: ObjectiveId, goals: readonly Goal[]): ObjectiveLine {
-  const done = world.objectivesDone.has(id);
-  const icon = goals[0]!;
-  const lock = objectiveLock(world, id);
-  const hall = world.entities.get(world.townHallId);
-
-  // La mairie en chantier se compte en objets livrés : la jauge avance à chaque bois.
-  if (!done && icon.type === 'build' && icon.building === 'townHall' && hall?.kind === 'site') {
-    const cost = Object.entries(BUILDINGS[hall.proto].cost) as [ItemId, number][];
-
-    return {
-      id,
-      done,
-      have: cost.reduce((sum, [item, needed]) => sum + Math.min(hall.delivered[item] ?? 0, needed), 0),
-      need: cost.reduce((sum, [, needed]) => sum + needed, 0),
-      icon,
-      lock,
-    };
-  }
-  if (goals.length === 1) {
-    const { have, need } = goalProgress(world, icon);
-
-    return { id, done, have: done ? need : have, need, icon, lock };
-  }
-
-  const met = goals.filter((goal) => {
-    const { have, need } = goalProgress(world, goal);
-
-    return have >= need;
-  }).length;
-
-  return { id, done, have: done ? goals.length : met, need: goals.length, icon, lock };
-}
-
-/**
- * Le détail de l'objectif choisi, sous les lignes : une jauge par objet du
- * chantier de la mairie, ou par condition — seulement s'il en a plusieurs,
- * ou qu'une attend une horloge (la naissance et son compte à rebours). Chaque
- * ligne donne sa clé tout de suite et ne bâtit ses nœuds qu'à la demande :
- * la quête compare les clés d'abord, et ne crée rien si rien n'a changé.
- */
-function objectiveDetail(world: World, id: ObjectiveId): { key: string; node: () => HTMLElement }[] {
-  const { goals } = objectiveProto(id);
-  const hall = world.entities.get(world.townHallId);
-  const first = goals[0];
-
-  if (first?.type === 'build' && first.building === 'townHall' && hall?.kind === 'site') {
-    return (Object.entries(BUILDINGS[hall.proto].cost) as [ItemId, number][]).map(([item, needed]) => {
-      const have = hall.delivered[item] ?? 0;
-
-      return { key: `${item}:${have}`, node: () => meter(item, have, needed) };
-    });
-  }
-
-  const reached = goals.map((goal) => goalProgress(world, goal));
-  const waits = goals.map((goal) => goalWait(world, goal));
-
-  if (goals.length === 1 && !waits[0]) return [];
-  return goals.map((goal, i) => ({
-    key: `${reached[i]!.have}:${waitLabel(goal, waits[i]!)}:${waits[i]?.remainingTicks ?? ''}`,
-    node: () => goalMeter(goal, reached[i]!.have, reached[i]!.need, waits[i]!),
-  }));
-}
-
-/** La ligne d'un objectif : un bouton, gardé d'une mise à jour à l'autre, que l'on remet à jour. */
-interface ObjectiveRowView {
-  node: HTMLButtonElement;
-  update(line: ObjectiveLine, selected: boolean): void;
-}
-
-function objectiveRow(id: ObjectiveId, choose: () => void): ObjectiveRowView {
-  const node = element('button', 'hud-objective-row');
-  const icon = element('span', 'hud-objective-icon');
-  const title = text('hud-objective-title', '');
-  const gauge = bar(0);
-  const value = text('hud-meter-value', '');
-  const lock = element('span', 'hud-objective-lock');
-  const lockText = text('hud-objective-lock-text', '');
-  let shown = '';
-  let locked = '';
-
-  lock.hidden = true;
-  lock.append(uiIcon('lock', 16), lockText);
-  node.type = 'button';
-  node.dataset['objective'] = id;
-  node.append(icon, title, gauge, value, lock);
-  node.addEventListener('click', choose);
-  return {
-    node,
-    update(line, selected) {
-      const look = `${line.done}:${locale()}`;
-      const label = t().objectives[id].title;
-
-      if (look !== shown) {
-        shown = look;
-        icon.replaceChildren(line.done ? uiIcon('check', 18) : goalIcon(line.icon));
-      }
-      title.textContent = label;
-      node.dataset['done'] = String(line.done);
-      node.dataset['locked'] = String(line.lock !== null);
-      node.setAttribute('aria-pressed', String(selected));
-
-      const hint = line.lock ? labLockText(line.lock) : '';
-
-      lock.hidden = hint === '';
-      if (hint !== locked) {
-        locked = hint;
-        lockText.textContent = hint;
-      }
-      (gauge.firstElementChild as HTMLElement).style.width = `${Math.round((Math.min(line.have, line.need) / line.need) * 100)}%`;
-      value.textContent = `${line.have}/${line.need}`;
-      node.setAttribute('aria-label', `${label} ${line.have}/${line.need}${line.done ? ` — ${t().hud.objectiveDone}` : ''}${hint ? ` — ${hint}` : ''}`);
-    },
-  };
-}
-
-/** « Au labo : Bûcheronnage (8 bois, 4 pierres) » : la recherche qui ouvre le bâtiment, et son coût. */
-function labLockText({ research }: ObjectiveLock): string {
-  const words = t().hud.quest;
-  const cost = researchCost(research).map(([item, amount]) => words.labCost(amount, t().items[item]));
-
-  return words.labLock(t().research[research].label, cost.join(', '));
-}
-
-/**
- * La jauge d'une condition d'objectif : ce qu'elle compte en icône, barre,
- * « 1/3 ». Une condition qui attend une horloge (`goalWait`) dit sous la
- * barre le temps qu'il reste, et sa barre avance avec l'horloge ; retenue
- * (la nurserie sans nourriture), la ligne passe en corail et dit pourquoi.
- */
-function goalMeter(goal: Goal, have: number, need: number, wait: GoalWait | null): HTMLElement {
-  const row = element('div', 'hud-meter');
-  const running = wait && wait.blockedBy === null ? 1 - wait.remainingTicks / wait.durationTicks : 0;
-
-  row.dataset['done'] = String(have >= need);
-  row.dataset['blocked'] = String(wait?.blockedBy != null);
-  row.append(goalIcon(goal), bar((have + running) / need), text('hud-meter-value', `${have}/${need}`));
-  const label = waitLabel(goal, wait);
-
-  if (label) row.append(text('hud-meter-wait', label));
-  return row;
-}
-
-/**
- * « bébé dans 2:41 », « la nurserie attend 2 nourritures » — vide sans
- * attente. Une nuit à tenir ne dit rien : l'horloge de la tête montre déjà
- * l'aube qui vient, et sa barre avance avec elle.
- */
-function waitLabel(goal: Goal, wait: GoalWait | null): string {
-  if (!wait) return '';
-
-  const label = t().hud.quest;
-
-  if (wait.blockedBy === 'paused') return label.nurseryPaused;
-  if (wait.blockedBy) return label.nurseryWaits(wait.missing, t().items[wait.blockedBy]);
-
-  return goal.type === 'births' ? label.babyIn(clock(Math.ceil(wait.remainingTicks / TICKS_PER_SECOND))) : '';
-}
-
-/** Ce que compte une condition d'objectif, en icône. */
-function goalIcon(goal: Goal): HTMLElement {
-  return goal.type === 'build'
-    ? tipped(buildingIcon(goal.building, 22), t().buildings[goal.building].label)
-    : goal.type === 'produce'
-      ? tipped(itemIcon(goal.item, 18), t().items[goal.item])
-      : goal.type === 'happiness' || goal.type === 'mood'
-        ? tipped(uiIcon('townMood', 18), t().hud.people.happinessName)
-        : goal.type === 'era'
-          ? tipped(uiIcon('town', 18), t().eras[goal.count]!.label)
-          : uiIcon(goal.type === 'nights' ? 'mutant' : goal.type === 'quests' ? 'eve' : 'people', 18);
-}
-
-/** Une ligne de quête : icône, barre, « 7/20 ». */
-function meter(item: ItemId, have: number, needed: number): HTMLElement {
-  const row = element('div', 'hud-meter');
-
-  row.dataset['done'] = String(have >= needed);
-  row.append(tipped(itemIcon(item, 18), t().items[item]), bar(have / needed), text('hud-meter-value', `${have}/${needed}`));
-  return row;
-}
-
-/** La récompense d'une quête, dite par le jeu. */
-function rewardLabel(reward: QuestReward): string {
-  return reward.type === 'plan'
-    ? t().hud.toast.planReceived(t().buildings[reward.building].label)
-    : t().hud.toast.toolReceived(t().tools[reward.tool]);
-}
-
-/** Le nom d'un niveau : le bâtiment au niveau 1, son amélioration au-delà. */
-function levelLabel(id: BuildingId, level: number): string {
-  const words = t().buildings[id];
-
-  return level <= 1 ? words.label : (words.upgrades[level - 2]?.label ?? words.label);
-}
-
-/**
- * Le bilan de l'écran de défaite. Les nuits survécues sont les aubes
- * atteintes, comme à la victoire : la mairie peut tomber de jour.
- */
-export function defeatRows(world: World): [string, string][] {
-  const survived = Math.floor((world.defeatTick || world.tickCount) / TICKS_PER_SECOND);
-
-  return [
-    [t().hud.defeat.nights, String(world.stats.nightsSurvived)],
-    [t().hud.defeat.kills, String(world.kills)],
-    [t().hud.defeat.time, clock(survived)],
-  ];
-}
-
-/** « 1:05 » ou « 0:09 » à partir d'un nombre de secondes. */
-export function clock(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-
-  return `${minutes}:${rest.toString().padStart(2, '0')}`;
-}
-
-/** Le défi du jour, sous les objectifs : son icône, son intitulé, sa jauge — cochée une fois réussi. */
-function dailyRow(daily: { id: ChallengeId; have: number; need: number; done: boolean; streak: number }): HTMLElement {
-  const row = element('div', 'hud-quest-daily');
-  const { icon } = CHALLENGES[daily.id];
-  const label = text('hud-quest-daily-label', t().challenges[daily.id]);
-
-  // La série : les jours réussis d'affilée, aujourd'hui compris une fois réussi.
-  const days = daily.streak + (daily.done ? 1 : 0);
-  const title = text('hud-quest-daily-title', t().hud.daily.title);
-
-  if (days > 1) title.append(text('hud-quest-daily-streak', t().hud.daily.streak(days)));
-  row.dataset['done'] = String(daily.done);
-  row.append(
-    title,
-    daily.done ? uiIcon('check', 18) : 'item' in icon ? itemIcon(icon.item, 18) : uiIcon(icon.ui, 18),
-    label,
-    bar(daily.have / daily.need),
-    text('hud-meter-value', `${daily.have}/${daily.need}`),
-  );
-  return row;
 }

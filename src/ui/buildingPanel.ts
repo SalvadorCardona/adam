@@ -73,56 +73,39 @@
  * seule si l'entité disparaît — rasée par un mutant, ennemi abattu.
  */
 
-import { BUILDINGS, REPAIR, bedsOf, buildingLevel, logisticRadiusOf, maxLevel, nextUpgrade, type BuildingId, type BuildingLevel, type BuildingProto } from '../data/buildings.ts';
-import { CLINIC } from '../data/clinic.ts';
+import { BUILDINGS, buildingLevel, nextUpgrade, type BuildingId, type BuildingLevel } from '../data/buildings.ts';
 import { enemyBaseLevel } from '../data/enemyBases.ts';
 import { GEAR_WORKSHOP, gearOf } from '../data/gear.ts';
-import { NURSERY_CARE } from '../data/inhabitants.ts';
 import type { ItemId } from '../data/items.ts';
-import { RECIPES, type RecipeProto } from '../data/recipes.ts';
 import { WEAPONS } from '../data/weapons.ts';
-import { PIG_FARM } from '../data/pigs.ts';
-import { BUILDERS, FARMERS, FORESTERS, LOGISTICIANS, LUMBERJACKS, WORK_PRIORITIES, type WorkPriority } from '../data/workers.ts';
-import { floorCost } from '../sim/antenna.ts';
+import { WORK_PRIORITIES, type WorkPriority } from '../data/workers.ts';
 import { NAME_MAX } from '../sim/inhabitants.ts';
-import { consumerTarget, forgeRecipe } from '../sim/consumers.ts';
 import { canDamage, isShielded, isStanding, raidCapacity } from '../sim/enemyBases.ts';
 import { KILL_PRESTIGE } from '../data/prestige.ts';
 import { ToolForge } from './toolForge.ts';
-import { countField, type FieldCount } from '../sim/farmer.ts';
-import { countPlot, type PlotCount } from '../sim/forester.ts';
-import { eraReady } from '../sim/eras.ts';
-import { canPause } from '../sim/staffing.ts';
-import type { Building, EnemyBase, Entity, EntityId, Farmer, Forester, Forge, MobileId, Nursery } from '../sim/types.ts';
-import { TICKS_PER_SECOND, repairCost, siteMissing, timerText, type SiteCoverage, type World } from '../sim/world.ts';
-import type { UiIcon } from '../art/ui.ts';
+import type { Building, EnemyBase, Entity, EntityId, MobileId } from '../sim/types.ts';
+import { timerText, type World } from '../sim/world.ts';
 import { onLocale, t } from '../i18n/locale.ts';
 import { SEX_SYMBOLS, creatureView, isCreature, type CreatureView, type Selection } from './creatureView.ts';
+import { Disposer } from './disposer.ts';
 import { buildingIcon, buildingIconUrl, creatureIconUrl, enemyBaseIconUrl, itemAmount, itemIcon, jobIcon, jobIconUrl, uiIcon } from './icons.ts';
 import { moodMeter } from './moodMeter.ts';
 import { needMeter } from './needMeter.ts';
 import { PanelTabs } from './panelTabs.ts';
-import { siteNeedHeader, siteNeedRow } from './siteNeedRow.ts';
 import { BarracksPanel } from './barracksPanel.ts';
 import type { ResearchId } from '../data/research.ts';
 import { ResearchPanel } from './researchPanel.ts';
 import { TransferPanel } from './transferPanel.ts';
+import { viewOf } from './views/index.ts';
+import type { PanelHost, Stat, TimerStyle } from './views/types.ts';
+
+export { siteCoverageText } from './views/siteView.ts';
 
 /** Combien de temps la bulle d'une puce reste affichée. */
 const TIP_MS = 2200;
 
 /** Les onglets de la fenêtre d'un bâtiment. */
 type BuildingTab = 'building' | 'inventory';
-
-/** Une puce : un pictogramme — ou l'icône d'un objet —, un nombre, et ce qu'il compte. */
-interface Stat {
-  icon: UiIcon;
-  item?: ItemId;
-  value: string;
-  label: string;
-  /** Un mot sous le nombre, quand la fenêtre est assez large pour le montrer. */
-  caption?: string;
-}
 
 export class BuildingPanel {
   public readonly root: HTMLElement;
@@ -219,6 +202,10 @@ export class BuildingPanel {
 
   private readonly world: World;
   private readonly onOpen: () => void;
+  /** Ce que la fenêtre prête aux vues de chaque sorte (`views/`). */
+  private readonly host: PanelHost;
+  /** Ce qu'elle a branché hors d'elle : la langue, et ce qu'en suivent ses sous-panneaux. */
+  private readonly disposer = new Disposer();
 
   public constructor(world: World, onOpen: () => void = () => {}) {
     this.world = world;
@@ -539,8 +526,42 @@ export class BuildingPanel {
 
     this.root.append(header, this.description, this.tabs.bar, this.tabs.pages, this.tip);
 
+    this.host = {
+      items: this.items,
+      stock: this.stock,
+      stockCount: this.stockCount,
+      buttons: {
+        transfer: this.transferButton,
+        repair: this.repairButton,
+        pause: this.pauseButton,
+        cancel: this.cancelButton,
+        era: this.eraButton,
+      },
+      crew: this.crew,
+      upgrade: this.upgrade,
+      gear: this.gear,
+      tools: this.tools,
+      exchange: this.exchange,
+      research: this.research,
+      barracks: this.barracks,
+      cancelArmed: () => this.cancelArmed,
+      setItems: (children, key) => this.setItems(children, key),
+      setInventory: (available) => this.tabs.setAvailable('inventory', available),
+      hideInfo: () => {
+        this.infoButton.hidden = true;
+        this.setDescription(false);
+      },
+      refreshCrew: (building) => this.refreshCrew(building),
+      refreshUpgrade: (building, inReach) => this.refreshUpgrade(building, inReach),
+      refreshGear: (building, inReach) => this.refreshGear(building, inReach),
+    };
+
+    this.disposer.add(() => this.exchange.dispose());
+    this.disposer.add(() => this.research.dispose());
+    this.disposer.add(() => this.barracks.dispose());
+
     // Les libellés fixes suivent la langue ; les caches tombent, la fenêtre ouverte se réécrit.
-    onLocale(() => {
+    this.disposer.add(onLocale(() => {
       const text = t().panel;
 
       this.infoButton.setAttribute('aria-label', text.about);
@@ -567,7 +588,7 @@ export class BuildingPanel {
       this.lastCrew = '';
       this.lastNeeds = '';
       this.update();
-    });
+    }));
   }
 
   /** Ce que fait « Ères » dans la fenêtre de la mairie : ouvrir le panneau des ères (`main.ts`). */
@@ -698,22 +719,15 @@ export class BuildingPanel {
     this.refresh(entity);
   }
 
+  /**
+   * Un chantier ou un bâtiment : le tronc commun ici — titre, vignette, phrase
+   * d'ambiance, compte à rebours, puces, lignes, jauge —, le reste à la vue de
+   * sa sorte (`views/`).
+   */
   private refresh(entity: Entity): void {
-    this.setProduction(entity);
-    const proto = BUILDINGS[entity.proto];
-    const text = t().panel;
-    const paused = text.paused;
-    const blocked = text.blocked;
-    // Le problème que la bulle d'alerte montre sur la carte, expliqué en une ligne.
-    const full = entity.kind !== 'site' && this.world.problem(entity) === 'storeFull';
-    const lines: string[] = [];
-    const stats: Stat[] = [];
-    let ratio: number;
-    let barClass: string;
-    let meterValue = '';
-    let meterLabel = '';
+    const view = viewOf(entity);
 
-    const inReach = this.world.inReach(entity);
+    this.setProduction(entity, view.timer);
 
     // Le chantier devient le bâtiment sous le même id, le bâtiment change de niveau : le texte suit.
     this.title.textContent = entity.kind === 'site' ? t().buildings[entity.proto].label : levelText(entity.proto, entity.level).label;
@@ -728,423 +742,27 @@ export class BuildingPanel {
     }
     this.job.hidden = false;
 
-    // Le labo fini : sa fenêtre devient le panneau Recherche, qui a besoin de toute la place.
-    const lab = entity.kind === 'lab';
-
     this.root.dataset['kind'] = entity.kind;
     this.meter.hidden = false;
-    this.infoButton.hidden = lab;
-    if (lab) this.setDescription(false);
-    this.research.root.hidden = !lab;
-    if (entity.kind === 'lab') this.research.update(entity);
-    this.barracks.root.hidden = entity.kind !== 'barracks';
-    if (entity.kind === 'barracks') this.barracks.update(entity, this.world.inReach(entity));
-
+    // Le (i), le panneau Recherche et celui de la caserne : la vue du labo ou de la caserne les reprend.
+    this.infoButton.hidden = false;
+    this.research.root.hidden = true;
+    this.barracks.root.hidden = true;
     delete this.items.dataset['layout'];
-    if (entity.kind === 'site') {
-      const total = Object.values(proto.cost).reduce((sum, amount) => sum + amount, 0);
-      const missing = siteMissing(entity);
-      const canGive = this.world.canTransfer(entity);
-      const fromTown = this.world.inTownRange(entity);
 
-      const building = this.world.awaitsBuilders(entity);
+    const stats: Stat[] = [];
+    const lines: string[] = [];
+    const meter = view.render({
+      world: this.world,
+      entity,
+      inReach: this.world.inReach(entity),
+      text: t().panel,
+      stats,
+      lines,
+      host: this.host,
+    });
 
-      ratio = total === 0 ? 1 : 1 - missing / total;
-      barClass = 'progress';
-
-      if (building) {
-        // Tout est livré : la barre suit le marteau des bâtisseurs.
-        const { done, total: work } = this.world.siteBuild(entity);
-        const builders = this.world.siteBuilders(entity.id);
-
-        ratio = work === 0 ? 1 : done / work;
-        barClass = 'build';
-        lines.push(
-          builders === 0 ? text.site.allDelivered : text.site.building(builders, Math.floor(ratio * 100)),
-        );
-      } else {
-        lines.push(
-          this.world.builderYard(entity)
-            ? text.site.byYard
-            : !fromTown && entity.id !== this.world.townHallId
-              ? text.site.outOfRange
-              : !inReach
-              ? text.site.comeCloser
-              : !fromTown
-                ? text.site.transferOrBump
-                : siteCoverageText(this.world.siteCoverage(entity)),
-        );
-      }
-      if (proto.workers > 0) stats.push({ icon: 'worker', value: String(proto.workers), label: text.site.workers(proto.workers) });
-
-      // Objet par objet : livré / requis, puis ce qui est en route et ce que la ville en a.
-      const ledger = this.world.siteLedger(entity);
-
-      this.setItems([siteNeedHeader(), ...ledger.map(siteNeedRow)], `site:${entity.id}:${JSON.stringify(ledger)}`);
-      this.items.dataset['layout'] = 'ledger';
-      this.transferButton.hidden = building;
-      this.transferButton.textContent = this.world.townStock() ? text.transferButton : text.transferBag;
-      this.transferButton.disabled = !inReach || !canGive;
-      // Le chantier de la mairie ne s'annule pas.
-      this.cancelButton.hidden = entity.id === this.world.townHallId;
-      this.cancelButton.textContent = this.cancelArmed ? text.cancelConfirm : text.cancelSite;
-      this.exchange.show(null);
-      this.tabs.setAvailable('inventory', false);
-      this.repairButton.hidden = true;
-      this.pauseButton.hidden = true;
-      this.eraButton.hidden = true;
-      this.crew.hidden = true;
-      this.upgrade.hidden = true;
-      this.gear.hidden = true;
-      this.tools.hide();
-      this.stock.hidden = true;
-    } else {
-      const level = buildingLevel(entity.proto, entity.level);
-
-      ratio = entity.hp / level.hp;
-      barClass = 'hp';
-      meterValue = `${entity.hp}/${level.hp}`;
-      meterLabel = text.hp(meterValue);
-
-      const pausable = canPause(entity.proto);
-      const stopped = this.world.stopped(entity);
-
-      // Une nurserie ou une forge consomme : Adam vient la remplir. L'antenne attend son étage suivant.
-      const consumer = entity.kind === 'nursery' || entity.kind === 'forge';
-      const floor = entity.kind === 'antenna' && nextUpgrade(entity.proto, entity.level) !== null;
-
-      // Abîmé : le bouton dit ce que coûte la remise à neuf, la ligne dit comment s'en passer.
-      const cost = repairCost(entity);
-      const stock = this.world.repairStock(entity);
-      const material = t().items[REPAIR.item];
-
-      if (cost > 0) {
-        lines.push(stock === 0 ? text.repair.noStock(material, REPAIR.hp) : text.repair.damaged(material, REPAIR.hp));
-      }
-      this.repairButton.hidden = cost === 0;
-      this.repairButton.disabled = !inReach || stock === 0;
-      const repairCostLabel = text.repair.buttonCost(stock > 0 ? Math.min(cost, stock) : cost, material);
-
-      if (this.repairButton.getAttribute('aria-label') !== repairCostLabel) {
-        // « Réparer · 🪵1 » : le coût en icône à droite, sans parenthèses.
-        this.repairButton.setAttribute('aria-label', repairCostLabel);
-        this.repairButton.replaceChildren(text.repair.button, itemAmount(REPAIR.item, stock > 0 ? Math.min(cost, stock) : cost));
-      }
-
-      this.eraButton.hidden = entity.kind !== 'townHall';
-      if (entity.kind === 'townHall') {
-        const eraLabel = t().eraPanel.open(t().eras[this.world.era]!.label);
-
-        if (this.eraButton.textContent !== eraLabel) this.eraButton.textContent = eraLabel;
-        // Tout est réuni : le bouton le dit, d'une pastille.
-        this.eraButton.dataset['ready'] = String(eraReady(this.world));
-      }
-
-      this.pauseButton.hidden = !pausable;
-      this.pauseButton.textContent = entity.paused ? text.resume : text.pause;
-      this.pauseButton.dataset['tone'] = entity.paused ? 'resume' : 'pause';
-      this.refreshCrew(entity);
-      this.cancelButton.hidden = entity.kind !== 'decor';
-      this.cancelButton.textContent = text.decor.remove;
-      this.transferButton.hidden = !consumer && !floor;
-      this.transferButton.textContent = this.world.inTownRange(entity) ? text.transferButton : text.transferBag;
-      this.transferButton.disabled = !inReach || !this.world.canSupply(entity);
-
-      // Un coffre où échanger : la mairie, un producteur, une forge, une nurserie.
-      const rules = this.world.transferRules(entity);
-
-      this.tabs.setAvailable('inventory', rules !== null);
-      this.exchange.show(
-        rules && {
-          id: entity.id,
-          store: entity.store,
-          rules,
-          title: entity.kind === 'townHall' ? text.chest.town : text.chest.plain,
-          icon: entity.kind === 'townHall' ? 'town' : 'chest',
-          reachable: inReach,
-        },
-      );
-
-      switch (entity.kind) {
-        case 'townHall': {
-          const { adults, children, workers } = this.world.population();
-          const radius = logisticRadiusOf(entity.proto, entity.level);
-
-          const captions = text.townHall.captions;
-
-          stats.push(
-            { icon: 'people', value: String(adults), label: text.townHall.adults(adults), caption: captions.adults },
-            { icon: 'child', value: String(children), label: text.townHall.children(children), caption: captions.children },
-            { icon: 'worker', value: String(workers), label: text.townHall.workers(workers), caption: captions.workers },
-            { icon: 'moon', value: String(this.world.night), label: text.townHall.nights(this.world.night), caption: captions.nights },
-            { icon: 'range', value: String(radius), label: text.townHall.radius(radius), caption: captions.radius },
-          );
-          break;
-        }
-
-        case 'drill':
-          lines.push(entity.output ? text.drill.extracts(t().items[entity.output]) : text.drill.dry);
-          lines.push(entity.paused ? paused : full ? text.storeFull : entity.output ? text.drill.running : '');
-          break;
-
-        case 'nursery': {
-          const kids = this.world.nurseryKids(entity).length;
-          const adult = this.world.nextAdultTicks(entity);
-
-          lines.push(text.nursery.perBirth(recipeLine(RECIPES.raiseChild.inputs)));
-          lines.push(
-            entity.paused
-              ? paused
-              : kids >= NURSERY_CARE.capacity
-                ? text.nursery.full
-                : entity.hungry
-                  ? text.nursery.hungry(starvedLine(this.world, entity))
-                  : '',
-          );
-          lines.push(adult === null ? text.nursery.noKids : text.nursery.nextAdult(clock(adult)));
-          stats.push(
-            {
-              icon: 'child',
-              value: `${kids}/${NURSERY_CARE.capacity}`,
-              label: text.nursery.kids(kids, NURSERY_CARE.capacity),
-            },
-            { icon: 'worker', value: String(entity.born), label: text.nursery.born(entity.born) },
-          );
-          // Son stock de nourriture, rapporté au stock visé, et ce qui est en route.
-          for (const item of Object.keys(RECIPES.raiseChild.inputs) as ItemId[]) {
-            const count = entity.store.count(item);
-            const target = consumerTarget(entity, item);
-            const coming = entity.store.expected(item);
-
-            stats.push({
-              icon: 'chest',
-              item,
-              value: `${count}/${target}${coming > 0 ? ` +${coming}` : ''}`,
-              label: text.nursery.stock(t().items[item], count, target, coming),
-            });
-          }
-          break;
-        }
-
-        case 'forge': {
-          // La forge fond des plaques, le four à charbon cuit le bois : chacun sa recette.
-          const recipe = forgeRecipe(entity);
-
-          lines.push(`${recipeLine(recipe.inputs)} → ${recipeLine(recipe.outputs)}`);
-          lines.push(
-            entity.paused
-              ? paused
-              : stopped
-                ? text.forge.noOne
-                : entity.blocked
-                ? this.world.supplyStatus(entity)
-                  ? text.forge.starved(starvedLine(this.world, entity))
-                  : blocked
-                : text.forge.heating,
-          );
-          break;
-        }
-
-        case 'tower': {
-          const weapon = level.weapon ? WEAPONS[level.weapon] : null;
-
-          if (level.weapon && weapon) {
-            stats.push({ icon: 'range', value: String(weapon.range), label: text.tower.range(t().weapons[level.weapon], weapon.range) });
-          }
-          lines.push(entity.armed ? text.tower.alert : text.tower.idle);
-          break;
-        }
-
-        case 'farm': {
-          const count = countField(this.world.farmField(entity));
-
-          stats.push(
-            { icon: 'seed', value: String(count.growing), label: text.farm.growing(count.growing) },
-            { icon: 'wheat', value: String(count.ripe), label: text.farm.ripe(count.ripe) },
-            { icon: 'plot', value: String(count.free), label: text.farm.free(count.free) },
-          );
-          lines.push(text.farm.field(FARMERS.plot));
-          lines.push(
-            entity.paused
-              ? text.farm.paused
-              : full
-                ? text.storeFull
-                : stopped
-                  ? text.farm.noOne
-                  : farmLine(this.world.farmerOf(entity), count),
-          );
-          break;
-        }
-
-        case 'quarry': {
-          // Le puits est une carrière sur sa propre recette : ses mots à lui.
-          const words = entity.proto === 'well' ? text.well : text.quarry;
-
-          lines.push(entity.paused ? paused : full ? text.storeFull : stopped ? words.noOne : words.working);
-          break;
-        }
-
-        case 'pigPen': {
-          const words = text.pigPen;
-          const seconds = Math.round(PIG_FARM.cycleTicks / TICKS_PER_SECOND);
-
-          stats.push(
-            { icon: 'pig', value: `${entity.pigs}/${PIG_FARM.capacity}`, label: words.pigs(entity.pigs, PIG_FARM.capacity) },
-            { icon: 'chest', item: 'meat', value: String(PIG_FARM.meatPerPig * entity.pigs), label: words.meat(PIG_FARM.meatPerPig * entity.pigs, seconds) },
-          );
-          lines.push(entity.paused ? words.paused : entity.pigs === 0 ? words.noPig : full ? text.storeFull : words.working);
-          break;
-        }
-
-        case 'house':
-          // La Maison n'emploie personne : ses lits sont à qui n'en a pas.
-          lines.push(proto.workers > 0 ? text.house.sleeping : text.house.beds);
-          break;
-
-        case 'lab':
-          // Tout est dans le panneau Recherche, sous les points de vie.
-          break;
-
-        case 'lumberCamp':
-          stats.push({
-            icon: 'range',
-            value: String(LUMBERJACKS.radius),
-            label: text.lumberCamp.radius(LUMBERJACKS.radius),
-          });
-          lines.push(
-            entity.paused
-              ? text.lumberCamp.paused
-              : full
-                ? text.storeFull
-                : stopped
-                  ? text.lumberCamp.noOne
-                  : this.world.treesLeft(entity) === 0
-                    ? text.lumberCamp.noTrees
-                    : text.lumberCamp.working,
-          );
-          break;
-
-        case 'foresterHouse': {
-          const tiles = this.world.forestPlot(entity);
-          const count = countPlot(tiles);
-
-          stats.push(
-            { icon: 'seed', value: String(count.saplings), label: text.foresterHouse.saplings(count.saplings) },
-            { icon: 'tree', value: String(count.trees), label: text.foresterHouse.trees(count.trees) },
-            { icon: 'plot', value: String(count.free), label: text.foresterHouse.free(count.free) },
-          );
-          lines.push(text.foresterHouse.plot(FORESTERS.plot));
-          lines.push(entity.paused ? text.foresterHouse.paused : stopped ? text.foresterHouse.noOne : foresterLine(this.world.foresterOf(entity), count));
-          break;
-        }
-
-        case 'depot': {
-          const served = this.world.depotProducers(entity);
-
-          stats.push({
-            icon: 'range',
-            value: String(LOGISTICIANS.radius),
-            label: text.depot.radius(LOGISTICIANS.radius),
-          });
-          lines.push(served === 0 ? text.depot.none : text.depot.served(served));
-          break;
-        }
-
-        case 'yard': {
-          const served = this.world.yardSites(entity);
-
-          stats.push({
-            icon: 'range',
-            value: String(BUILDERS.radius),
-            label: text.yard.radius(BUILDERS.radius),
-          });
-          lines.push(
-            entity.paused
-              ? text.yard.paused
-              : stopped
-                ? text.yard.noOne
-                : served === 0
-                  ? text.yard.none
-                  : text.yard.served(served),
-          );
-          break;
-        }
-
-        case 'antenna': {
-          const max = maxLevel(entity.proto);
-          const lure = this.world.lureNight;
-          const clock = this.world.clock();
-
-          lines.push(text.antenna.floor(entity.level, max));
-          lines.push(floor ? text.antenna.nextFloor : text.antenna.signalSent);
-          if (lure > this.world.night) lines.push(text.antenna.lureNight(lure));
-          else if (lure === this.world.night && clock?.phase === 'night') lines.push(text.antenna.lureTonight);
-          break;
-        }
-
-        case 'clinic': {
-          const used = this.world.clinicBedsUsed(entity.id);
-
-          stats.push({ icon: 'people', value: `${used}/${CLINIC.beds}`, label: text.clinic.beds(used, CLINIC.beds) });
-          lines.push(used >= CLINIC.beds ? text.clinic.full : text.clinic.open);
-          break;
-        }
-      }
-
-      // Une décoration : ce qu'elle ajoute au bonheur, et jusqu'où.
-      const decor: BuildingProto = BUILDINGS[entity.proto];
-      const mood = entity.kind === 'decor' ? decor.mood : undefined;
-
-      if (mood) stats.push({ icon: 'heart', value: `+${mood.amount}`, label: text.decor.mood(mood.amount, mood.radius) });
-
-      // Ses lits : combien sont pris, sur combien — sa part de l'Habitation.
-      const beds = bedsOf(entity.proto, entity.level);
-
-      if (beds > 0) {
-        const used = this.world.sleepersIn(entity.id).length;
-
-        stats.push({ icon: 'home', value: `${used}/${beds}`, label: text.house.bedsTaken(used, beds) });
-      }
-
-      // Le coffre de la mairie est le stock de la ville. Un coffre où échanger se lit dans la zone d'échange,
-      // celui du labo dans le panneau Recherche, celui de l'antenne en jauges de son étage suivant, comme un chantier.
-      if (rules) {
-        this.stock.hidden = true;
-        this.setItems([], 'exchange');
-      } else if (entity.kind === 'antenna') {
-        const cost = floorCost(entity);
-
-        this.stock.hidden = true;
-        this.items.dataset['layout'] = 'ledger';
-        this.setItems(
-          [siteNeedHeader(false), ...cost.map(([item, needed]) => itemAmount(item, needed, entity.store.count(item)))],
-          `floor:${entity.id}:${entity.level}:${cost.map(([item]) => `${item}=${entity.store.count(item)}`).join(',')}`,
-        );
-      } else if (proto.storage > 0 && !lab) {
-        const capacity = Number.isFinite(proto.storage) ? `/${proto.storage}` : '';
-        const entries = entity.store.entries();
-        const label = text.chest.label(`${entity.store.total()}${capacity}`);
-        // Sans plafond, un coffre ne dit son compte que vide.
-        const count = entries.length === 0 ? text.chest.empty : capacity ? `${entity.store.total()}${capacity}` : '';
-
-        this.stock.hidden = false;
-        this.stock.setAttribute('aria-label', entries.length ? label : text.chest.emptyLabel(label));
-        this.stock.title = label;
-        if (this.stockCount.textContent !== count) this.stockCount.textContent = count;
-        this.setItems(
-          entries.map(([item, amount]) => itemAmount(item, amount)),
-          `store:${entity.id}:${entries.map(([item, amount]) => `${item}=${amount}`).join(',')}`,
-        );
-      } else {
-        this.stock.hidden = true;
-        this.setItems([], 'none');
-      }
-      this.refreshUpgrade(entity, inReach);
-      this.refreshGear(entity, inReach);
-      this.tools.refresh(entity, inReach);
-    }
-
-    this.finish(stats, lines, ratio, barClass, meterValue, meterLabel);
+    this.finish(stats, lines, meter.ratio, meter.barClass, meter.value, meter.label);
   }
 
   /** La base mutante : la même fenêtre, sans bouton ni coffre. */
@@ -1298,18 +916,18 @@ export class BuildingPanel {
   }
 
   /** La barre et le « m:ss » de la production en cours, s'il y en a une ; chaque frame, à peu de frais. */
-  private setProduction(entity: Entity): void {
+  private setProduction(entity: Entity, style: TimerStyle): void {
     // Le labo a sa barre dans le panneau Recherche : une seule par fiche.
-    const timer = entity.kind === 'lab' ? null : this.world.productionTimer(entity);
+    const timer = style === 'none' ? null : this.world.productionTimer(entity);
 
     this.production.hidden = timer === null;
     if (!timer) return;
 
     const left = timerText(timer.left);
-    const nursery = entity.kind === 'nursery';
+    const birth = style === 'birth';
 
-    this.productionIcon.hidden = !nursery;
-    this.productionLabel = nursery ? t().panel.nursery.nextChild : '';
+    this.productionIcon.hidden = !birth;
+    this.productionLabel = birth ? t().panel.nursery.nextChild : '';
     this.productionFill.style.width = `${Math.round((1 - timer.left / timer.total) * 100)}%`;
     if (this.productionValue.textContent !== left) {
       this.productionValue.textContent = left;
@@ -1558,8 +1176,20 @@ export class BuildingPanel {
     this.items.hidden = children.length === 0;
   }
 
-  public destroy(): void {
+  /**
+   * Défait la fenêtre : ni elle ni ses sous-panneaux ne suivent plus la langue, sa bulle n'attend plus
+   * son minuteur, et elle quitte la page. Les écouteurs posés sur ses propres
+   * éléments partent avec eux.
+   */
+  public dispose(): void {
+    this.disposer.dispose();
+    this.hideTip();
     this.root.remove();
+  }
+
+  /** L'ancien nom de `dispose()`. */
+  public destroy(): void {
+    this.dispose();
   }
 }
 
@@ -1615,11 +1245,6 @@ function levelText(id: BuildingId, level: number): { label: string; description:
   return (level <= 1 ? undefined : text.upgrades[level - 2]) ?? text;
 }
 
-/** Ce que « Transférer » ferait d'un chantier à portée de la ville, en disant d'où vient la matière. */
-export function siteCoverageText(coverage: SiteCoverage): string {
-  return t().panel.site.coverage[coverage];
-}
-
 /** Ce qu'apporte un niveau : « PV 60 → 90, portée 8 → 10, cadence +29 % ». */
 export function upgradeEffect(from: BuildingLevel, to: BuildingLevel): string {
   const text = t().panel.upgrade;
@@ -1640,62 +1265,4 @@ export function upgradeEffect(from: BuildingLevel, to: BuildingLevel): string {
   if (to.logisticRadius !== undefined && to.logisticRadius !== (from.logisticRadius ?? 0)) parts.push(text.logistic(from.logisticRadius ?? 0, to.logisticRadius));
   if (to.speed !== undefined && to.speed !== (from.speed ?? 1)) parts.push(text.speed(Math.round((1 / to.speed - 1 / (from.speed ?? 1)) * 100)));
   return parts.join(', ');
-}
-
-/** « 2 minerai de fer + 1 charbon » à partir des quantités d'une recette. */
-/**
- * D'où vient la famine d'une forge ou d'une nurserie : ce qui manque est-il
- * en route, en ville, dans le sac — ou nulle part ?
- */
-function starvedLine(world: World, consumer: Nursery | Forge): string {
-  const status = world.supplyStatus(consumer);
-
-  if (!status) return '';
-
-  const label = t().items[status.item];
-  const text = t().panel.starved;
-
-  if (status.coming) return text.coming(label);
-  if (status.inTown > 0) {
-    return status.porters
-      ? text.inTown(label, status.inTown)
-      : text.noPorter(label, status.inTown, world.inTownRange(consumer));
-  }
-  if (world.player.inventory.count(status.item) > 0) return text.inBag(label);
-  return text.nowhere(label);
-}
-
-function recipeLine(amounts: RecipeProto['inputs']): string {
-  return (Object.entries(amounts) as [ItemId, number][])
-    .map(([item, amount]) => t().panel.recipeAmount(amount, t().items[item]))
-    .join(' + ');
-}
-
-/** « 9 min 32 s » à partir d'un nombre de ticks. */
-function clock(ticks: number): string {
-  const seconds = Math.ceil(ticks / TICKS_PER_SECOND);
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-
-  return t().panel.duration(minutes, rest);
-}
-
-/** Ce que font les fermiers — vu du premier : ils sèment, récoltent, dorment, ou attendent que le champ mûrisse. */
-function farmLine(farmer: Farmer | undefined, count: FieldCount): string {
-  const text = t().panel.farm;
-
-  if (farmer?.state === 'toSow' || farmer?.state === 'sow') return text.sowing;
-  if (farmer?.state === 'toHarvest' || farmer?.state === 'harvest' || farmer?.state === 'toFarm') return text.harvesting;
-  if (count.free + count.growing + count.ripe === 0) return text.nowhere;
-  return farmer?.inside ? text.asleep : text.growingLine;
-}
-
-/** Ce que fait le forestier : il marche vers sa case, il plante, il dort, ou il n'a plus rien à planter — et pourquoi. */
-function foresterLine(forester: Forester | undefined, count: PlotCount): string {
-  const text = t().panel.foresterHouse;
-
-  if (forester?.state === 'toPlot') return text.toPlot;
-  if (forester?.state === 'plant') return text.planting;
-  if (count.free === 0) return count.saplings + count.trees === 0 ? text.nowhere : text.full;
-  return forester?.inside ? text.asleep : text.seeking;
 }

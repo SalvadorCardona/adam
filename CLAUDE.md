@@ -361,7 +361,7 @@ nuit dans 1:31 » (c'est aussi son `aria-label`).
 **Passer la nuit** — une nuit calme (`World.calmNight` : vague abattue ou
 jamais sortie, Adam debout, pas d'ami) montre à côté de l'horloge un bouton
 « Passer la nuit » (`.hud-hasten`, pictogramme `hasten`) ; actif, la boucle
-de `main.ts` fait `HASTEN.speed` fois plus de ticks par image jusqu'à l'aube
+de `app/frame.ts` (`GameLoop`) fait `HASTEN.speed` fois plus de ticks par image jusqu'à l'aube
 — un mutant qui reparaît l'arrête. La simulation n'en sait rien.
 **Faveurs de l'aube** (`data/boons.ts`, `sim/boons.ts`, `ui/boonPanel.ts`) —
 chaque aube propose trois cartes hachées de la seed et de la nuit
@@ -406,7 +406,7 @@ ne soit pas un temps mort. La **Volée** (`castSkill`, `World.skill`,
 l'ennemi le plus proche, sinon le regard d'Adam ; recharge 8 s, sauvegardée
 (`skillReadyTick`) ; du crépuscule à l'aube (`World.skillOn`), bouton orange
 `.hud-skill` à gauche du sac (anneau de recharge, temps au centre), Espace au
-clavier et □ / X à la manette (`castVolley` de `main.ts` : le tiroir de
+clavier et □ / X à la manette (`castVolley` d'`app/input.ts` : le tiroir de
 construction garde Espace tiroir ouvert ou placement en cours), son `volley`.
 Les **traqueurs** (`HUNTERS`, `Mutant.hunts`, sauvegardé) : dès la nuit 2, un
 assaillant sur quatre (haché de la seed, de la nuit et du rang, jamais le PRNG)
@@ -686,7 +686,7 @@ la pause.
 
 **Hors ligne** (`data/offline.ts`, tous les réglages ; `sim/offline.ts`,
 `World.catchUp`) — à la réouverture (ou au retour d'un arrière-plan),
-`main.ts` mesure l'absence depuis `savedAt` (`awayMs` : horloge reculée ou
+`app/boot.ts` (au retour d'un arrière-plan, `app/screens.ts`) mesure l'absence depuis `savedAt` (`awayMs` : horloge reculée ou
 date illisible → 0) et pousse la commande `catchUp`. La ville la rattrape
 en agrégé, par pas d'une minute, bornée à `OFFLINE.maxMs` (8 h, lu par
 `World.offlineCapMs()`), rien sous `minMs` ni sans mairie : producteurs à
@@ -1001,7 +1001,7 @@ service worker : `sw.js` les pose et ramène le jeu au premier plan au tap.
 iOS : seulement dans une PWA ajoutée à l'écran d'accueil (16.4+), et jamais
 sans que la page tourne.
 
-- **Accessibilité** (`storage/localUiScale.ts`, `storage/localContrast.ts`, `data/contrast.ts`, bloc final de `style.css`) — réglages de l'appareil, jamais de la partie : « Taille de l'interface » (100 / 115 / 130 %, `adam:ui-scale`, variable racine `--ui-scale` lue par `zoom` sur `.hud`) et « Contraste élevé » (`adam:contrast`, `data-contrast` sur `<html>` : indigo foncé, toasts blancs, voile plus sombre), appliqués à chaud par `main.ts`. Un état ne tient jamais à sa seule couleur : point d'exclamation devant un compte en alerte et sur un objet à sec, coche ou point d'exclamation dans la pastille d'un toast, flèches montante / descendante des tendances, signe +/− des soldes. Un texte tient AA (4,5:1) : `TEXT_PAIRS` de `data/contrast.ts`, testé ; la menthe n'y suffit pas, le texte « bon » est `--good-text`. `prefers-reduced-motion` coupe les boucles du HUD, les rebonds, les secousses de caméra et les confettis (`render/motion.ts`).
+- **Accessibilité** (`storage/localUiScale.ts`, `storage/localContrast.ts`, `data/contrast.ts`, bloc final de `style.css`) — réglages de l'appareil, jamais de la partie : « Taille de l'interface » (100 / 115 / 130 %, `adam:ui-scale`, variable racine `--ui-scale` lue par `zoom` sur `.hud`) et « Contraste élevé » (`adam:contrast`, `data-contrast` sur `<html>` : indigo foncé, toasts blancs, voile plus sombre), appliqués à chaud par `app/prefs.ts`. Un état ne tient jamais à sa seule couleur : point d'exclamation devant un compte en alerte et sur un objet à sec, coche ou point d'exclamation dans la pastille d'un toast, flèches montante / descendante des tendances, signe +/− des soldes. Un texte tient AA (4,5:1) : `TEXT_PAIRS` de `data/contrast.ts`, testé ; la menthe n'y suffit pas, le texte « bon » est `--good-text`. `prefers-reduced-motion` coupe les boucles du HUD, les rebonds, les secousses de caméra et les confettis (`render/motion.ts`).
 
 ## Direction artistique
 
@@ -1099,7 +1099,7 @@ Les règles, en résumé :
 - Clavier : ZQSD / WASD (par position) et flèches font marcher Adam
   (`input/keyboard.ts`) ; Espace, flèches, Entrée et Échap tiennent le menu
   de construction (`BuildMenu.handleKey`) ; P, Échap, I, M et ² sont une
-  table pure (`input/shortcuts.ts`, testée) que `main.ts` applique. Une
+  table pure (`input/shortcuts.ts`, testée) qu'`app/input.ts` applique. Une
   touche tapée dans un champ (`isTyping`) ou avec Ctrl, Alt, Cmd n'est
   jamais un raccourci — sauf Échap, qui rend la main au jeu.
 - **Manette** (PlayStation, Xbox, Steam Deck ; API Gamepad, mapping standard) :
@@ -1173,14 +1173,14 @@ Les règles, en résumé :
   `storage/localPerf.ts`, caché par défaut) : une capsule en bas au centre du
   HUD donne FPS, ms par tick de sim et réveils du scheduler par tick
   (`World.wakesLastTick`), moyennés sur `PERF_WINDOW_MS` (`ui/perfMeter.ts`,
-  mesure prise par la boucle de `main.ts`). Rien n'est envoyé.
-- **Cadence du DOM** (`ui/uiClock.ts`) : la boucle de `main.ts` ne remet le
+  mesure prise par la boucle d'`app/frame.ts`). Rien n'est envoyé.
+- **Cadence du DOM** (`ui/uiClock.ts`) : la boucle d'`app/frame.ts` ne remet le
   HUD et les fenêtres à jour qu'à `UI_HZ` (12 Hz) ; un geste (`poke`) les fait
   suivre chaque frame `UI_LIVE_MS`. Seul ce qui suit la caméra reste à la frame
   (`Hud.frame` : infobulle, bulles d'Ève et d'un habitant, flèche du bandeau).
   Aucune lecture de mise en page dans la boucle : les tailles viennent d'un
   `ResizeObserver` et se relisent en tête de frame, avant toute écriture
-  (`Hud.measureLayout`, les insets du bas dans `main.ts`).
+  (`Hud.measureLayout`, les insets du bas dans `app/frame.ts`).
 
 ## Système de sprites
 
@@ -1291,7 +1291,7 @@ caché, baissée en pause ; interrupteur « Musique » et deux volumes
 `…:music-volume`, `…:sfx-volume`).
 Un nouvel effet = une entrée dans `SOUNDS` (`synth.ts`), une dans
 `SAMPLES` (`samples.ts`) avec ses fichiers et leur crédit, et une
-ligne dans `wireAudio()` (`main.ts`), qui est la seule table événement → son.
+ligne dans `wireAudio()` (`app/feedback.ts`), qui est la seule table événement → son.
 Rien ne joue avant un geste du joueur.
 
 ## Règles d'architecture
@@ -1344,6 +1344,23 @@ Rien ne joue avant un geste du joueur.
   `OfflineContext` (`sim/offline.ts`). Le rejeu de référence
   (`sim/replay.slow.test.ts`, 30 minutes, `checksum()` et sauvegarde
   entière) dit qu'une extraction ne change rien à la partie.
+- **`main.ts` ne fait que brancher** (moins de 200 lignes) : chaque morceau
+  a son module de `src/app/` — `boot.ts` (langue, partie à jouer), `party.ts`
+  (compte, invitation, vocal), `ui.ts` (`wireUi` : HUD, fenêtres, tiroir ;
+  `mountUi` : l'ordre d'empilement), `prefs.ts` (réglages), `screens.ts`
+  (titre, pause, onglet, sauvegarde), `overlays.ts` (victoire, ère, récap,
+  faveurs, talents), `input.ts` (`wireInput` : clavier, manette, doigts),
+  `frame.ts` (la boucle de rendu), `gameLoop.ts` (`GameLoop` : accumulateur,
+  `HASTEN`, plafond de pas, `reset()` à la place des remises à zéro),
+  `feedback.ts`, `persistence.ts`, `notifications.ts`. Tout ce qui se branche
+  hors de soi — `world.events`, `onLocale`, écouteurs de `window` ou de
+  `document`, `setInterval` — passe par un `Disposer` (`ui/disposer.ts` :
+  `on`, `listen`, `add`, `interval`) ; `life.dispose()` défait la partie, et
+  `Hud.dispose()`, `BuildingPanel.dispose()` leurs composants
+  (`ui/hud/`, une section par fichier ; `ui/views/`, une vue par
+  `entity.kind`). Les `*.dispose.dom.test.ts` et `app/wiring.dom.test.ts`
+  vérifient qu'après, plus rien n'écoute (`Emitter.listenerCount`,
+  `localeListenerCount`).
 - Pas d'ECS, pas de moteur physique. Le multijoueur viendra par le back-end
   (voir Back-end), jamais au prix du jeu hors ligne.
 - **Langue** (FR / EN) : tout texte visible passe par `t()` (`src/i18n/locale.ts`).
@@ -1457,7 +1474,7 @@ l'API ou un autre service = hors ligne), `socketUrl`. `connection.ts` :
 `subscribe`), sonde au démarrage sans le retarder, puis chaque minute en
 ligne, de plus en plus rarement hors ligne (`OFFLINE_BACKOFF_MS`, jusqu'à
 5 min) ; rien onglet caché ni sans réseau (`navigator.onLine`), resonde à
-leur retour. `main.ts` la crée et la démarre ; en dev, elle est sous
+leur retour. `app/boot.ts` la crée et la démarre ; en dev, elle est sous
 `window.adam.connection`. **Sans `VITE_API_URL` (le build de
 GitHub Pages, `npm run dev`), aucune requête n'est faite.** Avec une URL et
 le serveur coupé, le navigateur inscrit lui-même l'échec de la sonde dans la

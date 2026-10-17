@@ -29,6 +29,7 @@ import {
 } from '../sim/transfer.ts';
 import type { EntityId } from '../sim/types.ts';
 import { locale, onLocale, t } from '../i18n/locale.ts';
+import { Disposer } from './disposer.ts';
 import { itemIcon, uiIcon } from './icons.ts';
 
 /** Le coffre affiché : à qui il est, ce qu'il contient, ses règles, et si Adam est assez près. */
@@ -67,6 +68,8 @@ export class TransferPanel {
 
   private readonly bag: () => Store;
   private readonly push: (command: Command) => void;
+  /** Ce qu'il a branché hors de lui : la langue. */
+  private readonly disposer = new Disposer();
 
   public constructor(bag: () => Store, push: (command: Command) => void) {
     this.bag = bag;
@@ -140,7 +143,7 @@ export class TransferPanel {
     this.root.append(chestBand.root, selector, bagBand.root, actions, this.note);
 
     // Les libellés fixes suivent la langue ; le reste se réécrit au prochain `update`.
-    onLocale(() => {
+    this.disposer.add(onLocale(() => {
       const text = t().panel.transfer;
 
       selector.setAttribute('aria-label', text.quantity);
@@ -152,7 +155,12 @@ export class TransferPanel {
       depositAll.label.textContent = text.depositAll;
       this.lastKey = '';
       this.update();
-    });
+    }));
+  }
+
+  /** Ne suit plus la langue ; la fenêtre du bâtiment l'appelle en se défaisant. */
+  public dispose(): void {
+    this.disposer.dispose();
   }
 
   /** Le coffre à montrer, ou `null` : la zone se cache. */

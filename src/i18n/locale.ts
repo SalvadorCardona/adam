@@ -80,6 +80,11 @@ export function onLocale(apply: (locale: Locale) => void): () => void {
   return () => listeners.delete(apply);
 }
 
+/** Combien d'abonnés suivent la langue : un composant défait n'en laisse aucun. */
+export function localeListenerCount(): number {
+  return listeners.size;
+}
+
 /**
  * La langue d'un premier lancement, d'après celles du navigateur : le
  * français s'il vient en tête (`fr`, `fr-CA`…), l'anglais sinon.
