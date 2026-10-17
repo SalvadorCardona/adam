@@ -45,6 +45,32 @@ describe('LocalSave', () => {
     expect(serialize(loaded.world)).toEqual(serialize(world));
   });
 
+  it('mesure chaque écriture : taille, temps de chaque étape, pics de la session', () => {
+    const storage = memoryStorage();
+    const saves = new LocalSave(storage);
+    const world = new World(99);
+
+    expect(saves.stats).toBeNull();
+    saves.save(world);
+
+    const first = saves.stats!;
+
+    expect(first.bytes).toBe(storage.data.get(SAVE_KEY)!.length);
+    expect(first.writes).toBe(1);
+    for (const ms of [first.snapshotMs, first.stringifyMs, first.writeMs]) expect(ms).toBeGreaterThanOrEqual(0);
+    expect(first.peakMs).toBeCloseTo(first.snapshotMs + first.stringifyMs + first.writeMs, 6);
+
+    world.fog.reveal(0, 0, 60);
+    saves.save(world);
+    expect(saves.stats!.writes).toBe(2);
+    expect(saves.stats!.peakBytes).toBe(Math.max(first.bytes, saves.stats!.bytes));
+    // Une écriture refusée ne compte pas.
+    const refused = new LocalSave(hostile);
+
+    expect(refused.save(world)).toBe(false);
+    expect(refused.stats).toBeNull();
+  });
+
   it('dit « rien » quand il n’y a pas de sauvegarde', () => {
     expect(new LocalSave(memoryStorage()).load()).toEqual({ status: 'none' });
   });

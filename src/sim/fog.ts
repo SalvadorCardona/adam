@@ -86,6 +86,12 @@ export class FogOfWar {
   public readonly bases = new Map<number, EnemyBase>();
 
   private readonly chunks = new Map<string, FogChunk>();
+  /**
+   * Les plages de chaque chunk telles que `toJSON` les a encodées : une case
+   * explorée de plus jette celles de son chunk. Une sauvegarde ne ré-encode
+   * que les chunks qui ont changé depuis la précédente.
+   */
+  private readonly runs = new Map<FogChunk, readonly number[]>();
   private readonly sources = new Map<number, Stamp>();
   /** Le dernier chunk lu par `sight` : les lectures voisines n'ont pas de clé à fabriquer. */
   private lastCx = NaN;
@@ -163,6 +169,7 @@ export class FogOfWar {
       for (let index = from; index <= to; index += 1) {
         if (chunk.explored[index]) continue;
         chunk.explored[index] = 1;
+        this.runs.delete(chunk);
         this.revision += 1;
         this.exploredRevision += 1;
         this.explored += 1;
@@ -184,8 +191,9 @@ export class FogOfWar {
           if (!chunk.explored[index]) {
             this.exploredRevision += 1;
             this.explored += 1;
+            chunk.explored[index] = 1;
+            this.runs.delete(chunk);
           }
-          chunk.explored[index] = 1;
           this.revision += 1;
           if (this.looks.size > 0) {
             this.forget(cx * CHUNK_TILES + (index % CHUNK_TILES), cy * CHUNK_TILES + Math.floor(index / CHUNK_TILES));
@@ -253,22 +261,14 @@ export class FogOfWar {
     const explored: Record<string, number[]> = {};
 
     for (const [key, chunk] of this.chunks) {
-      const runs: number[] = [];
-      let value = 0;
-      let length = 0;
+      let runs = this.runs.get(chunk);
 
-      for (let index = 0; index < AREA; index += 1) {
-        if (chunk.explored[index] === value) {
-          length += 1;
-          continue;
-        }
-        runs.push(length);
-        value = chunk.explored[index]!;
-        length = 1;
+      if (!runs) {
+        runs = encodeRuns(chunk.explored);
+        this.runs.set(chunk, runs);
       }
-      runs.push(length);
       // Un chunk tout inexploré n'apprend rien à la sauvegarde.
-      if (runs.length > 1) explored[key] = runs;
+      if (runs.length > 1) explored[key] = [...runs];
     }
 
     return {
@@ -285,6 +285,7 @@ export class FogOfWar {
       this.sources.delete(id);
     }
     this.chunks.clear();
+    this.runs.clear();
     this.lastCx = NaN;
     this.explored = 0;
     for (const [key, runs] of Object.entries(saved.explored)) {
@@ -325,4 +326,23 @@ export class FogOfWar {
     }
     return box;
   }
+}
+
+/** Les cases explorées d'un chunk en longueurs de plages qui alternent, inexplorées d'abord. */
+function encodeRuns(explored: Uint8Array): number[] {
+  const runs: number[] = [];
+  let value = 0;
+  let length = 0;
+
+  for (let index = 0; index < AREA; index += 1) {
+    if (explored[index] === value) {
+      length += 1;
+      continue;
+    }
+    runs.push(length);
+    value = explored[index]!;
+    length = 1;
+  }
+  runs.push(length);
+  return runs;
 }

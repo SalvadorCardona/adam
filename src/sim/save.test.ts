@@ -8,7 +8,7 @@ import type { Command } from './commands.ts';
 import { BUILD_REACH_TILES } from './player.ts';
 import { nameOf, sexOf } from './inhabitants.ts';
 import { xpForLevel } from './levels.ts';
-import { SAVE_VERSION, decodeSave, deserialize, encodeSave, peekSave, serialize } from './save.ts';
+import { MIGRATIONS, SAVE_VERSION, decodeSave, deserialize, encodeSave, peekSave, serialize } from './save.ts';
 import { oreAt } from './terrain.ts';
 import type { EntityId } from './types.ts';
 import { World } from './world.ts';
@@ -348,6 +348,50 @@ describe('sauvegarde', () => {
 
     if (!building.ok) throw new Error(`sauvegarde refusée : ${building.reason}`);
     expect(building.world.clock()).toBeNull();
+  });
+
+  it('a une migration par version, de la 4 à la dernière, sans trou', () => {
+    const from = Object.keys(MIGRATIONS).map(Number).sort((a, b) => a - b);
+
+    expect(from).toEqual(Array.from({ length: SAVE_VERSION - 4 }, (_, index) => 4 + index));
+  });
+
+  it.each(Array.from({ length: SAVE_VERSION - 3 }, (_, index) => 4 + index))('charge une sauvegarde de la version %i, puis la partie tourne', (version) => {
+    const world = new World(7);
+
+    for (let i = 0; i < 5; i += 1) world.tick();
+
+    // L'état tel que cette version le rangeait, pour ce que les migrations remplacent.
+    const state: Record<string, unknown> = { ...serialize(world) };
+
+    if (version <= 10) {
+      delete state['chapter'];
+      delete state['objectivesDone'];
+      delete state['chapterBase'];
+      state['objective'] = 0;
+      state['objectiveBase'] = { ...world.stats, produced: { ...world.stats.produced } };
+    }
+    if (version <= 4) {
+      state['wave'] = state['night'];
+      state['nextWaveTick'] = 0;
+      delete state['night'];
+      delete state['cycleStartTick'];
+    }
+
+    const decoded = decodeSave(JSON.stringify({ version, savedAt: 3, state }));
+
+    if (!decoded.ok) throw new Error(`sauvegarde refusée : ${decoded.reason}`);
+    expect(decoded.savedAt).toBe(3);
+    expect(decoded.world.tickCount).toBe(world.tickCount);
+    expect(decoded.world.player.x).toBe(world.player.x);
+    expect(() => decoded.world.tick()).not.toThrow();
+  });
+
+  it('refuse une sauvegarde d’avant la version 4', () => {
+    const file = JSON.parse(encodeSave(new World(7), 1)) as Record<string, unknown>;
+
+    expect(decodeSave(JSON.stringify({ ...file, version: 3 }))).toEqual({ ok: false, reason: 'version' });
+    expect(decodeSave(JSON.stringify({ ...file, version: 4.5 }))).toEqual({ ok: false, reason: 'version' });
   });
 
   it('ignore sans lever une sauvegarde d’une autre version', () => {

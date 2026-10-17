@@ -8,7 +8,7 @@
  * stockage, le jeu tourne comme avant, sans sauvegarde.
  */
 
-import { decodeSave, encodeSave, peekSave, type SaveSummary } from '../sim/save.ts';
+import { decodeSave, encodeState, peekSave, serialize, type SaveSummary } from '../sim/save.ts';
 import type { World } from '../sim/world.ts';
 
 /** La clé de la partie en cours. */
@@ -23,6 +23,28 @@ export const CORRUPT_SAVE_KEY = 'adam:save:corrupt';
 /** Ce dont la sauvegarde a besoin d'un `Storage` — de quoi le remplacer en test. */
 export type SaveStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
+/**
+ * Ce qu'a coûté la dernière écriture, chronométrée étape par étape : le
+ * panneau `?debug` l'affiche. Tout est synchrone, sur le fil principal : la
+ * somme est la saccade que la sauvegarde fait sentir.
+ */
+export interface SaveStats {
+  /** Taille du texte écrit, en caractères : c'est ainsi que le quota du `localStorage` (~5 millions) se compte. */
+  bytes: number;
+  /** `World.snapshot()`. */
+  snapshotMs: number;
+  /** `JSON.stringify` du fichier. */
+  stringifyMs: number;
+  /** `localStorage.setItem`. */
+  writeMs: number;
+  /** La plus lourde des écritures de la session, en caractères. */
+  peakBytes: number;
+  /** La plus longue, en ms, les trois étapes réunies. */
+  peakMs: number;
+  /** Écritures réussies depuis le lancement. */
+  writes: number;
+}
+
 export type LoadResult =
   | { status: 'ok'; world: World; savedAt: number }
   /** Pas de sauvegarde, ou pas de stockage du tout. */
@@ -33,6 +55,7 @@ export type LoadResult =
 export class LocalSave {
   private readonly storage: SaveStorage | null;
   private readonly key: string;
+  private lastStats: SaveStats | null = null;
 
   /** `key` : l'emplacement — la partie principale par défaut, `DAILY_SAVE_KEY` pour la carte du jour. */
   public constructor(storage: SaveStorage | null, key: string = SAVE_KEY) {
@@ -92,12 +115,36 @@ export class LocalSave {
     }
   }
 
+  /** Ce qu'a coûté la dernière écriture réussie ; `null` avant la première. */
+  public get stats(): SaveStats | null {
+    return this.lastStats;
+  }
+
   /** Écrit la partie. Renvoie `false` si le stockage l'a refusée — le jeu continue quand même. */
   public save(world: World): boolean {
     if (!this.storage) return false;
 
     try {
-      this.storage.setItem(this.key, encodeSave(world, Date.now()));
+      const start = performance.now();
+      const state = serialize(world);
+      const taken = performance.now();
+      const text = encodeState(state, Date.now());
+      const encoded = performance.now();
+
+      this.storage.setItem(this.key, text);
+
+      const written = performance.now();
+      const previous = this.lastStats;
+
+      this.lastStats = {
+        bytes: text.length,
+        snapshotMs: taken - start,
+        stringifyMs: encoded - taken,
+        writeMs: written - encoded,
+        peakBytes: Math.max(previous?.peakBytes ?? 0, text.length),
+        peakMs: Math.max(previous?.peakMs ?? 0, written - start),
+        writes: (previous?.writes ?? 0) + 1,
+      };
       return true;
     } catch {
       return false;

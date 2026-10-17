@@ -55,6 +55,7 @@ import { LocalGarden } from './storage/localGarden.ts';
 import { LocalRecord } from './storage/localRecord.ts';
 import { submitDailyScore } from './net/dailyBoard.ts';
 import { LocalDaily } from './storage/localDaily.ts';
+import { AutosaveClock } from './storage/autosaveClock.ts';
 import { DAILY_SAVE_KEY, LocalSave, type LoadResult } from './storage/localSave.ts';
 import { LocalPlayed } from './storage/localPlayed.ts';
 import { TAB_KEY, TabLock } from './storage/localTab.ts';
@@ -165,13 +166,6 @@ const ITEM_PARTICLES: Record<ItemId, ParticleStyle> = {
   quartz: PARTICLES.iron,
   spore: PARTICLES.fur,
 };
-
-/**
- * Sauvegarde automatique toutes les cinq secondes de jeu. Sérialiser le monde
- * coûte quelques millisecondes : jamais à chaque frame, et jamais pendant un
- * tick — seulement entre deux.
- */
-const AUTOSAVE_MS = 5000;
 
 /** Ce que l'écran titre dit, discrètement, d'une sauvegarde qu'il n'a pas pu reprendre. */
 const LOAD_NOTICES: Partial<Record<LoadResult['status'], () => string>> = {
@@ -448,7 +442,7 @@ async function main(): Promise<void> {
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('nofog')) {
     world.push({ type: 'setFog', enabled: false });
   }
-  const hud = new Hud(world, debug);
+  const hud = new Hud(world, debug, () => saves.stats);
   const buildMenu = new BuildMenu(world, placement, MENU_BUILDING_IDS, () => {
     panel.close();
     inventory.close();
@@ -1555,8 +1549,10 @@ interface Autosave {
  * jamais une partie perdue : à la chute de la mairie, elle est effacée.
  *
  * Les moments clés (un bâtiment terminé, une vague repoussée, l'aube, un
- * objectif réussi) arrivent en plein tick ; ils ne font que lever un drapeau, et
- * l'écriture attend la fin du tick, quand l'état est cohérent.
+ * objectif réussi, un échange sac ⇄ coffre) arrivent en plein tick ; ils ne
+ * font que marquer la partie à sauver, et l'écriture attend la fin du tick,
+ * quand l'état est cohérent — au plus une par seconde (`AutosaveClock`) : des
+ * taps à la chaîne dans la zone d'échange ne font pas une écriture chacun.
  */
 function wireSave(
   world: World,
@@ -1570,15 +1566,13 @@ function wireSave(
     failed(): void;
   },
 ): Autosave {
-  let elapsed = 0;
-  let due = false;
+  const clock = new AutosaveClock();
   let enabled = true;
   let failing = false;
   let heldAt: number | null = null;
 
   const write = (): void => {
-    elapsed = 0;
-    due = false;
+    clock.wrote();
     if (!enabled || !started() || world.defeated) return;
     if (!tabs.held()) {
       alerts.lost();
@@ -1595,53 +1589,52 @@ function wireSave(
   };
 
   world.events.on('buildingCompleted', () => {
-    due = true;
+    clock.mark();
   });
   world.events.on('decorRemoved', () => {
-    due = true;
+    clock.mark();
   });
   world.events.on('siteCancelled', () => {
-    due = true;
+    clock.mark();
   });
   world.events.on('buildingUpgraded', () => {
-    due = true;
+    clock.mark();
   });
   world.events.on('objectiveCompleted', () => {
-    due = true;
+    clock.mark();
   });
   world.events.on('chapterCompleted', () => {
-    due = true;
+    clock.mark();
   });
   world.events.on('eraReached', () => {
-    due = true;
+    clock.mark();
   });
   const waveOver = (): void => {
     for (const mobile of world.mobiles.values()) if (mobile.kind === 'mutant') return;
-    due = true;
+    clock.mark();
   };
 
   world.events.on('mutantDied', waveOver);
   world.events.on('mutantStunned', waveOver);
   world.events.on('mutantHealed', () => {
-    due = true;
+    clock.mark();
   });
   world.events.on('dawnBroke', () => {
-    due = true;
+    clock.mark();
   });
   // Un échange sac ⇄ coffre est un geste du joueur : il ne doit pas se perdre à la fermeture de l'onglet.
   world.events.on('itemsTransferred', () => {
-    due = true;
+    clock.mark();
   });
   // Le temps rattrapé hors ligne est acquis : il s'écrit, pour ne pas le rattraper deux fois.
   world.events.on('offlineCaughtUp', () => {
-    due = true;
+    clock.mark();
   });
   world.events.on('townHallDestroyed', () => saves.clear());
 
   return {
     update(deltaMs) {
-      elapsed += deltaMs;
-      if (due || elapsed >= AUTOSAVE_MS) write();
+      if (clock.due(deltaMs)) write();
     },
     now: write,
     hold() {

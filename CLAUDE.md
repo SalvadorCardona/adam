@@ -1299,7 +1299,16 @@ Rien ne joue avant un geste du joueur.
   est le seul à toucher au `localStorage` (clé `adam:save`), et tout
   y est dans un try/catch. Un nouvel état de simulation doit entrer dans
   `World.snapshot()` / `restore()` — sinon il se perd au rechargement ; un
-  changement incompatible incrémente `SAVE_VERSION`.
+  changement incompatible incrémente `SAVE_VERSION` et ajoute sa ligne à
+  `MIGRATIONS` (`MIGRATIONS[v]` : de la version v à v + 1, enchaînées en
+  boucle). Cadence (`storage/autosaveClock.ts`) : toutes les 5 s, un moment
+  clé (bâtiment fini, échange, aube…) ne fait que marquer la partie, écrite
+  au plus une fois par seconde ; la sauvegarde de fermeture est immédiate.
+  Le brouillard garde le RLE de chaque chunk tant qu'il ne change pas.
+  `LocalSave.stats` chronomètre chaque écriture (état, JSON, `setItem`,
+  taille ; ligne du panneau `?debug`) ; `npm run bench:save` pèse une partie
+  du joueur simulé (~45 ko, < 1 ms en Node à 2 h) — sous 500 ko et 8 ms,
+  `localStorage` suffit.
 - **Ancien nom** : les clés de l'appareil sont sous `adam:*`. Au démarrage, `storage/legacyKeys.ts` (`adoptLegacyData`) renomme celles de l'ancien préfixe sans jamais écraser, importe le transfert `#import=…` envoyé par l'ancienne adresse (`client/legacy/`, servie par le second bloc de `client/nginx.conf`) et retire l'ancien service worker ; le serveur renomme sa base (`adoptLegacyDatabase`). Voir `docs/deploiement.md`, section 6.
 - **Deux onglets, une partie** : `storage/localTab.ts` (`TabLock`, clé `adam:tab`) donne la main au dernier onglet arrivé ; un onglet dépassé n'écrit plus, saute son rattrapage au retour et affiche `ui/tabLockPanel.ts` (« Reprendre la main » recharge). Un échec d'écriture (`LocalSave.save` à `false`) lève un toast une fois. La sauvegarde de fermeture attend le tick qui consomme un `catchUp` en attente (`Autosave.hold`).
 - Le **jardin des souvenirs** (graines laissées par chaque colonie tombée ou refondée après le Signal — « Fonder une nouvelle colonie » de l'écran de victoire verse les graines du bilan, `ColonyScore` : nuits, enfants, bâtiments, bases abattues, habitants, temps, Signal, puis repart sur une carte neuve ;
