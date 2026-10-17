@@ -78,6 +78,18 @@ const BLOCKS = ['.hud-topbar', '.hud-town', '.hud-people', '.hud-clock', '.hud-h
 /** Les cases de la barre : toutes de la hauteur `--cell-h`, tirée de `--hud-h`. */
 const CELLS = ['.hud-objective'];
 
+describe('la pastille de l’objet réclamé du sac', () => {
+  it('reste dans le bouton ou à son coin gauche, jamais au-delà de son bord droit', () => {
+    const rights = declared('.hud-bag-wanted', 'right');
+    const lefts = declared('.hud-bag-wanted', 'left');
+
+    expect(declared('.hud-bag-wanted', 'position')).toEqual(['absolute']);
+    expect(rights.filter((value) => value.startsWith('-'))).toEqual([]);
+    expect(lefts.length + rights.length).toBeGreaterThan(0);
+    for (const value of lefts) expect(Number.parseFloat(value)).toBeLessThanOrEqual(0);
+  });
+});
+
 describe('le haut de l’écran', () => {
   it('se colle au bord : la zone sûre et la marge fixe, partout', () => {
     expect(declared('.hud-top', 'top')).toEqual(['calc(var(--safe-top) + var(--hud-margin))']);
