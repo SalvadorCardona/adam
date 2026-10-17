@@ -32,7 +32,9 @@ import { LAST_ERA } from '../data/eras.ts';
 import { MAX_GEAR, MAX_TOOL } from '../data/gear.ts';
 import { XP_SHARE, type Shooter } from '../data/levels.ts';
 import type { TalentId } from '../data/talents.ts';
+import { GRAVES } from '../data/graves.ts';
 import { HAPPINESS } from '../data/housing.ts';
+import type { Bloom, Grave } from './graves.ts';
 import { COLONY, SEXES, type Sex } from '../data/inhabitants.ts';
 import { TRAIT_IDS } from '../data/traits.ts';
 import { ITEMS, type ItemId } from '../data/items.ts';
@@ -167,6 +169,12 @@ export interface WorldState {
   challenge?: DailyChallenge;
   /** Ceux qui ont eu peur depuis l'aube, cf. `World.scared` : leur nuit pèse sur le moral de l'aube. Absent : personne. */
   scared?: number[];
+  /** Ceux dont un proche est mort depuis l'aube, cf. `World.grieving` : le deuil pèse sur leur moral de l'aube. Absent : personne. */
+  grieving?: number[];
+  /** Les tombes (`sim/graves.ts`), les plus anciennes d'abord. Absent d'avant elles : aucune. */
+  graves?: Grave[];
+  /** Les tombes oubliées, réduites à leurs fleurs. Absent : aucune. */
+  blooms?: Bloom[];
   kills: number;
   /** Le Prestige de la colonie. Absent des sauvegardes d'avant lui : 0. */
   prestige: number;
@@ -635,6 +643,9 @@ function parseState(raw: unknown): WorldState {
     ...(state['boon'] !== undefined && { boon: parseBoon(state['boon']) }),
     ...(state['challenge'] !== undefined && { challenge: parseChallenge(state['challenge']) }),
     ...(state['scared'] !== undefined && { scared: [...new Set(array(state['scared']).map(int))] }),
+    ...(state['grieving'] !== undefined && { grieving: [...new Set(array(state['grieving']).map(int))] }),
+    ...(state['graves'] !== undefined && { graves: array(state['graves']).map(parseGrave).slice(-GRAVES.max) }),
+    ...(state['blooms'] !== undefined && { blooms: array(state['blooms']).map(parseBloom).slice(-GRAVES.maxBlooms) }),
     kills: int(state['kills']),
     // Absents d'une sauvegarde d'avant le Prestige : la colonie repart de zéro, ses bâtiments déjà payés.
     prestige: state['prestige'] === undefined ? 0 : int(state['prestige']),
@@ -1488,6 +1499,27 @@ function parseDen(raw: unknown): SavedDen {
   const den = record(raw);
 
   return { id: int(den['id']), members: int(den['members']), readyTick: int(den['readyTick']) };
+}
+
+function parseGrave(raw: unknown): Grave {
+  const entry = record(raw);
+
+  return {
+    id: int(entry['id']),
+    tx: int(entry['tx']),
+    ty: int(entry['ty']),
+    name: string(entry['name']).slice(0, NAME_MAX),
+    sex: oneOfList(entry['sex'], SEXES),
+    trait: oneOfList(entry['trait'], TRAIT_IDS),
+    need: oneOfList(entry['need'], NEED_IDS),
+    day: int(entry['day']),
+  };
+}
+
+function parseBloom(raw: unknown): Bloom {
+  const entry = record(raw);
+
+  return { tx: int(entry['tx']), ty: int(entry['ty']) };
 }
 
 function parseName(raw: unknown): SavedName {

@@ -155,6 +155,7 @@ export function wireAudio(life: Disposer, world: World, audio: AudioEngine, sett
   life.on(world.events, 'buildingUpgraded', () => audio.play('upgrade'));
   life.on(world.events, 'arrowShot', () => audio.play('arrow'));
   life.on(world.events, 'skillCast', () => audio.play('volley'));
+  life.on(world.events, 'workerStarved', () => audio.mourn());
   life.on(world.events, 'comboBroken', () => audio.play('deny'));
   life.on(world.events, 'mutantHit', () => audio.play('hit'));
   life.on(world.events, 'mutantDied', () => audio.play('die'));

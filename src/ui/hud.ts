@@ -320,6 +320,7 @@ export class Hud {
 
     this.reactions = new Reactions(world, {
       toasts: this.toasts,
+      focus: (x, y) => this.onFocus(x, y),
       floats: this.floats,
       advice: this.advice,
       quest: this.quest,
@@ -481,8 +482,19 @@ export class Hud {
    * Une bulle qui monte puis s'en va. `action` : un bouton dans la bulle —
    * « Essayer » sur une pièce de garde-robe trouvée — qui la ferme en servant.
    */
-  public notify(message: string, tone: ToastTone = 'info', action?: { label: string; run: () => void }): void {
-    this.toasts.notify(message, tone, action);
+  public notify(message: string, tone: ToastTone = 'info', action?: { label: string; run: () => void }): { update: (message: string) => boolean } | null {
+    return this.toasts.notify(message, tone, action);
+  }
+
+  /** Une tombe tapée : « Ici repose Lina — travailleuse, morte de soif au jour 4 ». */
+  public showGrave(id: number): void {
+    const grave = this.world.graves().find((candidate) => candidate.id === id);
+
+    if (!grave) return;
+
+    const text = t().panel.grave;
+
+    this.notify(text.epitaph(grave.name, text.trait[grave.trait][grave.sex], grave.sex === 'female', text.cause[grave.need], grave.day), 'info');
   }
 
   /**

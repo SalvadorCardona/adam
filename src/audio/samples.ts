@@ -47,6 +47,8 @@ export const SAMPLES = {
   arrow: { files: ['arrow_1', 'arrow_2', 'arrow_3'], gain: 0.4, spread: 0.08 },
   // Pas d'échantillon : la Volée se joue à la synthèse (`synth.ts`) jusqu'à ce qu'on lui en donne un.
   volley: { files: [], gain: 0.55 },
+  // Pas d'échantillon non plus : la note grave d'un deuil se joue à la synthèse.
+  toll: { files: [], gain: 0.6 },
   hit: { files: ['hit_1', 'hit_2', 'hit_3'], gain: 0.55, spread: 0.08 },
   die: { files: ['die'], gain: 0.5, spread: 0.06 },
   dizzy: { files: ['dizzy'], gain: 0.5 },
