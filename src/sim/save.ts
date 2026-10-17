@@ -31,6 +31,7 @@ import { ENEMIES, WILDLIFE, type EnemyId, type WildlifeId } from '../data/enemie
 import { LAST_ERA } from '../data/eras.ts';
 import { MAX_GEAR, MAX_TOOL } from '../data/gear.ts';
 import { XP_SHARE, type Shooter } from '../data/levels.ts';
+import type { TalentId } from '../data/talents.ts';
 import { HAPPINESS } from '../data/housing.ts';
 import { COLONY, SEXES, type Sex } from '../data/inhabitants.ts';
 import { TRAIT_IDS } from '../data/traits.ts';
@@ -50,6 +51,8 @@ import { freshHousing, type Housing } from './housing.ts';
 import { freshNeeds, fullNeeds } from './needs.ts';
 import { canPause, clampStaff, isWorkPriority, type StaffPost } from './staffing.ts';
 import { readLook, readUnseen, readWardrobe } from './wardrobe.ts';
+import { levelOf } from './levels.ts';
+import { cleanTalents, defaultTalents } from './talents.ts';
 import { REGION_COUNT } from './regions.ts';
 import { partnerName, type Partner } from './partner.ts';
 import type { Store, StoreSnapshot } from './store.ts';
@@ -764,6 +767,8 @@ function parsePlayer(raw: unknown): SavedPlayer {
     calmTicks: int(player['calmTicks']),
     // Absente d'avant les niveaux : Adam repart au niveau 1.
     xp: player['xp'] === undefined ? 0 : int(player['xp']),
+    // Absents d'avant les talents : chaque niveau déjà passé devient un talent par défaut.
+    talents: readTalents(player['talents'], player['xp'] === undefined ? 0 : int(player['xp'])),
     // Absent d'avant l'équipement : l'arc de fortune.
     gear: player['gear'] === undefined ? 0 : Math.min(MAX_GEAR, Math.max(0, int(player['gear']))),
     // Absents d'avant les outils : les mains nues.
@@ -776,6 +781,13 @@ function parsePlayer(raw: unknown): SavedPlayer {
     unseenPieces: readUnseen(player['unseenPieces'], wardrobe),
     inventory: stock(player['inventory']),
   };
+}
+
+/** Les talents d'Adam, au plus un par niveau passé ; d'avant eux, ceux de `defaultTalents`. */
+function readTalents(raw: unknown, xp: number): TalentId[] {
+  const level = levelOf(xp);
+
+  return raw === undefined ? defaultTalents(level) : cleanTalents(array(raw).map(string), level - 1);
 }
 
 function parsePartner(raw: unknown): SavedPartner {

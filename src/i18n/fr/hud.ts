@@ -184,8 +184,7 @@ export const hud = {
     regionLocked: (biome: string, era: string): string => `${biome} verrouillée : il faut l’ère « ${era} » pour que son gardien se montre`,
     regionConquered: (biome: string, prestige: number): string => `${biome} conquise ! +${prestige} Prestige — on peut y bâtir`,
     baseShielded: 'Son chef la protège : abattez-le d’abord, le bouclier tombera avec lui',
-    levelUp: (level: number, maxHp: number, bowDamage: number): string =>
-      `Niveau ${level} ! +${maxHp} PV max, +${String(Math.round(bowDamage * 100) / 100).replace('.', ',')} dégâts d’arc`,
+    levelUp: (level: number, maxHp: number): string => `Niveau ${level} ! +${maxHp} PV max — choisissez un talent`,
     chiefDefeated: (prestige: number): string => `Chef de base abattu ! +${prestige} Prestige — la base n’a plus de bouclier`,
     /** `gear` : l'arc forgé, avec sa majuscule. */
     companionTraining: (label: string, seconds: number): string => `${label} en formation — ${seconds} s`,
@@ -309,6 +308,28 @@ export const hud = {
     see: 'Voir',
     offer: 'Faveur de l’aube',
     /** Le toast, à la carte prise. */
+    chosen: (label: string): string => `${label} !`,
+  },
+  /** Les talents d'Adam (`ui/talentPanel.ts`) : les cartes d'un niveau, la liste des talents pris, la capsule. */
+  talent: {
+    title: 'Talents d’Adam',
+    lead: (level: number): string => `Niveau ${level} ! Choisissez un talent pour Adam.`,
+    /** Plusieurs niveaux passés d'un coup : ce qui reste à choisir après celui-ci. */
+    more: (count: number): string => `Encore ${count} talent${count > 1 ? 's' : ''} à choisir ensuite.`,
+    later: 'Plus tard',
+    close: 'Fermer',
+    /** Sur une carte : combien de fois on l'a déjà pris, sur son maximum. */
+    stack: (count: number, max: number): string => `Pris ${count}/${max}`,
+    taken: 'Talents pris',
+    none: 'Aucun talent pour l’instant : abattez des ennemis pour passer un niveau.',
+    /** Un talent pris plusieurs fois, dans la liste. */
+    times: (count: number): string => `×${count}`,
+    /** La capsule, quand un talent attend. */
+    offer: 'Talent à choisir',
+    /** Le niveau d'Adam, quand on le touche. */
+    open: 'Voir les talents d’Adam',
+    see: 'Choisir',
+    /** Le toast, au talent pris. */
     chosen: (label: string): string => `${label} !`,
   },
   /** La pile d'événements : le plus pressant, puis « +N » qui ouvre la liste. */

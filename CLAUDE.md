@@ -737,9 +737,18 @@ par niveau de base) : seule l'XP totale est de l'état (`Player.xp`, absente
 d'une ancienne sauvegarde : niveau 1), le niveau (`World.level()`, borné à
 `MAX_LEVEL`, courbe `XP_CURVE`) s'en déduit. Qui a tiré compte
 (`XP_SHARE`, `Arrow.shooter`) : Adam en plein, les compagnons de l'armée à
-moitié, les tours pas du tout. Chaque niveau donne `LEVEL_GAINS` : des PV max
-(`World.maxHp()`) et des modificateurs additifs sur les statistiques de la
-recherche, cumulés avec le labo dans l'unique `World.bonus(stat)`. Un niveau
+moitié, les tours pas du tout. Chaque niveau donne des PV max fixes (`LEVEL_GAINS`,
+`World.maxHp()`) et un **talent** à choisir parmi trois (`data/talents.ts`,
+tirés de la seed et du niveau par `drawTalents`, `sim/talents.ts`) : un
+modificateur additif sur une statistique de la recherche (dont `buildSpeed`,
+`hpRegen`), cumulé avec le labo dans l'unique `World.bonus(stat)`, repris
+jusqu'à son `max`. Commande `chooseTalent` ; seuls les talents pris sont de
+l'état (`Player.talents`), l'offre en attente s'en déduit
+(`World.talentOffer`). La fenêtre (`ui/talentPanel.ts`, format des faveurs)
+s'ouvre au niveau passé, arrête l'horloge, « Plus tard » la garde (capsule
+`talent` de la pile, pastille sur le niveau) ; elle liste aussi les talents
+pris — un tap sur le niveau l'ouvre. Une sauvegarde d'avant reçoit un talent
+par défaut par niveau (`defaultTalents`, `TALENT_OFFER.defaults`). Un niveau
 passé soigne Adam (événement `levelUp`, toast, confettis) ; le niveau et la
 barre d'XP ouvrent le bandeau de la ville (`.hud-level`), « +N XP » flotte
 sur l'ennemi.

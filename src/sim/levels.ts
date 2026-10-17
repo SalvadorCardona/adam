@@ -1,14 +1,14 @@
 /**
- * Les niveaux d'Adam : de l'XP au niveau, du niveau aux bonus.
+ * Les niveaux d'Adam : de l'XP au niveau, du niveau aux points de vie.
  *
  * Tout ici est pur. `World` garde l'XP totale (`Player.xp`), la gagne à
- * chaque ennemi abattu (`gainXp`) et lit les bonus de niveau à côté de ceux
- * de la recherche, dans `World.bonus` et `World.maxHp`.
+ * chaque ennemi abattu (`gainXp`) et lit les PV de niveau dans
+ * `World.maxHp` ; les bonus de statistiques sont les talents choisis
+ * (`sim/talents.ts`), lus dans `World.bonus`.
  */
 
 import { BASE_XP, KILL_XP, LEVEL_GAINS, MAX_LEVEL, XP_CURVE, XP_SHARE, type Shooter } from '../data/levels.ts';
 import type { EnemyId, WildlifeId } from '../data/enemies.ts';
-import type { ResearchStat } from '../data/research.ts';
 
 /** L'XP qui sépare le niveau `level` du suivant. */
 export function xpToNext(level: number): number {
@@ -37,13 +37,6 @@ export function levelProgress(xp: number): { level: number; into: number; needed
 
   if (level >= MAX_LEVEL) return { level, into: 1, needed: 1 };
   return { level, into: xp - xpForLevel(level), needed: xpToNext(level) };
-}
-
-/** Ce que les niveaux atteints ajoutent à une statistique de la recherche. */
-export function levelBonus(level: number, stat: ResearchStat): number {
-  const gain: number | undefined = LEVEL_GAINS.stats[stat as keyof typeof LEVEL_GAINS.stats];
-
-  return gain === undefined ? 0 : gain * (level - 1);
 }
 
 /** Les points de vie en plus que donnent les niveaux atteints. */

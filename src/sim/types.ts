@@ -23,6 +23,7 @@ import type { ResearchId } from '../data/research.ts';
 import type { ResourceId } from '../data/resources.ts';
 import type { Look, PieceId } from '../data/wardrobe.ts';
 import type { NeedId } from '../data/needs.ts';
+import type { TalentId } from '../data/talents.ts';
 import type { TraitId } from '../data/traits.ts';
 import type { JobPriority, WorkPriority } from '../data/workers.ts';
 import type { DoorSide } from './terrain.ts';
@@ -387,6 +388,12 @@ export interface Player {
   calmTicks: number;
   /** Son expérience totale (`data/levels.ts`) : son niveau et sa barre s'en déduisent. */
   xp: number;
+  /**
+   * Les talents choisis, un par niveau passé, dans l'ordre (`data/talents.ts`,
+   * commande `chooseTalent`) : des modificateurs lus par `World.bonus`. Un
+   * niveau sans talent attend son choix.
+   */
+  talents: TalentId[];
   /** Son âge, en années : une de plus à chaque aube (`data/inhabitants.ts`). */
   age: number;
   /** Son apparence (`data/wardrobe.ts`) : une pièce par emplacement, les couleurs choisies. L'éditeur la change par `dressAdam`. */
