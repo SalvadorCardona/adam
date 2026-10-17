@@ -1034,7 +1034,15 @@ Les règles, en résumé :
   sans icône ne compile pas ; `validatePrototypes()` vérifie cadre et règles.
 - `src/ui/hud.ts` : quête, conseil contextuel (le tutoriel), sac, bulles,
   gains flottants, défaite. `src/ui/screens.ts` : écran titre et pause — la
-  simulation ne tourne qu'après « Jouer » et hors pause. Police arrondie :
+  simulation ne tourne qu'après « Jouer » et hors pause. L'écran titre est une
+  scène : key art en trois plans qui respirent (`titleScene` d'`art/brand.ts` :
+  Adam de dos sur la colline, la mairie et ses lampions, Ève au loin, un mutant
+  derrière une ruine), logo dessiné en capsules (`titleLogo`), histoire en deux
+  phrases (`LORE.tagline`, le (i) déplie `pitch`), carte « Continuer » qui dit
+  jour, colons, chapitre et date (`peekSave`, sans charger le monde), gestes du
+  jeu avant la toute première partie seulement (`adam:played`,
+  `storage/localPlayed.ts`) ; tout tient sans défiler à 390 × 700. Captures
+  dans `docs/start-menu/`. Police arrondie :
   Fredoka, embarquée via `@fontsource` (ses chiffres ne se confondent pas).
   L'interface suit les règles des sprites : cartes blanches et capsules,
   trois tons (couleur, « face avant » pleine plus sombre, reflet en capsule),

@@ -112,4 +112,26 @@ describe('LocalSave', () => {
     saves.save(new World(99));
     expect(storage.data.get(CORRUPT_SAVE_KEY)).toBe('{"abîmée"');
   });
+
+  it('résume la partie sans la charger : jour, colons, chapitre, date', () => {
+    const storage = memoryStorage();
+    const saves = new LocalSave(storage);
+    const world = new World(99);
+
+    expect(saves.peek()).toBeNull();
+    saves.save(world);
+
+    const summary = saves.peek();
+
+    expect(summary).toMatchObject({ day: 1, colonists: world.colonists, chapter: world.chapter });
+    expect(summary!.savedAt).toBeGreaterThan(0);
+  });
+
+  it('ne résume pas un texte illisible, et ne lève jamais', () => {
+    const storage = memoryStorage();
+
+    storage.data.set(SAVE_KEY, '{pas du json');
+    expect(new LocalSave(storage).peek()).toBeNull();
+    expect(new LocalSave(hostile).peek()).toBeNull();
+  });
 });

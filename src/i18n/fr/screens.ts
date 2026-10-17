@@ -6,9 +6,21 @@
 
 export const screens = {
   title: {
-    kicker: 'Après la fin du monde',
     play: 'Jouer',
     resume: 'Continuer',
+    /** Le (i) du pitch : toute l'histoire, ou de nouveau les deux phrases. */
+    story: 'Toute l’histoire',
+    storyLess: 'Moins d’histoire',
+    /** La carte « Continuer » : où en est la partie sauvegardée, lue sans la charger. */
+    save: {
+      day: (day: number): string => `Jour ${day}`,
+      colonists: (count: number): string => `${count} colon${count > 1 ? 's' : ''}`,
+      chapter: (chapter: number): string => `Chapitre ${chapter}`,
+      afterSignal: 'Après le Signal',
+      /** Depuis quand la partie attend. */
+      ago: (minutes: number): string =>
+        minutes < 1 ? 'à l’instant' : minutes < 60 ? `il y a ${minutes} min` : minutes < 60 * 24 ? `il y a ${Math.floor(minutes / 60)} h` : `il y a ${Math.floor(minutes / (60 * 24))} j`,
+    },
     newGame: 'Nouvelle partie',
     /** Le bouton du jardin, avec ses graines. */
     garden: (seeds: number): string => `Jardin · ${seeds}`,

@@ -8,6 +8,7 @@ type Content = Pick<Messages, keyof typeof fr>;
 export const content: Content = {
   lore: {
     title: 'Adam',
+    tagline: 'After the end of the world, Adam builds a colony’s first roof. Eve will come soon — and so will the radioactive mutants.',
     pitch:
       'An apocalyptic future. A handful of survivors. Adam, alone among the ruins, gathers wood and ore with his bare hands to build a town hall — the colony’s first roof. Eve will come next. And with her, the radioactive mutants prowling beyond the clearing.',
     signal: {

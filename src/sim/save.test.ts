@@ -8,7 +8,7 @@ import type { Command } from './commands.ts';
 import { BUILD_REACH_TILES } from './player.ts';
 import { nameOf, sexOf } from './inhabitants.ts';
 import { xpForLevel } from './levels.ts';
-import { SAVE_VERSION, decodeSave, deserialize, encodeSave, serialize } from './save.ts';
+import { SAVE_VERSION, decodeSave, deserialize, encodeSave, peekSave, serialize } from './save.ts';
 import { oreAt } from './terrain.ts';
 import type { EntityId } from './types.ts';
 import { World } from './world.ts';
@@ -404,5 +404,27 @@ describe('base mutante entamée par un bonus d\'arc fractionnaire', () => {
 
     if (!decoded.ok) throw new Error(`sauvegarde illisible : ${decoded.reason}`);
     expect(decoded.world.enemyBases.find((entry) => entry.id === base.id)?.hp).toBe(base.hp);
+  });
+});
+
+describe('peekSave', () => {
+  it('lit le jour de l’horloge, les colons, le chapitre et la date sans restaurer le monde', () => {
+    const world = new World(7);
+
+    for (let i = 0; i < 10; i += 1) world.tick();
+    // Une mairie debout depuis trois cycles et demi : le jour 4.
+    world.cycleStartTick = world.tickCount - Math.round(3.5 * (DAY_CYCLE.day + DAY_CYCLE.dusk + DAY_CYCLE.night + DAY_CYCLE.dawn));
+    world.colonists = 9;
+
+    const summary = peekSave(encodeSave(world, 1234));
+
+    expect(summary).toEqual({ savedAt: 1234, day: world.dayDial()!.day, colonists: 9, chapter: world.chapter });
+    expect(summary!.day).toBeGreaterThan(1);
+  });
+
+  it('dit « jour 1 » avant la mairie et rend `null` pour un texte illisible', () => {
+    expect(peekSave(encodeSave(new World(7), 1))?.day).toBe(1);
+    expect(peekSave('pas du json')).toBeNull();
+    expect(peekSave('{"version":11}')).toBeNull();
   });
 });

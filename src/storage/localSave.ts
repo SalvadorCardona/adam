@@ -8,7 +8,7 @@
  * stockage, le jeu tourne comme avant, sans sauvegarde.
  */
 
-import { decodeSave, encodeSave } from '../sim/save.ts';
+import { decodeSave, encodeSave, peekSave, type SaveSummary } from '../sim/save.ts';
 import type { World } from '../sim/world.ts';
 
 /** La clé de la partie en cours. */
@@ -70,6 +70,17 @@ export class LocalSave {
       return { status: decoded.reason };
     }
     return { status: 'ok', world: decoded.world, savedAt: decoded.savedAt };
+  }
+
+  /** Le résumé de la partie pour l'écran titre, sans la charger ; `null` sans sauvegarde lisible. */
+  public peek(): SaveSummary | null {
+    try {
+      const text = this.storage?.getItem(this.key) ?? null;
+
+      return text === null ? null : peekSave(text);
+    } catch {
+      return null;
+    }
   }
 
   /** Garde une copie de ce qu'on ne sait pas relire : la prochaine autosave écrasera la clé principale. */
