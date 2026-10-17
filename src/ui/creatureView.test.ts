@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ENEMIES, WILDLIFE } from '../data/enemies.ts';
 import { TEST_SCENARIOS } from '../data/testScenario.ts';
 import { setLocale, t } from '../i18n/locale.ts';
-import { foeName, nameOf } from '../sim/inhabitants.ts';
+import { foeName } from '../sim/inhabitants.ts';
 import { stageScenario } from '../sim/testScenario.ts';
 import type { Beast, Mutant } from '../sim/types.ts';
 import type { World } from '../sim/world.ts';
@@ -45,7 +45,7 @@ describe('creatureView', () => {
     const view = creatureView(world, jack);
     const camp = world.entities.get(jack.homeId)!;
 
-    expect(view.name).toBe(nameOf(world.seed, jack.id, jack.sex));
+    expect(view.name).toBe(world.nameFor(jack));
     expect(view.sex).toBe(jack.sex);
     expect(view.age).toBe(jack.age);
     expect(view.portrait).toBe('lumberjack');

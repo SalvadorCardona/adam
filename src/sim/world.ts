@@ -216,6 +216,7 @@ import { Store } from './store.ts';
 import { ProblemWatch, type ProblemFacts } from './problems.ts';
 import { transferAllPlan, transferAmount, type TransferDirection, type TransferQuantity, type TransferRules } from './transfer.ts';
 import { footingAt, type Footing } from './footing.ts';
+import { campSpot } from './camp.ts';
 import { doorSide, findSpawn, habitatAt, isBuildable, isWalkable, oreAt, terrainAt, touchesWater } from './terrain.ts';
 import { inLogisticRange, pointInLogisticRange } from './warehouse.ts';
 import { gleanNodes } from './gleaners.ts';
@@ -8908,7 +8909,7 @@ export class World {
     }
     for (const { count: inside } of this.hosted.values()) count += inside;
     for (let i = count; i < this.colonists; i += 1) {
-      const { x, y } = colonistSpot(hall, i);
+      const { x, y } = campSpot(this.seed, hall, i);
 
       this.spawnFree(hall, x, y);
     }
@@ -11163,16 +11164,6 @@ function freeWorker(person: Person, hallId: EntityId): Worker {
     job: null,
     searchTicks: PORTERS.retryTicks,
     ...wanderFrom(person.x, person.y),
-  };
-}
-
-/** La place du `i`-ième ouvrier qui arrive libre : deux rangs de cinq devant la mairie, dans la clairière du départ. */
-function colonistSpot(hall: { tx: number; ty: number; width: number; height: number }, i: number): { x: number; y: number } {
-  const slot = i % 10;
-
-  return {
-    x: (hall.tx - 1 + (slot % 5) + 0.5) * TILE_SIZE,
-    y: (hall.ty + hall.height + Math.floor(slot / 5) + 0.5) * TILE_SIZE,
   };
 }
 
