@@ -90,6 +90,7 @@ import { PAD_POINTER_ID } from './ui/padCursor.ts';
 import { PadHelp } from './ui/padHelp.ts';
 import { PadHints } from './ui/padHints.ts';
 import { PerfSampler } from './ui/perfMeter.ts';
+import { UiClock } from './ui/uiClock.ts';
 import { NotificationPrompt } from './ui/notificationPrompt.ts';
 import { TabLockPanel } from './ui/tabLockPanel.ts';
 import { Notifier, browserBackend } from './ui/notifier.ts';
@@ -1180,7 +1181,27 @@ async function main(): Promise<void> {
   );
 
   let accumulator = 0;
-  let frame = 0;
+  // Le HUD et les fenêtres à `UI_HZ` ; un geste les fait suivre chaque frame, le temps que sa commande se voie.
+  const uiClock = new UiClock();
+
+  for (const type of ['pointerdown', 'pointerup', 'keydown'] as const) {
+    window.addEventListener(type, () => uiClock.poke(), { capture: true, passive: true });
+  }
+
+  // Ce que le bas de l'écran occupe (tiroir, barre de placement, fenêtres,
+  // joystick, zoom) : relu seulement quand l'un d'eux change de taille ou finit
+  // d'entrer — une fenêtre glisse (`panel-in`) —, jamais à chaque frame.
+  let insetsDirty = true;
+  const markInsets = (): void => {
+    insetsDirty = true;
+  };
+  const insetWatch = new ResizeObserver(markInsets);
+
+  for (const node of [...buildMenu.bottomParts, panel.root, resources.root, trade.root, stick.root, zoom.root]) {
+    insetWatch.observe(node);
+    node.addEventListener('animationend', markInsets);
+  }
+  window.addEventListener('resize', markInsets);
   // Arrêt sur image à la mise à mort, ralenti sur le dernier mutant : le temps de la vue, pas de la simulation.
   const dilation = new TimeDilation(reducedMotion);
 
@@ -1193,6 +1214,17 @@ async function main(): Promise<void> {
   let lastAxisY = 0;
 
   renderer.app.ticker.add((ticker) => {
+    // La mise en page se lit en tête de frame, avant toute écriture dans le DOM :
+    // celle de la dernière image peinte tient encore, rien n'est recalculé de force.
+    if (hud.measureLayout() || insetsDirty) {
+      insetsDirty = false;
+      renderer.setHudInsets(hud.topInset(), bottomInset(), [
+        ...hud.obstacles(),
+        stick.root.getBoundingClientRect(),
+        zoom.root.getBoundingClientRect(),
+      ]);
+    }
+
     const running = started && !paused && !settings.open && !notifyPrompt.open && !tabPanel.open && !inventory.dressing && !recap.open && !boons.open;
 
     // La manette se lit une fois par frame, avant les ticks : l'axe de marche est frais.
@@ -1235,15 +1267,16 @@ async function main(): Promise<void> {
 
       if (reading) hud.showPerf(reading);
     }
-    hud.update(ticker.FPS, renderer.bakedChunks, renderer.atlasStats, renderer.waterStats, renderer.weatherParticles);
-
-    // Lire la mise en page force un reflow : une fois tous les dix cadres suffit.
-    if (++frame % 10 === 0) {
-      renderer.setHudInsets(hud.topInset(), bottomInset(), [
-        ...hud.obstacles(),
-        stick.root.getBoundingClientRect(),
-        zoom.root.getBoundingClientRect(),
-      ]);
+    // Ce qui suit la caméra, à chaque frame ; le reste du HUD et les fenêtres, à la cadence de l'UI.
+    hud.frame();
+    if (uiClock.due(ticker.deltaMS)) {
+      hud.update(ticker.FPS, renderer.bakedChunks, renderer.atlasStats, renderer.waterStats, renderer.weatherParticles);
+      buildMenu.refresh();
+      panel.update();
+      eras.update();
+      inventory.update();
+      resources.update();
+      trade.update();
       // Seul un niveau choisi se mémorise : le cadrage de départ suit l'écran.
       if (renderer.zoomChosen && renderer.zoomLevel !== shownZoom) {
         shownZoom = renderer.zoomLevel;
@@ -1253,12 +1286,6 @@ async function main(): Promise<void> {
     zoom.update(worldMap.open ? worldMap.zoomLimits : renderer.zoomLimits);
     renderer.setObjective(hud.pointedItem());
     renderer.setSelected(panel.selection);
-    buildMenu.refresh();
-    panel.update();
-    eras.update();
-    inventory.update();
-    resources.update();
-    trade.update();
     // Un menu, une fenêtre ou la pause par-dessus : le joystick s'efface et
     // lâche son doigt ; il revient à la fermeture.
     stick.setEnabled(
