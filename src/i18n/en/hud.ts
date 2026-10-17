@@ -288,6 +288,8 @@ export const hud: Messages['hud'] = {
   people: {
     working: (n: number): string => `${n} worker${n === 1 ? '' : 's'} working`,
     idle: (n: number): string => `${n} idle worker${n === 1 ? '' : 's'}${n > 0 ? ' — tap to see one' : ''}`,
+    resting: (n: number): string => `${n} worker${n === 1 ? '' : 's'} resting`,
+    summary: (working: number, idle: number, resting: number): string => `${working} working · ${idle} idle · ${resting} resting`,
     children: (n: number): string => `${n} child${n === 1 ? '' : 'ren'}`,
     housing: (housed: number, population: number): string =>
       `Housing — ${housed} housed out of ${population} inhabitant${population === 1 ? '' : 's'}` +

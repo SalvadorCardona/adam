@@ -463,6 +463,8 @@ export interface WaveForecast {
 export interface Census {
   working: number;
   idle: number;
+  /** Ceux qui dorment ou s'abritent : ni au travail, ni inactifs. */
+  resting: number;
   children: number;
 }
 
@@ -4469,16 +4471,20 @@ export class World {
 
   /**
    * La population détaillée : les enfants, les ouvriers qui glandent dehors
-   * (`isIdle`), et tous les autres — à la tâche, entre deux, ou qui dorment.
+   * (`isIdle`), ceux qui se reposent (chez eux ou à la belle étoile : la nuit,
+   * ou à l'abri pendant une vague) et tous les autres, à la tâche ou entre deux.
    */
   public census(): Census {
     const { children, workers } = this.population();
     let idle = 0;
+    let resting = 0;
 
     for (const mobile of this.mobiles.values()) {
-      if (isLaborer(mobile) && this.isIdle(mobile)) idle += 1;
+      if (!isLaborer(mobile)) continue;
+      if (mobile.inside || mobile.sleepingOut) resting += 1;
+      else if (this.isIdle(mobile)) idle += 1;
     }
-    return { working: Math.max(0, workers - idle), idle, children };
+    return { working: Math.max(0, workers - idle - resting), idle, resting, children };
   }
 
   /** Les ouvriers qui glandent, par id : le HUD centre la caméra sur l'un, puis le suivant. */
