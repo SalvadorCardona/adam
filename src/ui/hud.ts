@@ -88,6 +88,7 @@ import { PersonTip } from './hud/person.ts';
 import { Quest } from './hud/quest.ts';
 import { Reactions } from './hud/reactions.ts';
 import { Toasts, type ToastHandle, type ToastTone } from './hud/toasts.ts';
+import { t } from '../i18n/locale.ts';
 import { TownBanner } from './hud/town.ts';
 import { Victory } from './hud/victory.ts';
 import { WaveWatch } from './hud/wave.ts';
