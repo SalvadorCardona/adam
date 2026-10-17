@@ -4806,6 +4806,33 @@ button:disabled,
   user-select: none;
 }
 
+.building-panel-stat[data-captioned='true'] {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Le mot sous le nombre : seulement quand la fenêtre est large ; sinon le tap garde son libellé affiché. */
+.building-panel-stat-caption {
+  display: none;
+  flex-basis: 100%;
+  margin-top: -2px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink);
+  opacity: 0.75;
+}
+
+@media (min-width: 700px) {
+  .building-panel-stat-caption {
+    display: block;
+  }
+
+  .building-panel-stat[data-captioned='true'] {
+    padding-bottom: 4px;
+  }
+}
+
 .building-panel-stat:active {
   transform: translateY(1px);
 }
@@ -4920,6 +4947,19 @@ button:disabled,
   gap: 10px;
 }
 
+.site-need-head {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.site-need-head-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
 .site-need-chip {
   display: inline-flex;
   align-items: center;
@@ -4956,8 +4996,20 @@ button:disabled,
 
 .building-panel-actions button {
   flex: 1;
+  min-width: 0;
   padding: 0 12px;
   font-size: 18px;
+  /* Une ligne, jamais deux : le texte trop long se coupe d'une ellipse. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 420px) {
+  .building-panel-actions button {
+    padding: 0 8px;
+    font-size: 16px;
+  }
 }
 
 .building-panel-actions button[hidden] {
@@ -5640,6 +5692,15 @@ button:disabled,
   background: var(--paper-shade);
   color: var(--ink);
   vertical-align: middle;
+  max-width: 100%;
+}
+
+/* Le nom du bâtiment tient sur une ligne, coupé d'une ellipse si besoin. */
+.research-unlock-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .research-unlock .icon-building {

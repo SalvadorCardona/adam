@@ -45,13 +45,15 @@ export const panel: Messages['panel'] = {
     needIncoming: (count: number): string => `${count} on the way`,
     needTownEmpty: 'none left in town',
     needInTown: (count: number): string => `${count} in town`,
+    needHeader: { delivered: 'delivered', incoming: 'on the way', town: 'in town' },
   },
 
   repair: {
     noStock: (item: string, hp: number): string => `Damaged — bring some ${item.toLowerCase()} to fix it (1 = ${hp} HP).`,
     damaged: (item: string, hp: number): string =>
       `Damaged — repair it, or bump into it with ${item.toLowerCase()} in your bag (1 = ${hp} HP).`,
-    button: (amount: number, item: string): string => `Repair (${amount} ${item.toLowerCase()})`,
+    button: 'Repair',
+    buttonCost: (amount: number, item: string): string => `Repair: ${amount} ${item.toLowerCase()}`,
   },
 
   chest: {
@@ -67,6 +69,7 @@ export const panel: Messages['panel'] = {
     children: (count: number): string => `Children: ${count}`,
     workers: (count: number): string => `Workers: ${count}`,
     nights: (count: number): string => `Nights survived: ${count}`,
+    captions: { adults: 'adults', children: 'kids', workers: 'workers', nights: 'nights', radius: 'radius' },
     radius: (tiles: number): string => `Supply radius: sites within ${tiles} tiles draw from its chest`,
   },
 
