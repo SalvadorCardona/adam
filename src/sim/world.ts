@@ -120,7 +120,7 @@ import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts
 import { CLEAN_NIGHT, COMBO, HUNTERS, VOLLEY } from '../data/skills.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
-import { BUILDERS, FARMERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
+import { BUILDERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherId } from '../data/weather.ts';
 import { ChunkIndex } from './chunk.ts';
 import { floorCost, floorMissing, floorNeeds, floorWants } from './antenna.ts';
@@ -223,8 +223,8 @@ import { inLogisticRange, pointInLogisticRange } from './warehouse.ts';
 import { gleanNodes } from './gleaners.ts';
 import { LumberjackCrew, chopSpot, treesInRange } from './lumberjacks.ts';
 import type { CrewContext } from './crew.ts';
-import { ForesterCrew, plantSpot, type PlotTile } from './forester.ts';
-import { fieldTiles, type FieldState, type FieldTile } from './farmer.ts';
+import { ForesterCrew, type PlotTile } from './forester.ts';
+import { FarmerCrew, type FieldTile } from './farmer.ts';
 import { labLedger, siteLedger, type SiteLine } from './siteLedger.ts';
 import { allocateStaff, canPause, clampStaff, employs, isWorkPriority, type StaffDemand, type StaffPost, type Staffing } from './staffing.ts';
 import { carryOf, clearLine, standStill, walkToward, wander, wanderFrom } from './workers.ts';
@@ -246,7 +246,6 @@ import type {
   EntityId,
   Farm,
   Farmer,
-  FarmerState,
   Quarry,
   Foe,
   Forester,
@@ -1138,6 +1137,9 @@ export class World {
   /** Les forestiers des maisons (`sim/forester.ts`). */
   private readonly foresters = new ForesterCrew(this.crew);
 
+  /** Les fermiers des fermes, et leurs champs (`sim/farmer.ts`). */
+  private readonly farmers = new FarmerCrew(this.crew);
+
   /** La météo du tick en cours : relue dans la seed au début de chaque tick, jamais sauvegardée. */
   private spell: WeatherSpell | null = null;
 
@@ -1537,7 +1539,7 @@ export class World {
     this.scheduler.restore(state.scheduler);
     this.restoreJobs();
     this.lumberjacks.restore();
-    this.restoreFarmers();
+    this.farmers.restore();
     this.restoreMeals();
 
     // Une sauvegarde d'avant la colonie : ses ouvriers étaient ceux qu'emploient ses bâtiments finis — elle les garde.
@@ -3928,7 +3930,7 @@ export class World {
         break;
 
       case 'farm':
-        this.staffFarm(building);
+        this.farmers.staff(building);
         break;
 
       case 'quarry':
@@ -4420,7 +4422,7 @@ export class World {
       case 'farm': {
         const tiles = this.farmField(entity).filter((tile) => tile.state !== 'blocked').length;
 
-        return { item: CROPS.item, amount: (tiles * this.cropYield() * OFFLINE.farmEfficiency * share * ticks) / CROPS.ripeTicks };
+        return { item: CROPS.item, amount: (tiles * this.farmers.cropYield() * OFFLINE.farmEfficiency * share * ticks) / CROPS.ripeTicks };
       }
 
       default:
@@ -5077,7 +5079,7 @@ export class World {
         case 'farmer':
           // Couché dehors, il ne l'est que tant que `sleep` l'y remet.
           mobile.sleepingOut = false;
-          if (!this.stepNeeds(mobile, alarm)) this.stepFarmer(mobile, alarm, bedtime);
+          if (!this.stepNeeds(mobile, alarm)) this.farmers.step(mobile, alarm, bedtime);
           this.noteIdle(mobile);
           break;
 
@@ -8490,7 +8492,7 @@ export class World {
       this.lumberjacks.releaseTree(mobile);
       if (onTrip && home?.kind === 'lumberCamp') home.store.releaseIn('wood', LUMBERJACKS.carry);
     }
-    if (mobile.kind === 'farmer' && home?.kind === 'farm') this.dropPlot(mobile, home);
+    if (mobile.kind === 'farmer' && home?.kind === 'farm') this.farmers.dropPlot(mobile, home);
 
     for (let index = 0; index < NEED_IDS.length; index += 1) this.famine.delete(famineKey(mobile.id, index));
     this.idleSince.delete(mobile.id);
@@ -8757,7 +8759,7 @@ export class World {
       if (entity.kind === 'house' || entity.kind === 'depot' || entity.kind === 'yard') this.staff(entity);
       if (entity.kind === 'lumberCamp') this.lumberjacks.staff(entity);
       if (entity.kind === 'foresterHouse') this.foresters.staff(entity);
-      if (entity.kind === 'farm') this.staffFarm(entity);
+      if (entity.kind === 'farm') this.farmers.staff(entity);
     }
     // Une maison finie ou tombée, des ouvriers venus ou partis : les lits suivent sans attendre.
     this.settleBeds();
@@ -9645,373 +9647,22 @@ export class World {
   private growForest(): void {
     if (this.tickCount % SAPLING.passTicks !== 0) return;
     for (const { tx, ty } of this.resources.grow(this.tickCount)) this.dirtyTile(tx, ty);
-    this.witherFields();
+    this.farmers.wither();
   }
 
   /* --------------------------------------------------------------- fermiers */
 
-  private *farmers(): IterableIterator<Farmer> {
-    for (const mobile of this.mobiles.values()) {
-      if (mobile.kind === 'farmer') yield mobile;
-    }
-  }
-
-  /** Pourvoit la ferme de fermiers, autant que de postes pourvus : les ouvriers libres les plus proches de sa porte. */
-  private staffFarm(farm: Farm): void {
-    let lodged = 0;
-
-    for (const farmer of this.farmers()) {
-      if (farmer.homeId === farm.id) lodged += 1;
-    }
-
-    const door = doorOf(farm);
-    const posts = this.roster().filled.get(farm.id) ?? 0;
-    let hired = 0;
-
-    for (let i = lodged; i < posts; i += 1) {
-      const worker = this.nearestFree(door);
-
-      if (!worker) break;
-
-      const farmer: Farmer = {
-        kind: 'farmer',
-        ...personOf(worker),
-        homeId: farm.id,
-        inside: false,
-        state: 'idle',
-        plot: null,
-        workTicks: 0,
-        load: 0,
-        // Ils ne partent pas du même pas : chacun suit le précédent.
-        searchTicks: 1 + i * 10,
-        ...wanderFrom(worker.x, worker.y),
-      };
-
-      this.mobiles.set(farmer.id, farmer);
-      this.idleSince.delete(farmer.id);
-      hired += 1;
-    }
-    if (hired > 0) this.duty = null;
-  }
-
   /** Le premier fermier d'une ferme, par id, ou `undefined` : la fenêtre dit ce qu'il fait. */
   public farmerOf(farm: Farm): Farmer | undefined {
-    let found: Farmer | undefined;
-
-    for (const farmer of this.farmers()) {
-      if (farmer.homeId === farm.id && (!found || farmer.id < found.id)) found = farmer;
-    }
-    return found;
+    return this.farmers.of(farm);
   }
 
   /**
    * Le champ d'une ferme — posée, ou en fantôme —, case par case dans
-   * l'ordre de semis : libre, semée, en pousse, mûre, ou prise par autre
-   * chose. Une case libre est une herbe nue, sans bâti, sans route, sans
-   * filon, sans arbre ni pousse du forestier.
+   * l'ordre de semis (`FarmerCrew.field`).
    */
   public farmField(farm: { tx: number; ty: number; width: number; height: number }): FieldTile[] {
-    return fieldTiles(farm).map(({ tx, ty }): FieldTile => ({ tx, ty, state: this.fieldState(tx, ty) }));
-  }
-
-  private fieldState(tx: number, ty: number): FieldState {
-    const crop = this.resources.crop(tx, ty);
-
-    if (crop) return crop;
-
-    const blocked =
-      this.resources.isTaken(tx, ty) ||
-      terrainAt(this.seed, tx, ty) !== 'grass' ||
-      oreAt(this.seed, tx, ty) !== null ||
-      this.chunks.occupantAt(tx, ty) !== undefined ||
-      this.chestAt(tx, ty) !== null;
-
-    return blocked ? 'blocked' : 'free';
-  }
-
-  /** Nourriture d'une case récoltée : celle des données, plus les fermes fertiles du labo. */
-  private cropYield(): number {
-    return CROPS.yield + this.bonus('farmYield');
-  }
-
-  /**
-   * La première case du champ dans l'état `want`, dans l'ordre, qu'aucun
-   * autre fermier ne vise et qu'on atteint en ligne droite sans passer par
-   * l'eau ; `null` sinon.
-   */
-  private nextField(farm: Farm, farmer: Farmer, from: { x: number; y: number }, want: FieldState): { tx: number; ty: number } | null {
-    const claimed = new Set<string>();
-
-    for (const other of this.farmers()) {
-      if (other !== farmer && other.plot) claimed.add(coordKey(other.plot.tx, other.plot.ty));
-    }
-    for (const tile of fieldTiles(farm)) {
-      if (claimed.has(coordKey(tile.tx, tile.ty)) || this.fieldState(tile.tx, tile.ty) !== want) continue;
-
-      const spot = plantSpot(tile);
-
-      if (this.lineIsClear(from.x, from.y, spot.x, spot.y)) return tile;
-    }
-    return null;
-  }
-
-  /**
-   * Un tick de fermier. Hors d'un geste, il cherche toutes les `retryTicks`
-   * de quoi faire : semer la première case libre de son champ, sinon
-   * récolter la première case mûre — sa place au coffre réservée d'abord ;
-   * coffre plein, il attend devant la porte. Récolte faite, il la rapporte au
-   * coffre, puis revient semer. La nuit, il ne repart pas ; pendant une
-   * vague, il rentre s'abriter, et reprendra sa case après.
-   */
-  private stepFarmer(farmer: Farmer, alarm: boolean, bedtime: boolean): void {
-    const farm = this.entities.get(farmer.homeId);
-
-    // Sa ferme est tombée : il redevient un ouvrier libre.
-    if (farm?.kind !== 'farm') {
-      this.release(farmer);
-      return;
-    }
-
-    const door = doorOf(farm);
-
-    if (alarm) {
-      if (farmer.state === 'sow') farmer.state = 'toSow';
-      if (farmer.state === 'harvest') farmer.state = 'toHarvest';
-      this.goHome(farmer, door);
-      return;
-    }
-
-    // Ferme en pause, ou lui retiré de son poste : il lâche sa case — la récolte qu'il porte, il la rapporte —, puis flâne.
-    const working = !farm.paused && this.onDuty(farmer);
-
-    if (!working && farmer.state !== 'idle' && farmer.state !== 'toFarm') this.stopFarming(farmer, farm, door);
-
-    // Retiré de son poste, sa récolte rangée : il rentre, et redevient un ouvrier libre.
-    if (!this.onDuty(farmer) && farmer.state === 'idle') {
-      this.release(farmer);
-      return;
-    }
-
-    switch (farmer.state) {
-      case 'idle':
-      case 'wait':
-        farmer.searchTicks -= 1;
-        if (farmer.searchTicks <= 0 && working && !bedtime) {
-          farmer.searchTicks = FARMERS.retryTicks;
-          this.seekField(farmer, farm, farmer.inside ? door : farmer);
-        }
-        if (farmer.state === 'idle') this.idle(farmer, door, bedtime);
-        else if (farmer.state === 'wait') this.waitAtFarm(farmer, door, bedtime);
-        else farmer.inside = false;
-        break;
-
-      case 'toSow':
-      case 'toHarvest': {
-        const plot = farmer.plot;
-        const want: FieldState = farmer.state === 'toSow' ? 'free' : 'ripe';
-
-        farmer.inside = false;
-        if (!plot || this.fieldState(plot.tx, plot.ty) !== want) {
-          // Prise entre-temps — un chantier, une route — : il en cherche une autre.
-          this.dropPlot(farmer, farm);
-          if (!this.seekField(farmer, farm, farmer) && (farmer.state as FarmerState) === 'idle') this.stopFarming(farmer, farm, door);
-          break;
-        }
-
-        const spot = plantSpot(plot);
-
-        if (walkToward(farmer, spot.x, spot.y, this.walkStep())) {
-          const sowing = farmer.state === 'toSow';
-
-          farmer.state = sowing ? 'sow' : 'harvest';
-          farmer.facing = 'right';
-          farmer.workTicks = sowing ? FARMERS.sowTicks : FARMERS.harvestTicks;
-        }
-        break;
-      }
-
-      case 'sow':
-      case 'harvest':
-        standStill(farmer);
-        farmer.inside = false;
-        farmer.workTicks -= this.toil(farmer.needs);
-        if (farmer.workTicks > 0) break;
-        if (farmer.state === 'sow') this.sow(farmer, farm, door, bedtime);
-        else this.reap(farmer, farm, door, bedtime);
-        break;
-
-      case 'toFarm':
-        farmer.inside = false;
-        if (walkToward(farmer, door.x, door.y, this.walkStep())) this.storeCrop(farmer, farm, door, bedtime);
-        break;
-    }
-  }
-
-  /**
-   * De quoi faire, depuis `from` : semer d'abord — le champ reste plein —,
-   * sinon récolter, sa place au coffre réservée ; coffre plein, il attend à
-   * la porte (`wait`) ; rien du tout, il reste oisif. Vrai s'il part sur une case.
-   */
-  private seekField(farmer: Farmer, farm: Farm, from: { x: number; y: number }): boolean {
-    const free = this.nextField(farm, farmer, from, 'free');
-
-    if (free) {
-      farmer.plot = free;
-      farmer.state = 'toSow';
-      return true;
-    }
-
-    const ripe = this.nextField(farm, farmer, from, 'ripe');
-
-    farmer.plot = null;
-    if (!ripe) {
-      farmer.state = 'idle';
-      return false;
-    }
-
-    const amount = this.cropYield();
-
-    if (!farm.store.reserveIn(CROPS.item, amount)) {
-      farmer.state = 'wait';
-      farmer.searchTicks = FARMERS.retryTicks;
-      return false;
-    }
-    farmer.load = amount;
-    farmer.plot = ripe;
-    farmer.state = 'toHarvest';
-    return true;
-  }
-
-  /** La graine en terre, puis la case suivante — sauf à la nuit tombée : il rentre. */
-  private sow(farmer: Farmer, farm: Farm, door: { x: number; y: number }, bedtime: boolean): void {
-    const plot = farmer.plot;
-
-    if (plot && this.fieldState(plot.tx, plot.ty) === 'free' && this.resources.sow(plot.tx, plot.ty, this.tickCount)) {
-      this.dirtyTile(plot.tx, plot.ty);
-      this.events.emit('cropSown', { farmerId: farmer.id, tx: plot.tx, ty: plot.ty });
-    }
-    farmer.plot = null;
-    if (bedtime || !this.seekField(farmer, farm, farmer)) {
-      if (farmer.state !== 'wait') this.stopFarming(farmer, farm, door);
-    }
-  }
-
-  /** La case mûre récoltée : le blé dans le panier, il le rapporte au coffre. */
-  private reap(farmer: Farmer, farm: Farm, door: { x: number; y: number }, bedtime: boolean): void {
-    const plot = farmer.plot;
-
-    if (plot && this.resources.reap(plot.tx, plot.ty)) {
-      this.dirtyTile(plot.tx, plot.ty);
-      this.events.emit('cropHarvested', { farmerId: farmer.id, tx: plot.tx, ty: plot.ty, amount: farmer.load });
-      farmer.plot = null;
-      farmer.state = 'toFarm';
-      return;
-    }
-    // Plus rien sur pied : sa place au coffre se libère, il cherche autre chose.
-    this.dropPlot(farmer, farm);
-    if (bedtime || !this.seekField(farmer, farm, farmer)) {
-      if (farmer.state !== 'wait') this.stopFarming(farmer, farm, door);
-    }
-  }
-
-  /** À la porte : la place réservée devient du blé dans le coffre ; il repart semer. */
-  private storeCrop(farmer: Farmer, farm: Farm, door: { x: number; y: number }, bedtime: boolean): void {
-    farm.store.releaseIn(CROPS.item, farmer.load);
-
-    const stored = farm.store.add(CROPS.item, farmer.load);
-
-    farmer.load -= stored;
-    if (stored > 0) {
-      this.tally(CROPS.item, stored);
-      this.events.emit('farmProduced', { id: farm.id, item: CROPS.item });
-    }
-    // Ce qui ne rentre pas — une sauvegarde retouchée, jamais en jeu — reste dans son panier : il attend.
-    if (farmer.load > 0) {
-      farmer.state = 'wait';
-      return;
-    }
-    farmer.state = 'idle';
-    farmer.searchTicks = 0;
-    if (bedtime) Object.assign(farmer, wanderFrom(door.x, door.y));
-  }
-
-  /** Coffre plein : devant la porte, sa récolte au panier s'il en a, jusqu'à ce qu'on fasse de la place. */
-  private waitAtFarm(farmer: Farmer, door: { x: number; y: number }, bedtime: boolean): void {
-    if (farmer.load > 0 && !farmer.plot) {
-      const farm = this.entities.get(farmer.homeId);
-
-      if (farm?.kind === 'farm' && farm.store.freeSpace() > 0) {
-        const stored = farm.store.add(CROPS.item, farmer.load);
-
-        farmer.load -= stored;
-        if (stored > 0) this.tally(CROPS.item, stored);
-      }
-    }
-    if (bedtime && farmer.load === 0) {
-      this.sleep(farmer, door);
-      return;
-    }
-    farmer.inside = false;
-    if (walkToward(farmer, door.x, door.y, this.walkStep())) farmer.facing = 'down';
-  }
-
-  /** Il lâche sa case ; une récolte pas encore cueillie rend sa place au coffre. */
-  private dropPlot(farmer: Farmer, farm: Farm): void {
-    if ((farmer.state === 'toHarvest' || farmer.state === 'harvest') && farmer.load > 0) {
-      farm.store.releaseIn(CROPS.item, farmer.load);
-      farmer.load = 0;
-    }
-    farmer.plot = null;
-  }
-
-  /** Plus rien à faire au champ : il lâche sa case et flâne à partir de sa porte. */
-  private stopFarming(farmer: Farmer, farm: Farm, door: { x: number; y: number }): void {
-    this.dropPlot(farmer, farm);
-    farmer.state = 'idle';
-    farmer.searchTicks = FARMERS.retryTicks;
-    Object.assign(farmer, wanderFrom(door.x, door.y));
-  }
-
-  /**
-   * Après un chargement : la place au coffre de chaque récolte en cours se
-   * réserve à nouveau, et deux fermiers qui viseraient la même case — une
-   * sauvegarde retouchée — n'en gardent qu'un.
-   */
-  private restoreFarmers(): void {
-    const claimed = new Set<string>();
-
-    for (const farmer of this.farmers()) {
-      const farm = this.entities.get(farmer.homeId);
-      const holds = farmer.state === 'toHarvest' || farmer.state === 'harvest' || farmer.state === 'toFarm';
-
-      if (farmer.plot) {
-        const key = coordKey(farmer.plot.tx, farmer.plot.ty);
-
-        if (claimed.has(key)) farmer.plot = null;
-        else claimed.add(key);
-      }
-      if (holds && farmer.load > 0 && farm?.kind === 'farm') farm.store.reserveIn(CROPS.item, farmer.load);
-    }
-  }
-
-  /**
-   * Les cultures d'un champ qu'aucune ferme ne cultive plus s'arrachent : la
-   * case redevient libre. Une ferme tombée en chantier garde les siennes.
-   */
-  private witherFields(): void {
-    if (this.resources.cropTiles().next().done) return;
-
-    const covered = new Set<string>();
-
-    for (const entity of this.entities.values()) {
-      if (entity.proto !== 'farm') continue;
-      for (const tile of fieldTiles(entity)) covered.add(coordKey(tile.tx, tile.ty));
-    }
-    for (const tile of [...this.resources.cropTiles()]) {
-      if (covered.has(coordKey(tile.tx, tile.ty))) continue;
-      this.resources.wither(tile.tx, tile.ty);
-      this.dirtyTile(tile.tx, tile.ty);
-    }
+    return this.farmers.field(farm);
   }
 
   /** Après un chargement : les réservations se rejouent depuis les jobs sauvegardés. */
@@ -10347,7 +9998,7 @@ export class World {
       storeFull = building.blocked && building.pigs > 0 && store.total() + PIG_FARM.meatPerPig * building.pigs > store.capacity;
     } else if (building.kind === 'farm') {
       // Plus la place d'une récolte au coffre : les cultures mûres attendent sur pied.
-      storeFull = store.total() + this.cropYield() > store.capacity;
+      storeFull = store.total() + this.farmers.cropYield() > store.capacity;
     } else if (building.kind === 'lumberCamp') {
       // Plus la place d'un voyage au coffre : les bûcherons attendent un porteur.
       storeFull = store.total() + LUMBERJACKS.carry > store.capacity;
