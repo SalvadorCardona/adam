@@ -1310,6 +1310,14 @@ Rien ne joue avant un geste du joueur.
   commande `applyPerks`, au départ d'une nouvelle colonie seulement.
 - Le contenu est de la donnée (`src/data/*.ts`, `as const satisfies`).
   `validatePrototypes()` tourne au démarrage en dev et dans les tests.
+- **`world.ts` se vide par systèmes** : `World` garde l'état, `tick()`,
+  `snapshot()` / `restore()` et les accesseurs que lit l'UI ; un système
+  sorti dans `sim/` reçoit un contexte étroit, jamais tout `World` — les
+  équipes logées (`LumberjackCrew`, `ForesterCrew`, `FarmerCrew`) un
+  `CrewContext` (`sim/crew.ts`, `World.crewContext`), le hors ligne un
+  `OfflineContext` (`sim/offline.ts`). Le rejeu de référence
+  (`sim/replay.slow.test.ts`, 30 minutes, `checksum()` et sauvegarde
+  entière) dit qu'une extraction ne change rien à la partie.
 - Pas d'ECS, pas de moteur physique. Le multijoueur viendra par le back-end
   (voir Back-end), jamais au prix du jeu hors ligne.
 - **Langue** (FR / EN) : tout texte visible passe par `t()` (`src/i18n/locale.ts`).

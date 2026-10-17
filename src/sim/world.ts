@@ -111,16 +111,17 @@ import {
   type PerkId,
 } from '../data/perks.ts';
 import { CHAPTERS, objectiveBagBonus, type ChapterProto, type ObjectiveId, type Reward } from '../data/objectives.ts';
-import { OFFLINE, OFFLINE_ALERTS, type OfflineAlertId } from '../data/offline.ts';
+import { OFFLINE } from '../data/offline.ts';
 import type { QuestId } from '../data/quests.ts';
-import { RECIPES, recipeOf, type RecipeId, type RecipeProto } from '../data/recipes.ts';
+import { RECIPES, type RecipeProto } from '../data/recipes.ts';
+import { DRILL_RECIPE, NURSERY_RECIPE, amountsOf, canCraft, hasInputs, inputItems, quarryRecipe } from './recipes.ts';
 import { ERAS, type EraProto } from '../data/eras.ts';
 import { RESEARCH, isResearchId, type ResearchId, type ResearchStat } from '../data/research.ts';
-import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
+import { RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts';
 import { CLEAN_NIGHT, COMBO, HUNTERS, VOLLEY } from '../data/skills.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
-import { BUILDERS, FARMERS, FORESTERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
+import { BUILDERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherId } from '../data/weather.ts';
 import { ChunkIndex } from './chunk.ts';
 import { floorCost, floorMissing, floorNeeds, floorWants } from './antenna.ts';
@@ -206,7 +207,7 @@ import {
   unlockingResearch,
 } from './research.ts';
 import { TownFlows } from './flows.ts';
-import { count, countedMs, feedNeed, mealsPerTick, wholeUnits, type OfflineReport } from './offline.ts';
+import { catchUp, type OfflineContext, type OfflineReport } from './offline.ts';
 import { ResourceIndex, type TileLook } from './resources.ts';
 import { FogOfWar, type Sight } from './fog.ts';
 import { Land } from './contamination.ts';
@@ -221,9 +222,10 @@ import { campSpot } from './camp.ts';
 import { doorSide, findSpawn, habitatAt, isBuildable, isWalkable, oreAt, terrainAt, touchesWater } from './terrain.ts';
 import { inLogisticRange, pointInLogisticRange } from './warehouse.ts';
 import { gleanNodes } from './gleaners.ts';
-import { chopSpot, isTree, pickTree, treesInRange } from './lumberjacks.ts';
-import { plantSpot, plotTiles, type PlotTile } from './forester.ts';
-import { fieldTiles, type FieldState, type FieldTile } from './farmer.ts';
+import { LumberjackCrew, chopSpot } from './lumberjacks.ts';
+import type { CrewContext } from './crew.ts';
+import { ForesterCrew, type PlotTile } from './forester.ts';
+import { FarmerCrew, type FieldTile } from './farmer.ts';
 import { labLedger, siteLedger, type SiteLine } from './siteLedger.ts';
 import { allocateStaff, canPause, clampStaff, employs, isWorkPriority, type StaffDemand, type StaffPost, type Staffing } from './staffing.ts';
 import { carryOf, clearLine, standStill, walkToward, wander, wanderFrom } from './workers.ts';
@@ -245,7 +247,6 @@ import type {
   EntityId,
   Farm,
   Farmer,
-  FarmerState,
   Quarry,
   Foe,
   Forester,
@@ -318,12 +319,6 @@ const ADAM_SIGHT = -1;
 /** Le sel du hachage qui désigne les traqueurs d'une vague (`HUNTERS`). */
 const HUNTER_SALT = 0x48554e54;
 const PARTNER_SIGHT = -2;
-
-/** Recette utilisée par une foreuse. Une seule pour l'instant, cf. `data/recipes.ts`. */
-const DRILL_RECIPE: RecipeId = 'mineOre';
-
-/** Ce que coûte une naissance à la nurserie, et tous les combien. */
-const NURSERY_RECIPE: RecipeId = 'raiseChild';
 
 /** Ticks de contact entre deux objets livrés sur un chantier. Court : le chantier se remplit à vue. */
 export const DELIVER_TICKS = 2;
@@ -1128,11 +1123,17 @@ export class World {
    */
   public gleaning = true;
 
-  /** Les arbres qu'un bûcheron vise : aucun autre ne les voit. Pas sauvegardé — rejoué depuis les bûcherons. */
-  private readonly claimedTrees = new Set<string>();
+  /** Ce que les équipes logées voient du monde (`crewContext`). */
+  private readonly crew = World.crewContext(this);
 
-  /** Le dernier compte d'arbres d'une cabane, cf. `treesLeft()`. */
-  private treeCount: { id: EntityId; tick: number; count: number } | null = null;
+  /** Les bûcherons des cabanes, et les arbres qu'ils visent (`sim/lumberjacks.ts`). */
+  private readonly lumberjacks = new LumberjackCrew(this.crew);
+
+  /** Les forestiers des maisons (`sim/forester.ts`). */
+  private readonly foresters = new ForesterCrew(this.crew);
+
+  /** Les fermiers des fermes, et leurs champs (`sim/farmer.ts`). */
+  private readonly farmers = new FarmerCrew(this.crew);
 
   /** La météo du tick en cours : relue dans la seed au début de chaque tick, jamais sauvegardée. */
   private spell: WeatherSpell | null = null;
@@ -1532,8 +1533,8 @@ export class World {
     for (const entity of this.entities.values()) this.faceDoor(entity);
     this.scheduler.restore(state.scheduler);
     this.restoreJobs();
-    this.restoreLumberjacks();
-    this.restoreFarmers();
+    this.lumberjacks.restore();
+    this.farmers.restore();
     this.restoreMeals();
 
     // Une sauvegarde d'avant la colonie : ses ouvriers étaient ceux qu'emploient ses bâtiments finis — elle les garde.
@@ -3924,7 +3925,7 @@ export class World {
         break;
 
       case 'farm':
-        this.staffFarm(building);
+        this.farmers.staff(building);
         break;
 
       case 'quarry':
@@ -3944,11 +3945,11 @@ export class World {
         break;
 
       case 'lumberCamp':
-        this.staffCamp(building);
+        this.lumberjacks.staff(building);
         break;
 
       case 'foresterHouse':
-        this.staffForester(building);
+        this.foresters.staff(building);
         break;
 
       case 'depot':
@@ -4265,347 +4266,49 @@ export class World {
 
   /**
    * La commande `catchUp` : la ville rattrape `awayMs` d'absence, borné au
-   * plafond, en agrégé — par pas de `OFFLINE.stepTicks`, pas tick par tick.
-   * À chaque pas, les producteurs rendent leur cadence moyenne, les forges
-   * transforment, les nurseries et les labos avancent leur compte à rebours,
-   * puis chacun mange et boit. Les porteurs (ou les logisticiens) sont
-   * supposés faire leur tournée : avec eux, ce qui sort va en ville et ce
-   * qui entre en vient ; sans eux, chaque coffre se remplit seul.
-   *
-   * L'horloge du jour, elle, ne bouge pas : ni nuit, ni vague, ni mort. Un
-   * habitant sans vivres s'arrête affamé (`OFFLINE.returnGauge`), et le
-   * récap le dit. Rien sans mairie bâtie, ni sous `OFFLINE.minMs`.
+   * plafond, en agrégé (`sim/offline.ts`). Ni nuit, ni vague, ni mort.
    */
   private catchUp(awayMs: number): void {
-    const hall = this.warehouse();
-    const counted = countedMs(awayMs, this.offlineCapMs());
-    const total = Math.floor(counted / STEP_MS);
+    catchUp(World.offlineContext(this), awayMs);
+  }
 
-    if (!hall || this.defeated || total <= 0) return;
-
-    const report: OfflineReport = {
-      awayMs,
-      ticks: total,
-      capped: awayMs > this.offlineCapMs(),
-      gained: {},
-      spent: {},
-      research: [],
-      births: 0,
-      alerts: [],
+  /** Ce que le rattrapage hors ligne voit du monde, et les gestes qu'il lui prête. */
+  private static offlineContext(world: World): OfflineContext {
+    return {
+      get tickCount() {
+        return world.tickCount;
+      },
+      stepMs: STEP_MS,
+      get defeated() {
+        return world.defeated;
+      },
+      entities: world.entities,
+      resources: world.resources,
+      harvestable: world.harvestable,
+      events: world.events,
+      flows: world.flows,
+      offlineCapMs: () => world.offlineCapMs(),
+      warehouse: () => world.warehouse(),
+      townStock: () => world.townStock(),
+      workers: () => world.workers(),
+      inhabitants: () => world.inhabitants(),
+      staffing: (building) => world.staffing(building),
+      stopped: (building) => world.stopped(building),
+      bonus: (stat) => world.bonus(stat),
+      dailyCycle: (proto) => world.dailyCycle(proto),
+      farmField: (farm) => world.farmers.field(farm),
+      cropYield: () => world.farmers.cropYield(),
+      tally: (item, amount) => world.tally(item, amount),
+      dirtyTile: (tx, ty) => world.dirtyTile(tx, ty),
+      schedule: (id, at) => world.scheduler.schedule(id, at, world.tickCount),
+      nurseryKids: (nursery) => world.nurseryKids(nursery),
+      bear: (nursery) => world.bear(nursery),
+      townStockForLab: (lab) => world.townStockForLab(lab),
+      supplyLab: (lab, item, amount, from, source) => world.supplyLab(lab, item, amount, from, source),
+      startCountdown: (lab) => world.startCountdown(lab),
+      finishResearch: (lab) => world.finishResearch(lab),
+      startPigPen: (pen) => world.startPigPen(pen),
     };
-    const alerts = new Set<OfflineAlertId>();
-    const carriers = this.hasCarriers();
-    const carry = new Map<EntityId, number>();
-    const woodLeft = new Map<EntityId, number>();
-    const felled = new Map<EntityId, number>();
-    const births = new Map<EntityId, number>();
-    const research = new Map<EntityId, number>();
-    let working = 1;
-
-    for (const entity of this.entities.values()) {
-      if (entity.kind === 'nursery') births.set(entity.id, entity.hungry ? 0 : entity.nextBirthTick - this.tickCount);
-      if (entity.kind === 'lab' && entity.endTick > 0) research.set(entity.id, entity.endTick - this.tickCount);
-      if (entity.kind === 'lumberCamp') woodLeft.set(entity.id, this.standingWood(entity));
-    }
-
-    for (let done = 0; done < total; done += OFFLINE.stepTicks) {
-      const span = Math.min(OFFLINE.stepTicks, total - done);
-
-      for (const entity of this.entities.values()) {
-        if (entity.kind === 'site') continue;
-
-        const made = this.offlineOutput(entity, span * (employs(entity.proto) ? working : 1), woodLeft);
-
-        if (made) {
-          const kept = this.offlineYield(entity, made.item, wholeUnits(carry, entity.id, made.amount), carriers, report, alerts);
-
-          if (entity.kind === 'lumberCamp') felled.set(entity.id, (felled.get(entity.id) ?? 0) + kept);
-        }
-        if (entity.kind === 'forge') this.offlineForge(entity, span * working, carry, carriers, report, alerts);
-      }
-      for (const entity of this.entities.values()) {
-        if (entity.kind === 'nursery') this.offlineBirths(entity, span, births, carriers, report);
-        if (entity.kind === 'lab') this.offlineResearch(entity, span, research, carriers, report);
-      }
-      working = this.offlineMeals(hall.store, span, report, alerts);
-    }
-
-    // Le bois rapporté a un prix : les arbres de la cabane, du plus proche au plus loin, perdent autant d'unités.
-    for (const [id, units] of felled) {
-      const camp = this.entities.get(id);
-
-      if (camp?.kind === 'lumberCamp') this.fellTrees(camp, units);
-    }
-
-    // Les comptes à rebours repartent d'où le rattrapage les a laissés ; un ancien réveil, en avance, ne sonne plus pour rien.
-    for (const entity of this.entities.values()) {
-      if (entity.kind === 'nursery' && !entity.paused) {
-        const left = births.get(entity.id) ?? 0;
-
-        if (left > 0) {
-          entity.hungry = false;
-          entity.nextBirthTick = this.tickCount + left;
-          this.scheduler.schedule(entity.id, entity.nextBirthTick, this.tickCount);
-        } else {
-          entity.nextBirthTick = Math.min(entity.nextBirthTick, this.tickCount);
-          if (entity.hungry) alerts.add('nurseryHungry');
-        }
-      }
-      if (entity.kind === 'lab' && entity.endTick > 0) {
-        entity.endTick = this.tickCount + Math.max(1, research.get(entity.id) ?? entity.endTick - this.tickCount);
-        this.scheduler.schedule(entity.id, entity.endTick, this.tickCount);
-      }
-      if (entity.kind === 'barracks' && entity.training) {
-        entity.training.endTick = Math.max(this.tickCount, entity.training.endTick - total);
-      }
-      // Le cycle de l'élevage repart d'ici ; un ancien réveil, en avance, ne sonne plus pour rien.
-      if (entity.kind === 'pigPen' && entity.pigs > 0 && !entity.blocked) this.startPigPen(entity);
-    }
-
-    this.offlineLowStock(hall.store, alerts);
-    report.alerts = OFFLINE_ALERTS.filter((alert) => alerts.has(alert));
-    // Le stock a sauté d'un coup : les débits de la ville repartent de zéro plutôt que d'afficher ce saut.
-    this.flows.reset();
-    this.events.emit('offlineCaughtUp', report);
-  }
-
-  /** Des porteurs ou des logisticiens pour faire la tournée des coffres : un ouvrier au travail qui n'est pas bâtisseur. */
-  private hasCarriers(): boolean {
-    for (const worker of this.workers()) if (!worker.free && !worker.builder) return true;
-    return false;
-  }
-
-  /**
-   * Ce qu'un producteur sans entrée sort en `ticks` de travail, à sa cadence
-   * moyenne : foreuse, carrière et puits, cabane de bûcheron, ferme. Fractionnaire,
-   * `wholeUnits` en fait des unités. `null` s'il ne produit rien.
-   */
-  private offlineOutput(entity: Building, ticks: number, woodLeft: Map<EntityId, number>): { item: ItemId; amount: number } | null {
-    if (entity.paused || ticks <= 0) return null;
-
-    const staffing = this.staffing(entity);
-    const share = staffing ? staffing.filled / Math.max(1, staffing.max) : 1;
-
-    switch (entity.kind) {
-      case 'drill': {
-        if (!entity.output) return null;
-
-        const amount = Object.values(RECIPES[DRILL_RECIPE].outputs)[0] ?? 1;
-
-        return { item: entity.output, amount: (amount * ticks) / Math.max(1, RECIPES[DRILL_RECIPE].duration + this.bonus('drillTicks')) };
-      }
-
-      case 'quarry': {
-        const recipe = quarryRecipe(entity);
-        const [item, amount] = (Object.entries(recipe.outputs) as [ItemId, number][])[0] ?? ['stone', 1];
-
-        return { item, amount: (amount * ticks * share) / (recipe.duration * this.dailyCycle(entity.proto)) };
-      }
-
-      case 'pigPen':
-        return entity.pigs > 0 ? { item: 'meat', amount: (PIG_FARM.meatPerPig * entity.pigs * ticks) / PIG_FARM.cycleTicks } : null;
-
-      case 'lumberCamp': {
-        const left = woodLeft.get(entity.id) ?? 0;
-        const amount = Math.min(left, (OFFLINE.lumberjackWoodPerMinute * (staffing?.filled ?? 0) * ticks) / (20 * 60));
-
-        woodLeft.set(entity.id, left - amount);
-        return { item: 'wood', amount };
-      }
-
-      case 'farm': {
-        const tiles = this.farmField(entity).filter((tile) => tile.state !== 'blocked').length;
-
-        return { item: CROPS.item, amount: (tiles * this.cropYield() * OFFLINE.farmEfficiency * share * ticks) / CROPS.ripeTicks };
-      }
-
-      default:
-        return null;
-    }
-  }
-
-  /** Range une production hors ligne : en ville si des porteurs font la tournée, sinon dans le coffre du bâtiment, tant qu'il a la place. */
-  private offlineYield(entity: Building, item: ItemId, amount: number, carriers: boolean, report: OfflineReport, alerts: Set<OfflineAlertId>): number {
-    if (amount <= 0) return 0;
-
-    const kept = carriers ? (this.townStock()?.add(item, amount) ?? 0) : entity.store.add(item, Math.min(amount, Math.max(0, entity.store.freeSpace())));
-
-    if (kept < amount) alerts.add('storeFull');
-    if (kept <= 0) return 0;
-    count(report.gained, item, kept);
-    this.tally(item, kept);
-    return kept;
-  }
-
-  /** Les unités de bois qui restent aux arbres debout dans le rayon d'une cabane. */
-  private standingWood(camp: LumberCamp): number {
-    let units = 0;
-
-    for (const tree of treesInRange(camp, this.resources, this.harvestable)) units += this.resources.at(tree.tx, tree.ty)?.remaining ?? 0;
-    return units;
-  }
-
-  /** Abat `units` unités de bois dans le rayon de la cabane, l'arbre le plus proche d'abord : les mêmes prises qu'un coup de hache. */
-  private fellTrees(camp: LumberCamp, units: number): void {
-    let left = units;
-
-    for (const tree of treesInRange(camp, this.resources, this.harvestable)) {
-      while (left > 0) {
-        const taken = this.resources.take(tree.tx, tree.ty);
-
-        if (!taken || taken.resource.id !== 'tree') break;
-        left -= 1;
-        if (taken.stageChanged) this.dirtyTile(tree.tx, tree.ty);
-        if (taken.resource.remaining <= 0) break;
-      }
-      if (left <= 0) return;
-    }
-  }
-
-  /**
-   * Les cycles d'une forge (ou d'un four à charbon) en `ticks` de travail :
-   * ses entrées viennent de son coffre, puis de la ville si des porteurs
-   * l'approvisionnent ; il manque de quoi, elle attend la suite.
-   */
-  private offlineForge(forge: Forge, ticks: number, carry: Map<EntityId, number>, carriers: boolean, report: OfflineReport, alerts: Set<OfflineAlertId>): void {
-    if (this.stopped(forge) || ticks <= 0) return;
-
-    const recipe = forgeRecipe(forge);
-    const town = carriers ? this.townStock() : null;
-    const inputs = amountsOf(recipe.inputs);
-    let cycles = wholeUnits(carry, -forge.id, ticks / recipe.duration);
-
-    for (; cycles > 0; cycles -= 1) {
-      const enough = inputs.every(([item, amount]) => forge.store.count(item) + (town?.available(item) ?? 0) >= amount);
-      const room = town !== null || forge.store.freeSpace() + totalOf(recipe.inputs) >= totalOf(recipe.outputs);
-
-      if (!enough || !room) break;
-      for (const [item, amount] of inputs) {
-        const own = forge.store.remove(item, amount);
-
-        if (own < amount) town?.remove(item, amount - own);
-        count(report.spent, item, amount);
-      }
-      for (const [item, amount] of amountsOf(recipe.outputs)) this.offlineYield(forge, item, amount, carriers, report, alerts);
-    }
-    if (cycles > 0) carry.set(-forge.id, 0);
-  }
-
-  /** Le compte à rebours d'une nurserie sur `ticks` : chaque fois qu'il arrive au bout, un enfant naît s'il y a de quoi le nourrir et de la place. */
-  private offlineBirths(nursery: Nursery, ticks: number, births: Map<EntityId, number>, carriers: boolean, report: OfflineReport): void {
-    if (nursery.paused) return;
-
-    const recipe: RecipeProto = RECIPES[NURSERY_RECIPE];
-    const town = carriers ? this.townStock() : null;
-    let left = (births.get(nursery.id) ?? 0) - ticks;
-
-    while (left <= 0) {
-      if (this.nurseryKids(nursery).length >= NURSERY_CARE.capacity) {
-        nursery.hungry = false;
-        left = 0;
-        break;
-      }
-      for (const [item, amount] of amountsOf(recipe.inputs)) {
-        const missing = amount - nursery.store.count(item);
-
-        if (town && missing > 0) nursery.store.add(item, town.remove(item, Math.min(missing, town.available(item))));
-      }
-      if (!hasInputs(nursery.store, recipe)) {
-        nursery.hungry = true;
-        left = 0;
-        break;
-      }
-      for (const [item, amount] of amountsOf(recipe.inputs)) count(report.spent, item, amount);
-      this.bear(nursery);
-      report.births += 1;
-      left += recipe.duration;
-    }
-    births.set(nursery.id, left);
-  }
-
-  /**
-   * Le compte à rebours d'un labo sur `ticks`. Une recherche finie laisse
-   * partir la suivante de la file ; celle qui attend son coût le reçoit de
-   * la ville, si des porteurs l'apportent et que le labo est dans son rayon.
-   */
-  private offlineResearch(lab: Lab, ticks: number, running: Map<EntityId, number>, carriers: boolean, report: OfflineReport): void {
-    let budget = ticks;
-
-    while (lab.research !== null && budget > 0) {
-      if (isCollecting(lab)) {
-        const town = carriers ? this.townStockForLab(lab) : null;
-
-        if (!town) return;
-        for (const [item] of researchCost(lab.research)) {
-          count(report.spent, item, this.supplyLab(lab, item, Math.min(labWants(lab, item), town.available(item)), town, 'town'));
-        }
-        this.startCountdown(lab);
-        if (isCollecting(lab)) return;
-        running.set(lab.id, RESEARCH[lab.research].duration);
-      }
-
-      const left = (running.get(lab.id) ?? 0) - budget;
-
-      if (left > 0) {
-        running.set(lab.id, left);
-        return;
-      }
-      budget = -left;
-
-      const done = lab.research;
-
-      lab.endTick = this.tickCount;
-      this.finishResearch(lab);
-      report.research.push(done);
-      running.set(lab.id, lab.endTick > 0 && lab.research !== null ? RESEARCH[lab.research].duration : 0);
-    }
-  }
-
-  /**
-   * Les repas d'un pas hors ligne, habitant par habitant, au stock de la
-   * ville. Renvoie la part des ouvriers qui travaillent encore : ceux qui
-   * n'ont plus rien n'avancent plus leur bâtiment au pas suivant.
-   */
-  private offlineMeals(town: Store, ticks: number, report: OfflineReport, alerts: Set<OfflineAlertId>): number {
-    let laborers = 0;
-    let stalled = 0;
-
-    for (const mobile of this.inhabitants()) {
-      const toiling = mobile.kind !== 'kid' && !(mobile.kind === 'worker' && mobile.free);
-      let starved = false;
-
-      for (const need of NEED_IDS) {
-        const { item, meal } = NEEDS[need];
-        const fed = feedNeed(need, mobile.needs[need], ticks, toiling, () => {
-          if (town.available(item) < meal) return false;
-          town.remove(item, meal);
-          count(report.spent, item, meal);
-          return true;
-        });
-
-        mobile.needs[need] = fed.level;
-        if (fed.starved) {
-          starved = true;
-          alerts.add(need);
-        }
-      }
-      if (mobile.kind === 'kid') continue;
-      laborers += 1;
-      if (starved) stalled += 1;
-    }
-    return laborers === 0 ? 1 : 1 - stalled / laborers;
-  }
-
-  /** La ville ne tiendra pas `NEED_ALERT.runwayTicks` au rythme des habitants : une alerte par besoin qui n'a pas déjà manqué. */
-  private offlineLowStock(town: Store, alerts: Set<OfflineAlertId>): void {
-    for (const need of NEED_IDS) {
-      if (alerts.has(need)) continue;
-
-      let rate = 0;
-
-      for (const mobile of this.inhabitants()) rate += mealsPerTick(need, mobile.kind !== 'kid' && !(mobile.kind === 'worker' && mobile.free));
-      if (rate > 0 && town.available(NEEDS[need].item) < rate * NEED_ALERT.runwayTicks) alerts.add(need === 'hunger' ? 'lowFood' : 'lowWater');
-    }
   }
 
   /**
@@ -5059,21 +4762,21 @@ export class World {
         case 'lumberjack':
           // Couché dehors, il ne l'est que tant que `sleep` l'y remet.
           mobile.sleepingOut = false;
-          if (!this.stepNeeds(mobile, alarm)) this.stepLumberjack(mobile, alarm, bedtime);
+          if (!this.stepNeeds(mobile, alarm)) this.lumberjacks.step(mobile, alarm, bedtime);
           this.noteIdle(mobile);
           break;
 
         case 'forester':
           // Couché dehors, il ne l'est que tant que `sleep` l'y remet.
           mobile.sleepingOut = false;
-          if (!this.stepNeeds(mobile, alarm)) this.stepForester(mobile, alarm, bedtime);
+          if (!this.stepNeeds(mobile, alarm)) this.foresters.step(mobile, alarm, bedtime);
           this.noteIdle(mobile);
           break;
 
         case 'farmer':
           // Couché dehors, il ne l'est que tant que `sleep` l'y remet.
           mobile.sleepingOut = false;
-          if (!this.stepNeeds(mobile, alarm)) this.stepFarmer(mobile, alarm, bedtime);
+          if (!this.stepNeeds(mobile, alarm)) this.farmers.step(mobile, alarm, bedtime);
           this.noteIdle(mobile);
           break;
 
@@ -8483,10 +8186,10 @@ export class World {
     if (mobile.kind === 'lumberjack') {
       const onTrip = mobile.state === 'toTree' || mobile.state === 'chop' || mobile.state === 'toCamp';
 
-      this.releaseTree(mobile);
+      this.lumberjacks.releaseTree(mobile);
       if (onTrip && home?.kind === 'lumberCamp') home.store.releaseIn('wood', LUMBERJACKS.carry);
     }
-    if (mobile.kind === 'farmer' && home?.kind === 'farm') this.dropPlot(mobile, home);
+    if (mobile.kind === 'farmer' && home?.kind === 'farm') this.farmers.dropPlot(mobile, home);
 
     for (let index = 0; index < NEED_IDS.length; index += 1) this.famine.delete(famineKey(mobile.id, index));
     this.idleSince.delete(mobile.id);
@@ -8751,9 +8454,9 @@ export class World {
     this.settleColonists();
     for (const entity of this.entities.values()) {
       if (entity.kind === 'house' || entity.kind === 'depot' || entity.kind === 'yard') this.staff(entity);
-      if (entity.kind === 'lumberCamp') this.staffCamp(entity);
-      if (entity.kind === 'foresterHouse') this.staffForester(entity);
-      if (entity.kind === 'farm') this.staffFarm(entity);
+      if (entity.kind === 'lumberCamp') this.lumberjacks.staff(entity);
+      if (entity.kind === 'foresterHouse') this.foresters.staff(entity);
+      if (entity.kind === 'farm') this.farmers.staff(entity);
     }
     // Une maison finie ou tombée, des ouvriers venus ou partis : les lits suivent sans attendre.
     this.settleBeds();
@@ -9079,7 +8782,7 @@ export class World {
    * chaque recherche — rien à rejouer au chargement, rien qui fuie.
    */
   private claimedNodes(): Set<string> {
-    const claimed = new Set(this.claimedTrees);
+    const claimed = new Set(this.lumberjacks.claimed);
 
     for (const worker of this.workers()) {
       if (worker.glean && !worker.glean.item) claimed.add(coordKey(worker.glean.tx, worker.glean.ty));
@@ -9548,365 +9251,89 @@ export class World {
     this.events.emit('decorRemoved', { id, proto: decor.proto, tx: decor.tx, ty: decor.ty, toTown: town !== null });
   }
 
-  /* -------------------------------------------------------------- bûcherons */
+  /* ---------------------------------------------------------------- équipes */
 
-  private *lumberjacks(): IterableIterator<Lumberjack> {
-    for (const mobile of this.mobiles.values()) {
-      if (mobile.kind === 'lumberjack') yield mobile;
-    }
-  }
+  /**
+   * Ce que les équipes logées — bûcherons, forestier, fermiers — voient du
+   * monde, et les gestes communs qu'il leur prête (`sim/crew.ts`). Lu à la
+   * demande : rien n'est copié, le contexte suit le monde.
+   */
+  private static crewContext(world: World): CrewContext {
+    return {
+      get seed() {
+        return world.seed;
+      },
+      get tickCount() {
+        return world.tickCount;
+      },
+      get resources() {
+        return world.resources;
+      },
+      get chunks() {
+        return world.chunks;
+      },
+      get entities() {
+        return world.entities;
+      },
+      get mobiles() {
+        return world.mobiles;
+      },
+      get events() {
+        return world.events;
+      },
+      get lineIsClear() {
+        return world.lineIsClear;
+      },
+      get harvestable() {
+        return world.harvestable;
+      },
+      claimedNodes: () => world.claimedNodes(),
+      chestAt: (tx, ty) => world.chestAt(tx, ty),
+      bonus: (stat) => world.bonus(stat),
+      tally: (item, amount) => world.tally(item, amount),
+      dirtyTile: (tx, ty) => world.dirtyTile(tx, ty),
+      posts: (id) => world.roster().filled.get(id) ?? 0,
+      recruit: (door) => {
+        const worker = world.nearestFree(door);
 
-  /** Pourvoit la cabane d'autant de bûcherons que de postes pourvus : les ouvriers libres les plus proches. */
-  private staffCamp(camp: LumberCamp): void {
-    let lodged = 0;
-
-    for (const lumberjack of this.lumberjacks()) {
-      if (lumberjack.homeId === camp.id) lodged += 1;
-    }
-
-    const door = doorOf(camp);
-    const posts = this.roster().filled.get(camp.id) ?? 0;
-    let hired = 0;
-
-    for (let i = lodged; i < posts; i += 1) {
-      const worker = this.nearestFree(door);
-
-      if (!worker) break;
-
-      const lumberjack: Lumberjack = {
-        kind: 'lumberjack',
-        ...personOf(worker),
-        homeId: camp.id,
-        inside: false,
-        state: 'idle',
-        tree: null,
-        chopTicks: 0,
-        load: 0,
-        // Ils ne partent pas du même pas : le second suit le premier.
-        searchTicks: 1 + i * 12,
-        ...wanderFrom(worker.x, worker.y),
-      };
-
-      this.mobiles.set(lumberjack.id, lumberjack);
-      this.idleSince.delete(lumberjack.id);
-      hired += 1;
-    }
-    if (hired > 0) this.duty = null;
+        return worker && personOf(worker);
+      },
+      hire: (member) => {
+        world.mobiles.set(member.id, member);
+        world.idleSince.delete(member.id);
+        world.duty = null;
+      },
+      onDuty: (member) => world.onDuty(member),
+      release: (member) => world.release(member),
+      goHome: (member, door) => world.goHome(member, door),
+      idle: (member, door, bedtime) => world.idle(member, door, bedtime),
+      sleep: (member, door) => world.sleep(member, door),
+      walkStep: () => world.walkStep(),
+      toil: (needs) => world.toil(needs),
+    };
   }
 
   /**
    * Les arbres encore debout dans le rayon de la cabane — zéro : « Plus
-   * d'arbres à portée ». La fenêtre le demande à chaque image : le compte
-   * n'est refait qu'une fois par tick.
+   * d'arbres à portée ».
    */
   public treesLeft(camp: LumberCamp): number {
-    if (this.treeCount?.id !== camp.id || this.treeCount.tick !== this.tickCount) {
-      this.treeCount = { id: camp.id, tick: this.tickCount, count: treesInRange(camp, this.resources, this.harvestable).length };
-    }
-    return this.treeCount.count;
-  }
-
-  /**
-   * Un tick de bûcheron. Hors d'un voyage, il cherche un arbre toutes les
-   * `retryTicks` — à condition qu'il y ait au coffre la place d'un voyage,
-   * réservée aussitôt : le bois rapporté y entre toujours. Coffre plein, il
-   * attend devant la porte ; plus d'arbre à portée, il flâne. La nuit, il ne
-   * repart pas ; pendant une vague, il rentre s'abriter, bois compris, et
-   * reprend son voyage ensuite.
-   */
-  private stepLumberjack(lumberjack: Lumberjack, alarm: boolean, bedtime: boolean): void {
-    const camp = this.entities.get(lumberjack.homeId);
-
-    // Sa cabane est tombée : il lâche son arbre et redevient un ouvrier libre.
-    if (camp?.kind !== 'lumberCamp') {
-      this.releaseTree(lumberjack);
-      this.release(lumberjack);
-      return;
-    }
-
-    const door = doorOf(camp);
-
-    if (alarm) {
-      // Il reprendra son arbre après la vague : il lui faudra d'abord y retourner.
-      if (lumberjack.state === 'chop') lumberjack.state = 'toTree';
-      this.goHome(lumberjack, door);
-      return;
-    }
-
-    // Cabane en pause, ou lui retiré de son poste : il finit son geste — rapporter le bois qu'il a —, puis flâne.
-    const working = !camp.paused && this.onDuty(lumberjack);
-
-    if (!working) {
-      if (lumberjack.state === 'toTree' || lumberjack.state === 'chop') this.endTrip(lumberjack, door);
-      else if (lumberjack.state === 'wait' && lumberjack.load === 0) lumberjack.state = 'idle';
-    }
-
-    // Retiré de son poste, son bois rapporté : il rentre, et redevient un ouvrier libre.
-    if (!this.onDuty(lumberjack) && lumberjack.state === 'idle' && lumberjack.load === 0) {
-      this.release(lumberjack);
-      return;
-    }
-
-    switch (lumberjack.state) {
-      case 'idle':
-      case 'wait':
-        lumberjack.searchTicks -= 1;
-        if (lumberjack.searchTicks <= 0 && working && !bedtime && lumberjack.load === 0) {
-          lumberjack.searchTicks = LUMBERJACKS.retryTicks;
-          this.startTrip(lumberjack, camp, door);
-        }
-        if (lumberjack.state === 'idle') this.idle(lumberjack, door, bedtime);
-        else if (lumberjack.state === 'wait') this.waitAtCamp(lumberjack, door, bedtime);
-        else lumberjack.inside = false;
-        break;
-
-      case 'toTree': {
-        const tree = lumberjack.tree;
-
-        lumberjack.inside = false;
-        if (!tree || !isTree(this.resources, tree.tx, tree.ty)) {
-          // Adam l'a coupé avant lui : il en cherche un autre sans attendre.
-          this.endTrip(lumberjack, door);
-          break;
-        }
-
-        const spot = chopSpot(tree);
-
-        if (walkToward(lumberjack, spot.x, spot.y, this.walkStep())) {
-          lumberjack.state = 'chop';
-          lumberjack.facing = 'right';
-          lumberjack.chopTicks = LUMBERJACKS.chopTicks;
-        }
-        break;
-      }
-
-      case 'chop':
-        standStill(lumberjack);
-        lumberjack.inside = false;
-        // Affamé, il ne frappe plus qu'un tick sur deux.
-        lumberjack.chopTicks -= this.toil(lumberjack.needs);
-        if (lumberjack.chopTicks <= 0) this.chop(lumberjack, door);
-        break;
-
-      case 'toCamp':
-        lumberjack.inside = false;
-        if (walkToward(lumberjack, door.x, door.y, this.walkStep())) this.storeWood(lumberjack, camp);
-        break;
-    }
-  }
-
-  /** Un voyage commence : la place au coffre, puis l'arbre — les deux réservés, ou rien. */
-  private startTrip(lumberjack: Lumberjack, camp: LumberCamp, door: { x: number; y: number }): void {
-    if (!camp.store.reserveIn('wood', LUMBERJACKS.carry)) {
-      lumberjack.state = 'wait';
-      return;
-    }
-
-    const tree = pickTree(camp, door, this.resources, this.claimedNodes(), this.lineIsClear, this.harvestable);
-
-    if (!tree) {
-      camp.store.releaseIn('wood', LUMBERJACKS.carry);
-      lumberjack.state = 'idle';
-      return;
-    }
-
-    this.claimedTrees.add(coordKey(tree.tx, tree.ty));
-    lumberjack.tree = tree;
-    lumberjack.state = 'toTree';
-  }
-
-  /** Un coup de hache : une unité de bois dans les bras. Arbre tombé ou bras pleins, il rentre. */
-  private chop(lumberjack: Lumberjack, door: { x: number; y: number }): void {
-    const tree = lumberjack.tree;
-    const taken = tree ? this.resources.take(tree.tx, tree.ty) : null;
-
-    if (!tree || !taken || taken.resource.id !== 'tree') {
-      this.endTrip(lumberjack, door);
-      return;
-    }
-
-    lumberjack.load += 1;
-    lumberjack.chopTicks = LUMBERJACKS.chopTicks;
-    // La même règle que pour Adam : entamé à mi-chemin, disparu à la dernière unité.
-    if (taken.stageChanged) this.dirtyTile(tree.tx, tree.ty);
-    this.events.emit('treeChopped', {
-      lumberjackId: lumberjack.id,
-      tx: tree.tx,
-      ty: tree.ty,
-      remaining: taken.resource.remaining,
-    });
-
-    if (taken.resource.remaining <= 0 || lumberjack.load >= LUMBERJACKS.carry) this.endTrip(lumberjack, door);
-  }
-
-  /** Plus rien à couper ici : l'arbre est lâché ; avec du bois, il le rapporte, sinon il repart aussitôt. */
-  private endTrip(lumberjack: Lumberjack, door: { x: number; y: number }): void {
-    this.releaseTree(lumberjack);
-
-    if (lumberjack.load > 0) {
-      lumberjack.state = 'toCamp';
-      return;
-    }
-
-    const camp = this.entities.get(lumberjack.homeId);
-
-    if (camp?.kind === 'lumberCamp') camp.store.releaseIn('wood', LUMBERJACKS.carry);
-    lumberjack.state = 'idle';
-    lumberjack.searchTicks = 0;
-    Object.assign(lumberjack, wanderFrom(door.x, door.y));
-  }
-
-  /** À la porte : la place réservée devient du bois dans le coffre. */
-  private storeWood(lumberjack: Lumberjack, camp: LumberCamp): void {
-    camp.store.releaseIn('wood', LUMBERJACKS.carry);
-
-    const stored = camp.store.add('wood', lumberjack.load);
-
-    lumberjack.load -= stored;
-    if (stored > 0) this.events.emit('woodStored', { lumberjackId: lumberjack.id, id: camp.id, amount: stored });
-
-    // Ce qui ne rentre pas — une sauvegarde retouchée, jamais en jeu — reste dans ses bras : il attend.
-    lumberjack.state = lumberjack.load > 0 ? 'wait' : 'idle';
-    lumberjack.searchTicks = 0;
-  }
-
-  /** Coffre plein : devant la porte, bois dans les bras s'il en a, jusqu'à ce qu'un porteur fasse de la place. */
-  private waitAtCamp(lumberjack: Lumberjack, door: { x: number; y: number }, bedtime: boolean): void {
-    if (lumberjack.load > 0) {
-      const camp = this.entities.get(lumberjack.homeId);
-
-      if (camp?.kind === 'lumberCamp' && camp.store.freeSpace() > 0) {
-        const stored = camp.store.add('wood', lumberjack.load);
-
-        lumberjack.load -= stored;
-        if (stored > 0) this.events.emit('woodStored', { lumberjackId: lumberjack.id, id: camp.id, amount: stored });
-      }
-    }
-    if (bedtime && lumberjack.load === 0) {
-      this.sleep(lumberjack, door);
-      return;
-    }
-    lumberjack.inside = false;
-    if (walkToward(lumberjack, door.x, door.y, this.walkStep())) lumberjack.facing = 'down';
-  }
-
-  private releaseTree(lumberjack: Lumberjack): void {
-    if (lumberjack.tree) this.claimedTrees.delete(coordKey(lumberjack.tree.tx, lumberjack.tree.ty));
-    lumberjack.tree = null;
-  }
-
-  /**
-   * Après un chargement : les arbres visés et la place réservée au coffre se
-   * rejouent depuis les bûcherons sauvegardés. Un arbre déjà pris par un
-   * autre — une sauvegarde retouchée — est lâché.
-   */
-  private restoreLumberjacks(): void {
-    this.claimedTrees.clear();
-
-    for (const lumberjack of this.lumberjacks()) {
-      const camp = this.entities.get(lumberjack.homeId);
-      const onTrip = lumberjack.state === 'toTree' || lumberjack.state === 'chop' || lumberjack.state === 'toCamp';
-
-      if (lumberjack.tree) {
-        const key = coordKey(lumberjack.tree.tx, lumberjack.tree.ty);
-
-        if (this.claimedTrees.has(key) || !onTrip) lumberjack.tree = null;
-        else this.claimedTrees.add(key);
-      }
-      if (onTrip && camp?.kind === 'lumberCamp') camp.store.reserveIn('wood', LUMBERJACKS.carry);
-    }
+    return this.lumberjacks.treesLeft(camp);
   }
 
   /* ------------------------------------------------------------- forestiers */
 
-  private *foresters(): IterableIterator<Forester> {
-    for (const mobile of this.mobiles.values()) {
-      if (mobile.kind === 'forester') yield mobile;
-    }
-  }
-
-  /** Pourvoit la maison du forestier si son poste l'est : l'ouvrier libre le plus proche devient forestier. */
-  private staffForester(house: ForesterHouse): void {
-    let lodged = 0;
-
-    for (const forester of this.foresters()) {
-      if (forester.homeId === house.id) lodged += 1;
-    }
-
-    const door = doorOf(house);
-    const posts = this.roster().filled.get(house.id) ?? 0;
-    let hired = 0;
-
-    for (let i = lodged; i < posts; i += 1) {
-      const worker = this.nearestFree(door);
-
-      if (!worker) break;
-
-      const forester: Forester = {
-        kind: 'forester',
-        ...personOf(worker),
-        homeId: house.id,
-        inside: false,
-        state: 'idle',
-        plot: null,
-        plantTicks: 0,
-        searchTicks: 1,
-        ...wanderFrom(worker.x, worker.y),
-      };
-
-      this.mobiles.set(forester.id, forester);
-      this.idleSince.delete(forester.id);
-      hired += 1;
-    }
-    if (hired > 0) this.duty = null;
-  }
-
   /** Le forestier d'une maison — le premier logé —, ou `undefined` : la fenêtre dit ce qu'il fait. */
   public foresterOf(house: ForesterHouse): Forester | undefined {
-    let found: Forester | undefined;
-
-    for (const forester of this.foresters()) {
-      if (forester.homeId === house.id && (!found || forester.id < found.id)) found = forester;
-    }
-    return found;
+    return this.foresters.of(house);
   }
 
   /**
    * Le carré de forêt d'une maison — posée, ou en fantôme à (tx, ty) —, case
-   * par case dans l'ordre de plantation : libre, en pousse, arbre, ou prise
-   * par autre chose. Une case libre est une herbe nue, sans bâti, sans route,
-   * sans filon — il resterait à la foreuse — et qu'aucune pousse n'occupe.
+   * par case dans l'ordre de plantation (`ForesterCrew.plot`).
    */
   public forestPlot(house: { tx: number; ty: number; width: number; height: number }): PlotTile[] {
-    return plotTiles(house).map(({ tx, ty }): PlotTile => {
-      if (this.resources.sapling(tx, ty)) return { tx, ty, state: 'sapling' };
-
-      const resource = this.resources.at(tx, ty);
-
-      if (resource?.id === 'tree') return { tx, ty, state: 'tree' };
-
-      const blocked =
-        resource !== null ||
-        this.resources.crop(tx, ty) !== null ||
-        terrainAt(this.seed, tx, ty) !== 'grass' ||
-        oreAt(this.seed, tx, ty) !== null ||
-        this.chunks.occupantAt(tx, ty) !== undefined ||
-        this.chestAt(tx, ty) !== null;
-
-      return { tx, ty, state: blocked ? 'blocked' : 'free' };
-    });
-  }
-
-  /** La première case libre du carré, dans l'ordre, qu'on atteint en ligne droite sans passer par l'eau ; `null` sinon. */
-  private nextPlot(house: ForesterHouse, from: { x: number; y: number }): { tx: number; ty: number } | null {
-    for (const tile of this.forestPlot(house)) {
-      if (tile.state !== 'free') continue;
-
-      const spot = plantSpot(tile);
-
-      if (this.lineIsClear(from.x, from.y, spot.x, spot.y)) return { tx: tile.tx, ty: tile.ty };
-    }
-    return null;
+    return this.foresters.plot(house);
   }
 
   /**
@@ -9917,478 +9344,22 @@ export class World {
   private growForest(): void {
     if (this.tickCount % SAPLING.passTicks !== 0) return;
     for (const { tx, ty } of this.resources.grow(this.tickCount)) this.dirtyTile(tx, ty);
-    this.witherFields();
-  }
-
-  /**
-   * Un tick de forestier. Hors d'une plantation, il cherche toutes les
-   * `retryTicks` la première case libre de son carré ; il y marche, plante,
-   * puis enchaîne sur la suivante sans rentrer. Carré plein, il flâne devant
-   * sa porte jusqu'à ce qu'on coupe un arbre. La nuit, il ne repart pas ;
-   * pendant une vague, il rentre s'abriter, et reprendra sa case après.
-   */
-  private stepForester(forester: Forester, alarm: boolean, bedtime: boolean): void {
-    const house = this.entities.get(forester.homeId);
-
-    // Sa maison est tombée : il redevient un ouvrier libre.
-    if (house?.kind !== 'foresterHouse') {
-      this.release(forester);
-      return;
-    }
-
-    const door = doorOf(house);
-
-    if (alarm) {
-      if (forester.state === 'plant') forester.state = 'toPlot';
-      this.goHome(forester, door);
-      return;
-    }
-
-    // Maison en pause, ou lui retiré de son poste : il lâche sa case et flâne — une pousse à moitié plantée ne pousse pas.
-    const working = !house.paused && this.onDuty(forester);
-
-    if (!working && forester.state !== 'idle') this.stopPlanting(forester, door);
-
-    // Retiré de son poste : il rentre, et redevient un ouvrier libre.
-    if (!this.onDuty(forester) && forester.state === 'idle') {
-      this.release(forester);
-      return;
-    }
-
-    switch (forester.state) {
-      case 'idle':
-        forester.searchTicks -= 1;
-        if (forester.searchTicks <= 0 && working && !bedtime) {
-          forester.searchTicks = FORESTERS.retryTicks;
-          this.seekPlot(forester, house, forester.inside ? door : forester);
-        }
-        if (forester.state === 'idle') this.idle(forester, door, bedtime);
-        else forester.inside = false;
-        break;
-
-      case 'toPlot': {
-        const plot = forester.plot;
-
-        forester.inside = false;
-        if (!plot || this.forestPlot(house).find((tile) => tile.tx === plot.tx && tile.ty === plot.ty)?.state !== 'free') {
-          // Prise entre-temps — une route, un chantier, l'autre forestier — : il en cherche une autre.
-          if (!this.seekPlot(forester, house, forester)) this.stopPlanting(forester, door);
-          break;
-        }
-
-        const spot = plantSpot(plot);
-
-        if (walkToward(forester, spot.x, spot.y, this.walkStep())) {
-          forester.state = 'plant';
-          forester.facing = 'right';
-          forester.plantTicks = FORESTERS.plantTicks;
-        }
-        break;
-      }
-
-      case 'plant':
-        standStill(forester);
-        forester.inside = false;
-        forester.plantTicks -= this.toil(forester.needs);
-        if (forester.plantTicks <= 0) this.plant(forester, house, door);
-        break;
-    }
-  }
-
-  /** La prochaine case : il y va ; plus rien à planter, il reste — ou redevient — oisif. Vrai s'il en a une. */
-  private seekPlot(forester: Forester, house: ForesterHouse, from: { x: number; y: number }): boolean {
-    const plot = this.nextPlot(house, from);
-
-    forester.plot = plot;
-    forester.state = plot ? 'toPlot' : 'idle';
-    return plot !== null;
-  }
-
-  /** La bêche s'enfonce : une pousse en terre, puis la case suivante, sans rentrer. */
-  private plant(forester: Forester, house: ForesterHouse, door: { x: number; y: number }): void {
-    const plot = forester.plot;
-    const free = plot && this.forestPlot(house).find((tile) => tile.tx === plot.tx && tile.ty === plot.ty)?.state === 'free';
-
-    if (plot && free && this.resources.plant(plot.tx, plot.ty, this.tickCount)) {
-      this.dirtyTile(plot.tx, plot.ty);
-      this.events.emit('treePlanted', { foresterId: forester.id, tx: plot.tx, ty: plot.ty });
-    }
-
-    if (!this.seekPlot(forester, house, forester)) this.stopPlanting(forester, door);
-  }
-
-  /** Plus de case à planter : il lâche la sienne et flâne à partir de sa porte. */
-  private stopPlanting(forester: Forester, door: { x: number; y: number }): void {
-    forester.plot = null;
-    forester.state = 'idle';
-    forester.searchTicks = FORESTERS.retryTicks;
-    Object.assign(forester, wanderFrom(door.x, door.y));
+    this.farmers.wither();
   }
 
   /* --------------------------------------------------------------- fermiers */
 
-  private *farmers(): IterableIterator<Farmer> {
-    for (const mobile of this.mobiles.values()) {
-      if (mobile.kind === 'farmer') yield mobile;
-    }
-  }
-
-  /** Pourvoit la ferme de fermiers, autant que de postes pourvus : les ouvriers libres les plus proches de sa porte. */
-  private staffFarm(farm: Farm): void {
-    let lodged = 0;
-
-    for (const farmer of this.farmers()) {
-      if (farmer.homeId === farm.id) lodged += 1;
-    }
-
-    const door = doorOf(farm);
-    const posts = this.roster().filled.get(farm.id) ?? 0;
-    let hired = 0;
-
-    for (let i = lodged; i < posts; i += 1) {
-      const worker = this.nearestFree(door);
-
-      if (!worker) break;
-
-      const farmer: Farmer = {
-        kind: 'farmer',
-        ...personOf(worker),
-        homeId: farm.id,
-        inside: false,
-        state: 'idle',
-        plot: null,
-        workTicks: 0,
-        load: 0,
-        // Ils ne partent pas du même pas : chacun suit le précédent.
-        searchTicks: 1 + i * 10,
-        ...wanderFrom(worker.x, worker.y),
-      };
-
-      this.mobiles.set(farmer.id, farmer);
-      this.idleSince.delete(farmer.id);
-      hired += 1;
-    }
-    if (hired > 0) this.duty = null;
-  }
-
   /** Le premier fermier d'une ferme, par id, ou `undefined` : la fenêtre dit ce qu'il fait. */
   public farmerOf(farm: Farm): Farmer | undefined {
-    let found: Farmer | undefined;
-
-    for (const farmer of this.farmers()) {
-      if (farmer.homeId === farm.id && (!found || farmer.id < found.id)) found = farmer;
-    }
-    return found;
+    return this.farmers.of(farm);
   }
 
   /**
    * Le champ d'une ferme — posée, ou en fantôme —, case par case dans
-   * l'ordre de semis : libre, semée, en pousse, mûre, ou prise par autre
-   * chose. Une case libre est une herbe nue, sans bâti, sans route, sans
-   * filon, sans arbre ni pousse du forestier.
+   * l'ordre de semis (`FarmerCrew.field`).
    */
   public farmField(farm: { tx: number; ty: number; width: number; height: number }): FieldTile[] {
-    return fieldTiles(farm).map(({ tx, ty }): FieldTile => ({ tx, ty, state: this.fieldState(tx, ty) }));
-  }
-
-  private fieldState(tx: number, ty: number): FieldState {
-    const crop = this.resources.crop(tx, ty);
-
-    if (crop) return crop;
-
-    const blocked =
-      this.resources.isTaken(tx, ty) ||
-      terrainAt(this.seed, tx, ty) !== 'grass' ||
-      oreAt(this.seed, tx, ty) !== null ||
-      this.chunks.occupantAt(tx, ty) !== undefined ||
-      this.chestAt(tx, ty) !== null;
-
-    return blocked ? 'blocked' : 'free';
-  }
-
-  /** Nourriture d'une case récoltée : celle des données, plus les fermes fertiles du labo. */
-  private cropYield(): number {
-    return CROPS.yield + this.bonus('farmYield');
-  }
-
-  /**
-   * La première case du champ dans l'état `want`, dans l'ordre, qu'aucun
-   * autre fermier ne vise et qu'on atteint en ligne droite sans passer par
-   * l'eau ; `null` sinon.
-   */
-  private nextField(farm: Farm, farmer: Farmer, from: { x: number; y: number }, want: FieldState): { tx: number; ty: number } | null {
-    const claimed = new Set<string>();
-
-    for (const other of this.farmers()) {
-      if (other !== farmer && other.plot) claimed.add(coordKey(other.plot.tx, other.plot.ty));
-    }
-    for (const tile of fieldTiles(farm)) {
-      if (claimed.has(coordKey(tile.tx, tile.ty)) || this.fieldState(tile.tx, tile.ty) !== want) continue;
-
-      const spot = plantSpot(tile);
-
-      if (this.lineIsClear(from.x, from.y, spot.x, spot.y)) return tile;
-    }
-    return null;
-  }
-
-  /**
-   * Un tick de fermier. Hors d'un geste, il cherche toutes les `retryTicks`
-   * de quoi faire : semer la première case libre de son champ, sinon
-   * récolter la première case mûre — sa place au coffre réservée d'abord ;
-   * coffre plein, il attend devant la porte. Récolte faite, il la rapporte au
-   * coffre, puis revient semer. La nuit, il ne repart pas ; pendant une
-   * vague, il rentre s'abriter, et reprendra sa case après.
-   */
-  private stepFarmer(farmer: Farmer, alarm: boolean, bedtime: boolean): void {
-    const farm = this.entities.get(farmer.homeId);
-
-    // Sa ferme est tombée : il redevient un ouvrier libre.
-    if (farm?.kind !== 'farm') {
-      this.release(farmer);
-      return;
-    }
-
-    const door = doorOf(farm);
-
-    if (alarm) {
-      if (farmer.state === 'sow') farmer.state = 'toSow';
-      if (farmer.state === 'harvest') farmer.state = 'toHarvest';
-      this.goHome(farmer, door);
-      return;
-    }
-
-    // Ferme en pause, ou lui retiré de son poste : il lâche sa case — la récolte qu'il porte, il la rapporte —, puis flâne.
-    const working = !farm.paused && this.onDuty(farmer);
-
-    if (!working && farmer.state !== 'idle' && farmer.state !== 'toFarm') this.stopFarming(farmer, farm, door);
-
-    // Retiré de son poste, sa récolte rangée : il rentre, et redevient un ouvrier libre.
-    if (!this.onDuty(farmer) && farmer.state === 'idle') {
-      this.release(farmer);
-      return;
-    }
-
-    switch (farmer.state) {
-      case 'idle':
-      case 'wait':
-        farmer.searchTicks -= 1;
-        if (farmer.searchTicks <= 0 && working && !bedtime) {
-          farmer.searchTicks = FARMERS.retryTicks;
-          this.seekField(farmer, farm, farmer.inside ? door : farmer);
-        }
-        if (farmer.state === 'idle') this.idle(farmer, door, bedtime);
-        else if (farmer.state === 'wait') this.waitAtFarm(farmer, door, bedtime);
-        else farmer.inside = false;
-        break;
-
-      case 'toSow':
-      case 'toHarvest': {
-        const plot = farmer.plot;
-        const want: FieldState = farmer.state === 'toSow' ? 'free' : 'ripe';
-
-        farmer.inside = false;
-        if (!plot || this.fieldState(plot.tx, plot.ty) !== want) {
-          // Prise entre-temps — un chantier, une route — : il en cherche une autre.
-          this.dropPlot(farmer, farm);
-          if (!this.seekField(farmer, farm, farmer) && (farmer.state as FarmerState) === 'idle') this.stopFarming(farmer, farm, door);
-          break;
-        }
-
-        const spot = plantSpot(plot);
-
-        if (walkToward(farmer, spot.x, spot.y, this.walkStep())) {
-          const sowing = farmer.state === 'toSow';
-
-          farmer.state = sowing ? 'sow' : 'harvest';
-          farmer.facing = 'right';
-          farmer.workTicks = sowing ? FARMERS.sowTicks : FARMERS.harvestTicks;
-        }
-        break;
-      }
-
-      case 'sow':
-      case 'harvest':
-        standStill(farmer);
-        farmer.inside = false;
-        farmer.workTicks -= this.toil(farmer.needs);
-        if (farmer.workTicks > 0) break;
-        if (farmer.state === 'sow') this.sow(farmer, farm, door, bedtime);
-        else this.reap(farmer, farm, door, bedtime);
-        break;
-
-      case 'toFarm':
-        farmer.inside = false;
-        if (walkToward(farmer, door.x, door.y, this.walkStep())) this.storeCrop(farmer, farm, door, bedtime);
-        break;
-    }
-  }
-
-  /**
-   * De quoi faire, depuis `from` : semer d'abord — le champ reste plein —,
-   * sinon récolter, sa place au coffre réservée ; coffre plein, il attend à
-   * la porte (`wait`) ; rien du tout, il reste oisif. Vrai s'il part sur une case.
-   */
-  private seekField(farmer: Farmer, farm: Farm, from: { x: number; y: number }): boolean {
-    const free = this.nextField(farm, farmer, from, 'free');
-
-    if (free) {
-      farmer.plot = free;
-      farmer.state = 'toSow';
-      return true;
-    }
-
-    const ripe = this.nextField(farm, farmer, from, 'ripe');
-
-    farmer.plot = null;
-    if (!ripe) {
-      farmer.state = 'idle';
-      return false;
-    }
-
-    const amount = this.cropYield();
-
-    if (!farm.store.reserveIn(CROPS.item, amount)) {
-      farmer.state = 'wait';
-      farmer.searchTicks = FARMERS.retryTicks;
-      return false;
-    }
-    farmer.load = amount;
-    farmer.plot = ripe;
-    farmer.state = 'toHarvest';
-    return true;
-  }
-
-  /** La graine en terre, puis la case suivante — sauf à la nuit tombée : il rentre. */
-  private sow(farmer: Farmer, farm: Farm, door: { x: number; y: number }, bedtime: boolean): void {
-    const plot = farmer.plot;
-
-    if (plot && this.fieldState(plot.tx, plot.ty) === 'free' && this.resources.sow(plot.tx, plot.ty, this.tickCount)) {
-      this.dirtyTile(plot.tx, plot.ty);
-      this.events.emit('cropSown', { farmerId: farmer.id, tx: plot.tx, ty: plot.ty });
-    }
-    farmer.plot = null;
-    if (bedtime || !this.seekField(farmer, farm, farmer)) {
-      if (farmer.state !== 'wait') this.stopFarming(farmer, farm, door);
-    }
-  }
-
-  /** La case mûre récoltée : le blé dans le panier, il le rapporte au coffre. */
-  private reap(farmer: Farmer, farm: Farm, door: { x: number; y: number }, bedtime: boolean): void {
-    const plot = farmer.plot;
-
-    if (plot && this.resources.reap(plot.tx, plot.ty)) {
-      this.dirtyTile(plot.tx, plot.ty);
-      this.events.emit('cropHarvested', { farmerId: farmer.id, tx: plot.tx, ty: plot.ty, amount: farmer.load });
-      farmer.plot = null;
-      farmer.state = 'toFarm';
-      return;
-    }
-    // Plus rien sur pied : sa place au coffre se libère, il cherche autre chose.
-    this.dropPlot(farmer, farm);
-    if (bedtime || !this.seekField(farmer, farm, farmer)) {
-      if (farmer.state !== 'wait') this.stopFarming(farmer, farm, door);
-    }
-  }
-
-  /** À la porte : la place réservée devient du blé dans le coffre ; il repart semer. */
-  private storeCrop(farmer: Farmer, farm: Farm, door: { x: number; y: number }, bedtime: boolean): void {
-    farm.store.releaseIn(CROPS.item, farmer.load);
-
-    const stored = farm.store.add(CROPS.item, farmer.load);
-
-    farmer.load -= stored;
-    if (stored > 0) {
-      this.tally(CROPS.item, stored);
-      this.events.emit('farmProduced', { id: farm.id, item: CROPS.item });
-    }
-    // Ce qui ne rentre pas — une sauvegarde retouchée, jamais en jeu — reste dans son panier : il attend.
-    if (farmer.load > 0) {
-      farmer.state = 'wait';
-      return;
-    }
-    farmer.state = 'idle';
-    farmer.searchTicks = 0;
-    if (bedtime) Object.assign(farmer, wanderFrom(door.x, door.y));
-  }
-
-  /** Coffre plein : devant la porte, sa récolte au panier s'il en a, jusqu'à ce qu'on fasse de la place. */
-  private waitAtFarm(farmer: Farmer, door: { x: number; y: number }, bedtime: boolean): void {
-    if (farmer.load > 0 && !farmer.plot) {
-      const farm = this.entities.get(farmer.homeId);
-
-      if (farm?.kind === 'farm' && farm.store.freeSpace() > 0) {
-        const stored = farm.store.add(CROPS.item, farmer.load);
-
-        farmer.load -= stored;
-        if (stored > 0) this.tally(CROPS.item, stored);
-      }
-    }
-    if (bedtime && farmer.load === 0) {
-      this.sleep(farmer, door);
-      return;
-    }
-    farmer.inside = false;
-    if (walkToward(farmer, door.x, door.y, this.walkStep())) farmer.facing = 'down';
-  }
-
-  /** Il lâche sa case ; une récolte pas encore cueillie rend sa place au coffre. */
-  private dropPlot(farmer: Farmer, farm: Farm): void {
-    if ((farmer.state === 'toHarvest' || farmer.state === 'harvest') && farmer.load > 0) {
-      farm.store.releaseIn(CROPS.item, farmer.load);
-      farmer.load = 0;
-    }
-    farmer.plot = null;
-  }
-
-  /** Plus rien à faire au champ : il lâche sa case et flâne à partir de sa porte. */
-  private stopFarming(farmer: Farmer, farm: Farm, door: { x: number; y: number }): void {
-    this.dropPlot(farmer, farm);
-    farmer.state = 'idle';
-    farmer.searchTicks = FARMERS.retryTicks;
-    Object.assign(farmer, wanderFrom(door.x, door.y));
-  }
-
-  /**
-   * Après un chargement : la place au coffre de chaque récolte en cours se
-   * réserve à nouveau, et deux fermiers qui viseraient la même case — une
-   * sauvegarde retouchée — n'en gardent qu'un.
-   */
-  private restoreFarmers(): void {
-    const claimed = new Set<string>();
-
-    for (const farmer of this.farmers()) {
-      const farm = this.entities.get(farmer.homeId);
-      const holds = farmer.state === 'toHarvest' || farmer.state === 'harvest' || farmer.state === 'toFarm';
-
-      if (farmer.plot) {
-        const key = coordKey(farmer.plot.tx, farmer.plot.ty);
-
-        if (claimed.has(key)) farmer.plot = null;
-        else claimed.add(key);
-      }
-      if (holds && farmer.load > 0 && farm?.kind === 'farm') farm.store.reserveIn(CROPS.item, farmer.load);
-    }
-  }
-
-  /**
-   * Les cultures d'un champ qu'aucune ferme ne cultive plus s'arrachent : la
-   * case redevient libre. Une ferme tombée en chantier garde les siennes.
-   */
-  private witherFields(): void {
-    if (this.resources.cropTiles().next().done) return;
-
-    const covered = new Set<string>();
-
-    for (const entity of this.entities.values()) {
-      if (entity.proto !== 'farm') continue;
-      for (const tile of fieldTiles(entity)) covered.add(coordKey(tile.tx, tile.ty));
-    }
-    for (const tile of [...this.resources.cropTiles()]) {
-      if (covered.has(coordKey(tile.tx, tile.ty))) continue;
-      this.resources.wither(tile.tx, tile.ty);
-      this.dirtyTile(tile.tx, tile.ty);
-    }
+    return this.farmers.field(farm);
   }
 
   /** Après un chargement : les réservations se rejouent depuis les jobs sauvegardés. */
@@ -10724,7 +9695,7 @@ export class World {
       storeFull = building.blocked && building.pigs > 0 && store.total() + PIG_FARM.meatPerPig * building.pigs > store.capacity;
     } else if (building.kind === 'farm') {
       // Plus la place d'une récolte au coffre : les cultures mûres attendent sur pied.
-      storeFull = store.total() + this.cropYield() > store.capacity;
+      storeFull = store.total() + this.farmers.cropYield() > store.capacity;
     } else if (building.kind === 'lumberCamp') {
       // Plus la place d'un voyage au coffre : les bûcherons attendent un porteur.
       storeFull = store.total() + LUMBERJACKS.carry > store.capacity;
@@ -11305,7 +10276,7 @@ function hasCrew(kind: BuildingKind): boolean {
 }
 
 /** Ce qu'un humain garde en changeant de métier : son id — donc son prénom —, son sexe, sa place, son âge, ses jauges, son lit. */
-type Person = Pick<Worker, 'id' | 'sex' | 'trait' | 'alias' | 'x' | 'y' | 'prevX' | 'prevY' | 'facing' | 'moving' | 'age' | 'needs' | 'meal' | 'happiness' | 'bed' | 'sleepingOut'>;
+export type Person = Pick<Worker, 'id' | 'sex' | 'trait' | 'alias' | 'x' | 'y' | 'prevX' | 'prevY' | 'facing' | 'moving' | 'age' | 'needs' | 'meal' | 'happiness' | 'bed' | 'sleepingOut'>;
 
 function personOf({ id, sex, trait, alias, x, y, prevX, prevY, facing, moving, age, needs, meal, happiness, bed, sleepingOut }: Laborer): Person {
   return { id, sex, ...bornOf({ trait, alias }), x, y, prevX, prevY, facing, moving, age, needs, meal, happiness, bed, sleepingOut };
@@ -11373,33 +10344,6 @@ export function siteMissing(site: Site): number {
     missing += Math.max(0, needed - (site.delivered[item] ?? 0));
   }
   return missing;
-}
-
-/** La recette d'une carrière ou d'un puits, trouvée par son id : la taille, le puisage. */
-function quarryRecipe(producer: Quarry): RecipeProto {
-  return recipeOf(producer.proto) ?? RECIPES.cutStone;
-}
-
-function amountsOf(amounts: RecipeProto['inputs']): [ItemId, number][] {
-  return Object.entries(amounts) as [ItemId, number][];
-}
-
-function inputItems(recipe: RecipeProto): ItemId[] {
-  return amountsOf(recipe.inputs).map(([item]) => item);
-}
-
-function totalOf(amounts: RecipeProto['inputs']): number {
-  return amountsOf(amounts).reduce((total, [, amount]) => total + amount, 0);
-}
-
-/** Le coffre contient-il toutes les entrées de la recette ? */
-function hasInputs(store: Store, recipe: RecipeProto): boolean {
-  return amountsOf(recipe.inputs).every(([item, amount]) => store.count(item) >= amount);
-}
-
-/** Toutes les entrées, et la place pour les sorties une fois les entrées consommées. */
-function canCraft(store: Store, recipe: RecipeProto): boolean {
-  return hasInputs(store, recipe) && store.freeSpace() + totalOf(recipe.inputs) >= totalOf(recipe.outputs);
 }
 
 function clamp(value: number, min: number, max: number): number {
