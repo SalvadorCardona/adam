@@ -13,6 +13,8 @@
  *   l'eau et ses voisines : le shader ne passe jamais sur la prairie ;
  * - un seul programme, un jeu d'uniformes partagé : un appel de dessin par
  *   bloc d'eau à l'écran, et rien à faire côté JS que de pousser l'heure ;
+ * - quelques blocs neufs par image, sous le budget de bake partagé avec le
+ *   sol (`bakeBudget.ts`) ;
  * - un bloc hors de l'écran est caché, et détruit — maillage et champ — avec
  *   la même marge d'éviction que le sol ;
  * - `prefers-reduced-motion` : l'heure s'arrête, l'eau est figée.
@@ -23,13 +25,17 @@
  */
 
 import { BufferImageSource, Container, GlProgram, Mesh, MeshGeometry, Shader, UniformGroup } from 'pixi.js';
-import { TILE_SIZE, coordKey } from '../core/grid.ts';
+import { TILE_SIZE } from '../core/grid.ts';
 import { hash3 } from '../core/rng.ts';
 import { GROUND, PALETTE, hex, type Color } from '../data/artDirection.ts';
+import { bakeOrder, type BakeBudget } from './bakeBudget.ts';
 import type { Camera } from './camera.ts';
 import { BAKE_MARGIN, BLOCK_SIZE, BLOCK_TILES, KEEP_MARGIN } from './chunkLayer.ts';
 import { FIELD_TEXELS, RIPPLE_TEXELS, ripplesTexture, waterField } from './waterField.ts';
 import { WATER_FRAGMENT, WATER_VERTEX } from './waterShader.ts';
+
+/** L'eau ne se rebake jamais : ses blocs sont faits ou à faire. */
+const NO_STALE: ReadonlySet<string> = new Set();
 
 /** L'heure du shader repart de zéro après une heure : les flottants gardent leur précision. */
 const TIME_WRAP_S = 3600;
@@ -98,7 +104,8 @@ export class WaterLayer {
     });
   }
 
-  public update(camera: Camera, deltaMs: number): void {
+  /** `budget` : les blocs que cette image peut encore faire (`bakeBudget.ts`). */
+  public update(camera: Camera, deltaMs: number, budget: BakeBudget): void {
     const still = this.reducedMotion?.matches ?? false;
     const bounds = camera.visibleCells(BLOCK_SIZE, BAKE_MARGIN);
 
@@ -108,12 +115,10 @@ export class WaterLayer {
       this.uniforms.update();
     }
 
-    for (let by = bounds.minCy; by <= bounds.maxCy; by += 1) {
-      for (let bx = bounds.minCx; bx <= bounds.maxCx; bx += 1) {
-        const key = coordKey(bx, by);
-
-        if (!this.blocks.has(key)) this.blocks.set(key, this.build(bx, by));
-      }
+    // Sous le budget de bake de l'image, partagé avec le sol : un bloc pas encore fait montre la terre de sa rive.
+    for (const { bx, by, key } of bakeOrder(bounds, camera.centerX / BLOCK_SIZE, camera.centerY / BLOCK_SIZE, (key) => this.blocks.has(key), NO_STALE)) {
+      if (!budget.take(performance.now())) break;
+      this.blocks.set(key, this.build(bx, by));
     }
 
     let blocks = 0;

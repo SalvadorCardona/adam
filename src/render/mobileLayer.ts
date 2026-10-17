@@ -79,8 +79,10 @@ import { terrainAt } from '../sim/terrain.ts';
 import { moodOf } from '../sim/housing.ts';
 import { deprivedNeed } from '../sim/needs.ts';
 import type { Inhabitant, Laborer, World } from '../sim/world.ts';
+import type { ChunkBounds } from './camera.ts';
 import { Puppet, type Lounge } from './puppet.ts';
 import { puppetOf } from './puppetOf.ts';
+import { mobileInSight } from './sight.ts';
 import type { SpriteLibrary } from './spriteLibrary.ts';
 import type { TerrainTiles } from './terrainTiles.ts';
 
@@ -210,6 +212,8 @@ interface MobileView {
   sleeper: Sprite | null;
   /** Le cercle du coup de zone d'un chef de base, créé à son premier coup. */
   mark?: Container;
+  /** Caché hors du champ de la caméra (`sight.ts`), à la dernière image. */
+  culled?: boolean;
 }
 
 /** Le vélo-cargo — une ombre, le cadre avec Ève en selle, deux roues qui tournent — ou la charrette du marchand. */
@@ -329,7 +333,8 @@ export class MobileLayer {
     world.events.on('companionStruck', ({ id }) => this.swings.set(id, COMPANION_SWING_MS));
   }
 
-  public update(alpha: number, ticker: Ticker): void {
+  /** `sight` : la zone vue en tuiles, marge comprise (`sight.ts`) ; un mobile hors champ n'est ni dessiné ni animé. */
+  public update(alpha: number, ticker: Ticker, sight: ChunkBounds): void {
     const deltaMs = ticker.deltaMS;
 
     for (const mobile of this.world.mobiles.values()) {
@@ -342,7 +347,23 @@ export class MobileLayer {
       const x = mobile.prevX + (mobile.x - mobile.prevX) * alpha;
       const y = mobile.prevY + (mobile.y - mobile.prevY) * alpha;
 
+      if (!mobileInSight(x / TILE_SIZE, y / TILE_SIZE, sight)) {
+        // Caché, pas animé. Son apparition se compte quand même : il ne refait pas son fondu en entrant dans le champ,
+        // et un coup reçu hors champ ne grimace pas à son retour.
+        view.root.visible = false;
+        view.culled = true;
+        view.age += deltaMs;
+        if ('hp' in mobile) view.lastHp = mobile.hp;
+        continue;
+      }
+
       view.root.position.set(x, y);
+      // Rentré dans le champ : chaque sorte redit plus bas ce qui la cache (chez lui, en soins, brouillard). Seulement
+      // au retour : basculer `visible` d'une image à l'autre ferait recomposer à Pixi tout le conteneur trié.
+      if (view.culled) {
+        view.culled = false;
+        view.root.visible = true;
+      }
 
       switch (mobile.kind) {
         case 'arrow':
@@ -507,7 +528,8 @@ export class MobileLayer {
             } else {
               view.root.scale.set(1);
 
-              if (view.age < SPAWN_MS) {
+              // Le fondu peut avoir fini hors champ : son alpha le rattrape en y entrant.
+              if (view.age < SPAWN_MS || view.root.alpha < 1) {
                 view.age = Math.min(SPAWN_MS, view.age + deltaMs);
                 view.root.alpha = view.age / SPAWN_MS;
               }
