@@ -102,7 +102,7 @@ import { buildingIcon, buildingIconUrl, creatureIconUrl, enemyBaseIconUrl, itemA
 import { moodMeter } from './moodMeter.ts';
 import { needMeter } from './needMeter.ts';
 import { PanelTabs } from './panelTabs.ts';
-import { siteNeedRow } from './siteNeedRow.ts';
+import { siteNeedHeader, siteNeedRow } from './siteNeedRow.ts';
 import { BarracksPanel } from './barracksPanel.ts';
 import type { ResearchId } from '../data/research.ts';
 import { ResearchPanel } from './researchPanel.ts';
@@ -120,6 +120,8 @@ interface Stat {
   item?: ItemId;
   value: string;
   label: string;
+  /** Un mot sous le nombre, quand la fenêtre est assez large pour le montrer. */
+  caption?: string;
 }
 
 export class BuildingPanel {
@@ -297,7 +299,11 @@ export class BuildingPanel {
     this.stats.addEventListener('click', (event) => {
       const chip = (event.target as HTMLElement).closest<HTMLElement>('.building-panel-stat');
 
-      if (chip) this.showTip(chip);
+      if (!chip) return;
+      // Sans le mot sous le nombre (fenêtre étroite), le libellé du tap reste affiché jusqu'à la fermeture.
+      const caption = chip.querySelector<HTMLElement>('.building-panel-stat-caption');
+
+      this.showTip(chip, undefined, caption !== null && getComputedStyle(caption).display === 'none');
     });
 
     this.tip = document.createElement('div');
@@ -774,7 +780,7 @@ export class BuildingPanel {
       // Objet par objet : livré / requis, puis ce qui est en route et ce que la ville en a.
       const ledger = this.world.siteLedger(entity);
 
-      this.setItems(ledger.map(siteNeedRow), `site:${entity.id}:${JSON.stringify(ledger)}`);
+      this.setItems([siteNeedHeader(), ...ledger.map(siteNeedRow)], `site:${entity.id}:${JSON.stringify(ledger)}`);
       this.items.dataset['layout'] = 'ledger';
       this.transferButton.hidden = building;
       this.transferButton.textContent = this.world.townStock() ? text.transferButton : text.transferBag;
@@ -817,9 +823,13 @@ export class BuildingPanel {
       }
       this.repairButton.hidden = cost === 0;
       this.repairButton.disabled = !inReach || stock === 0;
-      const repairLabel = text.repair.button(stock > 0 ? Math.min(cost, stock) : cost, material);
+      const repairCostLabel = text.repair.buttonCost(stock > 0 ? Math.min(cost, stock) : cost, material);
 
-      if (this.repairButton.textContent !== repairLabel) this.repairButton.textContent = repairLabel;
+      if (this.repairButton.getAttribute('aria-label') !== repairCostLabel) {
+        // « Réparer · 🪵1 » : le coût en icône à droite, sans parenthèses.
+        this.repairButton.setAttribute('aria-label', repairCostLabel);
+        this.repairButton.replaceChildren(text.repair.button, itemAmount(REPAIR.item, stock > 0 ? Math.min(cost, stock) : cost));
+      }
 
       this.eraButton.hidden = entity.kind !== 'townHall';
       if (entity.kind === 'townHall') {
@@ -860,12 +870,14 @@ export class BuildingPanel {
           const { adults, children, workers } = this.world.population();
           const radius = logisticRadiusOf(entity.proto, entity.level);
 
+          const captions = text.townHall.captions;
+
           stats.push(
-            { icon: 'people', value: String(adults), label: text.townHall.adults(adults) },
-            { icon: 'child', value: String(children), label: text.townHall.children(children) },
-            { icon: 'worker', value: String(workers), label: text.townHall.workers(workers) },
-            { icon: 'moon', value: String(this.world.night), label: text.townHall.nights(this.world.night) },
-            { icon: 'range', value: String(radius), label: text.townHall.radius(radius) },
+            { icon: 'people', value: String(adults), label: text.townHall.adults(adults), caption: captions.adults },
+            { icon: 'child', value: String(children), label: text.townHall.children(children), caption: captions.children },
+            { icon: 'worker', value: String(workers), label: text.townHall.workers(workers), caption: captions.workers },
+            { icon: 'moon', value: String(this.world.night), label: text.townHall.nights(this.world.night), caption: captions.nights },
+            { icon: 'range', value: String(radius), label: text.townHall.radius(radius), caption: captions.radius },
           );
           break;
         }
@@ -1103,8 +1115,9 @@ export class BuildingPanel {
         const cost = floorCost(entity);
 
         this.stock.hidden = true;
+        this.items.dataset['layout'] = 'ledger';
         this.setItems(
-          cost.map(([item, needed]) => itemAmount(item, needed, entity.store.count(item))),
+          [siteNeedHeader(false), ...cost.map(([item, needed]) => itemAmount(item, needed, entity.store.count(item)))],
           `floor:${entity.id}:${entity.level}:${cost.map(([item]) => `${item}=${entity.store.count(item)}`).join(',')}`,
         );
       } else if (proto.storage > 0 && !lab) {
@@ -1340,7 +1353,7 @@ export class BuildingPanel {
 
   /** Les puces ne sont reconstruites que si l'une change. */
   private setStats(stats: readonly Stat[]): void {
-    const key = stats.map(({ icon, item, value, label }) => `${item ?? icon}:${value}:${label}`).join('|');
+    const key = stats.map(({ icon, item, value, label, caption }) => `${item ?? icon}:${value}:${label}:${caption ?? ''}`).join('|');
 
     if (key === this.lastStats) return;
     this.lastStats = key;
@@ -1349,7 +1362,7 @@ export class BuildingPanel {
   }
 
   /** Un tap sur une puce : son libellé dans une bulle au-dessus d'elle, le temps de le lire. */
-  private showTip(chip: HTMLElement, label = chip.getAttribute('aria-label') ?? ''): void {
+  private showTip(chip: HTMLElement, label = chip.getAttribute('aria-label') ?? '', sticky = false): void {
     this.tip.textContent = label;
     this.tip.hidden = false;
     // La bulle reste dans la fenêtre : centrée sur la puce, bornée aux bords.
@@ -1360,7 +1373,7 @@ export class BuildingPanel {
     this.tip.style.left = `${left}px`;
     this.tip.style.top = `${chip.offsetTop - this.tip.offsetHeight - 6}px`;
     window.clearTimeout(this.tipTimer);
-    this.tipTimer = window.setTimeout(() => this.hideTip(), TIP_MS);
+    this.tipTimer = sticky ? undefined : window.setTimeout(() => this.hideTip(), TIP_MS);
   }
 
   private hideTip(): void {
@@ -1554,7 +1567,7 @@ export class BuildingPanel {
  * Une puce « pictogramme + nombre ». Un bouton, pour que le tap et le clavier
  * l'atteignent : il ne fait qu'afficher son libellé.
  */
-function statChip({ icon, item, value, label }: Stat): HTMLButtonElement {
+function statChip({ icon, item, value, label, caption }: Stat): HTMLButtonElement {
   const chip = document.createElement('button');
 
   chip.type = 'button';
@@ -1567,6 +1580,15 @@ function statChip({ icon, item, value, label }: Stat): HTMLButtonElement {
   picture.alt = '';
   picture.setAttribute('aria-hidden', 'true');
   chip.append(picture, value);
+  if (caption) {
+    const word = document.createElement('span');
+
+    word.className = 'building-panel-stat-caption';
+    word.setAttribute('aria-hidden', 'true');
+    word.textContent = caption;
+    chip.dataset['captioned'] = 'true';
+    chip.append(word);
+  }
   return chip;
 }
 

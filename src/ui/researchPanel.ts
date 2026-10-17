@@ -35,7 +35,7 @@ import type { Lab } from '../sim/types.ts';
 import { timerText, type World } from '../sim/world.ts';
 import { buildingIcon, itemAmount, itemIcon, uiIcon } from './icons.ts';
 import { PanelTabs } from './panelTabs.ts';
-import { siteNeedRow } from './siteNeedRow.ts';
+import { siteNeedHeader, siteNeedRow } from './siteNeedRow.ts';
 import { clock, effectLine, statusLine } from './researchText.ts';
 
 const THEMES = Object.keys(RESEARCH_THEMES) as ResearchTheme[];
@@ -301,7 +301,7 @@ export class ResearchPanel {
     // Objet par objet, comme la fenêtre d'un chantier : livré / demandé, en route, en ville.
     const ledger = world.labLedger(lab);
 
-    this.setCost(ledger.map(siteNeedRow), `collecting:${lab.research}:${JSON.stringify(ledger)}`);
+    this.setCost([siteNeedHeader(), ...ledger.map(siteNeedRow)], `collecting:${lab.research}:${JSON.stringify(ledger)}`);
   }
 
   /** Un porteur au travail (ni libre ni bâtisseur) peut-il apporter le coût ? */
@@ -485,7 +485,10 @@ export class ResearchPanel {
       ...buildings.map((building) => {
         const chip = element('span', 'research-unlock');
 
-        chip.append(buildingIcon(building, 28), t().buildings[building].label);
+        const name = element('span', 'research-unlock-name');
+
+        name.textContent = t().buildings[building].label;
+        chip.append(buildingIcon(building, 28), name);
         return chip;
       }),
     ];

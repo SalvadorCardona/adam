@@ -60,6 +60,8 @@ export const panel = {
     needIncoming: (count: number): string => `${count} en route`,
     needTownEmpty: 'plus rien en ville',
     needInTown: (count: number): string => `${count} en ville`,
+    /** L'en-tête du relevé : ce que disent les trois colonnes. */
+    needHeader: { delivered: 'livré', incoming: 'en route', town: 'en ville' },
   },
 
   repair: {
@@ -67,7 +69,9 @@ export const panel = {
     noStock: (item: string, hp: number): string => `Abîmé — rapportez du ${item.toLowerCase()} pour le réparer (1 = ${hp} PV).`,
     damaged: (item: string, hp: number): string =>
       `Abîmé — réparez-le, ou heurtez-le avec du ${item.toLowerCase()} dans le sac (1 = ${hp} PV).`,
-    button: (amount: number, item: string): string => `Réparer (${amount} ${item.toLowerCase()})`,
+    button: 'Réparer',
+    /** Le libellé lu du bouton, dont le coût s'affiche en icône. */
+    buttonCost: (amount: number, item: string): string => `Réparer : ${amount} ${item.toLowerCase()}`,
   },
 
   chest: {
@@ -86,6 +90,8 @@ export const panel = {
     children: (count: number): string => `Enfants : ${count}`,
     workers: (count: number): string => `Ouvriers : ${count}`,
     nights: (count: number): string => `Nuits affrontées : ${count}`,
+    /** Un mot sous chaque nombre des puces de la mairie. */
+    captions: { adults: 'adultes', children: 'enfants', workers: 'ouvriers', nights: 'nuits', radius: 'rayon' },
     radius: (tiles: number): string => `Rayon d’approvisionnement : les chantiers à ${tiles} cases puisent dans son coffre`,
   },
 

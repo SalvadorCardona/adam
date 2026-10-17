@@ -30,6 +30,30 @@ export function siteNeedRow(line: SiteLine): HTMLElement {
   return row;
 }
 
+/**
+ * L'en-tête du relevé, comme celui d'un tableau : livré · en route · en ville,
+ * en pictogramme et en texte court, sur la grille des lignes. L'antenne, qui
+ * n'a que le livré, passe `false`.
+ */
+export function siteNeedHeader(withFlows = true): HTMLElement {
+  const head = document.createElement('div');
+  const text = t().panel.site.needHeader;
+
+  head.className = 'site-need site-need-head';
+  head.setAttribute('aria-hidden', 'true');
+  head.append(headCell('chest', text.delivered));
+  if (withFlows) head.append(headCell('worker', text.incoming), headCell('town', text.town));
+  return head;
+}
+
+function headCell(icon: UiIcon, label: string): HTMLElement {
+  const cell = document.createElement('span');
+
+  cell.className = 'site-need-head-cell';
+  cell.append(uiIcon(icon, 12), label);
+  return cell;
+}
+
 function siteNeedChip(icon: UiIcon, value: number, kind: string): HTMLElement {
   const chip = document.createElement('span');
 
