@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RIVER, decorAt, findSpawn, homePond, inRiver, oreAt, resourceAt, terrainAt, touchesWater } from './terrain.ts';
+import { SWEEP_SEEDS } from './sweep.ts';
+import { SLOW } from './sweep.ts';
 
 describe('terrain', () => {
   /*
@@ -189,8 +191,8 @@ describe('foyer', () => {
    * pierre était à plus de trois écrans du départ. La mairie doit pouvoir se
    * bâtir sans explorer, sur toutes les seeds.
    */
-  it('met des arbres à 6 tuiles, de la pierre à 12 et du fer à 20 sur 1 000 seeds', () => {
-    for (let seed = 0; seed < 1000; seed += 1) {
+  it('met des arbres à 6 tuiles, de la pierre à 12 et du fer à 20 sur un balayage de seeds', () => {
+    for (let seed = 0; seed < SWEEP_SEEDS; seed += 1) {
       const trees = nearest(seed, 'tree', 6);
       const stone = nearest(seed, 'stoneRock', 12);
       const iron = nearest(seed, 'ironRock', 20);
@@ -229,7 +231,7 @@ describe('foyer', () => {
 });
 
 describe('rivières', () => {
-  it('serpentent sur la carte, sans jamais toucher au départ : une ancienne sauvegarde garde son terrain', () => {
+  it.skipIf(!SLOW)('serpentent sur la carte, sans jamais toucher au départ : une ancienne sauvegarde garde son terrain', () => {
     let seedsWithRiver = 0;
 
     for (let seed = 1; seed <= 10; seed += 1) {

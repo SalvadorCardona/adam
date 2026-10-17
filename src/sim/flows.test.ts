@@ -9,6 +9,7 @@ import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isWalkable, terrainAt } from './terrain.ts';
 import type { EntityId } from './types.ts';
 import { TICKS_PER_SECOND, World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 type Stock = Partial<Record<ItemId, number>>;
 
@@ -106,7 +107,7 @@ describe('débit de la ville', () => {
     expect(world.flows.netRate('wood')).toBe(0);
   });
 
-  it('l’anneau ne garde que les deux dernières minutes', () => {
+  it.skipIf(!SLOW)('l’anneau ne garde que les deux dernières minutes', () => {
     const world = colony({ hall: {}, houses: 1, drills: 1 });
 
     run(world, 2 * MINUTE);

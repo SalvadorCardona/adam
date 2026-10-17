@@ -10,6 +10,7 @@ import { chapterObjectives, currentChapter, goalProgress } from './objectives.ts
 import { decodeSave, encodeSave } from './save.ts';
 import type { Antenna, EntityId } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** L'objectif « Bâtir l'Antenne », seul de son chapitre, le dernier. */
 const ANTENNA_OBJECTIVE = OBJECTIVES.find((objective) => objective.goals.some((goal) => goal.type === 'build' && goal.building === 'antenna'))!;
@@ -196,7 +197,7 @@ describe('l’Antenne', () => {
     expect(progress()).toEqual({ have: 2, need: 3 });
   });
 
-  it('attire toutes les vagues de la nuit qui suit un étage fini', () => {
+  it.skipIf(!SLOW)('attire toutes les vagues de la nuit qui suit un étage fini', () => {
     const world = actTwo();
 
     // Le jour 1 : l'étage est fini avant la nuit 1, c'est elle qui marche sur l'antenne.
@@ -232,7 +233,7 @@ describe('l’Antenne', () => {
     expect(world.lureNight).toBe(2);
   });
 
-  it('lance le Signal au troisième étage, puis des survivants arrivent à chaque aube', () => {
+  it.skipIf(!SLOW)('lance le Signal au troisième étage, puis des survivants arrivent à chaque aube', () => {
     const world = actTwo();
     const antenna = firstFloor(world);
     let signals = 0;

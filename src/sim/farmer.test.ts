@@ -10,6 +10,7 @@ import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isWalkable, oreAt, terrainAt } from './terrain.ts';
 import type { Farm, Farmer } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 interface Spot {
   seed: number;
@@ -105,7 +106,7 @@ describe('ferme et fermiers', () => {
     expect(world.workforce()).toMatchObject({ assigned: BUILDINGS.farm.workers });
   });
 
-  it('ne cultive que l’herbe nue : ni eau, ni sable, ni bâti, ni filon, ni arbre', () => {
+  it.skipIf(!SLOW)('ne cultive que l’herbe nue : ni eau, ni sable, ni bâti, ni filon, ni arbre', () => {
     const world = colony();
     const farm = farmOf(world);
     run(world, 4000);
@@ -143,7 +144,7 @@ describe('ferme et fermiers', () => {
     expect(new Set(sown).size).toBe(sown.length);
   }, 30_000);
 
-  it('semis, pousse, mûre ; récoltée, le blé entre au coffre, et la case est ressemée', () => {
+  it.skipIf(!SLOW)('semis, pousse, mûre ; récoltée, le blé entre au coffre, et la case est ressemée', () => {
     const world = colony(1);
     const farm = farmOf(world);
     const first = world.farmField(farm).find((tile) => tile.state === 'free')!;
@@ -166,7 +167,7 @@ describe('ferme et fermiers', () => {
     expect(world.resources.crop(first.tx, first.ty)).not.toBeNull();
   }, 60_000);
 
-  it('deux fermiers ne travaillent jamais la même case', () => {
+  it.skipIf(!SLOW)('deux fermiers ne travaillent jamais la même case', () => {
     const world = colony();
     const farm = farmOf(world);
     let busiest = 0;
@@ -182,7 +183,7 @@ describe('ferme et fermiers', () => {
     expect(busiest).toBeGreaterThan(1);
   }, 60_000);
 
-  it('aucun blé sans récolte : le coffre ne monte que de ce qui est récolté', () => {
+  it.skipIf(!SLOW)('aucun blé sans récolte : le coffre ne monte que de ce qui est récolté', () => {
     const world = colony();
     const farm = farmOf(world);
     let harvested = 0;
@@ -201,7 +202,7 @@ describe('ferme et fermiers', () => {
     expect(farm.store.count('wheat') + carried).toBe(harvested);
   }, 60_000);
 
-  it('un champ plein produit autant que l’ancienne ferme au complet', () => {
+  it.skipIf(!SLOW)('un champ plein produit autant que l’ancienne ferme au complet', () => {
     const world = colony();
     const farm = farmOf(world);
     const minutes = 10;
@@ -335,7 +336,7 @@ describe('ferme et fermiers', () => {
     expect(sown).toBeGreaterThan(0);
   }, 30_000);
 
-  it('est déterministe : même seed, mêmes ticks, même champ', () => {
+  it.skipIf(!SLOW)('est déterministe : même seed, mêmes ticks, même champ', () => {
     const a = colony();
     const b = colony();
 

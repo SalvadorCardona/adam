@@ -8,6 +8,7 @@ import { footingAt, footingHalf } from './footing.ts';
 import { decodeSave, encodeSave } from './save.ts';
 import { findSpawn, homeOres, oreAt, terrainAt } from './terrain.ts';
 import { World } from './world.ts';
+import { SWEEP_SEEDS } from './sweep.ts';
 
 const DRILL = BUILDINGS.drill;
 const DEPOSITS = DRILL.deposits;
@@ -156,8 +157,8 @@ describe('assise d’une foreuse', () => {
     expect(world.canPlace('drill', tx, ty)).toBe('occupied');
   });
 
-  it('les filons du départ ont chacun un bord où poser une foreuse, sur 1 000 seeds', () => {
-    for (let seed = 0; seed < 1000; seed += 1) {
+  it('les filons du départ ont chacun un bord où poser une foreuse, sur un balayage de seeds', () => {
+    for (let seed = 0; seed < SWEEP_SEEDS; seed += 1) {
       for (const node of homeOres(seed)) {
         let found = false;
 

@@ -12,6 +12,7 @@ import { SAVE_VERSION, decodeSave, deserialize, encodeSave, peekSave, serialize 
 import { oreAt } from './terrain.ts';
 import type { EntityId } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** Remplit le sac, colle Adam à l'emprise, livre au contact : le dernier objet achève le chantier. */
 function completeSite(world: World, id: EntityId): void {
@@ -244,7 +245,7 @@ describe('sauvegarde', () => {
     expect(happiness(world)).not.toEqual(happiness(new World(4242)));
   });
 
-  it('le monde rechargé joue exactement la même suite de ticks', () => {
+  it.skipIf(!SLOW)('le monde rechargé joue exactement la même suite de ticks', () => {
     const reference = deserialize(JSON.parse(JSON.stringify(state)));
     const reloaded = decodeSave(encodeSave(reference, 1));
 

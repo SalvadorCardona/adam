@@ -3,6 +3,7 @@ import { CHALLENGE_IDS, CHALLENGE_STREAK, CHALLENGES } from '../data/challenges.
 import { drawChallenge } from './challenges.ts';
 import { deserialize, serialize } from './save.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** La mairie bâtie : le premier jour se lève. */
 function builtHall(seed = 1): World {
@@ -30,7 +31,7 @@ describe('défi du jour', () => {
     expect(seen.size).toBe(CHALLENGE_IDS.length);
   });
 
-  it('le premier jour se lève avec son défi ; l’aube suivante en tire un autre', () => {
+  it.skipIf(!SLOW)('le premier jour se lève avec son défi ; l’aube suivante en tire un autre', () => {
     const world = builtHall();
 
     expect(world.challenge()).toMatchObject({ have: 0, done: false });
@@ -109,7 +110,7 @@ describe('défi du jour', () => {
 });
 
 describe('série de défis', () => {
-  it('réussi la veille, le défi du jour paie la série ; raté, elle repart de zéro', () => {
+  it.skipIf(!SLOW)('réussi la veille, le défi du jour paie la série ; raté, elle repart de zéro', () => {
     const world = builtHall(4);
     const paid: number[] = [];
     const nextDay = (): void => {

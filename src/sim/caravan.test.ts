@@ -7,6 +7,7 @@ import { CYCLE_TICKS } from './dayNight.ts';
 import { deserialize, serialize } from './save.ts';
 import type { Caravan, EntityId } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** Un chantier livré d'office sauf un objet, que le sac apporte : le dernier objet l'achève. */
 function finish(world: World, id: EntityId): void {
@@ -59,7 +60,7 @@ describe('caravane de troc', () => {
     expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(isCaravanDay)).toEqual([4, 6, 8, 10]);
   });
 
-  it('seed 42 : des caravanes aux jours 4, 6 et 8, en jouant les journées', () => {
+  it.skipIf(!SLOW)('seed 42 : des caravanes aux jours 4, 6 et 8, en jouant les journées', () => {
     const world = withTownHall(42);
     const days: number[] = [];
 

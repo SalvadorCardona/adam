@@ -10,6 +10,7 @@ import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isWalkable, terrainAt } from './terrain.ts';
 import type { Forester, ForesterHouse, LumberCamp } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 interface Spot {
   seed: number;
@@ -101,7 +102,7 @@ describe('maison du forestier', () => {
     expect(world.population().workers).toBe(COLONY.startingWorkers);
   });
 
-  it('remplit le carré pousse par pousse, rang par rang, dans l’ordre', () => {
+  it.skipIf(!SLOW)('remplit le carré pousse par pousse, rang par rang, dans l’ordre', () => {
     const world = colony();
     const house = houseOf(world);
     const order = world
@@ -126,7 +127,7 @@ describe('maison du forestier', () => {
     }
   }, 30_000);
 
-  it('finit le carré, puis ses pousses grandissent jusqu’à des arbres à couper', () => {
+  it.skipIf(!SLOW)('finit le carré, puis ses pousses grandissent jusqu’à des arbres à couper', () => {
     const world = colony();
     const house = houseOf(world);
     const free = countPlot(world.forestPlot(house)).free;
@@ -223,7 +224,7 @@ describe('maison du forestier', () => {
     expect(planted).toBe(0);
   }, 30_000);
 
-  it('ne plante ni sur l’eau, ni sous le bâti', () => {
+  it.skipIf(!SLOW)('ne plante ni sur l’eau, ni sous le bâti', () => {
     const world = colony();
     const house = houseOf(world);
 
@@ -238,7 +239,7 @@ describe('maison du forestier', () => {
     expect(plotTiles(house).some((tile) => tile.tx === house.tx && tile.ty === house.ty)).toBe(false);
   }, 30_000);
 
-  it('sauvegarde les pousses et leur stade', () => {
+  it.skipIf(!SLOW)('sauvegarde les pousses et leur stade', () => {
     const world = colony();
     const house = houseOf(world);
 

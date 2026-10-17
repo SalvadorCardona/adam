@@ -12,6 +12,7 @@ import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isBuildable, isWalkable, resourceAt, terrainAt } from './terrain.ts';
 import type { LumberCamp, Lumberjack, TownHall, Worker } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 interface Spot {
   seed: number;
@@ -351,7 +352,7 @@ describe('bûcherons', () => {
     expect(out.size).toBe(2);
   });
 
-  it('les porteurs vident la cabane dans la mairie : tout le bois coupé arrive, rien de plus', () => {
+  it.skipIf(!SLOW)('les porteurs vident la cabane dans la mairie : tout le bois coupé arrive, rien de plus', () => {
     const world = colony({ house: true });
     let chopped = 0;
 
@@ -431,7 +432,7 @@ describe('bûcherons', () => {
     }
   });
 
-  it('une sauvegarde en pleine coupe se recharge avec ses arbres réservés, et la suite est identique', () => {
+  it.skipIf(!SLOW)('une sauvegarde en pleine coupe se recharge avec ses arbres réservés, et la suite est identique', () => {
     const world = colony({ house: true });
 
     // En pleine coupe : l'un d'eux a un arbre réservé et du bois dans les bras.

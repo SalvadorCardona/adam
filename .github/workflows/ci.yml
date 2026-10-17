@@ -29,11 +29,56 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Les tests tournent sans navigateur : c'est le bénéfice direct de la
-      # règle d'isolation de sim/. Pas de Playwright, pas de canvas, pas de
-      # serveur X — quelques centaines de millisecondes.
+      # Les tests rapides tournent sans navigateur : c'est le bénéfice direct
+      # de la règle d'isolation de sim/. Pas de canvas, pas de serveur X.
       - name: Tests
         run: npm test
 
       - name: Build
         run: npm run build
+
+  # Les balayages sur 1 000 graines, les courbes de défense et les longues
+  # parties : la suite entière, en parallèle de `verify` pour ne pas l'allonger.
+  slow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tests lents
+        run: npm run test:slow
+
+  # Le vrai jeu, construit, dans Chromium headless : un téléphone et un bureau.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test de fumée
+        run: npm run test:e2e
+
+      - name: Rapport Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

@@ -5,6 +5,7 @@ import { deserialize, serialize } from './save.ts';
 import { isStarNight } from './starfall.ts';
 import type { Pickup } from './types.ts';
 import { World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 /** Une graine dont la nuit 2 est une nuit d'étoiles. */
 function starSeed(): number {
@@ -28,7 +29,7 @@ describe('nuits d’étoiles filantes', () => {
     expect(stars / nights).toBeLessThan(STARFALL.chance + 0.08);
   });
 
-  it('annoncée au crépuscule, elle laisse des éclats autour de la mairie, qui éclairent la nuit et survivent au rechargement', () => {
+  it.skipIf(!SLOW)('annoncée au crépuscule, elle laisse des éclats autour de la mairie, qui éclairent la nuit et survivent au rechargement', () => {
     const world = new World(starSeed());
 
     world.player.inventory.add('wood', 25);

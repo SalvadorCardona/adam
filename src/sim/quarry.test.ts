@@ -8,6 +8,7 @@ import { decodeSave, encodeSave, type SavedEntity } from './save.ts';
 import { isWalkable, terrainAt } from './terrain.ts';
 import type { Entity, Quarry } from './types.ts';
 import { TICKS_PER_SECOND, World } from './world.ts';
+import { SLOW } from './sweep.ts';
 
 const MINUTE = 60 * TICKS_PER_SECOND;
 
@@ -134,7 +135,7 @@ describe('carrière', () => {
    * pierre dès qu'elle en a de quoi payer une tour, et la carrière la
    * remplit — jamais plus de deux minutes d'affilée à zéro.
    */
-  it('ne laisse pas la ville à court de pierre plus de deux minutes sur vingt', () => {
+  it.skipIf(!SLOW)('ne laisse pas la ville à court de pierre plus de deux minutes sur vingt', () => {
     const { world, hx, hy } = colony();
 
     buildQuarry(world, hx, hy);

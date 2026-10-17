@@ -4,6 +4,7 @@ import { DAY_CYCLE } from '../data/dayNight.ts';
 import type { ItemId } from '../data/items.ts';
 import { World } from '../sim/world.ts';
 import { defeatRows } from './hud.ts';
+import { SLOW } from '../sim/sweep.ts';
 
 const CYCLE = DAY_CYCLE.day + DAY_CYCLE.dusk + DAY_CYCLE.night + DAY_CYCLE.dawn;
 
@@ -42,7 +43,7 @@ describe('defeatRows', () => {
     expect(nightsSurvived(world)).toBe('0');
   });
 
-  it('ne compte pas la nuit pendant laquelle la mairie tombe', () => {
+  it.skipIf(!SLOW)('ne compte pas la nuit pendant laquelle la mairie tombe', () => {
     const world = builtWorld();
 
     // Passé les nuits de grâce (où elle ne tombe pas) : la nuit 4.
@@ -58,7 +59,7 @@ describe('defeatRows', () => {
     expect(nightsSurvived(world)).toBe('3');
   });
 
-  it('compte la nuit 3 si la mairie tombe le jour qui la suit', () => {
+  it.skipIf(!SLOW)('compte la nuit 3 si la mairie tombe le jour qui la suit', () => {
     const world = builtWorld();
     let dawns = 0;
 

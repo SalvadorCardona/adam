@@ -58,7 +58,7 @@ export default tseslint.config(
 
   // Tests et outillage tournent en Node, pas dans le navigateur.
   {
-    files: ['**/*.test.ts', 'src/tools/**'],
+    files: ['**/*.test.ts', 'src/tools/**', 'e2e/**', 'playwright.config.ts'],
     languageOptions: { globals: globals.node },
   },
 
