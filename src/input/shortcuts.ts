@@ -3,7 +3,8 @@
  * construction (`BuildMenu.handleKey`) :
  *
  * - P : pause ;
- * - Échap : ferme ce qui est au premier plan, sinon pause (`escape.ts`) ;
+ * - Échap : ferme ce qui est au premier plan, sinon pause (`escape.ts`) — sauf dans
+ *   les `ESCAPE_REPEAT_MS` qui suivent une fermeture (`escapeRepeats`) ;
  * - I : le sac, lu par position comme ZQSD ;
  * - M : la carte du monde, lue par caractère — c'est une initiale, et le M
  *   d'un clavier AZERTY n'est pas à la place de celui d'un QWERTY ;
@@ -42,4 +43,12 @@ export function shortcutOf(press: KeyPress): Shortcut | null {
   if (press.code === 'KeyV') return 'mic';
   if (press.key.toLowerCase() === 'm') return 'map';
   return null;
+}
+
+/** Après la fermeture d'une fenêtre, un Échap de plus dans ce délai (ms) est une répétition : il n'enchaîne pas sur la pause. */
+export const ESCAPE_REPEAT_MS = 300;
+
+/** `closedAt` : l'instant (ms) où Échap a fermé quelque chose pour la dernière fois, `null` si jamais. */
+export function escapeRepeats(closedAt: number | null, now: number): boolean {
+  return closedAt !== null && now - closedAt >= 0 && now - closedAt < ESCAPE_REPEAT_MS;
 }

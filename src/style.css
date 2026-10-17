@@ -3736,6 +3736,16 @@ button:disabled,
   display: none;
 }
 
+.button-secondary.pause-restart {
+  background: var(--coral);
+  color: var(--paper);
+  box-shadow: 0 5px 0 var(--coral-shade);
+}
+
+.button-secondary.pause-restart:active {
+  box-shadow: 0 2px 0 var(--coral-shade);
+}
+
 .build-armed button[data-confirm='true'] {
   background: var(--mint);
   color: var(--paper);

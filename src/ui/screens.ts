@@ -290,7 +290,7 @@ export class PauseScreen {
   private voiceOn = false;
 
   /** `onInvite` : `null` chez l’ami en jeu et sans serveur — le bouton n’existe alors pas. */
-  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: (() => void) | null, onVoice: (() => void) | null = null) {
+  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: (() => void) | null, onVoice: (() => void) | null = null, onSettings: () => void = () => {}, onTitle: (() => void) | null = null) {
     this.root = document.createElement('div');
     this.root.className = 'overlay pause-screen';
     this.root.hidden = true;
@@ -315,8 +315,22 @@ export class PauseScreen {
     const restart = document.createElement('button');
 
     restart.type = 'button';
-    restart.className = 'button-secondary';
+    restart.className = 'button-secondary pause-restart';
     restart.addEventListener('click', () => this.asking(true));
+
+    // Les réglages s'ouvrent par-dessus la pause, qui reste derrière.
+    const settings = document.createElement('button');
+
+    settings.type = 'button';
+    settings.className = 'button-secondary';
+    settings.addEventListener('click', onSettings);
+
+    // L'écran titre : la partie est écrite avant (`onTitle`), « Continuer » la reprend.
+    const toTitle = document.createElement('button');
+
+    toTitle.type = 'button';
+    toTitle.className = 'button-secondary';
+    if (onTitle) toTitle.addEventListener('click', onTitle);
 
     const invite = document.createElement('button');
 
@@ -353,6 +367,8 @@ export class PauseScreen {
       const { pause } = t().screens;
 
       showCollection.replaceChildren(uiIcon('trophy', 22), t().collection.title);
+      settings.replaceChildren(uiIcon('settings', 22), pause.settings);
+      toTitle.replaceChildren(uiIcon('home', 22), pause.titleScreen);
       invite.replaceChildren(uiIcon('invite', 22), t().party.invite);
       this.renderVoice();
 
@@ -363,7 +379,7 @@ export class PauseScreen {
     });
 
     this.confirm = confirmRestart(onRestart, () => this.asking(false));
-    this.panel.append(title, text, resume, ...(onInvite ? [invite] : []), this.voice, showCollection, restart, seedLine(seed));
+    this.panel.append(title, text, resume, settings, showCollection, ...(onInvite ? [invite] : []), this.voice, ...(onTitle ? [toTitle] : []), restart, seedLine(seed));
     this.root.append(this.panel, this.confirm, this.collection.root);
     this.collection.root.hidden = true;
     this.asking(false);

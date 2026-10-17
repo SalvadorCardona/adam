@@ -36,7 +36,7 @@ import { Inspect } from './input/inspect.ts';
 import { installCursors } from './ui/cursors.ts';
 import { Joystick } from './input/joystick.ts';
 import { Keyboard, isTyping, type KeyboardState } from './input/keyboard.ts';
-import { shortcutOf, type Shortcut } from './input/shortcuts.ts';
+import { escapeRepeats, shortcutOf, type Shortcut } from './input/shortcuts.ts';
 import { Placement } from './input/placement.ts';
 import { PointerRouter } from './input/pointer.ts';
 import { Pinch, bindWheelZoom } from './input/zoom.ts';
@@ -746,7 +746,14 @@ async function main(): Promise<void> {
   // Jouer à deux : chacun voit l'autre arriver et partir.
   world.events.on('partnerJoined', ({ name }) => hud.notify(t().party.play.partnerJoined(name), 'good'));
   world.events.on('partnerLeft', ({ name }) => hud.notify(t().party.play.partnerLeft(name), 'bad'));
-  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest || !connection.enabled ? null : () => invitePanel.show(), () => voicePanel.toggleMembership());
+  const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest || !connection.enabled ? null : () => invitePanel.show(), () => voicePanel.toggleMembership(),
+    () => settings.show(),
+    // L'écran titre : la partie est écrite, la page se recharge sur « Continuer ». Pas de sauvegarde en partie de test ni chez l'ami.
+    sandbox ? null : () => {
+      autosave.now();
+      window.location.reload();
+    },
+  );
   // Chez l'ami, l'hôte est là d'emblée : le vocal est à portée dès l'arrivée.
   if (guest) {
     attachVoice(guest.session);
@@ -908,6 +915,7 @@ async function main(): Promise<void> {
         return;
       }
       if (buildMenu.handleKey(event.code, event.repeat, canOpen)) {
+        if (event.code === 'Escape') escapeClosedAt = performance.now();
         event.preventDefault();
         event.stopPropagation();
       }
@@ -942,10 +950,17 @@ async function main(): Promise<void> {
    * de construction a pris les siens avant. La manette passe par la même
    * table : ○ / B est Échap, Options la pause, △ / Y le sac, View la carte.
    */
+  let escapeClosedAt: number | null = null;
+
   function runShortcut(shortcut: Shortcut | null, field: HTMLElement | null = null): void {
     if (shortcut === 'pause' && !settings.open) setPaused(!paused);
     // Échap ferme d'abord ce qui est au premier plan ; la pause, si rien ne l'est.
     if (shortcut === 'escape') {
+      const before = escapeClosedAt;
+      const now = performance.now();
+
+      // Tout ce qui suit ferme quelque chose, sauf la pause, qui le défait ci-dessous.
+      escapeClosedAt = now;
       // Le champ qui avait le clavier le rend : les touches suivantes reviennent au jeu.
       field?.blur();
 
@@ -999,7 +1014,11 @@ async function main(): Promise<void> {
         eras.hide();
       }
       else if (action === 'closeResources') resources.close();
-      else setPaused(action === 'pause');
+      else if (action === 'pause') {
+        // Un deuxième Échap tout de suite après une fermeture : la répétition ne met pas en pause.
+        escapeClosedAt = before;
+        if (!escapeRepeats(before, now)) setPaused(true);
+      } else setPaused(false);
     }
     if (shortcut === 'inventory' && started && !paused && !settings.open && !worldMap.open) inventory.toggle();
     if (shortcut === 'map') {
