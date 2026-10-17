@@ -120,7 +120,7 @@ import { CROPS, RESOURCES, SAPLING, type ResourceId } from '../data/resources.ts
 import { CLEAN_NIGHT, COMBO, HUNTERS, VOLLEY } from '../data/skills.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { baseXp, killXp, levelBonus, levelHp, levelOf, sharedXp } from './levels.ts';
-import { BUILDERS, FARMERS, FORESTERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
+import { BUILDERS, FARMERS, GLEANERS, IDLE, JOB_PRIORITY, LUMBERJACKS, PORTERS, VOLUNTEERS, WORK_PRIORITY, type WorkPriority } from '../data/workers.ts';
 import { WEATHER, WEATHER_CALENDAR, type WeatherId } from '../data/weather.ts';
 import { ChunkIndex } from './chunk.ts';
 import { floorCost, floorMissing, floorNeeds, floorWants } from './antenna.ts';
@@ -223,7 +223,7 @@ import { inLogisticRange, pointInLogisticRange } from './warehouse.ts';
 import { gleanNodes } from './gleaners.ts';
 import { LumberjackCrew, chopSpot, treesInRange } from './lumberjacks.ts';
 import type { CrewContext } from './crew.ts';
-import { plantSpot, plotTiles, type PlotTile } from './forester.ts';
+import { ForesterCrew, plantSpot, type PlotTile } from './forester.ts';
 import { fieldTiles, type FieldState, type FieldTile } from './farmer.ts';
 import { labLedger, siteLedger, type SiteLine } from './siteLedger.ts';
 import { allocateStaff, canPause, clampStaff, employs, isWorkPriority, type StaffDemand, type StaffPost, type Staffing } from './staffing.ts';
@@ -1129,8 +1129,14 @@ export class World {
    */
   public gleaning = true;
 
+  /** Ce que les équipes logées voient du monde (`crewContext`). */
+  private readonly crew = World.crewContext(this);
+
   /** Les bûcherons des cabanes, et les arbres qu'ils visent (`sim/lumberjacks.ts`). */
-  private readonly lumberjacks = new LumberjackCrew(World.crewContext(this));
+  private readonly lumberjacks = new LumberjackCrew(this.crew);
+
+  /** Les forestiers des maisons (`sim/forester.ts`). */
+  private readonly foresters = new ForesterCrew(this.crew);
 
   /** La météo du tick en cours : relue dans la seed au début de chaque tick, jamais sauvegardée. */
   private spell: WeatherSpell | null = null;
@@ -3946,7 +3952,7 @@ export class World {
         break;
 
       case 'foresterHouse':
-        this.staffForester(building);
+        this.foresters.staff(building);
         break;
 
       case 'depot':
@@ -5064,7 +5070,7 @@ export class World {
         case 'forester':
           // Couché dehors, il ne l'est que tant que `sleep` l'y remet.
           mobile.sleepingOut = false;
-          if (!this.stepNeeds(mobile, alarm)) this.stepForester(mobile, alarm, bedtime);
+          if (!this.stepNeeds(mobile, alarm)) this.foresters.step(mobile, alarm, bedtime);
           this.noteIdle(mobile);
           break;
 
@@ -8750,7 +8756,7 @@ export class World {
     for (const entity of this.entities.values()) {
       if (entity.kind === 'house' || entity.kind === 'depot' || entity.kind === 'yard') this.staff(entity);
       if (entity.kind === 'lumberCamp') this.lumberjacks.staff(entity);
-      if (entity.kind === 'foresterHouse') this.staffForester(entity);
+      if (entity.kind === 'foresterHouse') this.foresters.staff(entity);
       if (entity.kind === 'farm') this.staffFarm(entity);
     }
     // Une maison finie ou tombée, des ouvriers venus ou partis : les lits suivent sans attendre.
@@ -9618,94 +9624,17 @@ export class World {
 
   /* ------------------------------------------------------------- forestiers */
 
-  private *foresters(): IterableIterator<Forester> {
-    for (const mobile of this.mobiles.values()) {
-      if (mobile.kind === 'forester') yield mobile;
-    }
-  }
-
-  /** Pourvoit la maison du forestier si son poste l'est : l'ouvrier libre le plus proche devient forestier. */
-  private staffForester(house: ForesterHouse): void {
-    let lodged = 0;
-
-    for (const forester of this.foresters()) {
-      if (forester.homeId === house.id) lodged += 1;
-    }
-
-    const door = doorOf(house);
-    const posts = this.roster().filled.get(house.id) ?? 0;
-    let hired = 0;
-
-    for (let i = lodged; i < posts; i += 1) {
-      const worker = this.nearestFree(door);
-
-      if (!worker) break;
-
-      const forester: Forester = {
-        kind: 'forester',
-        ...personOf(worker),
-        homeId: house.id,
-        inside: false,
-        state: 'idle',
-        plot: null,
-        plantTicks: 0,
-        searchTicks: 1,
-        ...wanderFrom(worker.x, worker.y),
-      };
-
-      this.mobiles.set(forester.id, forester);
-      this.idleSince.delete(forester.id);
-      hired += 1;
-    }
-    if (hired > 0) this.duty = null;
-  }
-
   /** Le forestier d'une maison — le premier logé —, ou `undefined` : la fenêtre dit ce qu'il fait. */
   public foresterOf(house: ForesterHouse): Forester | undefined {
-    let found: Forester | undefined;
-
-    for (const forester of this.foresters()) {
-      if (forester.homeId === house.id && (!found || forester.id < found.id)) found = forester;
-    }
-    return found;
+    return this.foresters.of(house);
   }
 
   /**
    * Le carré de forêt d'une maison — posée, ou en fantôme à (tx, ty) —, case
-   * par case dans l'ordre de plantation : libre, en pousse, arbre, ou prise
-   * par autre chose. Une case libre est une herbe nue, sans bâti, sans route,
-   * sans filon — il resterait à la foreuse — et qu'aucune pousse n'occupe.
+   * par case dans l'ordre de plantation (`ForesterCrew.plot`).
    */
   public forestPlot(house: { tx: number; ty: number; width: number; height: number }): PlotTile[] {
-    return plotTiles(house).map(({ tx, ty }): PlotTile => {
-      if (this.resources.sapling(tx, ty)) return { tx, ty, state: 'sapling' };
-
-      const resource = this.resources.at(tx, ty);
-
-      if (resource?.id === 'tree') return { tx, ty, state: 'tree' };
-
-      const blocked =
-        resource !== null ||
-        this.resources.crop(tx, ty) !== null ||
-        terrainAt(this.seed, tx, ty) !== 'grass' ||
-        oreAt(this.seed, tx, ty) !== null ||
-        this.chunks.occupantAt(tx, ty) !== undefined ||
-        this.chestAt(tx, ty) !== null;
-
-      return { tx, ty, state: blocked ? 'blocked' : 'free' };
-    });
-  }
-
-  /** La première case libre du carré, dans l'ordre, qu'on atteint en ligne droite sans passer par l'eau ; `null` sinon. */
-  private nextPlot(house: ForesterHouse, from: { x: number; y: number }): { tx: number; ty: number } | null {
-    for (const tile of this.forestPlot(house)) {
-      if (tile.state !== 'free') continue;
-
-      const spot = plantSpot(tile);
-
-      if (this.lineIsClear(from.x, from.y, spot.x, spot.y)) return { tx: tile.tx, ty: tile.ty };
-    }
-    return null;
+    return this.foresters.plot(house);
   }
 
   /**
@@ -9717,111 +9646,6 @@ export class World {
     if (this.tickCount % SAPLING.passTicks !== 0) return;
     for (const { tx, ty } of this.resources.grow(this.tickCount)) this.dirtyTile(tx, ty);
     this.witherFields();
-  }
-
-  /**
-   * Un tick de forestier. Hors d'une plantation, il cherche toutes les
-   * `retryTicks` la première case libre de son carré ; il y marche, plante,
-   * puis enchaîne sur la suivante sans rentrer. Carré plein, il flâne devant
-   * sa porte jusqu'à ce qu'on coupe un arbre. La nuit, il ne repart pas ;
-   * pendant une vague, il rentre s'abriter, et reprendra sa case après.
-   */
-  private stepForester(forester: Forester, alarm: boolean, bedtime: boolean): void {
-    const house = this.entities.get(forester.homeId);
-
-    // Sa maison est tombée : il redevient un ouvrier libre.
-    if (house?.kind !== 'foresterHouse') {
-      this.release(forester);
-      return;
-    }
-
-    const door = doorOf(house);
-
-    if (alarm) {
-      if (forester.state === 'plant') forester.state = 'toPlot';
-      this.goHome(forester, door);
-      return;
-    }
-
-    // Maison en pause, ou lui retiré de son poste : il lâche sa case et flâne — une pousse à moitié plantée ne pousse pas.
-    const working = !house.paused && this.onDuty(forester);
-
-    if (!working && forester.state !== 'idle') this.stopPlanting(forester, door);
-
-    // Retiré de son poste : il rentre, et redevient un ouvrier libre.
-    if (!this.onDuty(forester) && forester.state === 'idle') {
-      this.release(forester);
-      return;
-    }
-
-    switch (forester.state) {
-      case 'idle':
-        forester.searchTicks -= 1;
-        if (forester.searchTicks <= 0 && working && !bedtime) {
-          forester.searchTicks = FORESTERS.retryTicks;
-          this.seekPlot(forester, house, forester.inside ? door : forester);
-        }
-        if (forester.state === 'idle') this.idle(forester, door, bedtime);
-        else forester.inside = false;
-        break;
-
-      case 'toPlot': {
-        const plot = forester.plot;
-
-        forester.inside = false;
-        if (!plot || this.forestPlot(house).find((tile) => tile.tx === plot.tx && tile.ty === plot.ty)?.state !== 'free') {
-          // Prise entre-temps — une route, un chantier, l'autre forestier — : il en cherche une autre.
-          if (!this.seekPlot(forester, house, forester)) this.stopPlanting(forester, door);
-          break;
-        }
-
-        const spot = plantSpot(plot);
-
-        if (walkToward(forester, spot.x, spot.y, this.walkStep())) {
-          forester.state = 'plant';
-          forester.facing = 'right';
-          forester.plantTicks = FORESTERS.plantTicks;
-        }
-        break;
-      }
-
-      case 'plant':
-        standStill(forester);
-        forester.inside = false;
-        forester.plantTicks -= this.toil(forester.needs);
-        if (forester.plantTicks <= 0) this.plant(forester, house, door);
-        break;
-    }
-  }
-
-  /** La prochaine case : il y va ; plus rien à planter, il reste — ou redevient — oisif. Vrai s'il en a une. */
-  private seekPlot(forester: Forester, house: ForesterHouse, from: { x: number; y: number }): boolean {
-    const plot = this.nextPlot(house, from);
-
-    forester.plot = plot;
-    forester.state = plot ? 'toPlot' : 'idle';
-    return plot !== null;
-  }
-
-  /** La bêche s'enfonce : une pousse en terre, puis la case suivante, sans rentrer. */
-  private plant(forester: Forester, house: ForesterHouse, door: { x: number; y: number }): void {
-    const plot = forester.plot;
-    const free = plot && this.forestPlot(house).find((tile) => tile.tx === plot.tx && tile.ty === plot.ty)?.state === 'free';
-
-    if (plot && free && this.resources.plant(plot.tx, plot.ty, this.tickCount)) {
-      this.dirtyTile(plot.tx, plot.ty);
-      this.events.emit('treePlanted', { foresterId: forester.id, tx: plot.tx, ty: plot.ty });
-    }
-
-    if (!this.seekPlot(forester, house, forester)) this.stopPlanting(forester, door);
-  }
-
-  /** Plus de case à planter : il lâche la sienne et flâne à partir de sa porte. */
-  private stopPlanting(forester: Forester, door: { x: number; y: number }): void {
-    forester.plot = null;
-    forester.state = 'idle';
-    forester.searchTicks = FORESTERS.retryTicks;
-    Object.assign(forester, wanderFrom(door.x, door.y));
   }
 
   /* --------------------------------------------------------------- fermiers */
