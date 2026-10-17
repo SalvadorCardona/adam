@@ -141,7 +141,8 @@ export function stepArrow<T extends Foe>(arrow: Arrow, foes: Iterable<T>, wind: 
    */
   const length = Math.hypot(arrow.vx, arrow.vy);
   const samples = Math.max(1, Math.ceil(length / SWEEP_STEP));
-  const list = [...foes];
+  // Une liste déjà relevée (`World.foes`) se lit telle quelle ; un itérable, une fois, avant le balayage.
+  const list: readonly T[] = Array.isArray(foes) ? (foes as readonly T[]) : [...foes];
 
   for (let i = 1; i <= samples; i += 1) {
     const x = arrow.prevX + (arrow.vx * i) / samples;

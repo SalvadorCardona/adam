@@ -47,6 +47,7 @@
 
 import { Emitter } from '../core/events.ts';
 import { CHUNK_SIZE, CHUNK_TILES, TILE_SIZE, coordKey, distanceSq, floorDiv, type TileCoord } from '../core/grid.ts';
+import { RevisedMap } from '../core/revisedMap.ts';
 import { hash3, mulberry32, type StatefulRng } from '../core/rng.ts';
 import { BUILDINGS, BUILDING_IDS, MENU_BUILDING_IDS, START_BUILDINGS, REPAIR, RUIN, bedsOf, buildingLevel, nextUpgrade, speedOf, type BuildingId, type BuildingKind, type BuildingProto } from '../data/buildings.ts';
 import { CARAVAN, RARE_OFFERS, type RareOfferId } from '../data/caravan.ts';
@@ -889,8 +890,8 @@ export class World {
   public readonly fog = new FogOfWar((tx, ty) => this.dirtyTile(tx, ty));
   /** La `revision` du brouillard à la dernière revue des bases : sans case changée, leur vue non plus. */
   private basesSightRevision = -1;
-  public readonly entities = new Map<EntityId, Entity>();
-  public readonly mobiles = new Map<MobileId, Mobile>();
+  public readonly entities = new RevisedMap<EntityId, Entity>();
+  public readonly mobiles = new RevisedMap<MobileId, Mobile>();
   public readonly events = new Emitter<WorldEvents>();
   /** Adam, toujours : le personnage de l'hôte, celui que la sauvegarde garde. */
   public readonly adam: Player;
@@ -1137,10 +1138,24 @@ export class World {
   private spell: WeatherSpell | null = null;
 
   /**
-   * La répartition des ouvriers, cf. `staffing()` : refaite une fois par tick,
-   * ou quand un effectif, un bâtiment fini ou tombé la change. Jamais sauvegardée.
+   * La répartition des ouvriers, cf. `staffing()` : refaite quand un effectif,
+   * un bâtiment fini ou tombé, la colonie ou une garde qui expire la change
+   * (`roster`), ses équipes quand les mobiles bougent. Jamais sauvegardée.
    */
-  private duty: { tick: number; filled: Map<EntityId, number>; onDuty: Set<MobileId> } | null = null;
+  private duty: Duty | null = null;
+
+  /** Les bonus de la recherche par statistique, pour cette liste de recherches finies (`researchBonus`). */
+  private readonly researchMemo: { done: readonly ResearchId[] | null; length: number; bonus: Map<ResearchStat, number> } = { done: null, length: -1, bonus: new Map() };
+  /** Le dernier niveau calculé, et l'XP d'où il vient (`level`). */
+  private levelMemo = { xp: -1, level: 1 };
+
+  /** Ce que comptaient les objectifs à leur dernier examen (`checkObjectives`). Jamais sauvegardé. */
+  private objectiveStamp: ObjectiveStamp | null = null;
+  /** Monte à chaque étage gagné ou perdu : les objectifs à étages se relisent. */
+  private levels = 0;
+
+  /** Les ennemis relevés à la dernière `revision` des mobiles (`foeLists`). Jamais sauvegardés. */
+  private foeCache: { revision: number; mutants: Mutant[]; foes: Foe[] } = { revision: -1, mutants: [], foes: [] };
 
   /**
    * La dernière répartition, d'où part la suivante (`allocateStaff`) : qui
@@ -2169,6 +2184,7 @@ export class World {
     const before = buildingLevel(building.proto, building.level).hp;
 
     building.level += 1;
+    this.levels += 1;
     building.hp = Math.max(1, Math.round((building.hp / before) * upgrade.hp));
     this.events.emit('buildingUpgraded', { id, level: building.level, fromBag });
   }
@@ -3042,6 +3058,7 @@ export class World {
     const before = buildingLevel(antenna.proto, antenna.level).hp;
 
     antenna.level += 1;
+    this.levels += 1;
     antenna.hp = Math.max(1, Math.round((antenna.hp / before) * floor.hp));
     this.events.emit('buildingUpgraded', { id: antenna.id, level: antenna.level, fromBag: [] });
     this.lure(antenna);
@@ -3066,6 +3083,7 @@ export class World {
   /** Abattue au-dessus du premier étage, l'antenne n'en perd qu'un : le coffre garde ce qui était livré. */
   private dropFloor(antenna: Antenna): void {
     antenna.level -= 1;
+    this.levels += 1;
     antenna.hp = Math.ceil(buildingLevel(antenna.proto, antenna.level).hp / 2);
     this.events.emit('antennaFell', { id: antenna.id, floor: antenna.level });
   }
@@ -3081,12 +3099,31 @@ export class World {
    */
   public bonus(stat: ResearchStat): number {
     return (
-      researchBonus(this.researchDone, stat) +
+      this.researchBonus(stat) +
       levelBonus(this.level(), stat) +
       boonBonus(this.activeBoon()?.id ?? null, stat) +
       toolBonus(this.player.axe, this.player.pickaxe, stat) +
       this.dailyBonus(stat)
     );
+  }
+
+  /** `researchBonus`, gardé par statistique tant que la liste des recherches finies ne change pas : `bonus` se lit des centaines de fois par tick. */
+  private researchBonus(stat: ResearchStat): number {
+    const memo = this.researchMemo;
+
+    if (memo.done !== this.researchDone || memo.length !== this.researchDone.length) {
+      memo.done = this.researchDone;
+      memo.length = this.researchDone.length;
+      memo.bonus.clear();
+    }
+
+    let bonus = memo.bonus.get(stat);
+
+    if (bonus === undefined) {
+      bonus = researchBonus(this.researchDone, stat);
+      memo.bonus.set(stat, bonus);
+    }
+    return bonus;
   }
 
   /** Ce que le modificateur de la carte du jour ajoute à une statistique. */
@@ -3200,7 +3237,10 @@ export class World {
 
   /** Le niveau d'Adam, déduit de son XP. */
   public level(): number {
-    return levelOf(this.player.xp);
+    const { xp } = this.player;
+
+    if (this.levelMemo.xp !== xp) this.levelMemo = { xp, level: levelOf(xp) };
+    return this.levelMemo.level;
   }
 
   /** Les points de vie max d'Adam : ceux de base, plus ses niveaux et la recherche. */
@@ -4601,17 +4641,34 @@ export class World {
 
   /* ---------------------------------------------------------------- mobiles */
 
-  private *mutants(): IterableIterator<Mutant> {
-    for (const mobile of this.mobiles.values()) {
-      if (mobile.kind === 'mutant') yield mobile;
-    }
+  private mutants(): readonly Mutant[] {
+    return this.foeLists().mutants;
   }
 
   /** Tout ce que l'arc d'Adam peut viser : les mutants et les bêtes. */
-  private *foes(): IterableIterator<Foe> {
+  private foes(): readonly Foe[] {
+    return this.foeLists().foes;
+  }
+
+  /**
+   * Mutants et ennemis dans l'ordre des mobiles, relevés une fois tant
+   * qu'aucun mobile n'entre ni ne sort : flèches, tours, compagnons et
+   * cochons lisent la même liste au lieu de reparcourir tous les mobiles.
+   */
+  private foeLists(): { mutants: Mutant[]; foes: Foe[] } {
+    const cache = this.foeCache;
+
+    if (cache.revision === this.mobiles.revision) return cache;
+
+    const mutants: Mutant[] = [];
+    const foes: Foe[] = [];
+
     for (const mobile of this.mobiles.values()) {
-      if (mobile.kind === 'mutant' || mobile.kind === 'beast') yield mobile;
+      if (mobile.kind === 'mutant') mutants.push(mobile);
+      if (mobile.kind === 'mutant' || mobile.kind === 'beast') foes.push(mobile);
     }
+    this.foeCache = { revision: this.mobiles.revision, mutants, foes };
+    return this.foeCache;
   }
 
   private *beasts(): IterableIterator<Beast> {
@@ -6513,6 +6570,12 @@ export class World {
   private checkObjectives(): void {
     if (this.defeated || this.victory) return;
 
+    // Rien de ce que comptent les objectifs n'a bougé depuis le dernier coup d'œil : ils n'ont pas changé non plus. Une fois par seconde, on regarde quand même.
+    const stamp = this.objectiveInputs();
+
+    if (this.objectiveStamp && this.tickCount % TICKS_PER_SECOND !== 0 && sameStamp(this.objectiveStamp, stamp)) return;
+    this.objectiveStamp = stamp;
+
     while (this.chapter < CHAPTERS.length) {
       const index = this.chapter;
       const objectives = chapterObjectives(this);
@@ -6542,6 +6605,38 @@ export class World {
     this.victoryTick = this.tickCount;
     this.signalNights = this.stats.nightsSurvived;
     this.events.emit('victory', {});
+  }
+
+  /**
+   * Ce que lisent les conditions des objectifs (`sim/objectives.ts`) : bâtiments posés, finis, tombés ou
+   * montés d'un étage, compteurs, quêtes, ère et chapitre. Le bonheur se lit sur chaque habitant et bouge
+   * sans bruit : tant qu'un objectif ouvert le compte, il change à chaque tick.
+   */
+  private objectiveInputs(): ObjectiveStamp {
+    let produced = 0;
+
+    for (const item in this.stats.produced) produced += this.stats.produced[item as ItemId] ?? 0;
+
+    let feeling = false;
+
+    for (const objective of chapterObjectives(this)) {
+      if (this.objectivesDone.has(objective.id)) continue;
+      if (objective.goals.some((goal) => goal.type === 'happiness' || goal.type === 'mood')) feeling = true;
+    }
+
+    return [
+      this.chapter,
+      this.objectivesDone.size,
+      this.entities.revision,
+      this.levels,
+      this.stats.nightsSurvived,
+      this.chapterBase.nightsSurvived,
+      this.stats.births,
+      produced,
+      this.questsDone,
+      this.era,
+      feeling ? this.tickCount : -1,
+    ];
   }
 
   /** La récompense : le sac d'abord agrandi, puis rempli ; le surplus à la mairie. Renvoie ce surplus. */
@@ -7405,12 +7500,20 @@ export class World {
           if (distanceSq(player.x, player.y, x, y) < near * near) continue;
           if (distanceSq(x, y, this.target.x, this.target.y) < hall * hall) continue;
           if (this.isSolid(spot.tx, spot.ty)) continue;
-          if ([...this.entities.values()].some((entity) => distanceSq(x, y, (entity.tx + entity.width / 2) * TILE_SIZE, (entity.ty + entity.height / 2) * TILE_SIZE) < clearance * clearance)) continue;
+          if (this.entityWithin(x, y, clearance)) continue;
 
           this.placePig(spot.tx, spot.ty, spot);
         }
       }
     }
+  }
+
+  /** Un bâtiment ou un chantier dont le centre est à moins de `reach` pixels de (x, y) ? */
+  private entityWithin(x: number, y: number, reach: number): boolean {
+    for (const entity of this.entities.values()) {
+      if (distanceSq(x, y, (entity.tx + entity.width / 2) * TILE_SIZE, (entity.ty + entity.height / 2) * TILE_SIZE) < reach * reach) return true;
+    }
+    return false;
   }
 
   /** Une bête sauvage ou un mutant sorti de sa flaque, assez près du cochon pour l'effrayer. */
@@ -10653,8 +10756,19 @@ export class World {
    * logés, par id, qui prennent les postes ; les autres finissent leur geste
    * et sont libres. Un ex-mutant n'occupe pas de poste : il porte toujours.
    */
-  private roster(): { filled: Map<EntityId, number>; onDuty: Set<MobileId> } {
-    if (this.duty?.tick === this.tickCount) return this.duty;
+  private roster(): Duty {
+    const duty = this.duty;
+
+    if (duty?.tick === this.tickCount) return duty;
+    // Rien de ce dont dépend la répartition n'a bougé, et aucune garde (`holdTicks`) n'expire : elle se referait à l'identique.
+    if (duty?.settled && duty.posts === this.posts && duty.colonists === this.colonists && this.tickCount < duty.expiry && this.sameDemands(duty.demands)) {
+      if (duty.mobiles !== this.mobiles.revision) {
+        duty.onDuty = this.crewsOnDuty(duty.filled);
+        duty.mobiles = this.mobiles.revision;
+      }
+      duty.tick = this.tickCount;
+      return duty;
+    }
 
     const demands: StaffDemand[] = [];
 
@@ -10666,13 +10780,47 @@ export class World {
     const before = this.posts;
     const posts = allocateStaff(demands, this.colonists, before, this.tickCount);
     const filled = new Map<EntityId, number>();
+    let expiry = Infinity;
 
     for (const [id, post] of posts) {
       filled.set(id, post.filled);
       // Un poste gagné ou repris : maisons, cabanes et bâtiments logent leurs nouveaux ouvriers au prochain tick.
       if (before && post.filled !== (before.get(id)?.filled ?? 0)) this.lodging = true;
+      // La garde d'un poste qui expire peut laisser une priorité plus haute le reprendre : la répartition est à refaire.
+      if (post.since !== null && post.since + WORK_PRIORITY.holdTicks > this.tickCount) expiry = Math.min(expiry, post.since + WORK_PRIORITY.holdTicks);
     }
     this.posts = posts;
+    this.duty = {
+      tick: this.tickCount,
+      filled,
+      onDuty: this.crewsOnDuty(filled),
+      settled: before !== null,
+      posts,
+      colonists: this.colonists,
+      demands,
+      expiry,
+      mobiles: this.mobiles.revision,
+    };
+    return this.duty;
+  }
+
+  /** Les bâtiments qui emploient sont-ils ceux de `demands`, dans le même ordre, aux mêmes réglages ? */
+  private sameDemands(demands: readonly StaffDemand[]): boolean {
+    let index = 0;
+
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'site' || !employs(entity.proto)) continue;
+
+      const demand = demands[index];
+
+      if (!demand || demand.id !== entity.id || demand.wanted !== entity.staff || demand.priority !== entity.priority || demand.paused !== entity.paused) return false;
+      index += 1;
+    }
+    return index === demands.length;
+  }
+
+  /** Qui est en poste : dans chaque bâtiment, ses premiers logés par id, autant que de postes pourvus. */
+  private crewsOnDuty(filled: ReadonlyMap<EntityId, number>): Set<MobileId> {
     const crews = new Map<EntityId, MobileId[]>();
 
     for (const mobile of this.mobiles.values()) {
@@ -10690,9 +10838,7 @@ export class World {
       crew.sort((a, b) => a - b);
       for (const id of crew.slice(0, filled.get(home) ?? 0)) onDuty.add(id);
     }
-
-    this.duty = { tick: this.tickCount, filled, onDuty };
-    return this.duty;
+    return onDuty;
   }
 
   /** L'ouvrier a-t-il un poste ? Sinon, il finit son geste, puis flâne. */
@@ -11125,6 +11271,29 @@ function isLaborer(mobile: Mobile): mobile is Laborer {
  * bâtisseur, bûcheron, forestier, fermier — : il compte dans `World.colonists`. Un
  * ex-mutant ou un survivant porte en plus d'eux.
  */
+/** Les entrées des objectifs, cf. `World.objectiveInputs`. */
+type ObjectiveStamp = readonly number[];
+
+function sameStamp(a: ObjectiveStamp, b: ObjectiveStamp): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/** La répartition des ouvriers (`roster`), et ce dont elle dépendait : tant que rien n'en change, elle tient. */
+interface Duty {
+  tick: number;
+  filled: Map<EntityId, number>;
+  onDuty: Set<MobileId>;
+  /** Partie d'une répartition d'avant : refaite sans changement, elle donnerait la même. */
+  settled: boolean;
+  posts: Map<EntityId, StaffPost>;
+  colonists: number;
+  demands: StaffDemand[];
+  /** Le tick où expire la première garde (`holdTicks`) encore active. */
+  expiry: number;
+  /** La `revision` des mobiles quand les équipes ont été comptées. */
+  mobiles: number;
+}
+
 function isColonist(mobile: Mobile): mobile is Laborer {
   if (mobile.kind === 'lumberjack' || mobile.kind === 'forester' || mobile.kind === 'farmer') return true;
   return mobile.kind === 'worker' && !mobile.exMutant && !mobile.grown && !mobile.survivor;

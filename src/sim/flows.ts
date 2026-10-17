@@ -104,13 +104,20 @@ export type FlowAlert =
   | { kind: 'surplus'; item: ItemId; target: EntityId; rate: number; stock: number };
 
 export class TownFlows {
-  /** Les échantillons, du plus ancien au plus récent. */
-  private readonly ring: Sample[] = [];
-  /** Le stock du tick d'avant, par objet ; vide tant qu'il n'y a pas de ville. */
-  private last: number[] = [];
+  /**
+   * Les échantillons, en anneau : `FLOW_SAMPLES` cases allouées une fois, la
+   * plus ancienne à `head`, `size` remplies. Un nouvel échantillon recopie
+   * ses chiffres dans la plus ancienne.
+   */
+  private readonly ring: Sample[] = Array.from({ length: FLOW_SAMPLES }, () => ({ stock: ITEM_IDS.map(() => 0), in: ITEM_IDS.map(() => 0), out: ITEM_IDS.map(() => 0) }));
+  private head = 0;
+  private size = 0;
+  /** Le stock du tick d'avant, par objet ; sans valeur (`primed` faux) tant qu'il n'y a pas de ville. */
+  private readonly last: number[] = ITEM_IDS.map(() => 0);
+  private primed = false;
   /** Entrées et sorties depuis le dernier échantillon. */
-  private pendingIn = ITEM_IDS.map(() => 0);
-  private pendingOut = ITEM_IDS.map(() => 0);
+  private readonly pendingIn: number[] = ITEM_IDS.map(() => 0);
+  private readonly pendingOut: number[] = ITEM_IDS.map(() => 0);
   /** La tendance de chaque objet, décidée à chaque échantillon. */
   private readonly trends: Trend[] = ITEM_IDS.map(() => 'flat');
   private samples = 0;
@@ -120,46 +127,61 @@ export class TownFlows {
     return this.samples;
   }
 
+  /** Le `index`-ième échantillon de l'anneau, du plus ancien (0) au plus récent (`size - 1`). */
+  private sample(index: number): Sample {
+    return this.ring[(this.head + index) % FLOW_SAMPLES]!;
+  }
+
   /**
    * Appelé à chaque tick : compte ce qui est entré et sorti de la ville
    * depuis le tick d'avant, et l'échantillonne toutes les
-   * `FLOW_SAMPLE_TICKS`. Sans ville, tout se vide.
+   * `FLOW_SAMPLE_TICKS`. Sans ville, tout se vide. N'alloue rien.
    */
   public observe(tick: number, town: Store | null): void {
     if (!town) {
-      if (this.last.length > 0) this.reset();
+      if (this.primed) this.reset();
       return;
     }
 
-    const counts = ITEM_IDS.map((item) => town.count(item));
+    for (let index = 0; index < ITEM_IDS.length; index += 1) {
+      const count = town.count(ITEM_IDS[index]!);
 
-    if (this.last.length > 0) {
-      for (let index = 0; index < counts.length; index += 1) {
-        const delta = counts[index]! - this.last[index]!;
+      if (this.primed) {
+        const delta = count - this.last[index]!;
 
         if (delta > 0) this.pendingIn[index]! += delta;
         else if (delta < 0) this.pendingOut[index]! -= delta;
       }
+      this.last[index] = count;
     }
-    this.last = counts;
+    this.primed = true;
 
     if (tick % FLOW_SAMPLE_TICKS !== 0) return;
-    this.ring.push({ stock: counts, in: this.pendingIn, out: this.pendingOut });
-    if (this.ring.length > FLOW_SAMPLES) this.ring.shift();
-    this.pendingIn = ITEM_IDS.map(() => 0);
-    this.pendingOut = ITEM_IDS.map(() => 0);
+
+    // Anneau plein : la plus ancienne case devient la plus récente.
+    const slot = this.ring[(this.head + this.size) % FLOW_SAMPLES]!;
+
+    if (this.size < FLOW_SAMPLES) this.size += 1;
+    else this.head = (this.head + 1) % FLOW_SAMPLES;
+    for (let index = 0; index < ITEM_IDS.length; index += 1) {
+      slot.stock[index] = this.last[index]!;
+      slot.in[index] = this.pendingIn[index]!;
+      slot.out[index] = this.pendingOut[index]!;
+    }
+    this.pendingIn.fill(0);
+    this.pendingOut.fill(0);
     this.samples += 1;
     this.decideTrends();
   }
 
   /** Débit net de l'objet en ville, en unités par minute, sur l'anneau ; 0 tant qu'il n'a pas deux échantillons. */
   public netRate(item: ItemId): number {
-    if (this.ring.length < 2) return 0;
+    if (this.size < 2) return 0;
 
     const index = ITEM_IDS.indexOf(item);
-    const first = this.ring[0]!;
-    const last = this.ring[this.ring.length - 1]!;
-    const ticks = (this.ring.length - 1) * FLOW_SAMPLE_TICKS;
+    const first = this.sample(0);
+    const last = this.sample(this.size - 1);
+    const ticks = (this.size - 1) * FLOW_SAMPLE_TICKS;
 
     return ((last.stock[index]! - first.stock[index]!) * TICKS_PER_MINUTE) / ticks;
   }
@@ -172,18 +194,23 @@ export class TownFlows {
   /** Le relevé d'un objet, sur tout l'anneau. */
   public stats(item: ItemId): ItemFlow {
     const index = ITEM_IDS.indexOf(item);
-    const ticks = (this.ring.length - 1) * FLOW_SAMPLE_TICKS;
+    const ticks = (this.size - 1) * FLOW_SAMPLE_TICKS;
+    const history: number[] = [];
     let entered = 0;
     let left = 0;
 
-    // L'entrée du premier échantillon précède l'anneau : elle n'y compte pas.
-    for (const sample of this.ring.slice(1)) {
+    for (let at = 0; at < this.size; at += 1) {
+      const sample = this.sample(at);
+
+      history.push(sample.stock[index]!);
+      // L'entrée du premier échantillon précède l'anneau : elle n'y compte pas.
+      if (at === 0) continue;
       entered += sample.in[index]!;
       left += sample.out[index]!;
     }
 
     const perMinute = (amount: number): number => (ticks > 0 ? (amount * TICKS_PER_MINUTE) / ticks : 0);
-    const stock = this.ring.at(-1)?.stock[index] ?? 0;
+    const stock = this.size > 0 ? this.sample(this.size - 1).stock[index]! : 0;
     const net = perMinute(entered - left);
 
     return {
@@ -193,24 +220,30 @@ export class TownFlows {
       produced: perMinute(entered),
       consumed: perMinute(left),
       net,
-      history: this.ring.map((sample) => sample.stock[index]!),
+      history,
       minutesLeft: net < 0 ? stock / -net : null,
     };
   }
 
   /** Les objets que le panneau montre, dans l'ordre d'`ITEM_IDS` : ceux qu'a la ville, et ceux qui ont bougé sur l'anneau. */
   public tracked(): ItemId[] {
-    return ITEM_IDS.filter((_, index) =>
-      this.ring.some((sample) => sample.stock[index]! > 0 || sample.in[index]! > 0 || sample.out[index]! > 0),
-    );
+    return ITEM_IDS.filter((_, index) => {
+      for (let at = 0; at < this.size; at += 1) {
+        const sample = this.sample(at);
+
+        if (sample.stock[index]! > 0 || sample.in[index]! > 0 || sample.out[index]! > 0) return true;
+      }
+      return false;
+    });
   }
 
   /** Tout oublier : sans ville, ou quand le stock a sauté d'un coup (le rattrapage hors ligne). */
   public reset(): void {
-    this.ring.length = 0;
-    this.last = [];
-    this.pendingIn = ITEM_IDS.map(() => 0);
-    this.pendingOut = ITEM_IDS.map(() => 0);
+    this.head = 0;
+    this.size = 0;
+    this.primed = false;
+    this.pendingIn.fill(0);
+    this.pendingOut.fill(0);
     this.trends.fill('flat');
   }
 
@@ -221,9 +254,9 @@ export class TownFlows {
    * une seule livraison sur cinq secondes ne fait pas une flèche.
    */
   private decideTrends(): void {
-    const from = Math.max(0, this.ring.length - 1 - TREND_SPAN);
-    const first = this.ring[from]!.stock;
-    const last = this.ring[this.ring.length - 1]!.stock;
+    const from = Math.max(0, this.size - 1 - TREND_SPAN);
+    const first = this.sample(from).stock;
+    const last = this.sample(this.size - 1).stock;
 
     for (let index = 0; index < ITEM_IDS.length; index += 1) {
       const rate = last[index]! - first[index]!;
