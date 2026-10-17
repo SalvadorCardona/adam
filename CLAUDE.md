@@ -1165,6 +1165,13 @@ Les règles, en résumé :
   HUD donne FPS, ms par tick de sim et réveils du scheduler par tick
   (`World.wakesLastTick`), moyennés sur `PERF_WINDOW_MS` (`ui/perfMeter.ts`,
   mesure prise par la boucle de `main.ts`). Rien n'est envoyé.
+- **Cadence du DOM** (`ui/uiClock.ts`) : la boucle de `main.ts` ne remet le
+  HUD et les fenêtres à jour qu'à `UI_HZ` (12 Hz) ; un geste (`poke`) les fait
+  suivre chaque frame `UI_LIVE_MS`. Seul ce qui suit la caméra reste à la frame
+  (`Hud.frame` : infobulle, bulles d'Ève et d'un habitant, flèche du bandeau).
+  Aucune lecture de mise en page dans la boucle : les tailles viennent d'un
+  `ResizeObserver` et se relisent en tête de frame, avant toute écriture
+  (`Hud.measureLayout`, les insets du bas dans `main.ts`).
 
 ## Système de sprites
 

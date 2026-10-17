@@ -256,6 +256,9 @@ export class Hud {
   public readonly resourcesButton: HTMLButtonElement;
   /** Le stock de la ville, compact. */
   private readonly town: HTMLElement;
+  /** Son titre (la maison) et la liste de ses objets, gardés d'une mise à jour à l'autre. */
+  private readonly townTitle = element('div', 'hud-bag-title');
+  private readonly townList = element('div', 'hud-stock-items');
   /** Le Prestige de la colonie : son icône et son compte, en haut à gauche. */
   private readonly prestige: HTMLElement;
   /** Le niveau d'Adam et sa barre d'XP, en tête du bandeau de la ville. */
@@ -371,6 +374,28 @@ export class Hud {
   private talks = 0;
   /** Hauteur de la bulle, lue une fois par réplique : son texte ne change pas entre-temps. */
   private speechHeight = 0;
+  /**
+   * La mise en page du haut, relue seulement quand un de ses blocs change de
+   * taille (`ResizeObserver`) ou que l'écran tourne — jamais à chaque frame :
+   * le bas des rangées du haut (`topInset`), les rectangles que les repères de
+   * bord contournent, la barre et le bas de `.hud-top` où se range le bandeau.
+   */
+  private layoutDirty = true;
+  private readonly resize: ResizeObserver;
+  private topInsetPx = 0;
+  /** La largeur de l'écran, relue au redimensionnement : les bulles qui suivent la caméra s'y bornent sans la relire à chaque frame. */
+  private viewWidth = window.innerWidth;
+  /** Le contenu du bandeau de la ville a changé : son bord estompé est à relire. */
+  private townOverflowDirty = false;
+  private obstacleRects: DOMRect[] = [];
+  private barRect: DOMRect | null = null;
+  private topRowBottom = 0;
+  /** Le bandeau de célébration rangé sous la barre (une fenêtre ouverte) ; sa hauteur, donnée par le `ResizeObserver`. */
+  private docked = false;
+  private celebrationHeight = 0;
+  /** Le nombre de mutants, compté une fois par tick de simulation (`countedTick`), pas à chaque lecture. */
+  private mutants = 0;
+  private countedTick = -1;
   private lastWeather = '';
   private debug: boolean;
 
@@ -669,6 +694,23 @@ export class Hud {
       this.death,
       this.defeat,
     );
+    this.resize = new ResizeObserver((entries) => {
+      this.layoutDirty = true;
+      for (const entry of entries) {
+        // L'infobulle d'un habitant : sa hauteur, sans la relire à chaque nouveau contenu.
+        if (entry.target === this.person) this.personHeight = entry.borderBoxSize[0]?.blockSize ?? this.personHeight;
+        if (entry.target !== this.celebration) continue;
+        // La hauteur sans l'animation (qui le fait rebondir) : la fenêtre ne bouge pas avec.
+        this.celebrationHeight = entry.borderBoxSize[0]?.blockSize ?? this.celebration.offsetHeight;
+        if (this.docked) this.dockCelebration();
+      }
+    });
+    for (const node of [this.top, this.quest, this.bar, this.left, this.actions, this.celebration, this.person]) this.resize.observe(node);
+    window.addEventListener('resize', () => {
+      this.layoutDirty = true;
+      this.viewWidth = window.innerWidth;
+    });
+
     // Une infobulle ne recouvre jamais la bulle d'Ève (ni celle d'un habitant) : elle se décale.
     this.tips = new Tooltips(this.root, () => [this.speech, this.person].filter((node) => !node.hidden).map((node) => node.getBoundingClientRect()));
 
@@ -1105,9 +1147,9 @@ export class Hud {
     // Au-dessus de la tête — plus haut en selle —, sans sortir de l'écran.
     const head = eve.state === 'arriving' ? 62 : 50;
     const { x, y } = this.project(eve.x, eve.y - head);
-    const margin = Math.min(130, window.innerWidth / 2);
+    const margin = Math.min(130, this.viewWidth / 2);
 
-    this.speech.style.left = `${Math.round(Math.min(Math.max(x, margin), window.innerWidth - margin))}px`;
+    this.speech.style.left = `${Math.round(Math.min(Math.max(x, margin), this.viewWidth - margin))}px`;
     // `top` est le bas de la bulle, qui flotte 10 px au-dessus : tout entière sous la quête.
     this.speech.style.top = `${Math.round(Math.max(y, questBottom + this.speechHeight + SPEECH_GAP))}px`;
   }
@@ -1154,13 +1196,12 @@ export class Hud {
         ...NEED_IDS.map((need) => needMeter(need, mobile.needs[need])),
         ...(happiness === null ? [] : [moodMeter(happiness)]),
       );
-      this.personHeight = this.person.offsetHeight;
     }
 
     const { x, y } = this.project(mobile.x, mobile.y - (mobile.kind === 'kid' ? 30 : 40));
-    const margin = Math.min(130, window.innerWidth / 2);
+    const margin = Math.min(130, this.viewWidth / 2);
 
-    this.person.style.left = `${Math.round(Math.min(Math.max(x, margin), window.innerWidth - margin))}px`;
+    this.person.style.left = `${Math.round(Math.min(Math.max(x, margin), this.viewWidth - margin))}px`;
     this.person.style.top = `${Math.round(Math.max(y, this.topInset() + this.personHeight + SPEECH_GAP))}px`;
   }
 
@@ -1374,9 +1415,35 @@ export class Hud {
 
   /** Bas des rangées du haut — ou de la quête, ouverte dessous —, en pixels écran : les repères de bord du renderer restent dessous. */
   public topInset(): number {
-    const bar = this.topBottom();
+    return this.topInsetPx;
+  }
 
-    return this.quest.dataset['folded'] === 'false' ? Math.max(bar, this.quest.getBoundingClientRect().bottom) : bar;
+  /**
+   * Relit la mise en page du haut si un bloc a changé de taille depuis la
+   * dernière fois ; vrai si elle a été relue. `main.ts` l'appelle en début de
+   * frame, avant toute écriture dans le DOM : la lecture ne force pas de
+   * mise en page, la dernière peinte est encore bonne.
+   */
+  public measureLayout(): boolean {
+    const measured = this.layoutDirty;
+
+    if (measured) {
+      this.layoutDirty = false;
+
+      const bar = this.topBottom();
+
+      this.topInsetPx = this.quest.dataset['folded'] === 'false' ? Math.max(bar, this.quest.getBoundingClientRect().bottom) : bar;
+      this.obstacleRects = [this.bar, this.left, this.controls, this.actions].map((node) => node.getBoundingClientRect());
+      this.barRect = this.bar.getBoundingClientRect();
+      this.topRowBottom = this.top.getBoundingClientRect().bottom;
+    }
+    // Les écritures après les lectures.
+    if (this.townOverflowDirty) {
+      this.townOverflowDirty = false;
+      this.markTownOverflow();
+    }
+    if (measured && this.docked) this.dockCelebration();
+    return measured;
   }
 
   /**
@@ -1397,11 +1464,12 @@ export class Hud {
   public mountControls(node: HTMLElement): void {
     this.controls = node;
     this.top.append(node);
+    this.resize.observe(node);
   }
 
   /** La barre du haut et ses deux groupes : les repères de bord les contournent. */
   public obstacles(): DOMRect[] {
-    return [this.bar, this.left, this.controls, this.actions].map((node) => node.getBoundingClientRect());
+    return this.obstacleRects;
   }
 
   /** La ressource que le conseil envoie chercher, ou `null` : le renderer y pointe un repère. */
@@ -1801,7 +1869,22 @@ export class Hud {
     window.setTimeout(() => floater.remove(), BUILT_MS);
   }
 
-  /** `fps`, `chunks`, `atlas` et `water` viennent du renderer : le monde ne les connaît pas. */
+  /**
+   * À chaque frame, ce qui suit la caméra ou le doigt : l'infobulle, les bulles
+   * d'Ève et d'un habitant, la flèche du bandeau. L'infobulle d'abord : elle
+   * lit sa place avant que les bulles n'écrivent la leur.
+   */
+  public frame(): void {
+    this.tips.refresh();
+    this.updateSpeech();
+    this.updatePerson();
+    if (!this.banner.hidden) this.aimBanner();
+  }
+
+  /**
+   * Le reste du HUD, à la cadence de l'UI (`ui/uiClock.ts`). `fps`, `chunks`,
+   * `atlas` et `water` viennent du renderer : le monde ne les connaît pas.
+   */
   public update(fps: number, chunks: number, atlas: AtlasStats, water: WaterStats, weatherParticles = 0): void {
     this.updateQuest();
     this.updateClock();
@@ -1815,16 +1898,14 @@ export class Hud {
     this.updateHunger();
     this.updateWave();
     this.updateVignette();
-    this.updateSpeech();
-    this.updatePerson();
     this.updateWeather();
     this.events.update();
     this.updateDeath();
     this.placeCelebration();
     this.updateQueenBanner();
-    this.tips.refresh();
-    this.root.dataset['danger'] = String(this.mutantCount() > 0 && !this.world.defeated);
-    if (!this.banner.hidden) this.aimBanner();
+    const danger = String(this.mutantCount() > 0 && !this.world.defeated);
+
+    if (this.root.dataset['danger'] !== danger) this.root.dataset['danger'] = danger;
     if (this.root.dataset['alarm'] === 'true' && (performance.now() > this.alarmUntil || this.world.defeated)) {
       this.root.dataset['alarm'] = 'false';
     }
@@ -1833,11 +1914,15 @@ export class Hud {
   }
 
   private mutantCount(): number {
+    if (this.world.tickCount === this.countedTick) return this.mutants;
+
     let count = 0;
 
     for (const mobile of this.world.mobiles.values()) {
       if (mobile.kind === 'mutant') count += 1;
     }
+    this.countedTick = this.world.tickCount;
+    this.mutants = count;
     return count;
   }
 
@@ -1878,7 +1963,7 @@ export class Hud {
       this.quest.dataset['mode'] = 'build';
       this.questTitle.textContent = chapterLabel(world.chapter);
       this.renderObjectives(lines, selected);
-      this.questBody.replaceChildren(chapterHead(world.chapter, done, objectives.length), this.objectiveList, ...detail.map((row) => row.node));
+      this.questBody.replaceChildren(chapterHead(world.chapter, done, objectives.length), this.objectiveList, ...detail.map((row) => row.node()));
       this.questStrip.dataset['urgent'] = 'false';
       this.questStrip.replaceChildren(...chapterStrip(world.chapter, done, objectives.length));
       return;
@@ -1929,7 +2014,7 @@ export class Hud {
     this.renderObjectives(lines, selected);
     this.questBody.replaceChildren(
       ...(chapter
-        ? [chapterHead(world.chapter, done, objectives.length), this.objectiveList, ...detail.map((row) => row.node)]
+        ? [chapterHead(world.chapter, done, objectives.length), this.objectiveList, ...detail.map((row) => row.node())]
         : [text('hud-quest-goal', words.endless)]),
       hp,
       line,
@@ -2338,29 +2423,25 @@ export class Hud {
     if (key === this.lastTown) return;
     this.lastTown = key;
 
-    const title = element('div', 'hud-bag-title');
-
+    const title = this.townTitle;
     const label = t().hud.stock;
 
-    title.append(uiIcon('town', 20));
+    title.replaceChildren(uiIcon('town', 20));
     if (!stock) title.append(text('hud-town-state', label.toBuild));
     setTip(title, label.townTitle);
 
-    const items = element('div', 'hud-stock-items');
-
-    items.append(...entries.map(([item, amount]) => townEntry(item, amount, flows.trend(item), this.world.townHasPlenty(item))));
+    // La liste reste le même nœud : son défilement tient sans le relire.
+    this.townList.replaceChildren(...entries.map(([item, amount]) => townEntry(item, amount, flows.trend(item), this.world.townHasPlenty(item))));
     this.town.dataset['empty'] = String(entries.length === 0);
     this.resourcesButton.hidden = !stock;
-    const scroll = this.townItems()?.scrollLeft ?? 0;
-
     // Le niveau d'Adam et le Prestige ouvrent le bandeau, avant la ville et ses objets ; le bouton des ressources le ferme.
-    this.town.replaceChildren(this.level, this.prestige, title, items, this.resourcesButton);
-    items.scrollLeft = scroll;
-    this.markTownOverflow();
+    if (this.townList.parentNode !== this.town) this.town.replaceChildren(this.level, this.prestige, title, this.townList, this.resourcesButton);
+    // Le bord qui s'estompe se relit en tête de la frame suivante (`measureLayout`), sans forcer la mise en page.
+    this.townOverflowDirty = true;
   }
 
   private townItems(): HTMLElement | null {
-    return this.town.querySelector<HTMLElement>('.hud-stock-items');
+    return this.townList.isConnected ? this.townList : null;
   }
 
   /** Le bandeau de la ville cache-t-il encore des objets à droite ? */
@@ -2368,7 +2449,9 @@ export class Hud {
     const items = this.townItems();
 
     if (!items) return;
-    items.dataset['more'] = String(items.scrollLeft + items.clientWidth < items.scrollWidth - 1);
+    const more = String(items.scrollLeft + items.clientWidth < items.scrollWidth - 1);
+
+    if (items.dataset['more'] !== more) items.dataset['more'] = more;
   }
 
   /** Le Prestige : caché tant que la colonie n'en a pas, puis toujours là, en tête du bandeau de la ville. */
@@ -2463,11 +2546,20 @@ export class Hud {
    * Une fenêtre ouverte (bâtiment ou sac) : le bandeau ne se pose pas dessus.
    * Il se range sous la barre, à sa largeur, et la fenêtre se tasse sous lui
    * (`--celebration-bottom`, cf. le CSS) — jamais deux cartes l'une sur l'autre.
+   * Rien ne se relit ici : la place se refait à l'ouverture ou à la fermeture
+   * d'une fenêtre, et quand la mise en page change (`measureLayout`).
    */
   private placeCelebration(): void {
     const docked = !this.celebration.hidden && this.root.querySelector('.building-panel:not([hidden])') !== null;
 
-    if (!docked) {
+    if (docked === this.docked) return;
+    this.docked = docked;
+    this.dockCelebration();
+  }
+
+  /** Écrit la place du bandeau d'après la mise en page en cache : sous `.hud-top`, centré sur la barre. */
+  private dockCelebration(): void {
+    if (!this.docked || !this.barRect) {
       if (this.root.dataset['celebration'] !== 'docked') return;
       delete this.root.dataset['celebration'];
       this.celebration.style.removeProperty('top');
@@ -2476,19 +2568,15 @@ export class Hud {
       return;
     }
 
-    const bar = this.bar.getBoundingClientRect();
+    const bar = this.barRect;
     // Sur un téléphone, le Prestige, la ville et l'horloge font une rangée sous la barre.
-    const above = this.top.getBoundingClientRect().bottom;
-    const width = Math.min(bar.width, CELEBRATION_WIDTH);
+    const top = Math.round(this.topRowBottom + CELEBRATION_GAP);
 
     this.root.dataset['celebration'] = 'docked';
-    this.celebration.style.top = `${Math.round(above + CELEBRATION_GAP)}px`;
+    this.celebration.style.top = `${top}px`;
     this.celebration.style.left = `${Math.round(bar.left + bar.width / 2)}px`;
-    this.celebration.style.width = `${Math.round(width)}px`;
-    // Le bas sans l'animation (qui le fait rebondir) : la fenêtre ne bouge pas avec.
-    const bottom = this.celebration.offsetTop + this.celebration.offsetHeight;
-
-    this.root.style.setProperty('--celebration-bottom', `${bottom}px`);
+    this.celebration.style.width = `${Math.round(Math.min(bar.width, CELEBRATION_WIDTH))}px`;
+    this.root.style.setProperty('--celebration-bottom', `${top + Math.round(this.celebrationHeight)}px`);
   }
 
   /** Des feuilles, des pétales : la pluie de confettis, en CSS. Chacune part au bout de sa chute. */
@@ -2790,9 +2878,11 @@ function objectiveLine(world: World, id: ObjectiveId, goals: readonly Goal[]): O
 /**
  * Le détail de l'objectif choisi, sous les lignes : une jauge par objet du
  * chantier de la mairie, ou par condition — seulement s'il en a plusieurs,
- * ou qu'une attend une horloge (la naissance et son compte à rebours).
+ * ou qu'une attend une horloge (la naissance et son compte à rebours). Chaque
+ * ligne donne sa clé tout de suite et ne bâtit ses nœuds qu'à la demande :
+ * la quête compare les clés d'abord, et ne crée rien si rien n'a changé.
  */
-function objectiveDetail(world: World, id: ObjectiveId): { key: string; node: HTMLElement }[] {
+function objectiveDetail(world: World, id: ObjectiveId): { key: string; node: () => HTMLElement }[] {
   const { goals } = objectiveProto(id);
   const hall = world.entities.get(world.townHallId);
   const first = goals[0];
@@ -2801,7 +2891,7 @@ function objectiveDetail(world: World, id: ObjectiveId): { key: string; node: HT
     return (Object.entries(BUILDINGS[hall.proto].cost) as [ItemId, number][]).map(([item, needed]) => {
       const have = hall.delivered[item] ?? 0;
 
-      return { key: `${item}:${have}`, node: meter(item, have, needed) };
+      return { key: `${item}:${have}`, node: () => meter(item, have, needed) };
     });
   }
 
@@ -2811,7 +2901,7 @@ function objectiveDetail(world: World, id: ObjectiveId): { key: string; node: HT
   if (goals.length === 1 && !waits[0]) return [];
   return goals.map((goal, i) => ({
     key: `${reached[i]!.have}:${waitLabel(goal, waits[i]!)}:${waits[i]?.remainingTicks ?? ''}`,
-    node: goalMeter(goal, reached[i]!.have, reached[i]!.need, waits[i]!),
+    node: () => goalMeter(goal, reached[i]!.have, reached[i]!.need, waits[i]!),
   }));
 }
 
