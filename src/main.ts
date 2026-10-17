@@ -57,6 +57,7 @@ import { LocalRecord } from './storage/localRecord.ts';
 import { submitDailyScore } from './net/dailyBoard.ts';
 import { LocalDaily } from './storage/localDaily.ts';
 import { DAILY_SAVE_KEY, LocalSave, type LoadResult } from './storage/localSave.ts';
+import { LocalPlayed } from './storage/localPlayed.ts';
 import { TAB_KEY, TabLock } from './storage/localTab.ts';
 import { LocalLocale } from './storage/localLocale.ts';
 import { LocalGamepad, type GamepadPrefs } from './storage/localGamepad.ts';
@@ -759,8 +760,12 @@ async function main(): Promise<void> {
     attachVoice(guest.session);
     voicePanel.setPartner(true);
   }
+  // La toute première partie de l'appareil : l'écran titre y rappelle les gestes du jeu.
+  const played = sandbox ? new LocalPlayed(null) : LocalPlayed.browser();
   const title = new TitleScreen({
     resume: loaded.status === 'ok',
+    summary: loaded.status === 'ok' ? saves.peek() : null,
+    firstRun: !played.load(),
     notice: LOAD_NOTICES[loaded.status] ?? linkNotice(world),
     garden: garden.current(),
     gardenActions: garden,
@@ -780,6 +785,7 @@ async function main(): Promise<void> {
       if (loaded.status !== 'ok') achievements.newRun();
       world.push({ type: 'grantPieces', pieces: earnedSkins(achievements.collection), silent: true });
       started = true;
+      played.save();
       hud.root.dataset['started'] = 'true';
       window.umami?.track(loaded.status === 'ok' ? 'partie-reprise' : 'partie-demarree');
     },

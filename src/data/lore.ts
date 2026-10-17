@@ -26,6 +26,11 @@ export const LORE = {
     '— le premier toit de la colonie. Ève arrivera ensuite. Et avec elle, ' +
     'les mutants radioactifs qui rôdent au-delà de la clairière.',
 
+  /** Le pitch en deux phrases, sous le logo de l'écran titre ; le reste derrière son (i). */
+  tagline:
+    'Après la fin du monde, Adam bâtit le premier toit d’une colonie. ' +
+    'Ève arrivera bientôt — les mutants radioactifs aussi.',
+
   /** Époque : futur post-apocalyptique, après une catastrophe nucléaire. */
   era: 'futur post-apocalyptique, longtemps après une catastrophe nucléaire',
 

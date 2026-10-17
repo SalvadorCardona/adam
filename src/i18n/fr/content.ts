@@ -81,6 +81,7 @@ export const content = {
   lore: {
     title: LORE.title,
     pitch: LORE.pitch,
+    tagline: LORE.tagline,
     signal: LORE.signal,
   },
   items: mapTable(ITEMS, (item): string => item.label),

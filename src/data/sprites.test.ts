@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { brandBanner, brandIcon } from '../art/brand.ts';
+import { brandBanner, brandIcon, titleLogo, titleScene } from '../art/brand.ts';
 import { GROUND_TILES, cornerTile, edgeTile, shadowTile } from '../art/terrain.ts';
 import { UI_ICONS, dayDialSvg } from '../art/ui.ts';
 import { DIAL_ARCS } from '../sim/dayNight.ts';
@@ -38,6 +38,8 @@ function everySvg(): [string, string][] {
   const brand: [string, string][] = [
     ['brand.icon', brandIcon()],
     ['brand.banner', brandBanner()],
+    ...Object.entries(titleScene()).map(([layer, svg]): [string, string] => [`brand.title.${layer}`, svg]),
+    ['brand.title.logo', titleLogo()],
   ];
 
   return [...sprites, ...terrain, ...icons, ...brand];
@@ -50,7 +52,7 @@ describe('sprites', () => {
 
   it('réserve le vert fluo aux mutants', () => {
     // Seuls ont le droit de le porter : le mutant, ses gardiens, cracheurs et chefs, leur crachat, la Reine des flaques, le patient (un mutant assommé), la flaque
-    // d'où il sort, leurs bases, son pictogramme, la bannière, où il en passe un, la gelée et le cœur de la Reine qu'ils lâchent en
+    // d'où il sort, leurs bases, son pictogramme, la bannière et la ville de l'écran titre, où il en passe un, la gelée et le cœur de la Reine qu'ils lâchent en
     // butin (des bouts d'eux : leur icône, le tas au sol, la charge d'un porteur) — et l'ex-mutant, pour un seul
     // détail (test suivant).
     const mutants = (name: string): boolean =>
@@ -67,7 +69,8 @@ describe('sprites', () => {
       name === 'ui.mutant' ||
       name.endsWith('.mutantGoo') ||
       name.endsWith('.radCore') ||
-      name === 'brand.banner';
+      name === 'brand.banner' ||
+      name === 'brand.title.town';
 
     for (const [name, svg] of everySvg()) {
       if (mutants(name)) continue;

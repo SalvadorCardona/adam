@@ -19,6 +19,7 @@ import { BOONS, type BoonId } from '../data/boons.ts';
 import { CHALLENGES, type ChallengeId } from '../data/challenges.ts';
 import { DAILY_MODS, type DailyGame, type DailyModId } from '../data/dailyMods.ts';
 import { isDailyDate } from './daily.ts';
+import { clockAt, dayDial } from './dayNight.ts';
 import type { DailyChallenge } from './challenges.ts';
 import { CHUNK_TILES } from '../core/grid.ts';
 import { BUILDINGS, MENU_BUILDING_IDS, START_BUILDINGS, maxLevel, type BuildingId } from '../data/buildings.ts';
@@ -269,6 +270,51 @@ export type DecodedSave =
   | { ok: true; world: World; savedAt: number }
   /** `version` : sauvegarde d'un autre format ; `corrupt` : illisible ou incohérente. */
   | { ok: false; reason: 'version' | 'corrupt' };
+
+/**
+ * Ce que l'écran titre dit d'une partie sauvegardée — « Jour 5 · 9 colons ·
+ * Chapitre 2 · il y a 3 h » —, lu dans le fichier sans reconstruire le monde.
+ */
+export interface SaveSummary {
+  savedAt: number;
+  /** Le numéro du jour de l'horloge du HUD ; 1 tant que la mairie est en chantier. */
+  day: number;
+  /** Les ouvriers adultes de la colonie (`colonists`) ; `null` pour une sauvegarde d'avant eux. */
+  colonists: number | null;
+  /** L'index du chapitre en cours, `CHAPTERS.length` après le Signal. */
+  chapter: number;
+}
+
+/**
+ * Le résumé d'une sauvegarde, ou `null` si le texte ne se lit pas. Quelques
+ * champs de l'état, sans migration ni `World.restore` : l'écran titre l'affiche
+ * avant même que la partie ne soit chargée. Ne lève jamais.
+ */
+export function peekSave(text: string): SaveSummary | null {
+  let file: unknown;
+
+  try {
+    file = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!isRecord(file) || !isRecord(file['state'])) return null;
+  const state = file['state'];
+  const count = (value: unknown): number | null => (typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null);
+  const integer = (value: unknown): number => (typeof value === 'number' && Number.isInteger(value) ? value : 0);
+  const tick = integer(state['tick']);
+  const start = integer(state['cycleStartTick']);
+  const early = isRecord(state['earlyDawn']) && count(state['earlyDawn']['cycle']) !== null && count(state['earlyDawn']['offset']) !== null
+    ? { cycle: state['earlyDawn']['cycle'] as number, offset: state['earlyDawn']['offset'] as number }
+    : null;
+
+  return {
+    savedAt: typeof file['savedAt'] === 'number' && Number.isFinite(file['savedAt']) ? file['savedAt'] : 0,
+    day: start === 0 || tick < start ? 1 : dayDial(clockAt(tick - start, early)).day,
+    colonists: count(state['colonists']),
+    chapter: Math.min(count(state['chapter']) ?? 0, CHAPTERS.length),
+  };
+}
 
 export function serialize(world: World): WorldState {
   return world.snapshot();

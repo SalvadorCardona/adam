@@ -4,12 +4,16 @@
  * L'écran titre n'est pas décoratif. Sur mobile, le son ne peut démarrer
  * qu'après un geste : le bouton « Jouer » est ce geste, et la partie ne
  * commence qu'à ce moment-là — le joueur n'arrive pas au milieu d'une
- * simulation déjà lancée. Derrière le voile, la carte est déjà dessinée : on
- * voit le monde dans lequel on va entrer.
+ * simulation déjà lancée. C'est une scène, pas une page : le key art en
+ * trois plans qui respirent (`titleScene` d'`art/brand.ts`), le logo dessiné
+ * (`titleLogo`), l'histoire en deux phrases — le (i) la déplie.
  *
  * Quand une partie est sauvegardée, l'écran titre propose « Continuer » (le
- * choix par défaut) et « Nouvelle partie ». Recommencer efface la colonie :
- * les deux écrans le font confirmer avant.
+ * choix par défaut), une carte qui dit où en est la partie — « Jour 5 ·
+ * 9 colons · Chapitre 2 · il y a 3 h », lu par `peekSave` sans charger le
+ * monde —, et « Nouvelle partie ». Recommencer efface la colonie : les deux
+ * écrans le font confirmer avant. Les trois gestes du jeu ne s'affichent
+ * qu'avant la toute première partie (`LocalPlayed`).
  *
  * L'écran titre ouvre aussi le jardin des souvenirs (`garden.ts`), où l'on
  * plante les graines des colonies tombées, et rappelle le record : les nuits
@@ -22,10 +26,13 @@
  * `main.ts` de jouer, d'arrêter l'horloge ou de recommencer, et c'est tout.
  */
 
+import { titleLogo, titleScene } from '../art/brand.ts';
 import type { DailyModId } from '../data/dailyMods.ts';
+import { CHAPTERS } from '../data/objectives.ts';
 import { onLocale, t } from '../i18n/locale.ts';
 import { progressOf, type Collection } from '../sim/collection.ts';
 import type { Garden } from '../sim/garden.ts';
+import type { SaveSummary } from '../sim/save.ts';
 import { CollectionPanel } from './collectionPanel.ts';
 import { GardenPanel, type GardenActions } from './garden.ts';
 import { buildingIcon, itemIcon, uiIcon } from './icons.ts';
@@ -34,6 +41,10 @@ import { seedLine } from './seed.ts';
 export interface TitleOptions {
   /** Une partie sauvegardée attend : « Continuer » et « Nouvelle partie » remplacent « Jouer ». */
   resume: boolean;
+  /** Ce que la carte « Continuer » dit de cette partie — jour, colons, chapitre, depuis quand ; `null` s'il ne se lit pas. */
+  summary: SaveSummary | null;
+  /** Aucune partie n'a encore été lancée sur l'appareil : l'écran rappelle les trois gestes du jeu. */
+  firstRun: boolean;
   /** Une ligne discrète sous les boutons — une vieille sauvegarde ignorée, par exemple ; relue à chaque langue. */
   notice?: () => string;
   onPlay: () => void;
@@ -61,9 +72,10 @@ export class TitleScreen {
   public readonly root: HTMLElement;
   private readonly unsubscribe: () => void;
 
-  public constructor({ resume, notice, onPlay, onRestart, garden, gardenActions, record, daily, collection, onSettings, accountButton }: TitleOptions) {
+  public constructor({ resume, summary, firstRun, notice, onPlay, onRestart, garden, gardenActions, record, daily, collection, onSettings, accountButton }: TitleOptions) {
     this.root = document.createElement('div');
     this.root.className = 'overlay title-screen';
+    this.root.append(keyArt());
 
     // Les libellés fixes, réécrits à chaque langue ; `relabel` les rassemble.
     const labels: (() => void)[] = [];
@@ -81,28 +93,49 @@ export class TitleScreen {
 
     panel.className = 'title-panel';
 
-    const kicker = document.createElement('div');
-
-    kicker.className = 'title-kicker';
-
+    // Le logo dessiné, pas une police : le titre de la page reste lisible par son `alt`.
     const title = document.createElement('h1');
+    const logo = document.createElement('img');
 
     title.className = 'title-logo';
+    logo.src = svgUrl(titleLogo());
+    logo.draggable = false;
+    title.append(logo);
 
+    // L'histoire en deux phrases ; le (i) la déplie en entier, et la replie.
+    const story = document.createElement('div');
     const pitch = document.createElement('p');
+    const more = document.createElement('button');
+    let unfolded = false;
+    const tellStory = (): void => {
+      const text = t();
 
+      pitch.textContent = unfolded ? text.lore.pitch : text.lore.tagline;
+      more.setAttribute('aria-label', unfolded ? text.screens.title.storyLess : text.screens.title.story);
+      more.setAttribute('aria-expanded', String(unfolded));
+    };
+
+    story.className = 'title-story';
     pitch.className = 'title-pitch';
+    more.type = 'button';
+    more.className = 'title-more';
+    more.append(uiIcon('info', 20));
+    more.addEventListener('click', () => {
+      unfolded = !unfolded;
+      tellStory();
+    });
+    story.append(pitch, more);
     labels.push(() => {
-      kicker.textContent = t().screens.title.kicker;
-      title.textContent = t().lore.title;
-      pitch.textContent = t().lore.pitch;
+      logo.alt = t().lore.title;
+      tellStory();
     });
 
+    // « Jouer », ou la carte de sauvegarde : « Continuer » et où en est la partie, sa vignette devant.
     const play = document.createElement('button');
 
     play.type = 'button';
-    play.className = 'button-primary title-play';
-    labels.push(() => play.replaceChildren(uiIcon('play', 26), resume ? t().screens.title.resume : t().screens.title.play));
+    play.className = resume ? 'button-primary title-play title-save' : 'button-primary title-play';
+    labels.push(() => play.replaceChildren(...(resume ? saveCard(summary) : [uiIcon('play', 26), t().screens.title.play])));
     play.addEventListener('click', () => {
       this.root.dataset['leaving'] = 'true';
       window.setTimeout(() => this.root.remove(), 380);
@@ -131,7 +164,11 @@ export class TitleScreen {
       controls.append(item);
     }
 
-    panel.append(kicker, title, pitch, play);
+    // Les boutons secondaires, deux par rangée : tout tient sans défiler sur un téléphone.
+    const extras = document.createElement('div');
+
+    extras.className = 'title-extras';
+    panel.append(title, story, play);
 
     if (resume) {
       const confirm = confirmRestart(onRestart, () => {
@@ -185,7 +222,7 @@ export class TitleScreen {
       gardenPanel.root.scrollTop = 0;
       gardenPanel.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus({ preventScroll: true });
     });
-    panel.append(gardenButton);
+    extras.append(gardenButton);
     this.root.append(gardenPanel.root);
 
     const collectionButton = document.createElement('button');
@@ -212,10 +249,10 @@ export class TitleScreen {
       collectionPanel.root.scrollTop = 0;
       collectionPanel.root.querySelector<HTMLButtonElement>('.button-secondary')?.focus({ preventScroll: true });
     });
-    panel.append(collectionButton);
+    extras.append(collectionButton);
     this.root.append(collectionPanel.root);
 
-    panel.append(accountButton);
+    extras.append(accountButton);
 
     const dailyButton = document.createElement('button');
 
@@ -223,7 +260,8 @@ export class TitleScreen {
     dailyButton.className = 'button-secondary title-garden';
     labels.push(() => dailyButton.replaceChildren(uiIcon('play', 22), daily.playing ? t().screens.daily.back : t().screens.daily.button));
     dailyButton.addEventListener('click', daily.open);
-    panel.append(dailyButton);
+    extras.append(dailyButton);
+    panel.append(extras);
 
     if (daily.playing) {
       const line = document.createElement('p');
@@ -268,8 +306,9 @@ export class TitleScreen {
       panel.append(line);
     }
 
-    panel.append(controls);
-    this.root.prepend(panel);
+    // Les trois gestes du jeu, avant la toute première partie seulement.
+    if (firstRun && !resume) panel.append(controls);
+    this.root.append(panel);
     this.root.append(settings);
     this.unsubscribe = onLocale(() => {
       for (const label of labels) label();
@@ -278,6 +317,70 @@ export class TitleScreen {
     // « Continuer » est le choix par défaut : Entrée ou Espace le prennent.
     window.setTimeout(() => play.focus(), 0);
   }
+}
+
+/** Un SVG en `data:` URL, pour un `<img>`. */
+function svgUrl(source: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+}
+
+/**
+ * Le key art derrière l'écran titre : le ciel, la ville, la colline (`titleScene`),
+ * trois plans empilés qui respirent chacun à son amplitude — le CSS les anime,
+ * et s'en abstient sous `prefers-reduced-motion`. Pur décor.
+ */
+function keyArt(): HTMLElement {
+  const art = document.createElement('div');
+  const scene = titleScene();
+
+  art.className = 'title-art';
+  art.setAttribute('aria-hidden', 'true');
+  for (const layer of ['sky', 'town', 'hill'] as const) {
+    const image = document.createElement('img');
+
+    image.className = 'title-layer';
+    image.dataset['layer'] = layer;
+    image.src = svgUrl(scene[layer]);
+    image.alt = '';
+    image.draggable = false;
+    art.append(image);
+  }
+  return art;
+}
+
+/**
+ * Le contenu de la carte « Continuer » : la vignette du chapitre en cours, le
+ * mot, puis « Jour 5 · 9 colons · Chapitre 2 · il y a 3 h ». Sans résumé
+ * lisible, la carte dit seulement « Continuer ».
+ */
+function saveCard(summary: SaveSummary | null): HTMLElement[] {
+  const text = t().screens.title;
+  const label = document.createElement('span');
+
+  label.className = 'title-save-label';
+  label.textContent = text.resume;
+  if (!summary) return [uiIcon('play', 26), label];
+
+  const chapter = CHAPTERS[summary.chapter];
+  const thumb = buildingIcon(chapter?.icon ?? 'antenna', 44);
+  const body = document.createElement('span');
+  const line = document.createElement('span');
+  const minutes = Math.max(0, Math.floor((Date.now() - summary.savedAt) / 60_000));
+  const parts = [
+    text.save.day(summary.day),
+    ...(summary.colonists === null ? [] : [text.save.colonists(summary.colonists)]),
+    chapter ? text.save.chapter(summary.chapter + 1) : text.save.afterSignal,
+    ...(summary.savedAt > 0 ? [text.save.ago(minutes)] : []),
+  ];
+
+  thumb.alt = '';
+  thumb.setAttribute('aria-hidden', 'true');
+  thumb.classList.add('title-save-thumb');
+  body.className = 'title-save-body';
+  line.className = 'title-save-line';
+  line.textContent = parts.join(' · ');
+  body.append(label, line);
+  return [thumb, body];
 }
 
 export class PauseScreen {

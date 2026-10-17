@@ -4,9 +4,18 @@ import type { Messages } from '../messages.ts';
 
 export const screens: Messages['screens'] = {
   title: {
-    kicker: 'After the end of the world',
     play: 'Play',
     resume: 'Continue',
+    story: 'The whole story',
+    storyLess: 'Less story',
+    save: {
+      day: (day: number): string => `Day ${day}`,
+      colonists: (count: number): string => `${count} colonist${count > 1 ? 's' : ''}`,
+      chapter: (chapter: number): string => `Chapter ${chapter}`,
+      afterSignal: 'After the Signal',
+      ago: (minutes: number): string =>
+        minutes < 1 ? 'just now' : minutes < 60 ? `${minutes} min ago` : minutes < 60 * 24 ? `${Math.floor(minutes / 60)} h ago` : `${Math.floor(minutes / (60 * 24))} d ago`,
+    },
     newGame: 'New game',
     garden: (seeds) => `Garden · ${seeds}`,
     gardenLabel: 'Garden of memories',
