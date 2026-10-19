@@ -54,6 +54,7 @@
  * - les statistiques de debug, seulement avec `?debug` (ou la touche `²`/`` ` ``).
  */
 
+import { t } from '../i18n/locale.ts';
 import type { ObjectiveId } from '../data/objectives.ts';
 import type { ItemId } from '../data/items.ts';
 import type { ResearchId } from '../data/research.ts';
