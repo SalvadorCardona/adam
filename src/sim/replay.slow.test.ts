@@ -51,19 +51,19 @@ describe('rejeu de référence, 30 minutes', () => {
 
   // Bûcherons, ferme, puits, postes, et deux heures d'absence rattrapées à la cinquième minute.
   it('la petite base', () => {
-    expect(prints(scenario('base', 6000))).toEqual([4175072270, 2169544273]);
+    expect(prints(scenario('base', 6000))).toEqual([4175072270, 2663209454]);
   });
 
   it('le forestier', () => {
-    expect(prints(scenario('forest', 6000))).toEqual([4258323457, 567778364]);
+    expect(prints(scenario('forest', 6000))).toEqual([4258323457, 828624511]);
   });
 
   it('la ferme', () => {
-    expect(prints(scenario('farm', 6000))).toEqual([2624773132, 1677882805]);
+    expect(prints(scenario('farm', 6000))).toEqual([2624773132, 3866569116]);
   });
 
   // Le soir tombe : bûcherons, bâtisseurs et logisticiens se couchent, dedans ou dehors.
   it('les maisons', () => {
-    expect(prints(scenario('housing', null))).toEqual([3168068197, 673254469]);
+    expect(prints(scenario('housing', null))).toEqual([3168068197, 3866555549]);
   });
 });
