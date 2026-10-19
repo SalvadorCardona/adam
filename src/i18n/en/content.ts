@@ -565,6 +565,11 @@ export const content: Content = {
       hint: 'Four beds under one roof: the workers will sleep somewhere warm.',
       celebration: 'Four workers sleep somewhere warm: +6 wood.',
     },
+    firstTower: {
+      title: 'Build a watchtower',
+      hint: 'From the fourth night on, they come for real: a watchtower near the town hall. “Lookout” at the lab.',
+      celebration: 'A tower watches over the town hall: +6 wood.',
+    },
     nights3: {
       title: 'Survive 3 nights',
       hint: 'At night, stay near the town hall: your bow shoots by itself. I’ll show up after the third!',
@@ -764,6 +769,7 @@ export const content: Content = {
     ],
     caravan: 'A caravan! Go see what he’s offering.',
     queen: 'Tomorrow night, the Queen comes out. Towers, Adam!',
+    graceEnding: 'Tonight, they come for real. Towers, Adam!',
     busy: 'Not now, Adam, they’re coming!',
     allDone: 'No more blueprints for now. I’m sketching what’s next!',
   },

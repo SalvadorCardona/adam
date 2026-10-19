@@ -222,6 +222,10 @@ export class Reactions {
       if (world.eve()) eve.say([t().eve.queen]);
       else notify(t().hud.toast.eveRadio(t().eve.queen), 'bad');
     }));
+    on(world.events.on('graceEnding', () => {
+      if (world.eve()) eve.say([t().eve.graceEnding]);
+      else notify(t().hud.toast.eveRadio(t().eve.graceEnding), 'bad');
+    }));
     on(world.events.on('queenSlain', ({ night }) =>
       banner.show('cleared', t().hud.wave.queenSlain, t().hud.wave.queenSlainText(night), null, BANNER_CLEARED_MS),
     ));

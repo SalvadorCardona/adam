@@ -221,6 +221,7 @@ export function wireAudio(life: Disposer, world: World, audio: AudioEngine, sett
     audio.play('dawn');
   });
   life.on(world.events, 'queenAnnounced', () => audio.play('horn'));
+  life.on(world.events, 'graceEnding', () => audio.play('horn'));
   life.on(world.events, 'queenLaid', () => audio.play('gloop'));
   life.on(world.events, 'queenDived', () => audio.play('gloop'));
   life.on(world.events, 'queenSlain', () => audio.play('objective'));
