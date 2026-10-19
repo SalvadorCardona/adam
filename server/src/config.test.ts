@@ -10,6 +10,7 @@ describe('loadConfig', () => {
     expect(config.databasePath).toBe('data/adam.sqlite');
     expect(originAllowed(config, 'http://localhost:5174')).toBe(true);
     expect(originAllowed(config, 'http://localhost.evil.example:5173')).toBe(false);
+    expect(originAllowed(config, 'https://hermez.dev')).toBe(true);
     expect(originAllowed(config, 'https://adam.cardona.digital')).toBe(true);
     expect(originAllowed(config, 'https://mobile-factory.cardona.digital')).toBe(true);
   });
