@@ -38,7 +38,7 @@ Projet **adam**, service **Application** `adam-server` :
 - **Variables d'environnement** (onglet Environment, jamais commitées) :
 
   ```
-  CORS_ORIGINS=https://cardona.digital,https://adam.cardona.digital
+  CORS_ORIGINS=https://hermez.dev,https://cardona.digital,https://adam.cardona.digital
   INVITE_TTL_MINUTES=60
   ```
 
@@ -48,6 +48,11 @@ Projet **adam**, service **Application** `adam-server` :
 
 Si le jeu est ouvert depuis une autre origine (domaine perso, `localhost`),
 l'ajouter à `CORS_ORIGINS`, séparées par des virgules.
+
+Le jeu est servi sous `https://hermez.dev/adam/` (cardona.digital y renvoie en
+301) : `https://hermez.dev` doit être dans la liste, sans quoi la sonde
+`/health` est bloquée par CORS et le jeu se croit hors ligne. Les anciennes
+origines restent le temps de la transition.
 
 ## 3. Sauvegarde
 

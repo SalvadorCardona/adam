@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Jeu de construction et de survie 2D pour mobile, TypeScript et PixiJS v8.",
   "type": "module",
-  "homepage": "https://cardona.digital/adam/",
+  "homepage": "https://hermez.dev/adam/",
   "author": {
     "name": "Salvador Cardona",
     "url": "https://cardona.digital"

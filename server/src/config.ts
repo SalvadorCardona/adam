@@ -33,12 +33,13 @@ export const DEFAULT_PORT = 8790;
 /**
  * Les origines par défaut : le serveur de Vite, en local, quel que soit son
  * port (5173 pris, il passe au suivant), et les adresses publiques du jeu —
- * les nouvelles, et l'ancienne, qu'un client encore en cache peut appeler
+ * hermez.dev, puis les anciennes, qu'un client encore en cache peut appeler
  * pendant la transition.
  */
 const DEFAULT_ORIGINS = [
   'http://localhost:*',
   'http://127.0.0.1:*',
+  'https://hermez.dev',
   'https://cardona.digital',
   'https://adam.cardona.digital',
   'https://mobile-factory.cardona.digital',
