@@ -53,8 +53,8 @@ describe('courbe des nuits', () => {
 
     expect(world.defeated).toBe(false);
     expect(world.night).toBe(10);
-    // Le gros mutant de la nuit 6 (et non plus 5) frappe une mairie moins réparée : un tiers, à quelques points près.
-    expect(lowest).toBeGreaterThan(BUILDINGS.townHall.hp * 0.3);
+    // La courbe lissée garde les assaillants des nuits 6 à 9 jusqu'à la Reine : la mairie descend plus bas à la nuit 10 (26 PV sur 120 à la graine 42), sans tomber.
+    expect(lowest).toBeGreaterThan(BUILDINGS.townHall.hp * 0.15);
   }, 60_000);
 });
 

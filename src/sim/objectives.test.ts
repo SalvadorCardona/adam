@@ -404,7 +404,7 @@ describe('objectifs en chapitres', () => {
     expect(lock('quarry')).toEqual({ building: 'quarry', research: 'mining' });
     expect(lock('well')).toEqual({ building: 'well', research: 'waterWell' });
     expect(lock('home')).toBeNull();
-    expect(lockedObjectiveBuildings(world).map(({ building }) => building)).toEqual(['lumberCamp', 'quarry', 'well']);
+    expect(lockedObjectiveBuildings(world).map(({ building }) => building)).toEqual(['lumberCamp', 'quarry', 'well', 'watchtower']);
     // Pas de labo, pas de chantier : rien à montrer du doigt ; son chantier, une fois posé, si.
     expect(labSpot(world)).toBeNull();
 
@@ -421,7 +421,7 @@ describe('objectifs en chapitres', () => {
     // La recherche finie, la cabane entre au menu : plus de cadenas.
     world.researchDone.push('woodcraft');
     expect(lock('lumberCamp')).toBeNull();
-    expect(lockedObjectiveBuildings(world).map(({ building }) => building)).toEqual(['quarry', 'well']);
+    expect(lockedObjectiveBuildings(world).map(({ building }) => building)).toEqual(['quarry', 'well', 'watchtower']);
   });
 
   it('gardent un objectif réussi, même si son bâtiment tombe', () => {

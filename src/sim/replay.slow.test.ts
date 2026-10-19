@@ -46,24 +46,24 @@ describe('rejeu de référence, 30 minutes', () => {
     const bot = new PlaytestBot(World.newColony(1), { seed: 1, now: () => 0 });
 
     bot.run(TICKS);
-    expect(prints(bot.world)).toEqual([3663157910, 1735284714]);
+    expect(prints(bot.world)).toEqual([474746077, 1552751185]);
   });
 
   // Bûcherons, ferme, puits, postes, et deux heures d'absence rattrapées à la cinquième minute.
   it('la petite base', () => {
-    expect(prints(scenario('base', 6000))).toEqual([578755868, 2904668959]);
+    expect(prints(scenario('base', 6000))).toEqual([4175072270, 2169544273]);
   });
 
   it('le forestier', () => {
-    expect(prints(scenario('forest', 6000))).toEqual([2723680799, 1564915585]);
+    expect(prints(scenario('forest', 6000))).toEqual([4258323457, 567778364]);
   });
 
   it('la ferme', () => {
-    expect(prints(scenario('farm', 6000))).toEqual([3644282354, 3037140848]);
+    expect(prints(scenario('farm', 6000))).toEqual([2624773132, 1677882805]);
   });
 
   // Le soir tombe : bûcherons, bâtisseurs et logisticiens se couchent, dedans ou dehors.
   it('les maisons', () => {
-    expect(prints(scenario('housing', null))).toEqual([2164273792, 248948658]);
+    expect(prints(scenario('housing', null))).toEqual([3168068197, 673254469]);
   });
 });
