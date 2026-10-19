@@ -302,6 +302,7 @@ bulle corail flotte au-dessus d'un affamé (`art/hungry.ts`, l'épi) ou d'un
 assoiffé (`art/thirsty.ts`, la goutte), et une capsule corail sous la
 population (`World.needAlert`, la plus pressante des deux) dit quand la
 ville va manquer ; son tap montre qui a faim ou soif.
+**Deuil** (`data/graves.ts`, `sim/graves.ts`, `render/graveLayer.ts`, sprite `grave`) — un habitant mort de faim ou de soif laisse une **tombe** fleurie sur sa case (la plus proche libre s'il y en a déjà une) : stèle violette, ruban de la couleur de son trait (`art/grave.ts`), état léger `Grave` (case, nom, sexe, trait, cause, jour) sous `graves`, plafonné à `GRAVES.max` (50) — les plus anciennes deviennent des fleurs seules (`blooms`, `GRAVES.maxBlooms`). Un tap (`Inspect`, `graveAt`) dit « Ici repose Lina — travailleuse, morte de soif au jour 4 » (`t().panel.grave`). Des morts à moins de `GRAVES.groupSeconds` font un seul toast, « 8 colons sont morts de soif », « Voir » centre la caméra (`ui/deathGroup.ts`). Son : la musique baisse 2 s puis une note grave (`AudioEngine.mourn`, son `toll`, synthèse). Les proches — même bâtiment — portent le deuil à l'aube (`MOOD.grief`, `World.grieving`, sauvegardé sous `grieving`).
 L'**eau** (`water`, goutte cyan — le bloc cyan clouté, c'est le minerai de
 fer) se tire au **puits** (`well`, un ouvrier) : une carrière sur sa
 propre recette (`drawWater`, trouvée par `recipeOf`), posée au **bord**

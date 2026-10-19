@@ -50,6 +50,8 @@ export const MOOD = {
   thirsty: -10,
   /** Un ennemi s'est approché pendant la nuit (le poids de sa peur est celui de son trait). */
   scared: -8,
+  /** Un proche — de son bâtiment — est mort la veille ou dans la journée. */
+  grief: -6,
 } as const satisfies Record<string, number>;
 
 export type MoodCause = keyof typeof MOOD;

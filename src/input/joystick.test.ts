@@ -163,7 +163,7 @@ describe('pouce posé à côté de l’anneau', () => {
     const opened: number[] = [];
     // Une maison des constructeurs sous le doigt, en (128, 544) – écran = monde.
     const building = { id: 7, proto: 'builderHouse', tx: 4, ty: 17, width: 2, height: 2 } as unknown as Entity;
-    const world = { entities: new Map([[7, building]]), mobiles: new Map(), eve: () => undefined, knownEnemyBases: () => [], sees: () => true } as unknown as World;
+    const world = { entities: new Map([[7, building]]), mobiles: new Map(), eve: () => undefined, knownEnemyBases: () => [], graves: () => [], sees: () => true } as unknown as World;
     const pointers = new PointerDispatch();
 
     pointers.add(new Inspect(world, (x, y) => ({ x, y }), () => true, (selection) => opened.push(selection.id)));

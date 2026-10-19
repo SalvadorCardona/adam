@@ -17,6 +17,7 @@ import { WEATHER } from '../../data/weather.ts';
 import { reducedMotion } from '../../render/motion.ts';
 import { TICKS_PER_SECOND, type World } from '../../sim/world.ts';
 import { t } from '../../i18n/locale.ts';
+import { DeathGroup } from '../deathGroup.ts';
 import { Disposer } from '../disposer.ts';
 import { HarvestCombo } from '../harvestCombo.ts';
 import { carriesWanted, harvestRefusedText } from '../hint.ts';
@@ -40,6 +41,8 @@ import type { WaveWatch } from './wave.ts';
 /** Les composants qu'un événement peut toucher. */
 export interface ReactionParts {
   toasts: Toasts;
+  /** Centre la caméra, pour le « Voir » du toast de deuil. */
+  focus: (x: number, y: number) => void;
   floats: Floats;
   advice: Advice;
   quest: Quest;
@@ -63,6 +66,10 @@ export class Reactions {
   public constructor(world: World, parts: ReactionParts) {
     const { toasts, floats, advice, quest, banner, wave, people, eve, celebration, town, death, defeat, victory } = parts;
     const notify = toasts.notify.bind(toasts);
+    // Les morts de faim ou de soif rapprochées, leur toast encore affiché et l'endroit que « Voir » centre.
+    const deaths = new DeathGroup();
+    let deathToast: { update: (message: string) => boolean } | null = null;
+    let deathSpot = { x: 0, y: 0 };
     const float = floats.float.bind(floats);
     const learned = advice.learned;
     const on = this.disposer.add.bind(this.disposer);
@@ -276,7 +283,15 @@ export class Reactions {
     on(world.events.on('mutantHealed', () => notify(t().hud.toast.mutantHealed, 'good')));
     on(world.events.on('kidGrewUp', ({ name }) => notify(t().hud.toast.kidGrewUp(name), 'good')));
     on(world.events.on('starving', ({ name, need, seconds }) => notify(t().hud.toast.starving[need](name, seconds), 'bad')));
-    on(world.events.on('workerStarved', ({ name, need }) => notify(t().hud.toast.workerStarved[need](name), 'bad')));
+    on(world.events.on('workerStarved', ({ name, need, x, y }) => {
+      // Plusieurs morts en moins de `GRAVES.groupSeconds` : le même toast réécrit en « N colons sont morts de soif ».
+      const reading = deaths.add(performance.now(), need, x, y);
+      const message = reading.count === 1 ? t().hud.toast.workerStarved[need](name) : t().hud.toast.workersStarved(reading.count, reading.need);
+
+      deathSpot = { x: reading.x, y: reading.y };
+      if (reading.count > 1 && deathToast?.update(message)) return;
+      deathToast = notify(message, 'bad', { label: t().hud.toast.see, run: () => parts.focus(deathSpot.x, deathSpot.y) });
+    }));
     on(world.events.on('growthStunted', ({ name, need }) => notify(t().hud.toast.growthStunted[need](name), 'bad')));
     on(world.events.on('townHallDestroyed', () => defeat.show()));
     on(world.events.on('playerKnockedOut', () => death.show()));

@@ -24,6 +24,8 @@
  * celle d'un ennemi, son cadre plus une marge : il bouge, le doigt suit
  * mal. Un mutant encore dans sa flaque ne se tape pas : on ne le voit pas.
  *
+ * Une tombe aussi : un doigt sur sa stèle dit qui repose là (`onGrave`).
+ *
  * Une base mutante aussi : un doigt sur son campement ouvre sa fenêtre
  * d'info (`onBase`), comme un bâtiment.
  *
@@ -41,6 +43,7 @@ import { ENEMY_BASE } from '../data/enemyBases.ts';
 import { ENEMIES, WILDLIFE } from '../data/enemies.ts';
 import { SPRITES } from '../data/sprites.ts';
 import { isStanding } from '../sim/enemyBases.ts';
+import type { Grave } from '../sim/graves.ts';
 import type { EnemyBase, Entity, EntityId, Eve, Mobile, MobileId } from '../sim/types.ts';
 import type { World } from '../sim/world.ts';
 import type { Selection } from '../ui/creatureView.ts';
@@ -59,7 +62,7 @@ const PERSON_BELOW = 4;
 const FOE_TAP_MARGIN = 6;
 
 /** Ce que le doigt vise : un bâtiment ou une créature, une base mutante, Ève, ou le vide (pour fermer la fenêtre ouverte). */
-type Target = Selection | { kind: 'enemyBase'; id: number } | { kind: 'eve' } | { kind: 'nothing' };
+type Target = Selection | { kind: 'enemyBase'; id: number } | { kind: 'grave'; id: number } | { kind: 'eve' } | { kind: 'nothing' };
 
 export class Inspect implements PointerConsumer {
   private pointerId: number | null = null;
@@ -76,6 +79,7 @@ export class Inspect implements PointerConsumer {
   private readonly canDismiss: () => boolean;
   private readonly onDismiss: () => void;
   private readonly onBase: (id: number) => void;
+  private readonly onGrave: (id: number) => void;
 
   public constructor(
     world: World,
@@ -86,6 +90,7 @@ export class Inspect implements PointerConsumer {
     canDismiss: () => boolean = () => false,
     onDismiss: () => void = () => {},
     onBase: (id: number) => void = () => {},
+    onGrave: (id: number) => void = () => {},
   ) {
     this.world = world;
     this.screenToWorld = screenToWorld;
@@ -95,6 +100,7 @@ export class Inspect implements PointerConsumer {
     this.canDismiss = canDismiss;
     this.onDismiss = onDismiss;
     this.onBase = onBase;
+    this.onGrave = onGrave;
   }
 
   public onDown(sample: PointerSample): boolean {
@@ -140,6 +146,9 @@ export class Inspect implements PointerConsumer {
       case 'enemyBase':
         this.onBase(target.id);
         return;
+      case 'grave':
+        this.onGrave(target.id);
+        return;
       case 'building':
         // Le bâtiment doit encore exister au relâchement : un mutant a pu le raser entre-temps.
         if (this.world.entities.has(target.id)) this.onSelect(target);
@@ -173,11 +182,38 @@ export class Inspect implements PointerConsumer {
 
     if (building !== undefined) return { kind: 'building', id: building };
 
+    // Une tombe, vue : son épitaphe. Un bâtiment qui la recouvre passe devant.
+    const grave = graveAt(this.world.graves(), position.x, position.y, (x, y) => this.world.sees(x, y));
+
+    if (grave !== undefined) return { kind: 'grave', id: grave };
+
     // Une base explorée se tape même hors de vue : sa fenêtre dit ce qu'on en sait.
     const base = enemyBaseAt(this.world.knownEnemyBases(), position.x, position.y);
 
     return base === undefined ? undefined : { kind: 'enemyBase', id: base };
   }
+}
+
+/** La stèle d'une tombe : demi-largeur, hauteur au-dessus de ses pieds, marge dessous, en pixels monde. Les pieds sont ceux de `render/graveLayer.ts`. */
+const GRAVE_HALF_W = 12;
+const GRAVE_TOP = 28;
+const GRAVE_BELOW = 4;
+const GRAVE_FOOT = 4;
+
+/** La tombe dessinée sous un point monde, la plus basse à l'écran si elles se recouvrent ; `seen` : sa case est-elle vue ? */
+export function graveAt(graves: readonly Grave[], x: number, y: number, seen: (x: number, y: number) => boolean = () => true): number | undefined {
+  let found: number | undefined;
+  let foundY = -Infinity;
+
+  for (const grave of graves) {
+    const gx = (grave.tx + 0.5) * TILE_SIZE;
+    const gy = (grave.ty + 1) * TILE_SIZE - GRAVE_FOOT;
+
+    if (Math.abs(x - gx) > GRAVE_HALF_W || y < gy - GRAVE_TOP || y > gy + GRAVE_BELOW || gy <= foundY || !seen(gx, gy)) continue;
+    found = grave.id;
+    foundY = gy;
+  }
+  return found;
 }
 
 /** Hauteur au-dessus du toit où la barre d'un chantier ou d'un labo est dessinée, en pixels monde. */
