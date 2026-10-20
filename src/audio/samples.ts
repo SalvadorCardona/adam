@@ -71,6 +71,10 @@ export const SAMPLES = {
   victory: { files: ['victory'], gain: 0.45 },
   colony: { files: ['colony'], gain: 0.4 },
   defeat: { files: ['defeat'], gain: 0.6 },
+  // L'écran titre se joue à la synthèse : une fleur qui pousse, le cri du mutant qui sursaute, un oiseau.
+  bloom: { files: [], gain: 0.5 },
+  squeal: { files: [], gain: 0.5 },
+  chirp: { files: [], gain: 0.4 },
 } as const satisfies Record<SoundName, SampleSpec>;
 
 const FORMATS = [

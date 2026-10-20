@@ -32,6 +32,7 @@
  * arrière-plan, et elle reprend où elle en était au retour.
  */
 
+import { Ambience } from './ambience.ts';
 import { Music } from './music.ts';
 import { NightLayer } from './nightLayer.ts';
 import {
@@ -78,6 +79,9 @@ export class AudioEngine {
   private danger = 0;
   /** La couche de tension : elle n'existe que la nuit, son activé. */
   private tension: NightLayer | null = null;
+  /** L'ambiance de l'écran titre : `null` hors de l'écran titre, sinon son niveau de crépuscule (0 à 1). */
+  private ambienceDusk: number | null = null;
+  private ambience: Ambience | null = null;
   private readonly lastPlayed = new Map<SoundName, number>();
   private mutedFlag: boolean;
   private musicFlag: boolean;
@@ -150,6 +154,7 @@ export class AudioEngine {
       this.music.setDucked(this.paused);
       this.syncTension(DUSK_RAMP_S);
     }
+    this.syncAmbience();
 
     if (this.hidden) return;
     if (this.ctx.state !== 'running') void this.ctx.resume();
@@ -185,6 +190,26 @@ export class AudioEngine {
     this.sfxLevel = clampLevel(volume);
     writeValue(SFX_VOLUME_KEY, String(this.sfxLevel));
     if (this.sfx && this.ctx) this.sfx.gain.setTargetAtTime(SFX_GAIN * this.sfxLevel, this.ctx.currentTime, 0.02);
+  }
+
+  /**
+   * L'ambiance de l'écran titre (vent, grillons au crépuscule) : `dusk`, de 0 à 1, dit où en est le
+   * soir ; `null` la coupe. Demandée avant le premier geste, elle attend le contexte et part avec lui.
+   */
+  public setAmbience(dusk: number | null): void {
+    this.ambienceDusk = dusk;
+    this.syncAmbience();
+  }
+
+  private syncAmbience(): void {
+    if (!this.ctx || !this.sfx) return;
+    if (this.ambienceDusk === null) {
+      this.ambience?.stop();
+      this.ambience = null;
+      return;
+    }
+    this.ambience ??= new Ambience(this.ctx, this.sfx);
+    this.ambience.setDusk(this.ambienceDusk);
   }
 
   /** Le jeu se met en pause ou reprend : la musique recule, puis revient. */
@@ -310,6 +335,8 @@ export class AudioEngine {
     this.music?.stop();
     this.tension?.stop(0);
     this.tension = null;
+    this.ambience?.stop();
+    this.ambience = null;
     void this.ctx?.close();
     this.ctx = null;
   }

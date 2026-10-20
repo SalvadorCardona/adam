@@ -125,6 +125,7 @@ export function wireScreens(
     },
     onRestart: () => autosave.restart(),
     onSettings: () => settings.show(),
+    sound: { play: (name) => audio.play(name), ambience: (dusk) => audio.setAmbience(dusk) },
     accountButton: party.accountPanel.button('button-secondary title-garden'),
   });
 

@@ -39,7 +39,7 @@ import { CollectionPanel } from './collectionPanel.ts';
 import { GardenPanel, type GardenActions } from './garden.ts';
 import { buildingIcon, itemIcon, uiIcon } from './icons.ts';
 import { seedLine } from './seed.ts';
-import { TITLE_DIVE_MS, TitleArt } from './titleArt.ts';
+import { TITLE_DIVE_MS, TitleArt, type TitleSound } from './titleArt.ts';
 
 export interface TitleOptions {
   /** Une partie sauvegardée attend : « Continuer » et « Nouvelle partie » remplacent « Jouer ». */
@@ -67,6 +67,8 @@ export interface TitleOptions {
   collection: () => Collection;
   /** L'engrenage du coin : le menu des réglages, la langue d'abord. */
   onSettings: () => void;
+  /** Le son de la scène : ambiance, fleurs, mutant, oiseaux. */
+  sound: TitleSound;
   /** Le bouton « Compte » (`AccountPanel.button`) : facultatif, on joue sans. */
   accountButton: HTMLButtonElement;
 }
@@ -75,10 +77,10 @@ export class TitleScreen {
   public readonly root: HTMLElement;
   private readonly unsubscribe: () => void;
 
-  public constructor({ resume, summary, firstRun, notice, onPlay, onRestart, garden, gardenActions, record, daily, collection, onSettings, accountButton }: TitleOptions) {
+  public constructor({ resume, summary, firstRun, notice, onPlay, onRestart, garden, gardenActions, record, daily, collection, onSettings, accountButton, sound }: TitleOptions) {
     this.root = document.createElement('div');
     this.root.className = 'overlay title-screen';
-    const art = new TitleArt();
+    const art = new TitleArt(sound);
 
     this.root.append(art.root);
 

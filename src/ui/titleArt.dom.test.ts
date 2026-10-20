@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { titleScene } from '../art/titleScene.ts';
-import { TitleArt } from './titleArt.ts';
+import { TitleArt, type TitleSound } from './titleArt.ts';
 
 /*
  * La scène vivante de l'écran titre dans un faux DOM : ses plans, ce qui y
@@ -84,6 +84,42 @@ describe('la scène de l’écran titre', () => {
     expect(art.root.dataset['ready']).toBeUndefined();
     art.dive();
     expect(art.root.dataset['leaving']).toBe('true');
+  });
+
+  it('joue un son par fleur, par oiseau envolé et par sursaut du mutant, et coupe l’ambiance en partant', () => {
+    vi.useFakeTimers();
+    const sound = { play: vi.fn(), ambience: vi.fn() } satisfies TitleSound;
+
+    art = new TitleArt(sound);
+    document.body.append(art.root);
+    const find = (id: string): HTMLElement => art!.root.querySelector<HTMLElement>(`[data-id="${id}"]`)!;
+
+    // L'ambiance est demandée d'emblée (le moteur l'attend jusqu'au premier geste), en plein jour.
+    expect(sound.ambience).toHaveBeenCalledWith(0);
+    tap(find('ruin'));
+    tap(find('perch-tower'));
+    vi.spyOn(find('ground'), 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 400, 400, 400));
+    tap(find('ground'), 120, 600);
+    expect(sound.play.mock.calls.map((call: unknown[]) => call[0])).toEqual(['squeal', 'chirp', 'bloom']);
+    art.dispose();
+    expect(sound.ambience).toHaveBeenLastCalledWith(null);
+  });
+
+  it('tourne les pupilles du mutant vers la visée, puis vers Adam, et les laisse au centre sous prefers-reduced-motion', () => {
+    vi.useFakeTimers();
+    art = new TitleArt();
+    document.body.append(art.root);
+    const pupil = art.root.querySelector<HTMLElement>('[data-id="mutant-pupil-0"]')!;
+
+    expect(art.root.querySelectorAll('[data-gaze]').length).toBe(2);
+    art.ready(true);
+    expect(pupil.style.transform).toContain('translate(-');
+    art.ready(false);
+    expect(pupil.style.transform).toBe('translate(0.0%, 0.0%)');
+
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({ matches: true, media: query }) as MediaQueryList);
+    art.ready(true);
+    expect(pupil.style.transform).toBe('');
   });
 
   it('n’écoute plus rien après dispose', () => {
