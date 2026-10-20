@@ -4,6 +4,7 @@
  * pause, l'onglet caché. Avec eux, ce qui s'écrit sur l'appareil.
  */
 import type { AudioEngine } from '../audio/engine.ts';
+import type { GameRenderer } from '../render/renderer.ts';
 import { loadLocale, locale, t } from '../i18n/locale.ts';
 import { submitDailyScore } from '../net/dailyBoard.ts';
 import { earnedSkins } from '../sim/collection.ts';
@@ -41,6 +42,7 @@ export function wireScreens(
   life: Disposer,
   boot: Boot,
   hud: Hud,
+  renderer: GameRenderer,
   audio: AudioEngine,
   loop: GameLoop,
   flags: PlayFlags,
@@ -127,6 +129,7 @@ export function wireScreens(
     onSettings: () => settings.show(),
     sound: { play: (name) => audio.play(name), ambience: (dusk) => audio.setAmbience(dusk) },
     accountButton: party.accountPanel.button('button-secondary title-garden'),
+    scene: () => renderer.openTitle(),
   });
 
   function setPaused(value: boolean): void {

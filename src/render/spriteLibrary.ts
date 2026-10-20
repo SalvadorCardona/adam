@@ -70,9 +70,13 @@ export class SpriteLibrary {
 
   /** Tous les sprites du registre, plus les images supplémentaires (tuiles de sol). */
   public static async load(extra: readonly SvgSource[], resolution = screenResolution()): Promise<SpriteLibrary> {
+    return SpriteLibrary.of([...spriteSources(), ...extra], resolution);
+  }
+
+  /** Ces seules images, hors du registre : la scène de l'écran titre. */
+  public static async of(sources: readonly SvgSource[], resolution: number): Promise<SpriteLibrary> {
     const started = performance.now();
     const library = new SpriteLibrary();
-    const sources = [...spriteSources(), ...extra];
     const slots = await Promise.all(sources.map((source) => rasterize(source, resolution)));
 
     library.pack(slots, resolution);
@@ -135,6 +139,8 @@ export class SpriteLibrary {
 
   /** Rangement en étagères, les plus hautes d'abord : simple, et bien assez dense ici. */
   private pack(slots: Slot[], resolution: number): void {
+    // Une image plus large qu'une page (la colline de l'écran titre) l'élargit d'autant.
+    const width = Math.max(PAGE_WIDTH, ...slots.map((slot) => slot.pw + 2 * GUTTER));
     const sorted = [...slots].sort((a, b) => b.ph - a.ph);
     let placed: { slot: Slot; x: number; y: number }[] = [];
     let x = GUTTER;
@@ -143,7 +149,7 @@ export class SpriteLibrary {
 
     const flush = (): void => {
       if (placed.length === 0) return;
-      this.page(placed, y + shelf + GUTTER, resolution);
+      this.page(placed, width, y + shelf + GUTTER, resolution);
       placed = [];
       x = GUTTER;
       y = GUTTER;
@@ -151,7 +157,7 @@ export class SpriteLibrary {
     };
 
     for (const slot of sorted) {
-      if (x + slot.pw + GUTTER > PAGE_WIDTH) {
+      if (x + slot.pw + GUTTER > width) {
         x = GUTTER;
         y += shelf + GUTTER;
         shelf = 0;
@@ -165,10 +171,10 @@ export class SpriteLibrary {
   }
 
   /** Dessine une page d'atlas et découpe ses textures. */
-  private page(placed: { slot: Slot; x: number; y: number }[], height: number, resolution: number): void {
+  private page(placed: { slot: Slot; x: number; y: number }[], width: number, height: number, resolution: number): void {
     const canvas = document.createElement('canvas');
 
-    canvas.width = PAGE_WIDTH;
+    canvas.width = width;
     canvas.height = Math.ceil(height);
 
     const context = canvas.getContext('2d');
@@ -185,11 +191,11 @@ export class SpriteLibrary {
     this.sources.push(source);
 
     for (const { slot, x, y } of placed) {
-      const { key, width, height: h } = slot.source;
+      const { key, width: w, height: h } = slot.source;
 
       this.textures.set(
         key,
-        new Texture({ source, frame: new Rectangle(x / resolution, y / resolution, width, h) }),
+        new Texture({ source, frame: new Rectangle(x / resolution, y / resolution, w, h) }),
       );
     }
   }

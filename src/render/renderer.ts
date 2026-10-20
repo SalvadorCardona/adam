@@ -50,6 +50,7 @@ import { SignalLayer } from './signalLayer.ts';
 import { Signboards } from './signboard.ts';
 import { SpriteLibrary, type AtlasStats } from './spriteLibrary.ts';
 import { TerrainTiles, terrainSources } from './terrainTiles.ts';
+import { TitleStage } from './titleStage.ts';
 import { WaterLayer, type WaterStats } from './waterLayer.ts';
 import { WorkReachLayer } from './workReach.ts';
 import { WeatherLayer } from './weatherLayer.ts';
@@ -89,6 +90,8 @@ export class GameRenderer {
   private readonly adamRing: AdamRing;
   /** Le bâtiment dont la fenêtre est ouverte : un cadre l'entoure, une cabane y montre son rayon de coupe. */
   private selected: Selection | null = null;
+  /** La scène de l'écran titre, tant qu'il est ouvert. */
+  private title: TitleStage | null = null;
   private readonly nightLayer: NightLayer;
   private readonly fogLayer: FogLayer;
   /** La taille d'écran pour laquelle la caméra a cadré la zone explorée. */
@@ -252,7 +255,21 @@ export class GameRenderer {
    * elle ne coûte plus rien au GPU ; `draw` continue de suivre le monde.
    */
   public setHidden(hidden: boolean): void {
-    this.app.stage.visible = !hidden;
+    this.worldContainer.visible = !hidden;
+    this.hudContainer.visible = !hidden;
+  }
+
+  /**
+   * La scène vivante de l'écran titre (`render/titleStage.ts`), par-dessus le
+   * jeu jusqu'à ce que l'écran la défasse : rastérisée à la taille de l'écran,
+   * puis animée à chaque `draw`.
+   */
+  public async openTitle(): Promise<TitleStage> {
+    const stage = await TitleStage.create(this.app.screen.width, this.app.screen.height);
+
+    this.title = stage;
+    this.app.stage.addChild(stage.container);
+    return stage;
   }
 
   /** La carte glisse d'elle-même (recul, coup d'œil) : cf. `Camera.drifting`. */
@@ -347,6 +364,8 @@ export class GameRenderer {
 
   /** `armed` : le bâtiment armé au menu de construction, ou `null` hors du mode construction. */
   public draw(alpha: number, armed: BuildingId | null, ghost: GhostState | null): void {
+    if (this.title?.destroyed) this.title = null;
+    this.title?.update(this.app.ticker.deltaMS, this.app.screen.width, this.app.screen.height);
     const building = armed !== null;
     const { player } = this.world;
 
