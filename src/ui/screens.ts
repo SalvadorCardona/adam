@@ -4,9 +4,10 @@
  * L'écran titre n'est pas décoratif. Sur mobile, le son ne peut démarrer
  * qu'après un geste : le bouton « Jouer » est ce geste, et la partie ne
  * commence qu'à ce moment-là — le joueur n'arrive pas au milieu d'une
- * simulation déjà lancée. C'est une scène, pas une page : le key art en
- * trois plans qui respirent (`titleScene` d'`art/brand.ts`), le logo dessiné
- * (`titleLogo`), l'histoire en deux phrases — le (i) la déplie.
+ * simulation déjà lancée. C'est une scène, pas une page : un tableau vivant
+ * en plans de profondeur (`TitleArt`, `ui/titleArt.ts`), le logo dessiné
+ * (`titleLogo`), l'histoire en deux phrases — le (i) la déplie. Le panneau
+ * reste au premier plan, immobile : seule la scène bouge derrière lui.
  *
  * Quand une partie est sauvegardée, l'écran titre propose « Continuer » (le
  * choix par défaut), une carte qui dit où en est la partie — « Jour 5 ·
@@ -26,10 +27,11 @@
  * `main.ts` de jouer, d'arrêter l'horloge ou de recommencer, et c'est tout.
  */
 
-import { titleLogo, titleScene } from '../art/brand.ts';
+import { titleLogo } from '../art/brand.ts';
 import type { DailyModId } from '../data/dailyMods.ts';
 import { CHAPTERS } from '../data/objectives.ts';
 import { onLocale, t } from '../i18n/locale.ts';
+import { reducedMotion } from '../render/motion.ts';
 import { progressOf, type Collection } from '../sim/collection.ts';
 import type { Garden } from '../sim/garden.ts';
 import type { SaveSummary } from '../sim/save.ts';
@@ -37,6 +39,7 @@ import { CollectionPanel } from './collectionPanel.ts';
 import { GardenPanel, type GardenActions } from './garden.ts';
 import { buildingIcon, itemIcon, uiIcon } from './icons.ts';
 import { seedLine } from './seed.ts';
+import { TITLE_DIVE_MS, TitleArt } from './titleArt.ts';
 
 export interface TitleOptions {
   /** Une partie sauvegardée attend : « Continuer » et « Nouvelle partie » remplacent « Jouer ». */
@@ -75,7 +78,9 @@ export class TitleScreen {
   public constructor({ resume, summary, firstRun, notice, onPlay, onRestart, garden, gardenActions, record, daily, collection, onSettings, accountButton }: TitleOptions) {
     this.root = document.createElement('div');
     this.root.className = 'overlay title-screen';
-    this.root.append(keyArt());
+    const art = new TitleArt();
+
+    this.root.append(art.root);
 
     // Les libellés fixes, réécrits à chaque langue ; `relabel` les rassemble.
     const labels: (() => void)[] = [];
@@ -136,9 +141,19 @@ export class TitleScreen {
     play.type = 'button';
     play.className = resume ? 'button-primary title-play title-save' : 'button-primary title-play';
     labels.push(() => play.replaceChildren(...(resume ? saveCard(summary) : [uiIcon('play', 26), t().screens.title.play])));
+    // Survolé ou visé, « Jouer » fait se retourner Adam ; pressé, la caméra plonge vers la mairie avant de laisser la place au jeu.
+    play.addEventListener('pointerenter', () => art.ready(true));
+    play.addEventListener('pointerleave', () => art.ready(false));
+    // Au clavier ou à la manette, le focus vaut le survol — pas celui que l'écran pose seul à l'ouverture.
+    play.addEventListener('focus', () => art.ready(play.matches(':focus-visible') && document.hasFocus() && opened));
+    play.addEventListener('blur', () => art.ready(false));
     play.addEventListener('click', () => {
       this.root.dataset['leaving'] = 'true';
-      window.setTimeout(() => this.root.remove(), 380);
+      art.dive();
+      window.setTimeout(() => {
+        art.dispose();
+        this.root.remove();
+      }, reducedMotion() ? 380 : TITLE_DIVE_MS);
       this.unsubscribe();
       onPlay();
     });
@@ -315,37 +330,18 @@ export class TitleScreen {
     });
 
     // « Continuer » est le choix par défaut : Entrée ou Espace le prennent.
-    window.setTimeout(() => play.focus(), 0);
+    let opened = false;
+
+    window.setTimeout(() => {
+      play.focus();
+      opened = true;
+    }, 0);
   }
 }
 
 /** Un SVG en `data:` URL, pour un `<img>`. */
 function svgUrl(source: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
-}
-
-/**
- * Le key art derrière l'écran titre : le ciel, la ville, la colline (`titleScene`),
- * trois plans empilés qui respirent chacun à son amplitude — le CSS les anime,
- * et s'en abstient sous `prefers-reduced-motion`. Pur décor.
- */
-function keyArt(): HTMLElement {
-  const art = document.createElement('div');
-  const scene = titleScene();
-
-  art.className = 'title-art';
-  art.setAttribute('aria-hidden', 'true');
-  for (const layer of ['sky', 'town', 'hill'] as const) {
-    const image = document.createElement('img');
-
-    image.className = 'title-layer';
-    image.dataset['layer'] = layer;
-    image.src = svgUrl(scene[layer]);
-    image.alt = '';
-    image.draggable = false;
-    art.append(image);
-  }
-  return art;
 }
 
 /**

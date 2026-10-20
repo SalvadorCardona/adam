@@ -111,8 +111,9 @@ export function wireFrame(
     // Une fois par seconde de jeu : les succès dont la condition vient d'être remplie.
     if (running && world.tickCount % TICKS_PER_SECOND === 0 && world.tickCount !== achievements.checkedAt) achievements.update();
 
-    // La carte du monde couvre l'écran : la scène du jeu ne se dessine plus, la carte si.
-    renderer.setHidden(worldMap.open);
+    // La carte du monde couvre l'écran : la scène du jeu ne se dessine plus, la carte si. L'écran titre aussi, tant
+    // qu'on n'a pas joué : sa scène vivante a la frame pour elle (la plongée de « Jouer » découvre le jeu déjà lancé).
+    renderer.setHidden(worldMap.open || !flags.started);
     if (hud.root.dataset['map'] !== String(worldMap.open)) hud.root.dataset['map'] = String(worldMap.open);
     worldMap.update(ticker.deltaMS);
 
