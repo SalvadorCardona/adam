@@ -1056,7 +1056,7 @@ Les règles, en résumé :
   crépuscule lent, réactions au toucher (le mutant sursaute, un lampion
   flambe, un oiseau s'envole, Adam se retourne, l'herbe fleurit), Adam qui se
   retourne quand on vise « Jouer », plongée vers la mairie au clic
-  (`TITLE_DIVE_MS`) ; tout s'arrête onglet caché, rien ne bouge sous
+  (`TITLE_DIVE_MS`); ambiance sonore après le premier geste (`TitleSound`, `audio/ambience.ts`, `AudioEngine.setAmbience` : vent, grillons à mesure que le voile du crépuscule tombe, pépiements au passage du vol d'oiseaux, « pop » des fleurs, cri du mutant — `bloom`, `squeal`, `chirp`, tout en synthèse, sur le bus des bruitages donc coupés par le muet et son volume), pupilles du mutant qui suivent la visée puis Adam (`data-gaze`, `TITLE_GAZE_ADAM`, immobiles sous `prefers-reduced-motion`) ; tout s'arrête onglet caché, rien ne bouge sous
   `prefers-reduced-motion`, et la scène Pixi ne se dessine pas tant qu'on n'a
   pas joué. Logo dessiné en capsules (`titleLogo`), histoire en deux
   phrases (`LORE.tagline`, le (i) déplie `pitch`), carte « Continuer » qui dit

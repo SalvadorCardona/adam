@@ -17,16 +17,38 @@
  *   réchauffe (`ready`) ; pressé, la caméra plonge vers la porte de la
  *   mairie (`dive`).
  *
- * Sous `prefers-reduced-motion`, ni parallaxe, ni boucles, ni plongée : la
- * scène est un tableau, qui répond encore au toucher sans s'agiter.
+ * - **Regard** : les pupilles du mutant suivent la visée de la parallaxe, puis
+ *   se tournent vers Adam quand il se retourne.
+ * - **Son** (`TitleSound`) : un vent doux dès le premier geste, des pépiements
+ *   quand le vol d'oiseaux passe, des grillons à mesure que le crépuscule
+ *   tombe ; un « pop » par fleur, le cri du mutant qui sursaute. Le moteur
+ *   audio ne joue rien avant un geste, et le muet comme le volume des
+ *   bruitages tiennent tout.
+ *
+ * Sous `prefers-reduced-motion`, ni parallaxe, ni boucles, ni plongée, ni
+ * regard : la scène est un tableau, qui répond encore au toucher sans s'agiter.
  * Pur décor : `aria-hidden`, rien n'y prend le focus.
  */
 
-import { TITLE_ART, TITLE_DOOR, titleScene, type TitleLayer, type TitleMotion, type TitleProp, type TitleTap } from '../art/titleScene.ts';
+import { TITLE_ART, TITLE_DOOR, TITLE_GAZE_ADAM, titleScene, type TitleLayer, type TitleMotion, type TitleProp, type TitleTap } from '../art/titleScene.ts';
 import { flower, svg, type Tone } from '../data/artDirection.ts';
 import { reducedMotion } from '../render/motion.ts';
 import { Disposer } from './disposer.ts';
 import { TITLE_MOTION, atRest, dragAim, pointerAim, springStep, tiltAim, type Aim, type Spring } from './titleMotion.ts';
+
+/** Ce que la scène demande au son : trois effets, et l'ambiance (`null` la coupe, sinon le crépuscule, de 0 à 1). */
+export interface TitleSound {
+  play: (name: 'bloom' | 'squeal' | 'chirp') => void;
+  ambience: (dusk: number | null) => void;
+}
+
+/** Le crépuscule et le vol d'oiseaux se relisent à ce rythme, en millisecondes : jamais dans la boucle de la caméra. */
+const AMBIENCE_MS = 500;
+/** Le crépuscule le plus sombre du voile (`title-dusk` du CSS) : son opacité, ramenée à 1. */
+const VEIL_MAX = 0.42;
+/** Le vol d'oiseaux est à l'écran entre ces deux parts de son tour (`flock` du CSS) ; il pépie de loin en loin. */
+const FLOCK_SPAN = [0.05, 0.52] as const;
+const CHIRP_GAP_MS = { min: 600, max: 1800 };
 
 /** Combien de temps dure la plongée de « Jouer », en millisecondes (le CSS a la même). */
 export const TITLE_DIVE_MS = 1100;
@@ -112,6 +134,7 @@ function propElement(item: TitleProp, parent: { x: number; y: number; width: num
         `${tag}.title-prop[data-id="${item.id}"]{animation-name:${name}}`,
     );
   }
+  if (item.gaze) element.dataset['gaze'] = String(item.gaze);
   if (item.tap) element.dataset['tap'] = item.tap;
   if (item.clip) element.dataset['clip'] = 'true';
   if (item.view) element.dataset['view'] = item.view;
@@ -138,8 +161,15 @@ export class TitleArt {
   private reach: { x: number; y: number } = { x: TITLE_MOTION.amplitude, y: TITLE_MOTION.amplitude * TITLE_MOTION.vertical };
   private askedTilt = false;
   private disposed = false;
+  private readonly sound: TitleSound | undefined;
+  private readonly pupils: HTMLElement[] = [];
+  /** Le regard du mutant est sur Adam (il s'est retourné, ou « Jouer » est visé), plutôt que sur la visée. */
+  private watching = false;
+  private nextChirp = 0;
+  private watchTimer = 0;
 
-  public constructor() {
+  public constructor(sound?: TitleSound) {
+    this.sound = sound;
     this.root = document.createElement('div');
     this.root.className = 'title-art';
     this.root.setAttribute('aria-hidden', 'true');
@@ -169,7 +199,9 @@ export class TitleArt {
 
     courses.textContent = sheet.join('');
     this.root.append(courses, this.camera);
+    this.pupils.push(...this.root.querySelectorAll<HTMLElement>('[data-gaze]'));
     this.wire();
+    this.sound?.ambience(0);
   }
 
   private layerElement(layer: TitleLayer, frameBox: { x: number; y: number; width: number; height: number }, order: number, sheet: string[]): HTMLElement {
@@ -217,11 +249,40 @@ export class TitleArt {
       if (document.hidden) this.stop();
       else this.kick();
     });
+    if (this.sound) life.interval(() => this.tune(), AMBIENCE_MS);
     if (typeof ResizeObserver === 'function') {
       const observer = new ResizeObserver(() => this.measure());
 
       observer.observe(root);
       life.add(() => observer.disconnect());
+    }
+  }
+
+  /** Relit le crépuscule (le voile) et le vol d'oiseaux : l'ambiance s'y accorde, et les oiseaux pépient. */
+  private tune(): void {
+    if (!this.sound || document.hidden || typeof getComputedStyle !== 'function') return;
+    const veil = this.root.querySelector('.title-veil');
+    const opacity = veil ? Number.parseFloat(getComputedStyle(veil).opacity) : 0;
+
+    this.sound.ambience(Number.isFinite(opacity) ? Math.min(1, opacity / VEIL_MAX) : 0);
+    const flock = this.find('flock')?.getAnimations?.()[0];
+    const timing = flock?.effect?.getComputedTiming();
+    const now = performance.now();
+
+    if (timing?.progress == null || timing.progress < FLOCK_SPAN[0] || timing.progress > FLOCK_SPAN[1] || now < this.nextChirp) return;
+    this.sound.play('chirp');
+    this.nextChirp = now + CHIRP_GAP_MS.min + Math.random() * (CHIRP_GAP_MS.max - CHIRP_GAP_MS.min);
+  }
+
+  /** Les pupilles du mutant : vers la visée de la parallaxe, ou vers Adam quand il nous regarde. Posées au centre sous `prefers-reduced-motion`. */
+  private look(): void {
+    const still = reducedMotion();
+    const [x, y] = this.watching ? TITLE_GAZE_ADAM : [this.spring.x, this.spring.y];
+
+    for (const pupil of this.pupils) {
+      const reach = Number(pupil.dataset['gaze']) * 100;
+
+      pupil.style.transform = still ? '' : `translate(${(x * reach).toFixed(1)}%, ${(y * reach).toFixed(1)}%)`;
     }
   }
 
@@ -289,6 +350,7 @@ export class TitleArt {
 
       element.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
     }
+    this.look();
     this.frame = settled ? 0 : requestAnimationFrame((later) => this.step(later));
   }
 
@@ -301,6 +363,7 @@ export class TitleArt {
       case 'mutant':
         this.pulse(this.find('mutant'), 'startled', 1600);
         this.pulse(this.find('fingers-hand'), 'startled', 1600);
+        this.sound?.play('squeal');
         return;
       case 'lantern':
         target.dataset['lit'] = 'true';
@@ -311,10 +374,12 @@ export class TitleArt {
         return;
       case 'adam':
         this.pulse(this.root, 'turned', 1800, 'turn');
+        this.watchAdam(1800);
         return;
       case 'bird':
         if (target.dataset['flown'] === 'true') return;
         this.pulse(target, 'flown', BIRD_AWAY_MS);
+        this.sound?.play('chirp');
         return;
       case 'ground':
         this.bloom(target, event);
@@ -324,6 +389,19 @@ export class TitleArt {
 
   private find(id: string): HTMLElement | null {
     return this.root.querySelector<HTMLElement>(`[data-id="${id}"]`);
+  }
+
+  /** Le mutant regarde Adam le temps de `ms`, puis revient à la visée. */
+  private watchAdam(ms: number): void {
+    this.watching = true;
+    this.look();
+    window.clearTimeout(this.watchTimer);
+    this.watchTimer = window.setTimeout(() => {
+      this.timers.delete(this.watchTimer);
+      this.watching = this.root.dataset['ready'] === 'true';
+      this.look();
+    }, ms);
+    this.timers.add(this.watchTimer);
   }
 
   /** Pose `data-<name>` le temps de `ms` : le CSS en fait une réaction ; un second toucher la relance. */
@@ -363,6 +441,7 @@ export class TitleArt {
     const blooms = this.root.querySelectorAll('.title-bloom');
 
     if (blooms.length > MAX_BLOOMS) blooms[0]!.remove();
+    this.sound?.play('bloom');
   }
 
   /* ---------------------------------------------------------- « Jouer » */
@@ -371,6 +450,8 @@ export class TitleArt {
   public ready(on: boolean): void {
     if (on) this.root.dataset['ready'] = 'true';
     else delete this.root.dataset['ready'];
+    this.watching = on || this.root.dataset['turned'] !== undefined;
+    this.look();
   }
 
   /** « Jouer » pressé : la caméra plonge vers la porte de la mairie, la scène s'efface (`TITLE_DIVE_MS`). */
@@ -383,6 +464,7 @@ export class TitleArt {
 
   public dispose(): void {
     this.disposed = true;
+    this.sound?.ambience(null);
     this.stop();
     for (const timer of this.timers) window.clearTimeout(timer);
     this.timers.clear();

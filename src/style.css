@@ -7049,6 +7049,10 @@ button:disabled,
   }
 }
 
+.title-prop[data-gaze] {
+  transition: transform 160ms ease-out;
+}
+
 .title-prop[data-motion='eyelid'] {
   transform: scaleY(0);
   animation-name: title-eyelid;

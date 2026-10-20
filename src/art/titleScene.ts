@@ -82,6 +82,12 @@ export type TitleMotion =
   | 'breathe'
   | 'mote';
 
+/** Jusqu'où une pupille du mutant se déplace dans son œil, en fraction de la boîte de l'œil. */
+const PUPIL_TRAVEL = 0.2;
+
+/** La direction du mutant vers Adam, à l'écran (vecteur unité) : où ses pupilles se tournent quand Adam se retourne. */
+export const TITLE_GAZE_ADAM: readonly [number, number] = [-0.97, 0.22];
+
 /** Ce à quoi réagit un accessoire touché. */
 export type TitleTap = 'sun' | 'bird' | 'lantern' | 'mutant' | 'adam' | 'ground';
 
@@ -107,6 +113,8 @@ export interface TitleProp {
   /** Pour une roue, le nombre de degrés par trajet. */
   readonly turns?: readonly [number, number];
   readonly tap?: TitleTap;
+  /** Une pupille que le regard déplace : jusqu'où, en fraction de sa boîte (`data-gaze`). */
+  readonly gaze?: number;
   /** Le groupe rogne ce qui en dépasse : le mutant se cache derrière sa ruine. */
   readonly clip?: boolean;
   /** Une vue d'Adam : l'écran montre l'une ou l'autre (`data-view`). */
@@ -552,6 +560,11 @@ function town(): TitleLayer {
   const [ruinX, ruinY, ruinScale] = [548, 540, 2.3];
   const [mx, my, mw, mh] = spriteBox(MUTANT, ruinX + 25, ruinY - 16, 1.6);
   const eye = (x: number, y: number, r: number): string => circle(mx + x * 1.6, my + y * 1.6, r * 1.6 + 0.6, PALETTE.toxic.base);
+  // Les deux yeux du sprite (x, y, rayon), en pixels du sprite ; la paupière (`eye`) les recouvre en clignant.
+  const eyes = [
+    [12.3, 12.6, 3.2],
+    [18.8, 13.2, 1.8],
+  ] as const;
   const [rx, ry, rw, rh] = spriteBox(RUIN_SPRITE, ruinX, ruinY, ruinScale);
   const lurker = bundle(
     'lurker',
@@ -569,6 +582,11 @@ function town(): TitleLayer {
         [
           prop('mutant-halo', mx - 10, my - 14, mw + 20, mw + 20, circle(ruinX + 25, ruinY - 62, 28, PALETTE.toxic.light)),
           prop('mutant-body', mx, my, mw, mh, embed(MUTANT.parts.down, mx, my, 1.6)),
+          // Les yeux repeints en blanc, puis leurs pupilles, que la visée déplace (`data-gaze`) : le regard suit la parallaxe, puis Adam.
+          ...eyes.map(([x, y, r], i) => prop(`mutant-eye-${i}`, mx + (x - r) * 1.6, my + (y - r) * 1.6, r * 3.2, r * 3.2, circle(mx + x * 1.6, my + y * 1.6, r * 1.6, PALETTE.paper.base))),
+          ...eyes.map(([x, y, r], i) =>
+            prop(`mutant-pupil-${i}`, mx + (x - r) * 1.6, my + (y - r) * 1.6, r * 3.2, r * 3.2, circle(mx + x * 1.6, my + y * 1.6, r * 0.72, PALETTE.ink.base), { gaze: PUPIL_TRAVEL }),
+          ),
           prop('mutant-eyelids', mx + 12, my + 12, 30, 16, eye(12.3, 12.6, 3.2) + eye(18.8, 13.2, 1.8), { motion: 'eyelid', duration: 4.2, origin: [mx + 24, my + 13] }),
         ],
         { motion: 'peek', duration: 9, tap: 'mutant', origin: [ruinX + 25, ruinY - 4], path: [0, 0, 0, 52] },

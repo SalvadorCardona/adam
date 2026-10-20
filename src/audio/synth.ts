@@ -51,7 +51,10 @@ export type SoundName =
   | 'objective'
   | 'colony'
   | 'heyHo'
-  | 'hey';
+  | 'hey'
+  | 'bloom'
+  | 'squeal'
+  | 'chirp';
 
 /** Ce que dit un habitant qu'on tape : un homme « Hé ho ! » d'une voix grave, une femme « Hé ! » d'une voix aiguë. */
 export const VOICES = { male: 'heyHo', female: 'hey' } as const satisfies Record<Sex, SoundName>;
@@ -171,6 +174,11 @@ function vowel(ctx: AudioContext, out: AudioNode, at: number, pitch: number, gli
 /** Variation aléatoire de ±`spread` autour de 1 : deux coups de hache ne sonnent jamais pareil. */
 function vary(spread: number): number {
   return 1 + (Math.random() * 2 - 1) * spread;
+}
+
+/** Un train de trois stridulations de grillon, à `pitch` Hz : l'ambiance du crépuscule de l'écran titre (`ambience.ts`). */
+export function cricket(ctx: AudioContext, out: AudioNode, at: number, pitch: number): void {
+  for (let i = 0; i < 3; i += 1) tone(ctx, out, at + i * 0.075, 'sine', pitch, pitch * 0.97, { attack: 0.012, decay: 0.045, peak: 0.5 });
 }
 
 export const SOUNDS: Record<SoundName, (ctx: AudioContext, out: AudioNode, at: number) => void> = {
@@ -409,5 +417,26 @@ export const SOUNDS: Record<SoundName, (ctx: AudioContext, out: AudioNode, at: n
   /** Une femme qu'on tape : « Hé ! », aigu, qui monte. */
   hey(ctx, out, at) {
     vowel(ctx, out, at, 235 * vary(0.05), 1.12, 470, 2300, 0.2);
+  },
+
+  /** Une fleur qui pousse sous le doigt : une bulle qui monte, un « pop » clair. */
+  bloom(ctx, out, at) {
+    const v = vary(0.1);
+
+    tone(ctx, out, at, 'sine', 380 * v, 1100 * v, { attack: 0.01, decay: 0.09, peak: 0.4 });
+    tone(ctx, out, at + 0.1, 'triangle', 1480 * v, 1480 * v, { decay: 0.12, peak: 0.18 });
+  },
+
+  /** Le mutant qui sursaute : un cri idiot, un « ouiiik » qui monte puis retombe en glapissant. */
+  squeal(ctx, out, at) {
+    vowel(ctx, out, at, 210 * vary(0.06), 2.1, 520, 1700, 0.22);
+    vowel(ctx, out, at + 0.26, 480, 0.5, 600, 1300, 0.28);
+  },
+
+  /** Un pépiement d'oiseau : trois petites notes aiguës qui montent. */
+  chirp(ctx, out, at) {
+    const v = vary(0.12);
+
+    for (let i = 0; i < 3; i += 1) tone(ctx, out, at + i * 0.07, 'sine', 2600 * v + i * 300, 3400 * v + i * 300, { attack: 0.008, decay: 0.05, peak: 0.22 });
   },
 };
