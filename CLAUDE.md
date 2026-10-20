@@ -1045,9 +1045,20 @@ Les règles, en résumé :
 - `src/ui/hud.ts` : quête, conseil contextuel (le tutoriel), sac, bulles,
   gains flottants, défaite. `src/ui/screens.ts` : écran titre et pause — la
   simulation ne tourne qu'après « Jouer » et hors pause. L'écran titre est une
-  scène : key art en trois plans qui respirent (`titleScene` d'`art/brand.ts` :
-  Adam de dos sur la colline, la mairie et ses lampions, Ève au loin, un mutant
-  derrière une ruine), logo dessiné en capsules (`titleLogo`), histoire en deux
+  scène vivante (`ui/titleArt.ts`) : onze plans de profondeur en `<img>` SVG
+  (`titleScene` d'`art/titleScene.ts` : ciel, soleil, nuages, vieille ville,
+  collines, étoiles, fenêtres, clairière, colline d'Adam, lucioles,
+  avant-plan), décalés chacun de `depth` × l'amplitude par un ressort amorti
+  (`ui/titleMotion.ts`) selon la souris, l'inclinaison du téléphone (iOS la
+  demande au premier toucher de la scène) ou le doigt ; entrée cinématique,
+  accessoires animés par le CSS (`data-motion`, transform et opacité ; les
+  trajets ont des images clés en valeurs, sans `var()`, pour le compositeur),
+  crépuscule lent, réactions au toucher (le mutant sursaute, un lampion
+  flambe, un oiseau s'envole, Adam se retourne, l'herbe fleurit), Adam qui se
+  retourne quand on vise « Jouer », plongée vers la mairie au clic
+  (`TITLE_DIVE_MS`) ; tout s'arrête onglet caché, rien ne bouge sous
+  `prefers-reduced-motion`, et la scène Pixi ne se dessine pas tant qu'on n'a
+  pas joué. Logo dessiné en capsules (`titleLogo`), histoire en deux
   phrases (`LORE.tagline`, le (i) déplie `pitch`), carte « Continuer » qui dit
   jour, colons, chapitre et date (`peekSave`, sans charger le monde), gestes du
   jeu avant la toute première partie seulement (`adam:played`,

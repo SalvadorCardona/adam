@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { brandBanner, brandIcon, titleLogo, titleScene } from '../art/brand.ts';
+import { brandBanner, brandIcon, titleLogo } from '../art/brand.ts';
+import { titleScene, type TitleProp } from '../art/titleScene.ts';
 import { GROUND_TILES, cornerTile, edgeTile, shadowTile } from '../art/terrain.ts';
 import { UI_ICONS, dayDialSvg } from '../art/ui.ts';
 import { DIAL_ARCS } from '../sim/dayNight.ts';
@@ -12,6 +13,11 @@ import { BUILDING_PARTS, SPRITES, SPRITE_IDS, WALKER_PARTS, type SpriteProto } f
 const TOXIC: readonly string[] = Object.values(PALETTE.toxic);
 
 /** Tous les SVG du jeu, avec un nom lisible pour le message d'échec. */
+/** Les accessoires de l'écran titre, chacun sous son chemin (`brand.title.town.lurker.mutant…`). */
+function titleProps(prefix: string, props: readonly TitleProp[]): [string, string][] {
+  return props.flatMap((item): [string, string][] => [...(item.svg ? [[`${prefix}.${item.id}`, item.svg] as [string, string]] : []), ...titleProps(`${prefix}.${item.id}`, item.children ?? [])]);
+}
+
 function everySvg(): [string, string][] {
   const sprites = SPRITE_IDS.flatMap((id) =>
     Object.entries((SPRITES[id] as SpriteProto).parts).map(([part, svg]): [string, string] => [`${id}.${part}`, svg]),
@@ -38,7 +44,7 @@ function everySvg(): [string, string][] {
   const brand: [string, string][] = [
     ['brand.icon', brandIcon()],
     ['brand.banner', brandBanner()],
-    ...Object.entries(titleScene()).map(([layer, svg]): [string, string] => [`brand.title.${layer}`, svg]),
+    ...titleScene().flatMap((layer) => titleProps(`brand.title.${layer.id}`, layer.props)),
     ['brand.title.logo', titleLogo()],
   ];
 
@@ -70,7 +76,8 @@ describe('sprites', () => {
       name.endsWith('.mutantGoo') ||
       name.endsWith('.radCore') ||
       name === 'brand.banner' ||
-      name === 'brand.title.town';
+      name.startsWith('brand.title.town.lurker') ||
+      name.startsWith('brand.title.town.fingers');
 
     for (const [name, svg] of everySvg()) {
       if (mutants(name)) continue;
