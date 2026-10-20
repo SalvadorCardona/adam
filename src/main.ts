@@ -90,7 +90,7 @@ async function main(): Promise<void> {
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
   }
 
-  const screens = wireScreens(life, boot, ui.hud, audio, loop, flags, party, prefs.settings);
+  const screens = wireScreens(life, boot, ui.hud, renderer, audio, loop, flags, party, prefs.settings);
   const overlays = wireOverlays(life, world, ui, audio, loop, flags, screens, prefs.settings);
 
   mountUi(boot, ui, prefs, party, screens, overlays);

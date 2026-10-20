@@ -113,7 +113,7 @@ export interface TitleProp {
   /** Pour une roue, le nombre de degrés par trajet. */
   readonly turns?: readonly [number, number];
   readonly tap?: TitleTap;
-  /** Une pupille que le regard déplace : jusqu'où, en fraction de sa boîte (`data-gaze`). */
+  /** Une pupille que le regard déplace : jusqu'où, en fraction de sa boîte (`pupilShift` de `render/titleMoves.ts`). */
   readonly gaze?: number;
   /** Le groupe rogne ce qui en dépasse : le mutant se cache derrière sa ruine. */
   readonly clip?: boolean;
@@ -582,7 +582,7 @@ function town(): TitleLayer {
         [
           prop('mutant-halo', mx - 10, my - 14, mw + 20, mw + 20, circle(ruinX + 25, ruinY - 62, 28, PALETTE.toxic.light)),
           prop('mutant-body', mx, my, mw, mh, embed(MUTANT.parts.down, mx, my, 1.6)),
-          // Les yeux repeints en blanc, puis leurs pupilles, que la visée déplace (`data-gaze`) : le regard suit la parallaxe, puis Adam.
+          // Les yeux repeints en blanc, puis leurs pupilles, que la visée déplace (`gaze`) : le regard suit la parallaxe, puis Adam.
           ...eyes.map(([x, y, r], i) => prop(`mutant-eye-${i}`, mx + (x - r) * 1.6, my + (y - r) * 1.6, r * 3.2, r * 3.2, circle(mx + x * 1.6, my + y * 1.6, r * 1.6, PALETTE.paper.base))),
           ...eyes.map(([x, y, r], i) =>
             prop(`mutant-pupil-${i}`, mx + (x - r) * 1.6, my + (y - r) * 1.6, r * 3.2, r * 3.2, circle(mx + x * 1.6, my + y * 1.6, r * 0.72, PALETTE.ink.base), { gaze: PUPIL_TRAVEL }),

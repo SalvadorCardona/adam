@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { titleScene } from '../art/titleScene.ts';
-import { TitleArt, type TitleSound } from './titleArt.ts';
+import { TitleArt, type TitleHit, type TitleSound, type TitleView } from './titleArt.ts';
 
 /*
- * La scène vivante de l'écran titre dans un faux DOM : ses plans, ce qui y
- * bouge, ce qui réagit au toucher, et rien qui écoute encore après `dispose`.
+ * La surface de l'écran titre dans un faux DOM : elle n'ouvre sa couche
+ * qu'une fois à l'écran, lui passe les gestes (ce qui est sous le doigt
+ * réagit), « Jouer » visé puis pressé, et rien qui écoute encore après
+ * `dispose`. La couche Pixi est remplacée par un témoin.
  */
 
 let art: TitleArt | null = null;
@@ -14,8 +16,33 @@ afterEach(() => {
   art?.dispose();
   art?.root.remove();
   art = null;
-  vi.useRealTimers();
 });
+
+/** Un témoin de couche : il dit `hit` sous tout point, et note ce qu'on lui demande. */
+function fakeView(hit: TitleHit | null = null, ambient = { dusk: 0, flock: false }): TitleView & { calls: string[] } {
+  const calls: string[] = [];
+
+  return {
+    calls,
+    parallax: () => undefined,
+    hit: () => hit,
+    react: (target, x, y) => calls.push(`react ${target.tap} ${target.id} ${x},${y}`) > 0,
+    ambient: () => ambient,
+    ready: (on) => calls.push(`ready ${on}`),
+    dive: () => calls.push('dive'),
+    dispose: () => calls.push('dispose'),
+  };
+}
+
+/** La couche s'ouvre : on attend sa promesse. */
+async function opened(view: TitleView, sound?: TitleSound): Promise<TitleArt> {
+  art = new TitleArt(() => Promise.resolve(view), sound);
+  document.body.append(art.root);
+  art.show();
+  await Promise.resolve();
+  await Promise.resolve();
+  return art;
+}
 
 function tap(target: Element, x = 10, y = 10): void {
   target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', pointerId: 1, clientX: x, clientY: y }));
@@ -32,101 +59,110 @@ describe('la scène de l’écran titre', () => {
     expect(layers.at(-1)!.depth).toBe(1);
   });
 
-  it('anime en continu plus de six sortes de choses, et en fait réagir plus de trois au toucher', () => {
-    art = new TitleArt();
+  it('n’ouvre sa couche qu’une fois montrée, et une seule fois', async () => {
+    const open = vi.fn(() => Promise.resolve(fakeView()));
+
+    art = new TitleArt(open);
+    art.show();
+    expect(open).not.toHaveBeenCalled();
     document.body.append(art.root);
-    const motions = new Set([...art.root.querySelectorAll<HTMLElement>('[data-motion]')].map((element) => element.dataset['motion']));
-    const taps = new Set([...art.root.querySelectorAll<HTMLElement>('[data-tap]')].map((element) => element.dataset['tap']));
-
-    expect(motions.size).toBeGreaterThanOrEqual(12);
-    expect(taps.size).toBeGreaterThanOrEqual(5);
-    expect(art.root.querySelectorAll('.title-plane').length).toBe(titleScene().length);
+    art.show();
+    art.show();
+    expect(open).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(art.root.dataset['drawn']).toBe('true');
   });
 
-  it('écrit les trajets en valeurs, sans variable CSS que le compositeur refuserait', () => {
-    art = new TitleArt();
-    const sheet = art.root.querySelector('style')!.textContent;
+  it('fait réagir ce qui est sous le doigt, au point touché', async () => {
+    const view = fakeView({ tap: 'mutant', id: 'ruin' });
 
-    expect(sheet).toContain('@keyframes title-course-');
-    expect(sheet).not.toContain('var(');
+    tap((await opened(view)).root, 120, 600);
+    expect(view.calls).toContain('react mutant ruin 120,600');
   });
 
-  it('fait sursauter le mutant, flamber un lampion, s’envoler un oiseau, se retourner Adam, fleurir l’herbe', () => {
-    vi.useFakeTimers();
-    art = new TitleArt();
-    document.body.append(art.root);
-    const find = (id: string): HTMLElement => art!.root.querySelector<HTMLElement>(`[data-id="${id}"]`)!;
+  it('ne fait rien réagir dans le vide', async () => {
+    const view = fakeView(null);
 
-    tap(find('ruin'));
-    expect(find('mutant').dataset['startled']).toBe('true');
-    tap(find('lantern-0'));
-    expect(find('lantern-0').dataset['hit']).toBe('true');
-    tap(find('perch-tower'));
-    expect(find('perch-tower').dataset['flown']).toBe('true');
-    tap(find('adam'));
-    expect(art.root.dataset['turned']).toBe('turn');
-    // Le faux DOM n'a pas de mise en page : l'herbe prend une boîte.
-    vi.spyOn(find('ground'), 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 400, 400, 400));
-    tap(find('ground'), 120, 600);
-    expect(art.root.querySelectorAll('.title-bloom').length).toBe(1);
-
-    vi.advanceTimersByTime(10_000);
-    expect(find('mutant').dataset['startled']).toBeUndefined();
-    expect(find('perch-tower').dataset['flown']).toBeUndefined();
-    expect(art.root.dataset['turned']).toBeUndefined();
+    tap((await opened(view)).root);
+    expect(view.calls.filter((call) => call.startsWith('react'))).toEqual([]);
   });
 
-  it('se retourne vers « Jouer » visé, plonge quand on le presse', () => {
-    art = new TitleArt();
+  it('se retourne vers « Jouer » visé, plonge quand on le presse — même visé avant que la couche soit là', async () => {
+    const view = fakeView();
+
+    art = new TitleArt(() => Promise.resolve(view));
     art.ready(true);
     expect(art.root.dataset['ready']).toBe('true');
+    document.body.append(art.root);
+    art.show();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(view.calls).toContain('ready true');
     art.ready(false);
     expect(art.root.dataset['ready']).toBeUndefined();
     art.dive();
     expect(art.root.dataset['leaving']).toBe('true');
+    expect(view.calls.at(-1)).toBe('dive');
   });
 
-  it('joue un son par fleur, par oiseau envolé et par sursaut du mutant, et coupe l’ambiance en partant', () => {
-    vi.useFakeTimers();
-    const sound = { play: vi.fn(), ambience: vi.fn() } satisfies TitleSound;
+  it('défait sa couche avec lui, même quand elle arrive après', async () => {
+    const view = fakeView();
+    let resolve: (view: TitleView) => void = () => undefined;
 
-    art = new TitleArt(sound);
+    art = new TitleArt(() => new Promise((done) => (resolve = done)));
     document.body.append(art.root);
-    const find = (id: string): HTMLElement => art!.root.querySelector<HTMLElement>(`[data-id="${id}"]`)!;
+    art.show();
+    art.dispose();
+    resolve(view);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(view.calls).toEqual(['dispose']);
+  });
 
+  it('joue un son par fleur, par oiseau envolé et par sursaut du mutant, et coupe l’ambiance en partant', async () => {
+    const sound = { play: vi.fn(), ambience: vi.fn() } satisfies TitleSound;
+    const hits: TitleHit[] = [
+      { tap: 'mutant', id: 'ruin' },
+      { tap: 'bird', id: 'perch-tower' },
+      { tap: 'ground', id: 'ground' },
+      { tap: 'lantern', id: 'lantern-0' },
+    ];
+    const view = { ...fakeView(), hit: () => hits.shift() ?? null };
+
+    await opened(view, sound);
     // L'ambiance est demandée d'emblée (le moteur l'attend jusqu'au premier geste), en plein jour.
     expect(sound.ambience).toHaveBeenCalledWith(0);
-    tap(find('ruin'));
-    tap(find('perch-tower'));
-    vi.spyOn(find('ground'), 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 400, 400, 400));
-    tap(find('ground'), 120, 600);
+    for (let i = 0; i < 4; i += 1) tap(art!.root, 120, 600);
     expect(sound.play.mock.calls.map((call: unknown[]) => call[0])).toEqual(['squeal', 'chirp', 'bloom']);
-    art.dispose();
+    art!.dispose();
     expect(sound.ambience).toHaveBeenLastCalledWith(null);
   });
 
-  it('tourne les pupilles du mutant vers la visée, puis vers Adam, et les laisse au centre sous prefers-reduced-motion', () => {
+  it('se tait quand rien n’a réagi : l’oiseau déjà envolé ne pépie pas deux fois', async () => {
+    const sound = { play: vi.fn(), ambience: vi.fn() } satisfies TitleSound;
+    const view = { ...fakeView({ tap: 'bird', id: 'perch-tower' }), react: () => false };
+
+    tap((await opened(view, sound)).root);
+    expect(sound.play).not.toHaveBeenCalled();
+  });
+
+  it('accorde l’ambiance au crépuscule de la scène, et pépie quand le vol d’oiseaux passe', async () => {
     vi.useFakeTimers();
-    art = new TitleArt();
-    document.body.append(art.root);
-    const pupil = art.root.querySelector<HTMLElement>('[data-id="mutant-pupil-0"]')!;
+    const sound = { play: vi.fn(), ambience: vi.fn() } satisfies TitleSound;
 
-    expect(art.root.querySelectorAll('[data-gaze]').length).toBe(2);
-    art.ready(true);
-    expect(pupil.style.transform).toContain('translate(-');
-    art.ready(false);
-    expect(pupil.style.transform).toBe('translate(0.0%, 0.0%)');
-
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({ matches: true, media: query }) as MediaQueryList);
-    art.ready(true);
-    expect(pupil.style.transform).toBe('');
+    await opened(fakeView(null, { dusk: 0.5, flock: true }), sound);
+    vi.advanceTimersByTime(600);
+    expect(sound.ambience).toHaveBeenLastCalledWith(0.5);
+    expect(sound.play).toHaveBeenCalledWith('chirp');
+    vi.useRealTimers();
   });
 
   it('n’écoute plus rien après dispose', () => {
     const add = vi.spyOn(window, 'addEventListener');
     const remove = vi.spyOn(window, 'removeEventListener');
 
-    art = new TitleArt();
+    art = new TitleArt(() => Promise.resolve(fakeView()));
     const added = add.mock.calls.length;
 
     art.dispose();
