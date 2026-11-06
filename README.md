@@ -177,11 +177,25 @@ place pour la restaurer. Une partie jouée dans le navigateur ne s'y retrouve
 pas : ce sont deux sauvegardes distinctes.
 
 **Autre méthode, par le navigateur.** En mode Bureau, ouvrez le jeu dans un
-navigateur (https://cardona.digital/adam/) : la manette intégrée est
-reconnue directement. Pour le mode Game : installez Chrome (Discover),
-ajoutez-le comme jeu non-Steam, mettez en option de lancement
-`--kiosk https://cardona.digital/adam/` (plein écran sans barre d'adresse) et
-choisissez, là aussi, la disposition « Gamepad ».
+navigateur (https://hermez.dev/adam/) : la manette intégrée est reconnue
+directement. Pour le mode Game, ajoutez le navigateur comme jeu non-Steam :
+
+- **Chrome** (Discover, Flatpak) : option de lancement
+  `--kiosk https://hermez.dev/adam/` (plein écran sans barre d'adresse) ;
+- **Firefox** (Flatpak `org.mozilla.firefox`) : programme `/usr/bin/flatpak`,
+  options `run org.mozilla.firefox --kiosk https://hermez.dev/adam/`. Le
+  Flatpak doit voir les manettes (permission `devices=all`, sinon
+  `flatpak override --user --device=all org.mozilla.firefox`).
+
+Dans les deux cas, **la disposition Steam Input doit être « Gamepad »** (page
+du jeu → icône manette → *Disposition du contrôleur* → *Modèles*), jamais
+« Web browser » : sticks en souris et molette, le jeu ne voit plus de
+manette. Firefox remonte le pad virtuel de Steam Input (Xbox 360,
+`28de:11ff`) sans mapping « standard », avec 8 axes et 11 boutons : le jeu le
+reconnaît et le remet aux indices standard (`standardize` dans
+`src/input/gamepad.ts`). Pour modifier `shortcuts.vdf` à la main, arrêtez
+Steam d'abord (`steam -shutdown`), sinon il écrase le fichier. Le plus simple
+reste l'AppImage ci-dessus.
 
 L'interface est lisible sur l'écran 1280 × 800 du Deck ; le curseur est plus
 grand que celui de la souris, cerné d'indigo, et l'élément choisi à la croix

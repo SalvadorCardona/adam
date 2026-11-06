@@ -160,6 +160,56 @@ export function padKindOf(id: string): PadKind {
 }
 
 /**
+ * Une manette **sans** mapping standard (`gamepad.mapping === ''`) dans la
+ * disposition brute d'une Xbox 360 de Linux (`joydev`) : 8 axes (stick gauche
+ * 0-1, gâchette gauche 2, stick droit 3-4, gâchette droite 5, croix 6-7) et
+ * 11 boutons (A B X Y LB RB View Menu Guide L3 R3). C'est ce que Firefox
+ * remonte du pad virtuel de Steam Input (28de:11ff) : Chrome le met au
+ * standard, Firefox non, et le jeu lisait alors les mauvais indices.
+ */
+export function isRawXbox(snapshot: PadSnapshot): boolean {
+  return snapshot.axes.length === 8 && snapshot.buttons.length === 11;
+}
+
+/**
+ * Le même instantané, au mapping standard (voir `PAD_BUTTONS`) : les
+ * gâchettes (de −1 à 1 au repos à −1) deviennent des boutons de 0 à 1, la
+ * croix (axes ±1) quatre boutons, les sticks restent aux axes 0-3.
+ */
+export function standardize(raw: PadSnapshot): PadSnapshot {
+  const button = (index: number): PadButtonState => raw.buttons[index] ?? { pressed: false, value: 0 };
+  const trigger = (axis: number): PadButtonState => {
+    const value = Math.min(1, Math.max(0, ((raw.axes[axis] ?? -1) + 1) / 2));
+
+    return { pressed: value > 0.5, value };
+  };
+  const hat = (on: boolean): PadButtonState => ({ pressed: on, value: on ? 1 : 0 });
+  const dx = raw.axes[6] ?? 0;
+  const dy = raw.axes[7] ?? 0;
+  const standard: PadButtonState[] = [
+    button(0), // A
+    button(1), // B
+    button(2), // X
+    button(3), // Y
+    button(4), // LB
+    button(5), // RB
+    trigger(2), // LT
+    trigger(5), // RT
+    button(6), // View
+    button(7), // Menu
+    button(9), // L3
+    button(10), // R3
+    hat(dy < -0.5),
+    hat(dy > 0.5),
+    hat(dx < -0.5),
+    hat(dx > 0.5),
+    button(8), // Guide
+  ];
+
+  return { axes: [raw.axes[0] ?? 0, raw.axes[1] ?? 0, raw.axes[3] ?? 0, raw.axes[4] ?? 0], buttons: standard };
+}
+
+/**
  * Lit les instantanés successifs d'une manette et en tire des **appuis**.
  *
  * `update` à chaque frame ; entre deux `update`, `pressed(b)` ne vaut vrai
