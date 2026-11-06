@@ -28,6 +28,10 @@ export const API_PATHS = {
   guest: '/auth/guest',
   logout: '/auth/logout',
   me: '/auth/me',
+  /** Mot de passe oublié : un e-mail, et le serveur envoie un lien s'il connaît le compte. */
+  forgot: '/auth/forgot',
+  /** Le lien ouvert : son jeton et le nouveau mot de passe, et le joueur est connecté. */
+  reset: '/auth/reset',
   parties: '/parties',
 } as const;
 
@@ -293,6 +297,32 @@ export interface GuestRequest {
   readonly nickname: string;
 }
 
+/**
+ * `POST /auth/forgot` : l'adresse du compte, et la langue de l'e-mail (celle du
+ * jeu ; le français par défaut). La réponse est toujours la même, que le compte
+ * existe ou non : `ForgotResponse`.
+ */
+export interface ForgotRequest {
+  readonly email: string;
+  readonly locale?: MailLocale;
+}
+
+/** Les langues de l'e-mail : celles du jeu. */
+export type MailLocale = 'fr' | 'en';
+
+export interface ForgotResponse {
+  readonly ok: true;
+}
+
+/** `POST /auth/reset` : le jeton du lien et le nouveau mot de passe ; la réponse est une `SessionResponse`. */
+export interface ResetRequest {
+  readonly token: string;
+  readonly password: string;
+}
+
+/** Le paramètre d'URL du lien envoyé par e-mail : `…/adam/?reset=<jeton>`. */
+export const RESET_PARAM = 'reset';
+
 /** La réponse d'une inscription (201), d'un invité (201) ou d'une connexion (200). */
 export interface SessionResponse {
   readonly ok: true;
@@ -309,11 +339,12 @@ export interface MeResponse {
 /**
  * Ce que le serveur répond quand il refuse : 400 `invalid` (avec les champs
  * en cause), 409 `emailTaken`, 401 `badCredentials` ou `unauthorized`, 429
- * `tooManyAttempts` (avec `retryAfter`, en secondes).
+ * `tooManyAttempts` (avec `retryAfter`, en secondes), 400 `badToken` (un lien
+ * de réinitialisation inconnu, expiré ou déjà servi).
  */
 export interface AccountErrorResponse {
   readonly ok: false;
-  readonly error: 'invalid' | 'emailTaken' | 'badCredentials' | 'unauthorized' | 'tooManyAttempts';
+  readonly error: 'invalid' | 'emailTaken' | 'badCredentials' | 'unauthorized' | 'tooManyAttempts' | 'badToken';
   readonly fields?: readonly FieldError[];
   readonly retryAfter?: number;
 }
@@ -347,7 +378,11 @@ export function isMeResponse(value: unknown): value is MeResponse {
   return body['ok'] === true && isAccountUser(body['user']);
 }
 
-const ACCOUNT_ERRORS = ['invalid', 'emailTaken', 'badCredentials', 'unauthorized', 'tooManyAttempts'];
+const ACCOUNT_ERRORS = ['invalid', 'emailTaken', 'badCredentials', 'unauthorized', 'tooManyAttempts', 'badToken'];
+
+export function isForgotResponse(value: unknown): value is ForgotResponse {
+  return typeof value === 'object' && value !== null && (value as Record<string, unknown>)['ok'] === true;
+}
 
 export function isAccountError(value: unknown): value is AccountErrorResponse {
   if (typeof value !== 'object' || value === null) return false;

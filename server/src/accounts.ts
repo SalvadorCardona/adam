@@ -24,9 +24,13 @@ import {
   type AccountErrorResponse,
   type AccountUser,
   type FieldError,
+  type ForgotResponse,
+  type MailLocale,
   type MeResponse,
   type SessionResponse,
+  RESET_PARAM,
 } from '../../shared/api.ts';
+import { resetEmail, type Mailer } from './mail.ts';
 import { DECOY_HASH, hashPassword, verifyPassword } from './passwords.ts';
 import { AttemptLimiter } from './rateLimit.ts';
 
@@ -41,6 +45,14 @@ export const REGISTER_MAX_PER_IP = 10;
 export const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 /** Invités par IP sur la même fenêtre : un salon, une soirée entre amis, pas une usine à comptes. */
 export const GUEST_MAX_PER_IP = 20;
+/** Un lien « mot de passe oublié » vaut 30 minutes. */
+export const RESET_TTL_MS = 30 * 60 * 1000;
+/** Demandes de lien par adresse, et par IP, sur la fenêtre : de quoi réessayer, pas de quoi inonder une boîte. */
+export const FORGOT_MAX_PER_EMAIL = 3;
+export const FORGOT_MAX_PER_IP = 10;
+export const FORGOT_WINDOW_MS = 60 * 60 * 1000;
+/** Jetons de réinitialisation refusés par IP sur la fenêtre de connexion. */
+export const RESET_MAX_PER_IP = 20;
 
 export interface AccountDeps {
   readonly db: DatabaseSync;
@@ -48,7 +60,24 @@ export interface AccountDeps {
   readonly clock: () => number;
   /** L'IP du client ; en test, une valeur fixe. */
   readonly clientIp: (c: Context) => string;
+  /** L'envoi des e-mails (Brevo, ou les journaux sans clé). */
+  readonly mailer: Mailer;
+  /** L'adresse publique du jeu : le lien de l'e-mail y mène (`PUBLIC_URL`). */
+  readonly publicUrl: string;
 }
+
+/** Le lien de l'e-mail : la page du jeu et `?reset=<jeton>`. */
+export function resetLink(publicUrl: string, token: string): string {
+  const url = new URL(publicUrl);
+
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set(RESET_PARAM, token);
+
+  return url.toString();
+}
+
+const mailLocale = (value: unknown): MailLocale => (value === 'en' ? 'en' : 'fr');
 
 interface AccountRow {
   readonly id: number;
@@ -125,13 +154,16 @@ function bearer(c: Context): string | null {
   return match?.[1] ?? null;
 }
 
-export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
+export function accountRoutes({ db, clock, clientIp, mailer, publicUrl }: AccountDeps): Hono {
   const routes = new Hono();
   const loginByEmail = new AttemptLimiter(LOGIN_MAX_PER_EMAIL, LOGIN_WINDOW_MS, clock);
   const loginByIp = new AttemptLimiter(LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS, clock);
   const registerByIp = new AttemptLimiter(REGISTER_MAX_PER_IP, REGISTER_WINDOW_MS, clock);
 
   const guestByIp = new AttemptLimiter(GUEST_MAX_PER_IP, REGISTER_WINDOW_MS, clock);
+  const forgotByEmail = new AttemptLimiter(FORGOT_MAX_PER_EMAIL, FORGOT_WINDOW_MS, clock);
+  const forgotByIp = new AttemptLimiter(FORGOT_MAX_PER_IP, FORGOT_WINDOW_MS, clock);
+  const resetByIp = new AttemptLimiter(RESET_MAX_PER_IP, LOGIN_WINDOW_MS, clock);
 
   const findByEmail = db.prepare('SELECT id, nickname, email, password_hash, guest FROM accounts WHERE email = ?');
   const insertAccount = db.prepare('INSERT INTO accounts (nickname, email, password_hash, created_at) VALUES (?, ?, ?, ?)');
@@ -140,6 +172,15 @@ export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
   const deleteSession = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
   const deleteExpired = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
   const currentUser = sessionReader(db, clock);
+  const insertReset = db.prepare('INSERT INTO password_resets (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)');
+  const deleteResetsOf = db.prepare('DELETE FROM password_resets WHERE account_id = ?');
+  const deleteExpiredResets = db.prepare('DELETE FROM password_resets WHERE expires_at <= ?');
+  const findReset = db.prepare(
+    'SELECT a.id, a.nickname, a.email, a.password_hash, a.guest FROM password_resets r JOIN accounts a ON a.id = r.account_id WHERE r.token_hash = ? AND r.expires_at > ?',
+  );
+  const consumeReset = db.prepare('DELETE FROM password_resets WHERE token_hash = ? AND expires_at > ?');
+  const updatePassword = db.prepare('UPDATE accounts SET password_hash = ? WHERE id = ?');
+  const deleteSessionsOf = db.prepare('DELETE FROM sessions WHERE account_id = ?');
 
   function openSession(accountId: number): string {
     const token = randomBytes(32).toString('base64url');
@@ -249,6 +290,107 @@ export function accountRoutes({ db, clock, clientIp }: AccountDeps): Hono {
     }
 
     loginByEmail.reset(email);
+
+    const response: SessionResponse = { ok: true, token: openSession(row.id), user: publicUser(row) };
+
+    c.header('Cache-Control', 'no-store');
+
+    return c.json(response);
+  });
+
+  /*
+   * Mot de passe oublié. La réponse est toujours la même, que l'adresse ait un
+   * compte ou non, et elle n'attend pas l'envoi : ni le corps ni la durée ne
+   * disent si le compte existe. Un invité n'a pas d'adresse : rien ne part.
+   * Un nouveau lien remplace les précédents du compte.
+   */
+  routes.post(API_PATHS.forgot, async (c) => {
+    const ip = clientIp(c);
+    const body = await readJson(c);
+    const email = cleanEmail(text(body?.['email']));
+    const wait = Math.max(forgotByIp.retryAfter(ip), forgotByEmail.retryAfter(email));
+
+    if (wait > 0) return fail(c, 429, 'tooManyAttempts', { retryAfter: wait });
+
+    const problem = emailProblem(email);
+
+    if (!body || problem) return fail(c, 400, 'invalid', { fields: [{ field: 'email', problem: problem ?? 'empty' }] });
+
+    forgotByIp.hit(ip);
+    forgotByEmail.hit(email);
+
+    const row = findByEmail.get(email) as AccountRow | undefined;
+
+    if (row && !row.guest) {
+      const token = randomBytes(32).toString('base64url');
+      const now = clock();
+
+      deleteExpiredResets.run(now);
+      deleteResetsOf.run(row.id);
+      insertReset.run(fingerprint(token), row.id, new Date(now).toISOString(), now + RESET_TTL_MS);
+
+      const message = resetEmail(mailLocale(body['locale']), row.nickname, resetLink(publicUrl, token));
+
+      void mailer.send({ to: row.email, toName: row.nickname, ...message }).catch(() => false);
+    }
+
+    const response: ForgotResponse = { ok: true };
+
+    c.header('Cache-Control', 'no-store');
+
+    return c.json(response);
+  });
+
+  /*
+   * Le lien ouvert : le jeton (inconnu, expiré ou déjà servi : `badToken`) et
+   * le nouveau mot de passe, aux règles de l'inscription. Le jeton est
+   * consommé, toutes les sessions du compte sont fermées — un voleur de
+   * session en est chassé —, puis une nouvelle s'ouvre pour ce joueur-ci.
+   */
+  routes.post(API_PATHS.reset, async (c) => {
+    const ip = clientIp(c);
+    const wait = resetByIp.retryAfter(ip);
+
+    if (wait > 0) return fail(c, 429, 'tooManyAttempts', { retryAfter: wait });
+
+    const body = await readJson(c);
+    const token = text(body?.['token']);
+    const password = text(body?.['password']);
+    const problem = passwordProblem(password);
+
+    if (!body || problem) return fail(c, 400, 'invalid', { fields: [{ field: 'password', problem: problem ?? 'empty' }] });
+
+    const now = clock();
+    const hash = fingerprint(token);
+    const row = token.length > 0 && token.length <= 128 ? (findReset.get(hash, now) as AccountRow | undefined) : undefined;
+
+    if (!row) {
+      resetByIp.hit(ip);
+
+      return fail(c, 400, 'badToken');
+    }
+
+    const passwordHash = await hashPassword(password);
+
+    db.exec('BEGIN');
+    try {
+      // Deux envois du même lien en même temps : un seul le consomme.
+      if (Number(consumeReset.run(hash, clock()).changes) !== 1) {
+        db.exec('ROLLBACK');
+        resetByIp.hit(ip);
+
+        return fail(c, 400, 'badToken');
+      }
+      updatePassword.run(passwordHash, row.id);
+      deleteResetsOf.run(row.id);
+      deleteSessionsOf.run(row.id);
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+
+    loginByEmail.reset(row.email);
 
     const response: SessionResponse = { ok: true, token: openSession(row.id), user: publicUser(row) };
 

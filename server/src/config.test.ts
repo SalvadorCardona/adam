@@ -35,7 +35,20 @@ describe('loadConfig', () => {
       databasePath: '/data/game.sqlite',
       corsOrigins: ['https://cardona.digital', 'https://example.org'],
       inviteTtlMs: 15 * 60_000,
+      mail: { apiKey: null, from: '', fromName: 'Adam', publicUrl: 'https://hermez.dev/adam/' },
     });
+  });
+
+  it('lit la configuration des e-mails', () => {
+    expect(
+      loadConfig({ BREVO_API_KEY: 'xkeysib-1', MAIL_FROM: 'adam@hermez.dev', MAIL_FROM_NAME: 'Adam le jeu', PUBLIC_URL: 'http://localhost:5173/adam/' }).mail,
+    ).toEqual({ apiKey: 'xkeysib-1', from: 'adam@hermez.dev', fromName: 'Adam le jeu', publicUrl: 'http://localhost:5173/adam/' });
+  });
+
+  it('refuse une clé Brevo sans expéditeur, et une adresse publique illisible', () => {
+    expect(() => loadConfig({ BREVO_API_KEY: 'xkeysib-1' })).toThrow(/MAIL_FROM/u);
+    expect(() => loadConfig({ PUBLIC_URL: 'pas une adresse' })).toThrow(/PUBLIC_URL/u);
+    expect(() => loadConfig({ PUBLIC_URL: 'ftp://hermez.dev/' })).toThrow(/PUBLIC_URL/u);
   });
 
   it('refuse un port illisible', () => {

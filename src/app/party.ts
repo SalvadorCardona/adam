@@ -4,6 +4,7 @@
  * serveur, rien de tout cela ne fait de requête.
  */
 import { t } from '../i18n/locale.ts';
+import { resetTokenOf, withoutReset } from '../net/account.ts';
 import { inviteCodeOf, playUrl, withoutInvite } from '../net/invite.ts';
 import type { GuestSession, HostSession } from '../net/play.ts';
 import { PartyClient } from '../net/party.ts';
@@ -47,6 +48,11 @@ export async function wireParty(life: Disposer, boot: Boot, hooks: PartyHooks): 
       if (state === 'online') void accounts.refresh();
     }),
   );
+
+  // Le lien d'un e-mail « mot de passe oublié » (`?reset=`) : la fenêtre du compte s'ouvre sur le nouveau mot de passe.
+  const resetToken = scenario || guest ? null : resetTokenOf(window.location.search);
+
+  if (resetToken !== null) accountPanel.showReset(resetToken, () => window.history.replaceState(null, '', withoutReset(window.location.href)));
 
   // Héberger sa partie et inviter un ami ; ou, par un lien d'invitation (`?join=`), rejoindre celle d'un ami.
   const parties = new PartyClient(accounts);

@@ -8454,6 +8454,28 @@ span.wardrobe-thumb {
   box-shadow: inset 0 0 0 4px var(--paper-shade), inset 0 0 0 7px var(--violet);
 }
 
+/* « Mot de passe oublié ? » : un lien discret sous le mot de passe, à la zone de tap d'un bouton. */
+.account-link {
+  align-self: flex-end;
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--violet-shade);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.account-link:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
 .account-profile-name {
   margin: 0;
   font-size: 22px;

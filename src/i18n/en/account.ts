@@ -25,6 +25,17 @@ export const account: Messages['account'] = {
   guestProfile: 'Guest, no account: this nickname only lives on this device.',
   welcome: (nickname) => `Welcome, ${nickname}!`,
   signedOutDone: 'You are signed out.',
+  forgotLink: 'Forgot your password?',
+  forgotIntro: 'Enter your account’s address: you will receive a link to choose a new password.',
+  forgotSend: 'Send the link',
+  forgotSent: 'If an account exists for this address, an email is on its way. Its link is valid for 30 minutes.',
+  backToSignIn: 'Back to sign in',
+  resetIntro: 'Choose a new password.',
+  newPassword: 'New password',
+  confirmPassword: 'Confirm the password',
+  resetSubmit: 'Change password',
+  requestNewLink: 'Request a new link',
+  resetDone: (nickname) => `Password changed. Welcome, ${nickname}!`,
   field: {
     empty: 'Required.',
     tooShort: (min) => `Too short (at least ${min} characters).`,
@@ -34,6 +45,7 @@ export const account: Messages['account'] = {
       email: 'This address doesn’t look valid.',
       password: 'Password refused.',
     },
+    mismatch: 'The two passwords don’t match.',
   },
   errors: {
     invalid: 'Check the highlighted fields.',
@@ -43,5 +55,6 @@ export const account: Messages['account'] = {
     tooManyAttempts: (seconds) =>
       seconds >= 90 ? `Too many attempts. Try again in ${Math.ceil(seconds / 60)} min.` : `Too many attempts. Try again in ${seconds} s.`,
     server: 'The server answered oddly. Try again later.',
+    badToken: 'This link has expired or was already used. Request a new one.',
   },
 };
