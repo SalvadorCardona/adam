@@ -15,3 +15,6 @@ Toutes sont tirées du key art de l'écran titre et du logo en capsules
 (`src/art/titleScene.ts`, `src/art/brand.ts`) : aucun dessin de plus. Pour les
 refaire : `npm run art:steam -- /tmp/steam`, puis les commandes Chrome
 qu'il affiche.
+
+Pose en ligne de commande, sous les noms d'appid de Steam :
+`desktop/steam/install-art.sh <appid>` (voir le README, « Sur Steam Deck »).

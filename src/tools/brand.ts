@@ -10,7 +10,7 @@
  *
  * Puis affiche les commandes Chrome sans interface qui en font les PNG du
  * dépôt : `public/icon.png` (1024 px), `public/favicon.png` (64 px) et
- * `docs/banner.png` (1280 × 640).
+ * `docs/banner.png` (1280 × 640, le titre « Adam »).
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -35,7 +35,7 @@ svg { display: block; }
 .title { position: absolute; left: 64px; top: 40px; font-family: 'Fredoka'; font-weight: 700; }
 .kicker { display: inline-block; padding: 6px 22px; border-radius: 999px; background: ${PALETTE.paper.base};
   box-shadow: 0 5px 0 ${PALETTE.paper.shade}; color: ${PALETTE.violet.base}; font-size: 26px; letter-spacing: 0.2em; text-transform: uppercase; }
-.logo { margin: 18px 0 0; font-size: 116px; line-height: 0.95; color: ${PALETTE.yellow.base};
+.logo { margin: 18px 0 0; font-size: 190px; line-height: 0.95; color: ${PALETTE.yellow.base};
   text-shadow: 0 8px 0 ${PALETTE.yellow.shade}, 0 16px 0 ${PALETTE.ink.base}; }
 </style></head><body>${sized}${overlay}</body></html>`;
 }
@@ -53,7 +53,7 @@ writeFileSync(
     brandBanner(),
     1280,
     640,
-    '<div class="title"><div class="kicker">Après la fin du monde</div><h1 class="logo">Mobile<br>Factory</h1></div>',
+    '<div class="title"><div class="kicker">Après la fin du monde</div><h1 class="logo">Adam</h1></div>',
   ),
 );
 writeFileSync(`${out}/icon.svg`, brandIcon());
