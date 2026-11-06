@@ -64,7 +64,7 @@ import type { SiteLine } from '../sim/siteLedger.ts';
 import { canPause, employs } from '../sim/staffing.ts';
 import type { WorkPriority } from '../data/workers.ts';
 import { HARVEST_REACH_TILES, siteMissing, timerText, type World } from '../sim/world.ts';
-import { ZOOM, type ChunkBounds } from './camera.ts';
+import { textResolution, type ChunkBounds } from './camera.ts';
 import { buildingInSight } from './sight.ts';
 import { MobileLayer, drawHp } from './mobileLayer.ts';
 import { type HeldTool, Puppet } from './puppet.ts';
@@ -252,7 +252,7 @@ export class EntityLayer {
     this.partnerName = new Text({
       text: '',
       style: { fontFamily: 'Fredoka', fontWeight: '600', fontSize: TAG_FONT, fill: INK },
-      resolution: Math.min(3, window.devicePixelRatio || 1) * ZOOM.max,
+      resolution: textResolution(),
     });
     this.partnerName.anchor.set(0.5, 0.5);
     this.partnerTag.addChild(new Graphics(), this.partnerName);
@@ -447,7 +447,7 @@ export class EntityLayer {
         text: '',
         style: { fontFamily: 'Fredoka', fontWeight: '600', fontSize: TIMER_FONT, fill: INK },
         // Net jusqu'au zoom le plus fort, à la densité de l'écran.
-        resolution: Math.min(3, window.devicePixelRatio || 1) * ZOOM.max,
+        resolution: textResolution(),
       });
       timer.anchor.set(0.5, 0);
       timer.position.set((entity.width * TILE_SIZE) / 2, barTop(entity) + BAR_HEIGHT + 1);

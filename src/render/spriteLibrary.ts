@@ -54,9 +54,12 @@ interface Slot {
   ph: number;
 }
 
-/** Résolution de rastérisation : celle de l'écran, entre 1 et `MAX_RESOLUTION`. */
+/** Au moins deux : un écran 1080p qui zoome à ×3 ne montre pas des sprites baveux. */
+const MIN_RESOLUTION = 2;
+
+/** Résolution de rastérisation : celle de l'écran, entre `MIN_RESOLUTION` et `MAX_RESOLUTION`. */
 export function screenResolution(): number {
-  return Math.min(MAX_RESOLUTION, Math.max(1, window.devicePixelRatio || 1));
+  return Math.min(MAX_RESOLUTION, Math.max(MIN_RESOLUTION, window.devicePixelRatio || 1));
 }
 
 export class SpriteLibrary {

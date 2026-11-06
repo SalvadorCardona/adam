@@ -9,6 +9,7 @@ import { NIGHT_STAKES } from '../data/dayNight.ts';
 import type { ItemId } from '../data/items.ts';
 import type { AudioEngine } from '../audio/engine.ts';
 import { TILE_SIZE } from '../core/grid.ts';
+import { ZOOM } from '../render/camera.ts';
 import { reducedMotion } from '../render/motion.ts';
 import type { GameRenderer } from '../render/renderer.ts';
 import type { Entity } from '../sim/types.ts';
@@ -58,7 +59,7 @@ const WAVE_ANNOUNCE_SECONDS = 3;
  * l'annonce et de la sortie des flaques — assez pour voir d'où elle vient,
  * pas assez pour gêner la récolte.
  */
-const WAVE_ZOOM = 0.82;
+const WAVE_ZOOM = ZOOM.default * 0.82;
 const WAVE_ZOOM_MS = 5200;
 
 /** Les gestes qui comptent comme une activation utilisateur pour l'audio. */

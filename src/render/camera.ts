@@ -78,10 +78,21 @@ const LEVEL_MS = 140;
 /**
  * Bornes du zoom du joueur. En deçà de `min`, le sol à baker grossit vite
  * (blocs de 512 px à la résolution de l'écran) ; au-delà de `max`, les
- * sprites, rastérisés une fois à la résolution de l'écran, s'étirent et
- * deviennent flous. Un cran (bouton, touche) multiplie par `step`.
+ * sprites, rastérisés une fois à la résolution de l'écran (deux au moins),
+ * s'étirent et deviennent flous. Un cran (bouton, touche) multiplie par `step`.
  */
-export const ZOOM = { min: 0.6, max: 1.5, default: 1, step: 1.25 } as const;
+export const ZOOM = { min: 0.6, max: 3, default: 1.5, step: 2 ** (1 / 3) } as const;
+
+/**
+ * Plafond de zoom auquel les textes (`Text` de Pixi) restent nets : au-delà,
+ * leur texture grossirait pour rien (mémoire, i/s), un peu de flou vaut mieux.
+ */
+export const TEXT_ZOOM = 2;
+
+/** La résolution d'une texture de texte : la densité de l'écran, jusqu'à `TEXT_ZOOM`. */
+export function textResolution(): number {
+  return Math.min(3, window.devicePixelRatio || 1) * TEXT_ZOOM;
+}
 
 /** Un décalage du joueur garde Adam à au moins autant de pixels monde du bord de l'écran. */
 const PAN_MARGIN = 3 * TILE_SIZE;
@@ -109,14 +120,15 @@ export function clampZoom(level: number): number {
 
 /**
  * Le cran suivant depuis `level`, vers l'avant (`direction` 1) ou l'arrière
- * (-1) : les crans sont les puissances de `ZOOM.step`, si bien qu'on retombe
+ * (-1) : les crans sont `ZOOM.default` fois les puissances de `ZOOM.step`
+ * (trois crans jusqu'au maximum), si bien qu'on retombe
  * toujours sur le zoom par défaut, même parti d'un niveau de molette.
  */
 export function stepZoom(level: number, direction: 1 | -1): number {
-  const index = Math.log(level) / Math.log(ZOOM.step);
+  const index = Math.log(level / ZOOM.default) / Math.log(ZOOM.step);
   const next = direction > 0 ? Math.floor(index + 1e-6) + 1 : Math.ceil(index - 1e-6) - 1;
 
-  return clampZoom(ZOOM.step ** next);
+  return clampZoom(ZOOM.default * ZOOM.step ** next);
 }
 
 /**
@@ -182,7 +194,7 @@ export class Camera {
   /** Centre de la caméra, en pixels monde. */
   public x = 0;
   public y = 0;
-  public zoom = 1;
+  public zoom: number = ZOOM.default;
   public viewWidth = 1;
   public viewHeight = 1;
 
@@ -206,7 +218,7 @@ export class Camera {
   private lookWeight = 0;
 
   /** Zoom visé pendant un recul, et ms pendant lesquelles il est tenu. */
-  private zoomTarget = 1;
+  private zoomTarget: number = ZOOM.default;
   private zoomHold = 0;
   /** Le cadrage serré du départ : facteur du niveau du joueur, et ms restantes. */
   private introFactor = 1;

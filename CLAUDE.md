@@ -1262,7 +1262,7 @@ Les règles, en résumé :
   l'objet (`TerrainTiles.shadow`), dans un conteneur sous tout le reste.
 - Ressenti (rebond, secousse, tremblement, flash, caméra) : des minuteurs
   de vue côté `render/`, jamais de l'état de simulation.
-  Le **zoom** du joueur (`Camera.level`, bornes `ZOOM` : 0,6–1,5) se
+  Le **zoom** du joueur (`Camera.level`, bornes `ZOOM` : 0,6–3, défaut 1,5, trois crans de ×2^⅓ jusqu’au maximum) se
   pilote aux trois boutons du bord droit (`ui/zoomControls.ts` : avancer,
   revenir sur Adam, reculer ; Pause, Réglages et la carte du monde au-dessus), à la molette sous le curseur et au pinch
   (`input/zoom.ts`, le geste à deux doigts de `PointerDispatch`, qui ne
