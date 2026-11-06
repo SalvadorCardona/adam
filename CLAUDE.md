@@ -1411,6 +1411,18 @@ Rien ne joue avant un geste du joueur.
   lourd et rarement ouvert se charge de même. Audio : boucles et bruitages sont
   réencodés à débit modeste (`public/audio/*/CREDITS.md`) ; bruitages en mono.
 
+## Application de bureau (Steam Deck)
+
+`desktop/` : le jeu dans Electron, un AppImage et un tar.gz Linux x64
+(`npm run desktop:build`, `desktop:dev`, `test:desktop` — Playwright
+`_electron` sur le paquet). Paquet à part (son lockfile, Electron figé) : le
+web n'en sait rien. Le build servi par `app://adam/adam/…` (origine stable :
+la sauvegarde en dépend), profil `~/.config/Adam`, hors ligne sans
+`VITE_API_URL` (mode Vite `desktop` : sans Umami). Le jeu ne voit que
+`window.adamDesktop` (`src/app/desktop.ts`) : « Quitter » au titre et à la
+pause, pas de service worker, pause à la perte du focus. Détails et sécurité :
+`desktop/README.md` ; images Steam : `docs/steam/` (`npm run art:steam`).
+
 ## Partie de test
 
 **`/adam/test`** — en local `http://localhost:5173/adam/test`,

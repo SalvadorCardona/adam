@@ -91,6 +91,9 @@ sur la même carte, ce qui rend un bug de génération reproductible. En dev,
 | `npm test`          | Vitest rapide (projet `fast`), moins de 40 s |
 | `npm run test:slow` | Vitest, suite entière : 1 000 graines, défense, longues parties |
 | `npm run test:e2e`  | Playwright : le vrai jeu dans Chromium, 390 × 844 et 1440 × 900 |
+| `npm run desktop:dev` | le jeu dans Electron, servi par Vite (F12 : DevTools) |
+| `npm run desktop:build` | l'application de bureau : AppImage et tar.gz Linux x64, dans `desktop/release/` |
+| `npm run test:desktop` | Playwright : le paquet construit, lancé par Electron |
 
 Le back-end (`server/` : Hono, `ws`, SQLite embarqué dans Node) est
 facultatif : le jeu se joue entièrement sans lui. Sa configuration est dans
@@ -125,20 +128,60 @@ règlent dans **Réglages → Manette**, où « Contrôles manette » rappelle c
 tableau avec les boutons de votre manette. Débranchée en pleine partie, la
 manette met le jeu en pause.
 
-**Steam Deck.** En mode Bureau, ouvrez le jeu dans le navigateur
-(https://cardona.digital/adam/) : la manette intégrée est reconnue
-directement. En mode Game :
+### Sur Steam Deck, en mode Game
 
-1. en mode Bureau, installez un navigateur (Chrome ou Firefox, depuis Discover),
-   puis dans Steam : *Jeux → Ajouter un jeu non-Steam* et choisissez-le ;
-2. dans les *Propriétés* du raccourci, mettez l'URL du jeu en option de
-   lancement — pour Chrome en Flatpak :
-   `--kiosk https://cardona.digital/adam/` (`--kiosk` pour un plein
-   écran sans barre d'adresse) ;
-3. *Contrôleur → Disposition* : choisissez le modèle **« Gamepad »** (manette),
-   pas « Web browser » — ce dernier transforme les sticks en souris et en
-   molette, et le jeu ne verrait plus de manette. Steam Input présente alors le
-   Steam Deck comme une manette Xbox : le jeu affiche A, B, X, Y.
+Adam existe en **application de bureau Linux** (Electron, dossier
+[`desktop/`](desktop/)) : un seul fichier, `Adam-<version>.AppImage`, qui
+embarque son propre Chromium — la même manette, le même WebGL et le même son
+que dans Chrome. Il se lance en plein écran, sans navigateur à installer ni
+adresse à taper, et se joue **hors ligne** : le paquet ne fait aucune requête.
+
+1. **Télécharger l'AppImage**, en mode Bureau (bouton Steam → *Alimentation* →
+   *Passer au Bureau*) : sur la page des
+   [Releases](https://github.com/SalvadorCardona/adam/releases), prenez
+   `Adam-<version>.AppImage` (environ 140 Mo), par exemple dans
+   `~/Applications/`.
+2. **Le rendre exécutable** : clic droit sur le fichier → *Propriétés* →
+   *Permissions* → cochez *Est exécutable*. Ou, dans un terminal (Konsole) :
+   `chmod +x ~/Applications/Adam-*.AppImage`.
+3. **L'ajouter à Steam** : ouvrez Steam (toujours en mode Bureau) →
+   *Jeux* → *Ajouter un jeu non-Steam à ma bibliothèque* → *Parcourir…* →
+   choisissez l'AppImage (type de fichier : *Tous les fichiers*).
+4. **Choisir la disposition « Gamepad »** : de retour en mode Game, dans la
+   page du jeu, l'icône manette → *Disposition du contrôleur* → *Modèles* →
+   **« Gamepad »** (manette), pas « Web browser », qui transforme les sticks en
+   souris et en molette : le jeu ne verrait plus de manette. Steam Input
+   présente alors le Deck comme une manette Xbox : le jeu affiche A, B, X, Y.
+   Les détails sont dans [`desktop/steam/`](desktop/steam/README.md).
+5. **Poser les images** (facultatif) : dans la page du jeu, *Propriétés* (ou
+   la roue dentée → *Gérer*) → *Personnaliser*, puis les fichiers de
+   [`docs/steam/`](docs/steam/) — `capsule.png` (portrait), `banner.png`,
+   `hero.png` (l'image d'en-tête), `logo.png` (transparent) et `icon.png`.
+
+« Quitter » est sur l'écran titre et dans la pause : en mode Game, c'est la
+façon propre de fermer le jeu (la partie est écrite avant). Le menu Steam ou
+la mise en veille mettent la partie en pause ; au retour, *Reprendre*. Le
+nombre d'images par seconde n'est pas bridé : le limiteur de Steam (40, 60,
+90 Hz) s'en charge. Sur un PC, F11 bascule le plein écran.
+
+Un AppImage qui ne démarre pas (FUSE absent, par exemple) a son secours :
+`Adam-<version>-linux-x64.tar.gz`, sur la même page. Détaré, c'est un dossier
+dont l'exécutable `adam` se lance tel quel — c'est lui qu'on ajoute à Steam.
+
+**Les sauvegardes** sont dans le profil de l'application, `~/.config/Adam`
+(le `localStorage` du jeu, sous `Local Storage/`), qui ne bouge pas d'une
+version à l'autre : une nouvelle AppImage reprend la partie. Pour la mettre
+de côté, copiez ce dossier application fermée — par exemple
+`tar czf ~/adam-sauvegarde.tar.gz -C ~/.config Adam` — et remettez-le en
+place pour la restaurer. Une partie jouée dans le navigateur ne s'y retrouve
+pas : ce sont deux sauvegardes distinctes.
+
+**Autre méthode, par le navigateur.** En mode Bureau, ouvrez le jeu dans un
+navigateur (https://cardona.digital/adam/) : la manette intégrée est
+reconnue directement. Pour le mode Game : installez Chrome (Discover),
+ajoutez-le comme jeu non-Steam, mettez en option de lancement
+`--kiosk https://cardona.digital/adam/` (plein écran sans barre d'adresse) et
+choisissez, là aussi, la disposition « Gamepad ».
 
 L'interface est lisible sur l'écran 1280 × 800 du Deck ; le curseur est plus
 grand que celui de la souris, cerné d'indigo, et l'élément choisi à la croix
@@ -280,6 +323,10 @@ Chrome, sur un vrai téléphone.
 Chaque push sur `main` construit le jeu et le publie sur GitHub Pages, à
 [cardona.digital/adam](https://cardona.digital/adam/)
 (`.github/workflows/deploy.yml`).
+
+L'application de bureau (AppImage et tar.gz Linux x64) est construite à
+chaque PR pour vérifier l'empaquetage, et attachée à la Release de chaque tag
+`v*` (`.github/workflows/desktop.yml`, voir [`desktop/`](desktop/README.md)).
 
 Le site est servi sous un sous-chemin, d'où le `base` de `vite.config.ts`. Ces
 deux valeurs doivent rester d'accord : si le dépôt est renommé, l'une sans

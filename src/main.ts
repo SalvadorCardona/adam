@@ -24,6 +24,7 @@ import { AudioEngine } from './audio/engine.ts';
 import { GameRenderer } from './render/renderer.ts';
 import { Disposer } from './ui/disposer.ts';
 import { bootGame } from './app/boot.ts';
+import { desktopShell } from './app/desktop.ts';
 import { wireAlarm, wireAudio, wireHaptics, wireParticles, wireRumble, wireShake } from './app/feedback.ts';
 import { wireFrame } from './app/frame.ts';
 import { GameLoop, type PlayFlags } from './app/gameLoop.ts';
@@ -85,8 +86,8 @@ async function main(): Promise<void> {
 
   wireHaptics(life, world);
 
-  // Le service worker garde le jeu en cache : installable, ouvert sans réseau. Rien en développement.
-  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  // Le service worker garde le jeu en cache : installable, ouvert sans réseau. Rien en développement, ni dans l'application de bureau, dont les fichiers sont déjà sur le disque.
+  if (import.meta.env.PROD && 'serviceWorker' in navigator && !desktopShell()) {
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
   }
 

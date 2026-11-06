@@ -368,6 +368,20 @@ export const UI_ICONS = {
     pill(8, 20, 8, 2, mint.shade),
     line(3.5, 3.5, 20.5, 20.5, coral.shade),
   ),
+  /** Quitter (application de bureau) : une porte violette entrouverte, une flèche orange qui en sort. */
+  quit: svg(
+    S,
+    S,
+    shadedBlock(3, 3, 11, 18, 2, 'violet', 2.5),
+    rect(5.5, 5.5, 6, 13, violet.shade, 1.5),
+    circle(10, 12.5, 1.1, PALETTE.yellow.base),
+    pill(5, 4.5, 4, 1.4, violet.light),
+    pill(12, 11.4, 6.5, 3.2, orange.shade),
+    polygon([17.2, 7.6, 22.4, 13, 17.2, 18.4], orange.shade),
+    pill(11.4, 10.6, 6.5, 3.2, orange.base),
+    polygon([16.6, 6.8, 21.8, 12.2, 16.6, 17.6], orange.base),
+    pill(12.4, 11.1, 3, 1, orange.light),
+  ),
   /** Un chevron vers le bas : le rappel d'un volet qui s'ouvre (retourné en CSS une fois ouvert). */
   chevron: svg(S, S, polyline([6, 9, 12, 15, 18, 9], violet.shade)),
   /** L'ampoule du conseil. */

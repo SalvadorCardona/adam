@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/app-builder-lib/scheme.json",
+  "appId": "dev.hermez.adam",
+  "productName": "Adam",
+  "copyright": "Copyright © Hermez",
+  "extraMetadata": {
+    "author": { "name": "Hermez", "email": "contact@cardona.digital", "url": "https://hermez.dev" }
+  },
+  "directories": {
+    "app": "app",
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": ["**/*"],
+  "asar": true,
+  "electronLanguages": ["fr", "en-US"],
+  "toolsets": { "appimage": "1.0.3" },
+  "afterPack": "./scripts/afterPack.cjs",
+  "publish": null,
+  "linux": {
+    "target": [
+      { "target": "AppImage", "arch": ["x64"] },
+      { "target": "tar.gz", "arch": ["x64"] }
+    ],
+    "executableName": "adam",
+    "icon": "app/icon.png",
+    "category": "Game",
+    "synopsis": "Jeu de construction et de survie 2D",
+    "description": "Adam — jeu de construction et de survie 2D. Un produit Hermez.",
+    "artifactName": "Adam-${version}-linux-${arch}.${ext}",
+    "desktop": {
+      "entry": { "Name": "Adam", "Comment": "Jeu de construction et de survie 2D", "StartupWMClass": "Adam" }
+    }
+  },
+  "appImage": {
+    "artifactName": "Adam-${version}.${ext}"
+  }
+}

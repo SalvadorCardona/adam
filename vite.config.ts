@@ -74,6 +74,20 @@ function precache(): Plugin {
 }
 
 /*
+ * L'application de bureau (`desktop/`, `vite build --mode desktop`) : le même
+ * jeu, sans le script d'Umami — hors ligne, il ne mesurerait rien, et le CSP
+ * de l'application refuse tout script venu d'ailleurs. Le build du web n'y
+ * passe pas.
+ */
+function desktopPage(): Plugin {
+  return {
+    name: 'adam:desktop-page',
+    apply: (_config, env) => env.mode === 'desktop',
+    transformIndexHtml: (html) => html.replace(/\s*<script\s+src="https:\/\/umami\.[^"]*"[^>]*><\/script>/, ''),
+  };
+}
+
+/*
  * Le jeu est publié en project page GitHub Pages, donc servi sous un
  * sous-chemin — https://cardona.digital/adam/ — et non à la racine
  * du domaine.
@@ -93,7 +107,7 @@ function precache(): Plugin {
  */
 export default defineConfig({
   base: '/adam/',
-  plugins: [testPages(), precache()],
+  plugins: [testPages(), precache(), desktopPage()],
   build: {
     rolldownOptions: {
       output: {

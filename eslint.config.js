@@ -3,7 +3,11 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'coverage'] },
+  /*
+   * `desktop/` a ses propres dépendances (Electron), absentes d'un `npm ci` de
+   * la racine : `npm run desktop:check` le lint, une fois `desktop/` installé.
+   */
+  { ignores: ['dist', 'node_modules', 'coverage', 'desktop/**'] },
 
   js.configs.recommended,
 
@@ -11,11 +15,11 @@ export default tseslint.config(
   // eslint.config.js lui-même n'en fait pas partie.
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({
     ...config,
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.mts'],
   })),
 
   {
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.mts'],
     languageOptions: {
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
       globals: globals.browser,
@@ -62,9 +66,9 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
 
-  // Le back-end tourne dans Node.
+  // Le back-end tourne dans Node, et le processus principal de l'application de bureau aussi.
   {
-    files: ['server/**'],
+    files: ['server/**', 'desktop/**'],
     languageOptions: { globals: globals.node },
   },
 

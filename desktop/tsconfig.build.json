@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "outDir": "app",
+    "rootDir": ".",
+    "sourceMap": false
+  },
+  "include": ["main.ts", "preload.ts"]
+}

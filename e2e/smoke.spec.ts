@@ -55,6 +55,8 @@ test('du titre au HUD : jouer, marcher, mettre en pause', async ({ page }) => {
 
   await expect(title).toBeVisible();
   expect(await hiddenButVisible(page)).toEqual([]);
+  // « Quitter » n'existe que dans l'application de bureau (`window.adamDesktop`).
+  await expect(page.locator('.title-quit, .pause-quit')).toHaveCount(0);
   await title.locator('.button-primary').first().click();
   await expect(title).toBeHidden();
 
@@ -84,6 +86,7 @@ test('du titre au HUD : jouer, marcher, mettre en pause', async ({ page }) => {
   await page.locator('.hud-pause').click();
   await expect(pause).toBeVisible();
   expect(await hiddenButVisible(page)).toEqual([]);
+  await expect(page.locator('.pause-quit')).toHaveCount(0);
   await pause.getByRole('button', { name: 'Reprendre' }).click();
   await expect(pause).toBeHidden();
 

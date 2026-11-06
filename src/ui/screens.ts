@@ -73,13 +73,15 @@ export interface TitleOptions {
   accountButton: HTMLButtonElement;
   /** Ouvre la couche qui peint la scène vivante (`GameRenderer.openTitle`), quand l'écran est montré. */
   scene: () => Promise<TitleView>;
+  /** « Quitter » : l'application de bureau seulement (`app/desktop.ts`) ; `null` sur le web, où le bouton n'existe pas. */
+  onQuit?: (() => void) | null;
 }
 
 export class TitleScreen {
   public readonly root: HTMLElement;
   private readonly unsubscribe: () => void;
 
-  public constructor({ resume, summary, firstRun, notice, onPlay, onRestart, garden, gardenActions, record, daily, collection, onSettings, accountButton, sound, scene }: TitleOptions) {
+  public constructor({ resume, summary, firstRun, notice, onPlay, onRestart, garden, gardenActions, record, daily, collection, onSettings, accountButton, sound, scene, onQuit = null }: TitleOptions) {
     this.root = document.createElement('div');
     this.root.className = 'overlay title-screen';
     const art = new TitleArt(scene, sound);
@@ -282,6 +284,9 @@ export class TitleScreen {
     extras.append(dailyButton);
     panel.append(extras);
 
+    // L'application de bureau : en mode Game du Steam Deck, c'est la seule façon propre de fermer le jeu.
+    if (onQuit) panel.append(quitButton(onQuit, 'button-secondary title-quit', labels));
+
     if (daily.playing) {
       const line = document.createElement('p');
 
@@ -343,6 +348,17 @@ export class TitleScreen {
   }
 }
 
+/** « Quitter » (application de bureau) : `labels` reçoit de quoi réécrire son libellé à chaque langue. */
+function quitButton(onQuit: () => void, className: string, labels: (() => void)[]): HTMLButtonElement {
+  const button = document.createElement('button');
+
+  button.type = 'button';
+  button.className = className;
+  button.addEventListener('click', onQuit);
+  labels.push(() => button.replaceChildren(uiIcon('quit', 22), t().screens.quit));
+  return button;
+}
+
 /** Un SVG en `data:` URL, pour un `<img>`. */
 function svgUrl(source: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
@@ -393,7 +409,7 @@ export class PauseScreen {
   private voiceOn = false;
 
   /** `onInvite` : `null` chez l’ami en jeu et sans serveur — le bouton n’existe alors pas. */
-  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: (() => void) | null, onVoice: (() => void) | null = null, onSettings: () => void = () => {}, onTitle: (() => void) | null = null) {
+  public constructor(seed: number, collection: () => Collection, onResume: () => void, onRestart: () => void, onInvite: (() => void) | null, onVoice: (() => void) | null = null, onSettings: () => void = () => {}, onTitle: (() => void) | null = null, onQuit: (() => void) | null = null) {
     this.root = document.createElement('div');
     this.root.className = 'overlay pause-screen';
     this.root.hidden = true;
@@ -466,9 +482,14 @@ export class PauseScreen {
       showCollection.focus();
     });
 
+    // L'application de bureau seulement : quitter, la partie écrite avant.
+    const quitLabels: (() => void)[] = [];
+    const quit = onQuit ? quitButton(onQuit, 'button-secondary pause-quit', quitLabels) : null;
+
     onLocale(() => {
       const { pause } = t().screens;
 
+      for (const label of quitLabels) label();
       showCollection.replaceChildren(uiIcon('trophy', 22), t().collection.title);
       settings.replaceChildren(uiIcon('settings', 22), pause.settings);
       toTitle.replaceChildren(uiIcon('home', 22), pause.titleScreen);
@@ -482,7 +503,7 @@ export class PauseScreen {
     });
 
     this.confirm = confirmRestart(onRestart, () => this.asking(false));
-    this.panel.append(title, text, resume, settings, showCollection, ...(onInvite ? [invite] : []), this.voice, ...(onTitle ? [toTitle] : []), restart, seedLine(seed));
+    this.panel.append(title, text, resume, settings, showCollection, ...(onInvite ? [invite] : []), this.voice, ...(onTitle ? [toTitle] : []), restart, ...(quit ? [quit] : []), seedLine(seed));
     this.root.append(this.panel, this.confirm, this.collection.root);
     this.collection.root.hidden = true;
     this.asking(false);

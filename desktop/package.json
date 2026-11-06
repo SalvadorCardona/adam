@@ -1,0 +1,11 @@
+{
+  "name": "adam-desktop",
+  "private": true,
+  "type": "commonjs",
+  "description": "Adam en application de bureau (Electron) : un AppImage Linux pour le Steam Deck.",
+  "scripts": {},
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
+  }
+}
