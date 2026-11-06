@@ -6789,6 +6789,13 @@ button:disabled,
   flex: none;
 }
 
+/* « Quitter » : l'application de bureau seulement (`app/desktop.ts`), sous les autres boutons, aussi large qu'eux. */
+.title-quit {
+  width: 100%;
+  min-height: 44px;
+  font-size: 15px;
+}
+
 /* Discret : une vieille sauvegarde ignorée ne mérite pas une alerte. */
 .title-notice {
   margin: 0;
@@ -8223,6 +8230,12 @@ span.wardrobe-thumb {
   .pad-focus {
     animation: none;
   }
+}
+
+/* L'application de bureau à la manette (Steam Deck) : le curseur du jeu suffit, celui du système s'efface. */
+[data-desktop='true'][data-input='pad'],
+[data-desktop='true'][data-input='pad'] * {
+  cursor: none !important;
 }
 
 /* En mode manette, le joystick tactile et les touches du clavier s'effacent ; les boutons de la manette paraissent. */

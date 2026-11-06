@@ -26,6 +26,7 @@ import { PauseScreen, TitleScreen } from '../ui/screens.ts';
 import type { SettingsPanel } from '../ui/settingsPanel.ts';
 import { TabLockPanel } from '../ui/tabLockPanel.ts';
 import { linkNotice, type Boot } from './boot.ts';
+import { desktopShell } from './desktop.ts';
 import type { GameLoop, PlayFlags } from './gameLoop.ts';
 import type { Party } from './party.ts';
 import { wireAchievements, wireDaily, wireGarden, wireRecord, wireSave } from './persistence.ts';
@@ -78,6 +79,14 @@ export function wireScreens(
   // Jouer à deux : chacun voit l'autre arriver et partir.
   life.on(world.events, 'partnerJoined', ({ name }) => hud.notify(t().party.play.partnerJoined(name), 'good'));
   life.on(world.events, 'partnerLeft', ({ name }) => hud.notify(t().party.play.partnerLeft(name), 'bad'));
+  // L'application de bureau (Steam Deck) : « Quitter » écrit la partie, puis ferme. Sur le web, ni bouton ni écouteur.
+  const desktop = desktopShell();
+  const quit = desktop
+    ? (): void => {
+        autosave.now();
+        desktop.quit();
+      }
+    : null;
   const pause = new PauseScreen(world.seed, () => achievements.collection, () => setPaused(false), () => autosave.restart(), guest || !connection.enabled ? null : () => party.invitePanel.with((panel) => panel.show()), () => party.voicePanel.toggleMembership(),
     () => settings.show(),
     // L'écran titre : la partie est écrite, la page se recharge sur « Continuer ». Pas de sauvegarde en partie de test ni chez l'ami.
@@ -85,6 +94,7 @@ export function wireScreens(
       autosave.now();
       window.location.reload();
     },
+    quit,
   );
   // Chez l'ami, l'hôte est là d'emblée : le vocal est à portée dès l'arrivée.
   if (guest) {
@@ -130,6 +140,7 @@ export function wireScreens(
     sound: { play: (name) => audio.play(name), ambience: (dusk) => audio.setAmbience(dusk) },
     accountButton: party.accountPanel.button('button-secondary title-garden'),
     scene: () => renderer.openTitle(),
+    onQuit: quit,
   });
 
   function setPaused(value: boolean): void {
@@ -172,6 +183,22 @@ export function wireScreens(
     autosave.now();
   });
   life.listen(window, 'pagehide', () => autosave.now());
+
+  /*
+   * L'application de bureau : le menu Steam ou la veille du Deck ôtent le focus
+   * sans cacher la fenêtre — la partie s'arrête et s'écrit aussi là. Au retour,
+   * le son repart (Electron le permet sans geste : la manette n'en est pas un).
+   */
+  if (desktop) {
+    document.documentElement.dataset['desktop'] = 'true';
+    life.listen(window, 'blur', () => {
+      setPaused(true);
+      autosave.now();
+    });
+    life.listen(window, 'focus', () => {
+      if (!document.hidden) audio.unlock();
+    });
+  }
 
   return { setPaused, pause, title, tabPanel, autosave, garden, achievements };
 }

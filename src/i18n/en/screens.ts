@@ -42,6 +42,8 @@ export const screens: Messages['screens'] = {
       slowDrills: { name: 'Slow drills', text: 'Each ore takes half as long again.' },
     },
   },
+  /** L'application de bureau seulement (Steam Deck) : fermer le jeu, depuis l'écran titre ou la pause. */
+  quit: 'Quit',
   pause: {
     title: 'Paused',
     text: 'The mutants are waiting too.',

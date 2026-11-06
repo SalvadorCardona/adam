@@ -53,6 +53,8 @@ export const screens = {
       slowDrills: { name: 'Foreuses lentes', text: 'Chaque minerai prend une moitié de temps de plus.' },
     },
   },
+  /** L'application de bureau seulement (Steam Deck) : fermer le jeu, depuis l'écran titre ou la pause. */
+  quit: 'Quitter',
   pause: {
     title: 'Pause',
     text: 'Les mutants attendent, eux aussi.',

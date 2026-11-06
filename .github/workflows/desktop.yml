@@ -1,0 +1,95 @@
+name: Bureau
+
+# L'application de bureau (Electron) : l'AppImage du Steam Deck et son tar.gz
+# de secours. Sur une PR, on vérifie que l'empaquetage passe et que le paquet
+# s'ouvre (test Playwright `_electron`) ; les deux fichiers restent une
+# semaine en artefacts, pour un essai à la main. Sur un tag `v*`, ils sont
+# attachés à la Release du tag (créée si elle n'existe pas).
+on:
+  pull_request:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+
+      - run: npm ci
+
+      # Electron et electron-builder : le lockfile de desktop/, à part de celui du jeu.
+      - run: npm ci --prefix desktop
+
+      - name: Lint et typecheck du bureau
+        run: npm run desktop:check
+
+      # Le paquet hors ligne : aucun VITE_API_URL. Sur un tag, la version du fichier est celle du tag.
+      - name: Empaquetage (AppImage, tar.gz)
+        run: npm run desktop:build
+        env:
+          VITE_API_URL: ''
+          ADAM_DESKTOP_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+
+      - name: Taille du paquet
+        run: ls -lh desktop/release/*.AppImage desktop/release/*.tar.gz | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Test de bout en bout (Electron)
+        run: npm run test:desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adam-linux-x64
+          path: |
+            desktop/release/*.AppImage
+            desktop/release/*.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Rapport Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-test-results
+          path: desktop/test-results/
+          retention-days: 7
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: adam-linux-x64
+          path: out
+
+      - name: Attacher à la Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" out/* --clobber
+          else
+            gh release create "$TAG" out/* --title "Adam $TAG" --generate-notes
+          fi
