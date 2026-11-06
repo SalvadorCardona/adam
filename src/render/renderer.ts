@@ -56,7 +56,8 @@ import { WorkReachLayer } from './workReach.ts';
 import { WeatherLayer } from './weatherLayer.ts';
 
 /** Le recul de la caméra quand l'antenne s'allume : de quoi voir le pylône entier et ses premières ondes. */
-const SIGNAL_ZOOM = 0.75;
+// Relatif au zoom par défaut : le recul garde la même ampleur.
+const SIGNAL_ZOOM = ZOOM.default * 0.75;
 /** Au lancement, la caméra cadre Adam un peu plus serré, une seconde. */
 const INTRO_ZOOM = 1.25;
 const INTRO_MS = 1000;

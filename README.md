@@ -117,7 +117,7 @@ touche l'écran, et revient au premier geste à la manette.
 | ○ / B | retour : ferme la fenêtre ou le menu ouverts, annule un placement |
 | △ / Y | le sac (inventaire, habillement) |
 | □ / X | « Bâtir » |
-| L1 / R1 (LB / RB) | un cran de zoom arrière / avant |
+| L1 / R1 (LB / RB) | un cran de zoom arrière / avant (trois crans jusqu’au maximum ×3) |
 | L2 / R2 (LT / RT) | zoom continu |
 | R3 (clic du stick droit) | revenir sur Adam |
 | Options / Menu | pause |

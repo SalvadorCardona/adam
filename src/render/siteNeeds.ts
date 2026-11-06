@@ -17,7 +17,7 @@ import { PALETTE, hex } from '../data/artDirection.ts';
 import { ICON_SIZE } from '../data/icons.ts';
 import type { ItemId } from '../data/items.ts';
 import type { SiteLine } from '../sim/siteLedger.ts';
-import { ZOOM } from './camera.ts';
+import { textResolution } from './camera.ts';
 import type { SpriteLibrary } from './spriteLibrary.ts';
 
 /** Côté d'une icône, en pixels monde : la moitié de celle du sac. */
@@ -146,7 +146,7 @@ export class SiteNeeds {
       text: '',
       style: { fontFamily: 'Fredoka', fontWeight: '600', fontSize: FONT, fill: INK },
       // Net jusqu'au zoom le plus fort, à la densité de l'écran.
-      resolution: Math.min(3, window.devicePixelRatio || 1) * ZOOM.max,
+      resolution: textResolution(),
     });
 
     count.anchor.set(0, 0.5);

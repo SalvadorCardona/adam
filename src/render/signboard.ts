@@ -26,9 +26,9 @@ import { PALETTE, hex } from '../data/artDirection.ts';
 import type { BuildingId } from '../data/buildings.ts';
 import { ICON_SIZE } from '../data/icons.ts';
 import type { ItemId } from '../data/items.ts';
-import { ZOOM } from './camera.ts';
+import { TEXT_ZOOM } from './camera.ts';
 import type { SignMode } from './signs.ts';
-import { screenResolution, type SpriteLibrary } from './spriteLibrary.ts';
+import { type SpriteLibrary } from './spriteLibrary.ts';
 
 /** Taille du nom et côté de l'icône d'objet, en pixels monde. */
 const FONT = 9;
@@ -61,7 +61,7 @@ export class Signboards {
   private readonly stale: Texture[] = [];
   private readonly renderer: Renderer;
   private readonly library: SpriteLibrary;
-  private readonly resolution = screenResolution() * ZOOM.max;
+  private readonly resolution = Math.min(3, window.devicePixelRatio || 1) * TEXT_ZOOM;
   /** Change quand la police arrive : la clé de chaque texture avec. */
   public generation = 0;
 

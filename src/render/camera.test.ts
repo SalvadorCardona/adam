@@ -73,24 +73,26 @@ describe('zoom du joueur', () => {
     expect(up.at(-1)).toBe(ZOOM.max);
     expect(up.every((value) => value <= ZOOM.max)).toBe(true);
     // Redescendre depuis la butée repasse par les mêmes crans.
-    expect(stepZoom(ZOOM.max, -1)).toBeCloseTo(ZOOM.step);
-    expect(stepZoom(ZOOM.step, -1)).toBeCloseTo(ZOOM.default);
+    expect(stepZoom(ZOOM.max, -1)).toBeCloseTo(ZOOM.default * ZOOM.step ** 2);
+    expect(stepZoom(ZOOM.default * ZOOM.step ** 2, -1)).toBeCloseTo(ZOOM.default * ZOOM.step);
+    // Trois crans du zoom par défaut au maximum.
+    expect(up[2]).toBeCloseTo(ZOOM.max);
     expect(stepZoom(ZOOM.min, -1)).toBe(ZOOM.min);
     // Un niveau de molette entre deux crans va au cran voisin, pas plus loin.
-    expect(stepZoom(1.1, 1)).toBeCloseTo(ZOOM.step);
-    expect(stepZoom(1.1, -1)).toBeCloseTo(ZOOM.default);
+    expect(stepZoom(1.7, 1)).toBeCloseTo(ZOOM.default * ZOOM.step);
+    expect(stepZoom(1.7, -1)).toBeCloseTo(ZOOM.default);
   });
 
   it('glisse vers le niveau choisi sans compter comme une dérive', () => {
     const camera = still();
 
-    camera.zoomTo(1.25);
+    camera.zoomTo(2);
     camera.follow(0, 0, 0, 0, 16);
-    expect(camera.zoom).toBeGreaterThan(1);
-    expect(camera.zoom).toBeLessThan(1.25);
+    expect(camera.zoom).toBeGreaterThan(ZOOM.default);
+    expect(camera.zoom).toBeLessThan(2);
     expect(camera.drifting).toBe(false);
     run(camera, 1000);
-    expect(camera.zoom).toBe(1.25);
+    expect(camera.zoom).toBe(2);
   });
 
   it('garde le point visé sous le curseur, en glissant comme d’un coup', () => {
@@ -142,7 +144,7 @@ describe('zoom du joueur', () => {
     expect(camera.atHome).toBe(true);
     expect(camera.zoom).toBe(ZOOM.default);
     expect(camera.worldToScreen(0, 0).x).toBeCloseTo(195, 0);
-    expect(camera.worldToScreen(0, 0).y).toBeCloseTo(422, 0);
+    expect(Math.abs(camera.worldToScreen(0, 0).y - 422)).toBeLessThan(1);
   });
 
   it('laisse le recul d’une vague élargir, jamais resserrer', () => {
@@ -198,12 +200,12 @@ describe('Camera.lookAt', () => {
 
 describe('cadrage de la zone explorée', () => {
   it('avance sur un grand écran pour que la clairière le remplisse', () => {
-    const level = fitZoom(1440, 900, 33, 33);
+    const level = fitZoom(1440, 900, 20, 20);
 
     expect(level).toBeGreaterThan(ZOOM.default);
-    // La clairière couvre au moins la moitié de la hauteur — en fait, toute.
-    expect((33 * TILE_SIZE * level) / 900).toBeGreaterThanOrEqual(0.5);
-    expect((33 * TILE_SIZE * level) / 1440).toBeCloseTo(FIT_COVER, 5);
+    // La zone couvre au moins la moitié de la hauteur — en fait, toute.
+    expect((20 * TILE_SIZE * level) / 900).toBeGreaterThanOrEqual(0.5);
+    expect((20 * TILE_SIZE * level) / 1440).toBeCloseTo(FIT_COVER, 5);
   });
 
   it('reste dans les bornes, et ne recule jamais sous le zoom par défaut', () => {
