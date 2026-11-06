@@ -12,7 +12,9 @@
 
 import {
   API_PATHS,
+  RESET_PARAM,
   isAccountError,
+  isForgotResponse,
   isMeResponse,
   isSessionResponse,
   type AccountErrorResponse,
@@ -20,9 +22,30 @@ import {
   type FieldError,
   type GuestRequest,
   type LoginRequest,
+  type MailLocale,
   type RegisterRequest,
+  type ResetRequest,
 } from '../../shared/api.ts';
 import type { LocalAccount } from '../storage/localAccount.ts';
+
+/**
+ * Le jeton d'un lien « mot de passe oublié » (`?reset=<jeton>`), ou `null` :
+ * la page n'a pas été ouverte par un tel lien.
+ */
+export function resetTokenOf(search: string): string | null {
+  const token = new URLSearchParams(search).get(RESET_PARAM)?.trim();
+
+  return token ? token : null;
+}
+
+/** L'adresse de la page sans le jeton : on n'y revient pas en rechargeant. */
+export function withoutReset(pageHref: string): string {
+  const url = new URL(pageHref);
+
+  url.searchParams.delete(RESET_PARAM);
+
+  return url.toString();
+}
 
 /** Le temps au-delà duquel un appel de compte est tenu pour perdu. */
 export const ACCOUNT_TIMEOUT_MS = 10_000;
@@ -114,6 +137,24 @@ export class AccountClient {
   }
 
   /**
+   * Mot de passe oublié : le serveur envoie un lien si l'adresse a un compte.
+   * Sa réponse est la même dans les deux cas — l'interface aussi.
+   */
+  public async forgot(email: string, locale: MailLocale): Promise<{ readonly ok: true } | AccountFailure> {
+    const answer = await this.call('POST', API_PATHS.forgot, { email, locale });
+
+    if (answer.status === 'offline') return { ok: false, reason: 'offline' };
+    if (isForgotResponse(answer.body)) return { ok: true };
+
+    return failureOf(answer.body);
+  }
+
+  /** Le lien ouvert : nouveau mot de passe, et le joueur est connecté (les autres sessions du compte sont fermées). */
+  public async reset(request: ResetRequest): Promise<AccountResult> {
+    return this.open(API_PATHS.reset, request);
+  }
+
+  /**
    * Jouer à deux sans compte : un pseudo suffit, le serveur ouvre une session
    * d'invité, gardée ici comme une autre (l'ami qui rouvre le lien la retrouve).
    */
@@ -129,7 +170,7 @@ export class AccountClient {
     if (session) await this.call('POST', API_PATHS.logout, {}, session.token);
   }
 
-  private async open(path: string, request: RegisterRequest | LoginRequest | GuestRequest): Promise<AccountResult> {
+  private async open(path: string, request: RegisterRequest | LoginRequest | GuestRequest | ResetRequest): Promise<AccountResult> {
     const answer = await this.call('POST', path, request);
 
     if (answer.status === 'offline') return { ok: false, reason: 'offline' };
@@ -138,13 +179,8 @@ export class AccountClient {
 
       return { ok: true, user: answer.body.user };
     }
-    if (isAccountError(answer.body)) {
-      const { error, fields, retryAfter } = answer.body;
 
-      return { ok: false, reason: error, ...(fields && { fields }), ...(retryAfter !== undefined && { retryAfter }) };
-    }
-
-    return { ok: false, reason: 'server' };
+    return failureOf(answer.body);
   }
 
   private set(session: { token: string; user: AccountUser } | null): void {
@@ -185,4 +221,13 @@ export class AccountClient {
       clearTimeout(timer);
     }
   }
+}
+
+/** Un refus du serveur, ou une réponse qu'on ne sait pas lire. */
+function failureOf(body: unknown): AccountFailure {
+  if (!isAccountError(body)) return { ok: false, reason: 'server' };
+
+  const { error, fields, retryAfter } = body;
+
+  return { ok: false, reason: error, ...(fields && { fields }), ...(retryAfter !== undefined && { retryAfter }) };
 }

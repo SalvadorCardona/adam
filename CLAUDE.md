@@ -1530,7 +1530,18 @@ adresse, 20 par IP, 15 min ; 10 inscriptions par IP et heure), IP lue dans
 jamais d'exception, hors ligne = `offline`), session gardée sous
 `adam:account` (`storage/localAccount.ts`, jamais dans la partie),
 fenêtre `ui/accountPanel.ts` (boutons « Compte » de l'écran titre et des
-Réglages, Échap la ferme la première), textes `i18n/*/account.ts`. Sans
+Réglages, Échap la ferme la première), textes `i18n/*/account.ts`. **Mot de passe
+oublié** (`POST /auth/forgot`, `/auth/reset`, migration `0006`) : même
+réponse que le compte existe ou non (rien pour un invité), jeton de 32 octets
+dont seule l'empreinte est en base, 30 minutes, un seul usage, le dernier
+demandé remplace les autres ; servi, il ferme toutes les sessions du compte et
+en ouvre une. Limites par adresse et par IP (`FORGOT_MAX_*`, `RESET_MAX_PER_IP`).
+L'e-mail (`server/src/mail.ts` : HTML en tableaux et styles en ligne, version
+texte, « Un produit Hermez », FR/EN selon la langue du jeu) part par l'API
+transactionnelle de Brevo (`BREVO_API_KEY`, `MAIL_FROM`, `MAIL_FROM_NAME`) ;
+sans clé, il est écrit dans les journaux. Le lien mène à `PUBLIC_URL?reset=…`,
+qui ouvre la fenêtre du compte sur le nouveau mot de passe (deux fois), puis
+connecte le joueur (`AccountPanel.showReset`, `app/party.ts`). Sans
 serveur ou sans `VITE_API_URL`, le bouton dit « hors ligne » et rien d'autre
 ne change. Captures dans `docs/comptes/`.
 

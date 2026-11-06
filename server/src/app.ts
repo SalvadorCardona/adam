@@ -12,6 +12,7 @@ import { API_PATHS, API_SERVICE, API_VERSION, type HealthResponse } from '../../
 import { originAllowed, type ServerConfig } from './config.ts';
 import { accountRoutes, sessionReader } from './accounts.ts';
 import { dailyRoutes } from './daily.ts';
+import { createMailer, type Mailer } from './mail.ts';
 import { partyRoutes } from './parties.ts';
 import { schemaVersion } from './db.ts';
 
@@ -26,6 +27,8 @@ export interface AppDeps {
   readonly clientIp?: (c: Context) => string;
   /** Une session de partie se ferme : ceux qui y jouent par le WebSocket l'apprennent. */
   readonly onPartyClosed?: (code: string) => void;
+  /** L'envoi des e-mails ; par défaut, Brevo si `BREVO_API_KEY` est posée, sinon les journaux. */
+  readonly mailer?: Mailer;
 }
 
 /** L'IP vue par Node ; derrière un proxy (Dokploy), la première de `X-Forwarded-For`. */
@@ -40,7 +43,7 @@ function peerIp(c: Context): string {
   }
 }
 
-export function createApp({ config, db, now = () => performance.now(), clock = Date.now, clientIp = peerIp, onPartyClosed }: AppDeps): Hono {
+export function createApp({ config, db, now = () => performance.now(), clock = Date.now, clientIp = peerIp, onPartyClosed, mailer = createMailer(config.mail) }: AppDeps): Hono {
   const startedAt = now();
   const app = new Hono();
 
@@ -77,7 +80,7 @@ export function createApp({ config, db, now = () => performance.now(), clock = D
     return c.json(body);
   });
 
-  app.route('/', accountRoutes({ db, clock, clientIp }));
+  app.route('/', accountRoutes({ db, clock, clientIp, mailer, publicUrl: config.mail.publicUrl }));
   app.route('/', dailyRoutes({ db, clock, userOf: sessionReader(db, clock) }));
   app.route('/', partyRoutes({ db, clock, clientIp, userOf: sessionReader(db, clock), ttlMs: config.inviteTtlMs, ...(onPartyClosed && { onClosed: onPartyClosed }) }));
 

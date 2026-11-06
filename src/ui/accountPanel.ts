@@ -1,5 +1,7 @@
 /**
- * La fenêtre du compte, facultative : inscription, connexion, déconnexion.
+ * La fenêtre du compte, facultative : inscription, connexion, déconnexion,
+ * mot de passe oublié (l'adresse, puis un message neutre) et la page qu'ouvre
+ * le lien de l'e-mail (`?reset=` : le nouveau mot de passe, deux fois).
  * Ouverte depuis l'écran titre et depuis les Réglages ; fermée par sa croix,
  * un tap sur le voile ou Échap (`main.ts`). Elle ne touche pas à la partie :
  * jouer sans compte, et sans serveur, reste le cas normal.
@@ -24,10 +26,23 @@ import {
 } from '../../shared/api.ts';
 import type { AccountClient, AccountFailure } from '../net/account.ts';
 import type { Connection } from '../net/connection.ts';
-import { onLocale, t } from '../i18n/locale.ts';
+import { locale, onLocale, t } from '../i18n/locale.ts';
 import { uiIcon } from './icons.ts';
 
-type Mode = 'signIn' | 'signUp';
+/** `forgot` : l'adresse à qui envoyer un lien ; `sent` : le message neutre ; `reset` : la page du lien. */
+type Mode = 'signIn' | 'signUp' | 'forgot' | 'sent' | 'reset';
+
+/** Les champs de chaque écran. */
+const SHOWN: Record<Mode, readonly (AccountField | 'confirm')[]> = {
+  signIn: ['email', 'password'],
+  signUp: ['nickname', 'email', 'password'],
+  forgot: ['email'],
+  sent: [],
+  reset: ['password', 'confirm'],
+};
+
+/** Le lien du bas de chaque écran mène à celui-ci. */
+const SWITCH: Record<Mode, Mode> = { signIn: 'signUp', signUp: 'signIn', forgot: 'signIn', sent: 'signIn', reset: 'forgot' };
 
 const FIELDS = ['nickname', 'email', 'password'] as const;
 
@@ -49,6 +64,9 @@ export class AccountPanel {
   private readonly status: HTMLParagraphElement;
   private readonly form: HTMLFormElement;
   private readonly fields: Record<AccountField, Field>;
+  /** Le nouveau mot de passe, une seconde fois (la page du lien). */
+  private readonly confirm: Field;
+  private readonly forgotLink: HTMLButtonElement;
   private readonly reveal: HTMLButtonElement;
   private readonly submit: HTMLButtonElement;
   private readonly switcher: HTMLButtonElement;
@@ -62,6 +80,11 @@ export class AccountPanel {
   /** Le dernier message du haut, relu à chaque langue. */
   private message: (() => string) | null = null;
   private problems: readonly FieldError[] = [];
+  /** Les deux saisies du nouveau mot de passe diffèrent. */
+  private mismatch = false;
+  /** Le jeton du lien ouvert (`?reset=`), et ce qu'il faut faire une fois servi ou abandonné. */
+  private resetToken: string | null = null;
+  private resetDone: () => void = () => {};
 
   public constructor(client: AccountClient, connection: Connection) {
     this.client = client;
@@ -71,6 +94,17 @@ export class AccountPanel {
     this.root.hidden = true;
     this.root.addEventListener('click', (event) => {
       if (event.target === this.root) this.close();
+    });
+    /*
+     * Fenêtre modale : un focus parti ailleurs (l'écran titre qui pose le sien
+     * sur « Continuer » juste après qu'elle s'est ouverte d'un lien `?reset=`)
+     * revient dedans — le clavier et la manette restent dans le formulaire.
+     */
+    this.root.addEventListener('focusout', (event) => {
+      const next = event.relatedTarget;
+
+      if (!this.open || !(next instanceof Node) || this.root.contains(next)) return;
+      queueMicrotask(() => this.focusFirst());
     });
 
     const panel = document.createElement('div');
@@ -105,6 +139,7 @@ export class AccountPanel {
       email: this.field('email', 'email', 'email'),
       password: this.field('password', 'password', 'current-password'),
     };
+    this.confirm = this.field('password', 'confirm', 'new-password');
 
     // Voir le mot de passe : indispensable sur un téléphone, où l'on tape de travers.
     this.reveal = document.createElement('button');
@@ -114,6 +149,7 @@ export class AccountPanel {
       const input = this.fields.password.input;
 
       input.type = input.type === 'password' ? 'text' : 'password';
+      this.confirm.input.type = input.type;
       this.render();
     });
     this.fields.password.root.append(this.reveal);
@@ -124,13 +160,21 @@ export class AccountPanel {
     this.switcher = document.createElement('button');
     this.switcher.type = 'button';
     this.switcher.className = 'button-secondary';
-    this.switcher.addEventListener('click', () => {
-      this.mode = this.mode === 'signIn' ? 'signUp' : 'signIn';
-      this.message = null;
-      this.problems = [];
-      this.render();
-    });
-    this.form.append(this.fields.nickname.root, this.fields.email.root, this.fields.password.root, this.submit, this.switcher);
+    this.switcher.addEventListener('click', () => this.switchTo(SWITCH[this.mode]));
+    // Un lien plutôt qu'un bouton plein : il ne passe pas devant « Se connecter ».
+    this.forgotLink = document.createElement('button');
+    this.forgotLink.type = 'button';
+    this.forgotLink.className = 'account-link';
+    this.forgotLink.addEventListener('click', () => this.switchTo('forgot'));
+    this.form.append(
+      this.fields.nickname.root,
+      this.fields.email.root,
+      this.fields.password.root,
+      this.confirm.root,
+      this.forgotLink,
+      this.submit,
+      this.switcher,
+    );
     this.form.addEventListener('submit', (event) => {
       event.preventDefault();
       void this.send();
@@ -164,20 +208,73 @@ export class AccountPanel {
     if (this.open) return;
     this.message = null;
     this.problems = [];
+    this.mismatch = false;
     this.root.hidden = false;
     this.render();
-    // Connecté, la croix ; sinon le premier champ à remplir.
-    if (this.client.user) this.closeButton.focus();
-    else this.firstField().focus({ preventScroll: true });
+    this.focusFirst();
     // La session a pu expirer : on la redemande, sans bloquer.
     void this.client.refresh();
+  }
+
+  /**
+   * Connecté, la croix ; sinon le premier champ à remplir. Ouverte d'un lien
+   * (`?reset=`), la fenêtre l'est avant d'être montée dans la page : le focus
+   * attend qu'elle y soit.
+   */
+  private focusFirst(): void {
+    if (!this.open) return;
+    if (!this.root.isConnected) {
+      requestAnimationFrame(() => this.focusFirst());
+
+      return;
+    }
+    if (this.client.user && this.mode !== 'reset') this.closeButton.focus();
+    else this.firstField().focus({ preventScroll: true });
+  }
+
+  /**
+   * La page ouverte par le lien de l'e-mail : le nouveau mot de passe, deux
+   * fois. `done` : le lien est servi ou abandonné (l'adresse de la page s'en
+   * débarrasse).
+   */
+  public showReset(token: string, done: () => void): void {
+    // Déjà ouverte (sur la connexion, par exemple) : elle se rouvre sur la page du lien.
+    this.root.hidden = true;
+    this.resetToken = token;
+    this.resetDone = done;
+    this.mode = 'reset';
+    this.show();
   }
 
   public close(): void {
     if (!this.open) return;
     this.root.hidden = true;
-    this.fields.password.input.value = '';
-    this.fields.password.input.type = 'password';
+    for (const field of [this.fields.password, this.confirm]) {
+      field.input.value = '';
+      field.input.type = 'password';
+    }
+    // Le lien abandonné ne revient pas ; le message « e-mail parti » non plus.
+    if (this.mode === 'reset' || this.mode === 'sent') this.leaveReset('signIn');
+  }
+
+  /** Passe à un autre écran du compte, le premier champ au doigt. */
+  private switchTo(mode: Mode): void {
+    if (this.mode === 'reset') this.leaveReset(mode);
+    else this.mode = mode;
+    this.message = null;
+    this.problems = [];
+    this.mismatch = false;
+    this.render();
+    (SHOWN[mode].length > 0 ? this.firstField() : this.switcher).focus({ preventScroll: true });
+  }
+
+  private leaveReset(next: Mode): void {
+    const done = this.resetToken !== null ? this.resetDone : null;
+
+    this.mode = next;
+    this.resetToken = null;
+    this.resetDone = () => {};
+    done?.();
   }
 
   /**
@@ -199,10 +296,12 @@ export class AccountPanel {
   }
 
   private firstField(): HTMLInputElement {
-    return (this.mode === 'signUp' ? this.fields.nickname : this.fields.email).input;
+    const first = SHOWN[this.mode][0];
+
+    return first === undefined ? this.fields.email.input : first === 'confirm' ? this.confirm.input : this.fields[first].input;
   }
 
-  private field(type: string, name: AccountField, autocomplete: AutoFill): Field {
+  private field(type: string, name: AccountField | 'confirm', autocomplete: AutoFill): Field {
     const root = document.createElement('label');
     const label = document.createElement('span');
     const hint = document.createElement('span');
@@ -220,7 +319,7 @@ export class AccountPanel {
     input.autocomplete = autocomplete;
     input.autocapitalize = 'off';
     input.spellcheck = false;
-    input.enterKeyHint = name === 'password' ? 'go' : 'next';
+    input.enterKeyHint = name === 'password' || name === 'confirm' ? 'go' : 'next';
     input.maxLength = name === 'email' ? ACCOUNT_LIMITS.email.max : 256;
     input.addEventListener('input', () => {
       input.removeAttribute('aria-invalid');
@@ -238,33 +337,62 @@ export class AccountPanel {
   private render(): void {
     const text = t().account;
     const user = this.client.user;
-    const signUp = this.mode === 'signUp';
+    const mode = this.mode;
+    const shown = SHOWN[mode];
+    // La page du lien s'ouvre même connecté (un autre compte sur cet appareil) : le formulaire passe devant.
+    const profile = user !== null && mode !== 'reset';
 
     this.title.textContent = text.title;
     this.closeButton.setAttribute('aria-label', t().common.close);
-    this.profile.hidden = !user;
-    this.form.hidden = user !== null;
+    this.profile.hidden = !profile;
+    this.form.hidden = profile;
     this.status.textContent = this.statusText();
     this.status.dataset['tone'] = this.available ? 'info' : 'offline';
 
-    if (user) {
+    if (user && profile) {
       this.profileName.textContent = text.signedIn(user.nickname);
       this.profileEmail.textContent = user.guest ? text.guestProfile : text.signedInEmail(user.email);
       this.signOut.replaceChildren(text.signOut);
     } else {
-      const labels = { nickname: text.nickname, email: text.email, password: text.password } as const;
+      const fresh = mode === 'signUp' || mode === 'reset';
+      const labels = { nickname: text.nickname, email: text.email, password: mode === 'reset' ? text.newPassword : text.password } as const;
       const hidden = this.fields.password.input.type === 'password';
+      const submits: Record<Mode, string> = {
+        signIn: text.signIn,
+        signUp: text.signUp,
+        forgot: text.forgotSend,
+        sent: text.forgotSend,
+        reset: text.resetSubmit,
+      };
+      const switches: Record<Mode, string> = {
+        signIn: text.switchToSignUp,
+        signUp: text.switchToSignIn,
+        forgot: text.backToSignIn,
+        sent: text.backToSignIn,
+        reset: text.requestNewLink,
+      };
 
-      this.fields.nickname.root.hidden = !signUp;
-      for (const key of FIELDS) this.fields[key].name.textContent = labels[key];
+      for (const key of FIELDS) {
+        this.fields[key].root.hidden = !shown.includes(key);
+        this.fields[key].name.textContent = labels[key];
+      }
+      this.confirm.root.hidden = !shown.includes('confirm');
+      this.confirm.name.textContent = text.confirmPassword;
+      this.confirm.error.textContent = this.mismatch ? text.field.mismatch : '';
+      if (this.mismatch) this.confirm.input.setAttribute('aria-invalid', 'true');
+      else this.confirm.input.removeAttribute('aria-invalid');
       this.fields.nickname.hint.textContent = text.nicknameHint;
-      this.fields.password.hint.textContent = signUp ? text.passwordHint(ACCOUNT_LIMITS.password.min) : '';
-      this.fields.password.input.autocomplete = signUp ? 'new-password' : 'current-password';
+      this.fields.password.hint.textContent = fresh ? text.passwordHint(ACCOUNT_LIMITS.password.min) : '';
+      this.fields.password.input.autocomplete = fresh ? 'new-password' : 'current-password';
+      this.fields.password.input.enterKeyHint = mode === 'reset' ? 'next' : 'go';
       this.reveal.setAttribute('aria-pressed', String(!hidden));
       this.reveal.setAttribute('aria-label', hidden ? text.showPassword : text.hidePassword);
-      this.submit.replaceChildren(this.busy ? text.working : signUp ? text.signUp : text.signIn);
+      this.forgotLink.hidden = mode !== 'signIn';
+      this.forgotLink.textContent = text.forgotLink;
+      this.submit.hidden = mode === 'sent';
+      this.submit.replaceChildren(this.busy ? text.working : submits[mode]);
       this.submit.disabled = this.busy || !this.available;
-      this.switcher.textContent = signUp ? text.switchToSignIn : text.switchToSignUp;
+      this.switcher.textContent = switches[mode];
       for (const key of FIELDS) {
         const found = this.problems.find((problem) => problem.field === key);
         const field = this.fields[key];
@@ -278,14 +406,27 @@ export class AccountPanel {
     for (const button of this.buttons) this.paintButton(button);
   }
 
-  /** La ligne du haut : le serveur injoignable avant tout, sinon le dernier message. */
+  /** La ligne du haut : le serveur injoignable avant tout, sinon le dernier message, sinon celle de l'écran. */
   private statusText(): string {
     const text = t().account;
 
     if (!this.connection.enabled) return text.notConfigured;
     if (!this.connection.online) return text.offline;
 
-    return this.message?.() ?? (this.client.user ? '' : text.intro);
+    const message = this.message?.();
+
+    if (message) return message;
+
+    switch (this.mode) {
+      case 'forgot':
+        return text.forgotIntro;
+      case 'sent':
+        return text.forgotSent;
+      case 'reset':
+        return text.resetIntro;
+      default:
+        return this.client.user ? '' : text.intro;
+    }
   }
 
   private paintButton(button: HTMLButtonElement): void {
@@ -302,6 +443,9 @@ export class AccountPanel {
   /** Valide ici d'abord (le serveur re-vérifie tout), puis envoie. */
   private async send(): Promise<void> {
     if (this.busy || !this.available) return;
+    if (this.mode === 'forgot') return this.sendForgot();
+    if (this.mode === 'reset') return this.sendReset();
+    if (this.mode === 'sent') return;
 
     const signUp = this.mode === 'signUp';
     const nickname = cleanNickname(this.fields.nickname.input.value);
@@ -316,14 +460,7 @@ export class AccountPanel {
     if (nicknameIssue) found.push({ field: 'nickname', problem: nicknameIssue });
     if (emailIssue) found.push({ field: 'email', problem: emailIssue });
     if (passwordIssue) found.push({ field: 'password', problem: passwordIssue });
-    this.problems = found;
-    this.message = null;
-    if (found.length > 0) {
-      this.render();
-      this.form.querySelector<HTMLInputElement>('input[aria-invalid="true"]')?.focus();
-
-      return;
-    }
+    if (!this.check(found)) return;
 
     this.busy = true;
     this.render();
@@ -332,17 +469,87 @@ export class AccountPanel {
 
     this.busy = false;
     if (result.ok) {
-      this.fields.password.input.value = '';
-      this.problems = [];
-      this.message = () => t().account.welcome(result.user.nickname);
-      this.render();
-      this.closeButton.focus();
+      this.signedIn(() => t().account.welcome(result.user.nickname));
 
       return;
     }
 
-    this.problems = result.reason === 'invalid' ? (result.fields ?? []) : [];
-    this.message = () => failureText(result);
+    this.refused(result);
+  }
+
+  /** Mot de passe oublié : la réponse est la même que le compte existe ou non, le message aussi. */
+  private async sendForgot(): Promise<void> {
+    const email = cleanEmail(this.fields.email.input.value);
+    const problem = emailProblem(email);
+
+    if (!this.check(problem ? [{ field: 'email', problem }] : [])) return;
+
+    this.busy = true;
+    this.render();
+
+    const result = await this.client.forgot(email, locale());
+
+    this.busy = false;
+    if (result.ok) {
+      this.mode = 'sent';
+      this.render();
+      this.switcher.focus({ preventScroll: true });
+
+      return;
+    }
+
+    this.refused(result);
+  }
+
+  /** La page du lien : le nouveau mot de passe, aux règles de l'inscription, deux fois le même. */
+  private async sendReset(): Promise<void> {
+    const token = this.resetToken;
+    const password = this.fields.password.input.value;
+    const problem = passwordProblem(password);
+
+    if (token === null) return;
+    this.mismatch = problem === null && password !== this.confirm.input.value;
+    if (!this.check(problem ? [{ field: 'password', problem }] : [])) return;
+
+    this.busy = true;
+    this.render();
+
+    const result = await this.client.reset({ token, password });
+
+    this.busy = false;
+    if (result.ok) {
+      this.confirm.input.value = '';
+      this.leaveReset('signIn');
+      this.signedIn(() => t().account.resetDone(result.user.nickname));
+
+      return;
+    }
+
+    this.refused(result);
+  }
+
+  /** Les problèmes trouvés ici : `false` (et le premier champ fautif au doigt) s'il y en a. */
+  private check(found: readonly FieldError[]): boolean {
+    this.problems = found;
+    this.message = null;
+    if (found.length === 0 && !this.mismatch) return true;
+    this.render();
+    this.form.querySelector<HTMLInputElement>('input[aria-invalid="true"]')?.focus();
+
+    return false;
+  }
+
+  private signedIn(message: () => string): void {
+    this.fields.password.input.value = '';
+    this.problems = [];
+    this.message = message;
+    this.render();
+    this.closeButton.focus();
+  }
+
+  private refused(failure: AccountFailure): void {
+    this.problems = failure.reason === 'invalid' ? (failure.fields ?? []) : [];
+    this.message = () => failureText(failure);
     this.render();
   }
 

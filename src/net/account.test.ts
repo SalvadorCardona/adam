@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AccountClient } from './account.ts';
+import { AccountClient, resetTokenOf, withoutReset } from './account.ts';
 import { LocalAccount } from '../storage/localAccount.ts';
 
 const USER = { id: 1, nickname: 'Adam', email: 'adam@example.com' };
@@ -95,5 +95,47 @@ describe('AccountClient', () => {
 
     expect(client.user).toBeNull();
     expect(await client.login({ email: 'a@b.fr', password: 'x' })).toEqual({ ok: false, reason: 'offline' });
+  });
+
+  it('demande un lien de réinitialisation, dans la langue du jeu', async () => {
+    const sent: { url: string; body: unknown }[] = [];
+    const fetcher = ((url: string, init: RequestInit) => {
+      sent.push({ url, body: JSON.parse(init.body as string) });
+
+      return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    }) as unknown as typeof fetch;
+    const client = new AccountClient('http://x', new LocalAccount(memory()), fetcher);
+
+    expect(await client.forgot('adam@example.com', 'en')).toEqual({ ok: true });
+    expect(sent).toEqual([{ url: 'http://x/auth/forgot', body: { email: 'adam@example.com', locale: 'en' } }]);
+    expect(client.user).toBeNull();
+  });
+
+  it('dit pourquoi la demande de lien est refusée', async () => {
+    const client = new AccountClient('http://x', new LocalAccount(memory()), reply(429, { ok: false, error: 'tooManyAttempts', retryAfter: 30 }));
+
+    expect(await client.forgot('adam@example.com', 'fr')).toEqual({ ok: false, reason: 'tooManyAttempts', retryAfter: 30 });
+    expect(await new AccountClient('http://x', new LocalAccount(memory()), down).forgot('a@b.fr', 'fr')).toEqual({ ok: false, reason: 'offline' });
+  });
+
+  it('se connecte avec le lien et le nouveau mot de passe, ou dit que le lien ne vaut plus', async () => {
+    const storage = memory();
+    const client = new AccountClient('http://x', new LocalAccount(storage), reply(200, { ok: true, token: 'n', user: USER }));
+
+    expect(await client.reset({ token: 'jeton', password: 'nouveau-secret' })).toEqual({ ok: true, user: USER });
+    expect(client.token).toBe('n');
+
+    const stale = new AccountClient('http://x', new LocalAccount(memory()), reply(400, { ok: false, error: 'badToken' }));
+
+    expect(await stale.reset({ token: 'vieux', password: 'nouveau-secret' })).toEqual({ ok: false, reason: 'badToken' });
+  });
+});
+
+describe('lien de réinitialisation', () => {
+  it('lit le jeton dans la requête de la page, et l’en retire', () => {
+    expect(resetTokenOf('?reset=abc_-1')).toBe('abc_-1');
+    expect(resetTokenOf('?join=X&reset=')).toBeNull();
+    expect(resetTokenOf('')).toBeNull();
+    expect(withoutReset('https://hermez.dev/adam/?reset=abc&seed=3')).toBe('https://hermez.dev/adam/?seed=3');
   });
 });

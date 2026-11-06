@@ -29,6 +29,20 @@ export const account = {
   guestProfile: 'Invité, sans compte : ce pseudo ne vaut que sur cet appareil.',
   welcome: (nickname: string): string => `Bienvenue, ${nickname} !`,
   signedOutDone: 'Vous êtes déconnecté.',
+  /** Mot de passe oublié : le lien sous la connexion, puis le formulaire d'adresse. */
+  forgotLink: 'Mot de passe oublié ?',
+  forgotIntro: 'Entrez l’adresse de votre compte : vous recevrez un lien pour choisir un nouveau mot de passe.',
+  forgotSend: 'Envoyer le lien',
+  /** Toujours le même message, que le compte existe ou non. */
+  forgotSent: 'Si un compte existe pour cette adresse, un e-mail est parti. Son lien vaut 30 minutes.',
+  backToSignIn: 'Retour à la connexion',
+  /** La page ouverte par le lien de l'e-mail (`?reset=`). */
+  resetIntro: 'Choisissez un nouveau mot de passe.',
+  newPassword: 'Nouveau mot de passe',
+  confirmPassword: 'Confirmez le mot de passe',
+  resetSubmit: 'Changer le mot de passe',
+  requestNewLink: 'Demander un nouveau lien',
+  resetDone: (nickname: string): string => `Mot de passe changé. Bienvenue, ${nickname} !`,
   /** Pourquoi un champ est refusé. */
   field: {
     empty: 'À remplir.',
@@ -39,6 +53,8 @@ export const account = {
       email: 'Cette adresse n’a pas l’air valide.',
       password: 'Mot de passe refusé.',
     },
+    /** Les deux saisies du nouveau mot de passe diffèrent. */
+    mismatch: 'Les deux mots de passe ne sont pas les mêmes.',
   },
   errors: {
     invalid: 'Vérifiez les champs signalés.',
@@ -48,5 +64,6 @@ export const account = {
     tooManyAttempts: (seconds: number): string =>
       seconds >= 90 ? `Trop d’essais. Réessayez dans ${Math.ceil(seconds / 60)} min.` : `Trop d’essais. Réessayez dans ${seconds} s.`,
     server: 'Le serveur a répondu de travers. Réessayez plus tard.',
+    badToken: 'Ce lien a expiré ou a déjà servi. Demandez-en un nouveau.',
   },
 };

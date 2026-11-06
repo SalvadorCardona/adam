@@ -40,11 +40,23 @@ Projet **adam**, service **Application** `adam-server` :
   ```
   CORS_ORIGINS=https://hermez.dev,https://cardona.digital,https://adam.cardona.digital
   INVITE_TTL_MINUTES=60
+  BREVO_API_KEY=xkeysib-…
+  MAIL_FROM=<adresse d'expéditeur validée chez Brevo>
+  MAIL_FROM_NAME=Adam
+  PUBLIC_URL=https://hermez.dev/adam/
   ```
 
   `PORT`, `HOST` et `DATABASE_PATH` ont déjà leurs valeurs dans l'image. Aucun
   secret de session : le jeton est aléatoire et seule son empreinte SHA-256
   est en base.
+
+  Les quatre dernières servent au « mot de passe oublié » (`server/src/mail.ts`,
+  API transactionnelle de Brevo). Sans `BREVO_API_KEY`, rien ne part : l'e-mail
+  et son lien sont écrits dans les journaux du conteneur. Avec elle, `MAIL_FROM`
+  est obligatoire (le serveur refuse de démarrer sans) et doit être un
+  expéditeur validé chez Brevo, sinon Brevo refuse l'envoi (journal
+  `[mail] Brevo a refusé l'envoi : HTTP 4xx`). `PUBLIC_URL` est la page où mène
+  le lien (`?reset=<jeton>`, valable 30 minutes, une seule fois).
 
 Si le jeu est ouvert depuis une autre origine (domaine perso, `localhost`),
 l'ajouter à `CORS_ORIGINS`, séparées par des virgules.

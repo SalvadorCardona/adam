@@ -21,7 +21,29 @@ export interface ServerConfig {
   readonly corsOrigins: readonly string[];
   /** Combien de temps une invitation reste valable, en millisecondes. */
   readonly inviteTtlMs: number;
+  /** L'envoi des e-mails (mot de passe oublié). */
+  readonly mail: MailConfig;
 }
+
+/**
+ * L'envoi des e-mails, par l'API transactionnelle de Brevo. Sans clé (`apiKey`
+ * à `null` : le développement, les tests), l'e-mail est écrit dans les
+ * journaux au lieu de partir, et le serveur démarre quand même.
+ */
+export interface MailConfig {
+  /** `BREVO_API_KEY` ; `null` : rien ne part, tout va aux journaux. */
+  readonly apiKey: string | null;
+  /** L'expéditeur, `MAIL_FROM` : une adresse validée chez Brevo. Obligatoire avec une clé. */
+  readonly from: string;
+  /** Son nom affiché, `MAIL_FROM_NAME`. */
+  readonly fromName: string;
+  /** L'adresse publique du jeu, `PUBLIC_URL` : les liens des e-mails y mènent. */
+  readonly publicUrl: string;
+}
+
+/** L'adresse du jeu en ligne, où mènent les liens des e-mails. */
+export const DEFAULT_PUBLIC_URL = 'https://hermez.dev/adam/';
+export const DEFAULT_MAIL_FROM_NAME = 'Adam';
 
 /** Une invitation vaut une heure par défaut ; réglable de 1 minute à 24 heures. */
 export const DEFAULT_INVITE_MINUTES = 60;
@@ -84,12 +106,22 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): S
     .map((origin) => origin.trim())
     .filter((origin) => origin !== '');
 
+  const apiKey = env['BREVO_API_KEY']?.trim() || null;
+  const from = env['MAIL_FROM']?.trim() ?? '';
+
+  if (apiKey && !/^[^\s@]+@[^\s@]+$/u.test(from)) throw new Error(`MAIL_FROM invalide (obligatoire avec BREVO_API_KEY) : ${env['MAIL_FROM'] ?? ''}`);
+
+  const publicUrl = env['PUBLIC_URL']?.trim() || DEFAULT_PUBLIC_URL;
+
+  if (!URL.canParse(publicUrl) || !/^https?:$/u.test(new URL(publicUrl).protocol)) throw new Error(`PUBLIC_URL invalide : ${publicUrl}`);
+
   return {
     port,
     host: env['HOST'] || '0.0.0.0',
     databasePath: currentDatabasePath(env['DATABASE_PATH'] || DEFAULT_DATABASE),
     corsOrigins: origins.length > 0 ? origins : DEFAULT_ORIGINS,
     inviteTtlMs: minutes * 60_000,
+    mail: { apiKey, from, fromName: env['MAIL_FROM_NAME']?.trim() || DEFAULT_MAIL_FROM_NAME, publicUrl },
   };
 }
 
