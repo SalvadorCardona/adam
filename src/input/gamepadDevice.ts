@@ -12,7 +12,7 @@
  * il lui faut des valeurs qui ne changent pas entre-temps.
  */
 
-import { padKindOf, type PadKind, type PadSnapshot } from './gamepad.ts';
+import { isRawXbox, padKindOf, standardize, type PadKind, type PadSnapshot } from './gamepad.ts';
 
 export interface PadInfo {
   index: number;
@@ -79,10 +79,14 @@ export class GamepadDevice {
     const pad = this.active === null ? null : pads[this.active];
 
     if (!pad?.connected) return null;
-    return {
+
+    const snapshot: PadSnapshot = {
       axes: [...pad.axes],
       buttons: pad.buttons.map((button) => ({ pressed: button.pressed, value: button.value })),
     };
+
+    // Firefox (Linux) ne met pas le pad virtuel de Steam Input au mapping standard.
+    return pad.mapping !== 'standard' && isRawXbox(snapshot) ? standardize(snapshot) : snapshot;
   }
 
   /** Une petite vibration de la manette suivie, si elle en a une. `strength` de 0 à 1. */

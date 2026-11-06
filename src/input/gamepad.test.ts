@@ -8,7 +8,9 @@ import {
   cursorVelocity,
   deadZone,
   nearestInDirection,
+  isRawXbox,
   padKindOf,
+  standardize,
   type PadButton,
   type PadSnapshot,
 } from './gamepad.ts';
@@ -188,5 +190,63 @@ describe('nearestInDirection', () => {
   it('rend -1 quand il n’y a rien par là', () => {
     expect(nearestInDirection({ x: 20, y: 20 }, 'left', boxes)).toBe(-1);
     expect(nearestInDirection({ x: 80, y: 100 }, 'down', boxes)).toBe(-1);
+  });
+});
+
+describe('manette sans mapping standard (Firefox, pad virtuel de Steam Input)', () => {
+  /** La disposition brute de `joydev` : 8 axes, 11 boutons, gâchettes au repos à −1. */
+  function raw(held: readonly number[] = [], axes: Partial<Record<number, number>> = {}): PadSnapshot {
+    const base = [0, 0, -1, 0, 0, -1, 0, 0];
+
+    return {
+      axes: base.map((value, index) => axes[index] ?? value),
+      buttons: Array.from({ length: 11 }, (_, index) => ({ pressed: held.includes(index), value: held.includes(index) ? 1 : 0 })),
+    };
+  }
+
+  it('reconnaît la disposition brute, pas une manette standard', () => {
+    expect(isRawXbox(raw())).toBe(true);
+    expect(isRawXbox(pad())).toBe(false);
+  });
+
+  it('remet A, X, Y, Menu et View aux indices standard', () => {
+    const snapshot = standardize(raw([0, 2, 3, 7, 6]));
+    const pressed = (name: PadButton) => snapshot.buttons[PAD_BUTTONS[name]]?.pressed;
+
+    expect(pressed('south')).toBe(true);
+    expect(pressed('west')).toBe(true);
+    expect(pressed('north')).toBe(true);
+    expect(pressed('start')).toBe(true);
+    expect(pressed('select')).toBe(true);
+    expect(pressed('east')).toBe(false);
+  });
+
+  it('range les clics des sticks à L3 / R3', () => {
+    const snapshot = standardize(raw([9, 10]));
+
+    expect(snapshot.buttons[PAD_BUTTONS.l3]?.pressed).toBe(true);
+    expect(snapshot.buttons[PAD_BUTTONS.r3]?.pressed).toBe(true);
+  });
+
+  it('lit le stick droit aux axes 2-3 et le gauche aux axes 0-1', () => {
+    expect(standardize(raw([], { 0: 0.5, 1: -0.5, 3: 0.25, 4: 0.75 })).axes).toEqual([0.5, -0.5, 0.25, 0.75]);
+  });
+
+  it('change les gâchettes en boutons de 0 à 1', () => {
+    const rest = standardize(raw());
+    const full = standardize(raw([], { 2: 1, 5: 0 }));
+
+    expect(rest.buttons[PAD_BUTTONS.l2]).toEqual({ pressed: false, value: 0 });
+    expect(full.buttons[PAD_BUTTONS.l2]).toEqual({ pressed: true, value: 1 });
+    expect(full.buttons[PAD_BUTTONS.r2]?.value).toBeCloseTo(0.5);
+  });
+
+  it('change la croix (axes 6-7) en quatre boutons', () => {
+    const snapshot = standardize(raw([], { 6: -1, 7: 1 }));
+
+    expect(snapshot.buttons[PAD_BUTTONS.left]?.pressed).toBe(true);
+    expect(snapshot.buttons[PAD_BUTTONS.down]?.pressed).toBe(true);
+    expect(snapshot.buttons[PAD_BUTTONS.up]?.pressed).toBe(false);
+    expect(snapshot.buttons[PAD_BUTTONS.right]?.pressed).toBe(false);
   });
 });
