@@ -9,6 +9,7 @@ export const gamepad: Messages['gamepad'] = {
   deadZone: 'Stick dead zone',
   kinds: { playstation: 'PlayStation', xbox: 'Xbox · Steam Deck' },
   detected: (name: string): string => `Controller detected: ${name}`,
+  debugTitle: 'Controller diagnostics',
   none: 'No controller detected. Plug it in, then press a button.',
   connected: (kind: string): string => `${kind} controller connected`,
   disconnected: 'Controller unplugged. Game paused',

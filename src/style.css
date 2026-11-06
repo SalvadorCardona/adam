@@ -8232,6 +8232,23 @@ span.wardrobe-thumb {
   }
 }
 
+/* Le diagnostic manette (`?pad=debug`, `ui/padDebug.ts`) : du texte brut, lisible sur une console à 1280 × 800. */
+.pad-debug {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  padding: 24px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.pad-debug pre {
+  white-space: pre-wrap;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
 /* L'application de bureau à la manette (Steam Deck) : le curseur du jeu suffit, celui du système s'efface. */
 [data-desktop='true'][data-input='pad'],
 [data-desktop='true'][data-input='pad'] * {

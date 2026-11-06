@@ -10,6 +10,8 @@ export const gamepad = {
   /** Les deux familles de l'aide. */
   kinds: { playstation: 'PlayStation', xbox: 'Xbox · Steam Deck' },
   detected: (name: string): string => `Manette détectée : ${name}`,
+  /** Le diagnostic `?pad=debug` (`ui/padDebug.ts`). */
+  debugTitle: 'Diagnostic manette',
   none: 'Aucune manette détectée — branchez-la, puis appuyez sur un bouton.',
   /** Les bulles du branchement à chaud. */
   connected: (kind: string): string => `Manette ${kind} connectée`,

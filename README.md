@@ -130,6 +130,12 @@ manette met le jeu en pause.
 
 ### Sur Steam Deck, en mode Game
 
+Cette marche à suivre vaut pour **toute console SteamOS** : Steam Deck, mais
+aussi ASUS ROG Ally X (ou une autre portable) sous SteamOS. Sur l'Ally X, la
+manette intégrée est réservée à Steam ; le jeu ne voit que la manette Xbox 360
+virtuelle de Steam Input (`28de:11ff`), au mapping « standard », comme sur le
+Deck.
+
 Adam existe en **application de bureau Linux** (Electron, dossier
 [`desktop/`](desktop/)) : un seul fichier, `Adam-<version>.AppImage`, qui
 embarque son propre Chromium — la même manette, le même WebGL et le même son
@@ -168,6 +174,16 @@ adresse à taper, et se joue **hors ligne** : le paquet ne fait aucune requête.
    `npm run art:steam -- /tmp/steam` (commandes Chrome affichées) ; la bannière
    de ce README, par `npm run art:brand -- /tmp/brand`.
 
+**Un raccourci « Adam » qui lançait un navigateur** (Firefox ou Chrome, voir
+plus bas) se repointe sur l'AppImage sans perdre ses images : page du jeu →
+roue dentée → *Propriétés* → *Raccourci* : *Cible*
+`"/home/deck/Applications/Adam-<version>.AppImage"`, *Dossier de lancement*
+`"/home/deck/Applications/"`, *Options de lancement* vides. Les images restent
+attachées au numéro du raccourci (l'appid), qui ne change pas. Pour modifier
+`~/.local/share/Steam/userdata/<id>/config/shortcuts.vdf` à la main, arrêtez
+Steam d'abord (`steam -shutdown`) et gardez-en une copie : Steam réécrit ce
+fichier en partant.
+
 « Quitter » est sur l'écran titre et dans la pause : en mode Game, c'est la
 façon propre de fermer le jeu (la partie est écrite avant). Le menu Steam ou
 la mise en veille mettent la partie en pause ; au retour, *Reprendre*. Le
@@ -186,26 +202,23 @@ de côté, copiez ce dossier application fermée — par exemple
 place pour la restaurer. Une partie jouée dans le navigateur ne s'y retrouve
 pas : ce sont deux sauvegardes distinctes.
 
-**Autre méthode, par le navigateur.** En mode Bureau, ouvrez le jeu dans un
-navigateur (https://hermez.dev/adam/) : la manette intégrée est reconnue
-directement. Pour le mode Game, ajoutez le navigateur comme jeu non-Steam :
+**Le navigateur, en mode Bureau seulement.** En mode Bureau, le jeu s'ouvre
+dans un navigateur (https://hermez.dev/adam/) et la manette intégrée est
+reconnue. En mode Game, passez par l'AppImage : relevé
+sur une ROG Ally X (SteamOS 3.9, Firefox 155 en Flatpak), **Firefox ne voit
+aucune manette**. Son bac à sable Flatpak n'a pas `/run/udev` : Firefox n'y
+reconnaît que les manettes branchées après son démarrage, et le pad virtuel de
+Steam Input existe avant que le jeu soit lancé.
 
-- **Chrome** (Discover, Flatpak) : option de lancement
-  `--kiosk https://hermez.dev/adam/` (plein écran sans barre d'adresse) ;
-- **Firefox** (Flatpak `org.mozilla.firefox`) : programme `/usr/bin/flatpak`,
-  options `run org.mozilla.firefox --kiosk https://hermez.dev/adam/`. Le
-  Flatpak doit voir les manettes (permission `devices=all`, sinon
-  `flatpak override --user --device=all org.mozilla.firefox`).
-
-Dans les deux cas, **la disposition Steam Input doit être « Gamepad »** (page
-du jeu → icône manette → *Disposition du contrôleur* → *Modèles*), jamais
-« Web browser » : sticks en souris et molette, le jeu ne voit plus de
-manette. Firefox remonte le pad virtuel de Steam Input (Xbox 360,
-`28de:11ff`) sans mapping « standard », avec 8 axes et 11 boutons : le jeu le
-reconnaît et le remet aux indices standard (`standardize` dans
-`src/input/gamepad.ts`). Pour modifier `shortcuts.vdf` à la main, arrêtez
-Steam d'abord (`steam -shutdown`), sinon il écrase le fichier. Le plus simple
-reste l'AppImage ci-dessus.
+**Diagnostic manette.** `https://hermez.dev/adam/?pad=debug` (ou, pour
+l'application de bureau, l'option `--pad-debug` : *Options de lancement* du
+raccourci `%command% --pad-debug`) remplace le jeu par un tableau de ce
+que la Gamepad API remonte : pour chaque manette, `id`, `mapping`, le nombre
+d'axes et de boutons et leurs valeurs en direct. Chaque changement s'écrit aussi
+dans la console, une ligne `[pad] {…}` ; pour la relire sans écran, options de
+lancement `ELECTRON_ENABLE_LOGGING=1 %command% --pad-debug >/tmp/adam.log 2>&1`.
+Lancée par Steam, l'application voit d'abord toutes les manettes, puis Steam
+en masque toutes sauf une (souvent à l'index 2) : c'est normal.
 
 L'interface est lisible sur l'écran 1280 × 800 du Deck ; le curseur est plus
 grand que celui de la souris, cerné d'indigo, et l'élément choisi à la croix
