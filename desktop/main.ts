@@ -22,7 +22,8 @@ const HOST = 'adam';
 /** La `base` de Vite (`vite.config.ts`) : le jeu vit sous `/adam/`, comme sur le web. */
 const BASE = '/adam/';
 const ORIGIN = `${SCHEME}://${HOST}`;
-const START_URL = `${ORIGIN}${BASE}`;
+/** `adam --pad-debug` ouvre le diagnostic manette (`?pad=debug`, `src/ui/padDebug.ts`) à la place du jeu. */
+const START_URL = `${ORIGIN}${BASE}${process.argv.includes('--pad-debug') ? '?pad=debug' : ''}`;
 
 /** Le dossier de l'application empaquetée (ou `desktop/app/` en développement). */
 const APP_DIR = __dirname;

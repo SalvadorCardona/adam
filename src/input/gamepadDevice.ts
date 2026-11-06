@@ -7,12 +7,19 @@
  * ne montre une manette qu'après un premier appui ; Firefox, parfois dès le
  * branchement — dans les deux cas, `gamepadconnected` arrive.
  *
+ * Le jeu n'entend parler que de la première arrivée et de la dernière
+ * partie. Lancé par Steam, Chromium voit d'abord toutes les manettes — le
+ * périphérique brut et les pads virtuels de Steam Input —, puis Steam en
+ * masque toutes sauf une (`gamepaddisconnected`) : relevé sur une console
+ * SteamOS, `getGamepads()` finit en `[null, null, pad]`. Ces départs ne sont
+ * pas une manette débranchée, et la partie ne doit pas se mettre en pause.
+ *
  * Les instantanés sont copiés : un `Gamepad` de Chrome est figé à sa lecture,
  * celui de Firefox bouge sous nos pieds ; `PadReader` compare deux frames,
  * il lui faut des valeurs qui ne changent pas entre-temps.
  */
 
-import { isRawXbox, padKindOf, standardize, type PadKind, type PadSnapshot } from './gamepad.ts';
+import { padKindOf, type PadKind, type PadSnapshot } from './gamepad.ts';
 
 export interface PadInfo {
   index: number;
@@ -35,17 +42,18 @@ export class GamepadDevice {
   public constructor(events: PadEvents) {
     const connected = (event: GamepadEvent) => {
       const pad = info(event.gamepad);
+      const first = this.known.size === 0;
 
       this.known.set(pad.index, pad);
       this.active ??= pad.index;
-      events.connected(pad);
+      if (first) events.connected(pad);
     };
     const disconnected = (event: GamepadEvent) => {
       const pad = this.known.get(event.gamepad.index) ?? info(event.gamepad);
 
       this.known.delete(pad.index);
       if (this.active === pad.index) this.active = this.known.keys().next().value ?? null;
-      events.disconnected(pad);
+      if (this.known.size === 0) events.disconnected(pad);
     };
 
     window.addEventListener('gamepadconnected', connected);
@@ -79,14 +87,10 @@ export class GamepadDevice {
     const pad = this.active === null ? null : pads[this.active];
 
     if (!pad?.connected) return null;
-
-    const snapshot: PadSnapshot = {
+    return {
       axes: [...pad.axes],
       buttons: pad.buttons.map((button) => ({ pressed: button.pressed, value: button.value })),
     };
-
-    // Firefox (Linux) ne met pas le pad virtuel de Steam Input au mapping standard.
-    return pad.mapping !== 'standard' && isRawXbox(snapshot) ? standardize(snapshot) : snapshot;
   }
 
   /** Une petite vibration de la manette suivie, si elle en a une. `strength` de 0 à 1. */

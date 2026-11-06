@@ -43,6 +43,12 @@ declare global {
 }
 
 async function main(): Promise<void> {
+  // Le diagnostic manette (`?pad=debug`) remplace le jeu : ce que `getGamepads()` remonte, en direct.
+  if (new URLSearchParams(window.location.search).get('pad') === 'debug') {
+    (await import('./ui/padDebug.ts')).mountPadDebug(document.body);
+    return;
+  }
+
   const boot = await bootGame();
 
   if (!boot) return;

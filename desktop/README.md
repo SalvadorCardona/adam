@@ -35,6 +35,8 @@ quelques minutes ; le paquet fait environ 140 Mo.
   quelles, et l'origine est stable — le `localStorage`, donc la sauvegarde,
   en dépend. Le profil est fixé à `~/.config/Adam` (`ADAM_USER_DATA` le
   remplace pour les tests). Fenêtre plein écran, sans menu ; F11 bascule.
+  `adam --pad-debug` ouvre le diagnostic manette (`?pad=debug`) à la place du
+  jeu.
 - **`preload.ts`** — n'expose que `window.adamDesktop` : `isDesktop`,
   `version`, `quit()`. Le jeu le lit dans `src/app/desktop.ts` : bouton
   « Quitter » (écran titre, pause), pas de service worker, pause et écriture
