@@ -157,6 +157,16 @@ adresse à taper, et se joue **hors ligne** : le paquet ne fait aucune requête.
    la roue dentée → *Gérer*) → *Personnaliser*, puis les fichiers de
    [`docs/steam/`](docs/steam/) — `capsule.png` (portrait), `banner.png`,
    `hero.png` (l'image d'en-tête), `logo.png` (transparent) et `icon.png`.
+   Ou en une commande, sans passer par l'interface :
+   `desktop/steam/install-art.sh <appid>` copie les cinq images dans
+   `~/.local/share/Steam/userdata/<id>/config/grid/` sous les noms que Steam
+   lit — `<appid>p.png` (portrait), `<appid>.png` (bannière), `<appid>_hero.png`,
+   `<appid>_logo.png`, `<appid>_icon.png`. L'appid d'un jeu non-Steam est le
+   nombre du raccourci (`shortcuts.vdf`, ou le nom des images que Steam a
+   déjà posées dans ce dossier). Si la bibliothèque ne les prend pas :
+   `steam -shutdown`, puis `steam -silent`. Les images se refont par
+   `npm run art:steam -- /tmp/steam` (commandes Chrome affichées) ; la bannière
+   de ce README, par `npm run art:brand -- /tmp/brand`.
 
 « Quitter » est sur l'écran titre et dans la pause : en mode Game, c'est la
 façon propre de fermer le jeu (la partie est écrite avant). Le menu Steam ou
