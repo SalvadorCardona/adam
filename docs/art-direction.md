@@ -7,7 +7,7 @@ et ce fichier ne disent pas la même chose, c'est le fichier qui a raison, et
 ce document qu'il faut corriger.**
 
 Avant de créer ou de modifier un visuel, charger le skill
-`.claude/skills/art-direction/` : il résume ces règles et donne la check-list
+`art-direction` (une skill de Ponos, portée Adam) : il résume ces règles et donne la check-list
 de relecture.
 
 ## En une phrase

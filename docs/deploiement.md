@@ -1,6 +1,6 @@
 # Déployer le jeu et le serveur sur Dokploy
 
-Le serveur (`server/`, voir CLAUDE.md « Back-end ») et le client tournent sur
+Le serveur (`server/`, voir AGENTS.md « Back-end ») et le client tournent sur
 le Dokploy de cardona.digital, deux services du projet **adam** :
 le serveur construit depuis `server/Dockerfile`, le client depuis
 `client/Dockerfile`. Le jeu ne parle au serveur que si `VITE_API_URL` est

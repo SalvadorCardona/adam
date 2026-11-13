@@ -1010,8 +1010,8 @@ sans que la page tourne.
 Ruines arrondies envahies de lianes, fleurs, drapeaux, échelles, grues,
 antennes ; les mutants sont drôles plus qu'effrayants.
 
-**Charger le skill `art-direction` (`.claude/skills/art-direction/`) avant
-toute création ou modification de visuel.** Référence :
+**Charger le skill `art-direction` (une skill de Ponos, Contexte › Skills,
+portée Adam) avant toute création ou modification de visuel.** Référence :
 `docs/art-direction.md` (règles, palette chiffrée, construction, maquette et
 dessins de l'illustrateur dans `docs/art-direction/`) ; version exécutable :
 `src/data/artDirection.ts` (`PALETTE`, `GROUND`, `RADIUS`, `STROKE`, `LIGHT`,
@@ -1455,10 +1455,10 @@ d'emploi : `src/tools/README.md`. C'est la mesure des tickets d'équilibrage.
 
 ## Aperçu en direct
 
-`.claude/launch.json` déclare le serveur Vite (`npm run dev`, port 5173) :
-dans l'app Claude Code (onglet Code), l'aperçu lance le jeu et le recharge à
-chaque modification (HMR). Le jeu est sous `/adam/`, la partie de
-test sous `/adam/test`.
+Le serveur d'aperçu est celui de Vite : `npm run dev -- --port 5173
+--strictPort` (port 5173), qui recharge le jeu à chaque modification (HMR).
+Un outil d'aperçu qui veut sa configuration la déclare chez lui, hors du
+dépôt. Le jeu est sous `/adam/`, la partie de test sous `/adam/test`.
 
 ## Back-end
 
