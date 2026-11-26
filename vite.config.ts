@@ -89,7 +89,7 @@ function desktopPage(): Plugin {
 
 /*
  * Le jeu est publié en project page GitHub Pages, donc servi sous un
- * sous-chemin — https://cardona.digital/adam/ — et non à la racine
+ * sous-chemin — https://hermez.dev/adam/ — et non à la racine
  * du domaine.
  *
  * Sans cette `base`, Vite écrit des URLs absolues `/assets/…` dans le HTML
