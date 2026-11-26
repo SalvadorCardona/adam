@@ -2,8 +2,10 @@
 
 # Adam
 
-**[▶ Jouer](https://cardona.digital/adam/)** — dans le navigateur,
-téléphone compris.
+*[A Hermez product](https://hermez.dev)*
+
+**[▶ Jouer](https://hermez.dev/adam/)** — dans le navigateur,
+téléphone compris. Toute la documentation : [`docs/`](docs/README.md).
 
 Jeu de construction et de survie 2D pour navigateur mobile, en TypeScript et PixiJS. On explore une
 carte générée à l'infini, on pose des machines qui extraient et transforment des
@@ -358,8 +360,9 @@ Chrome, sur un vrai téléphone.
 ## Déploiement
 
 Chaque push sur `main` construit le jeu et le publie sur GitHub Pages, à
-[cardona.digital/adam](https://cardona.digital/adam/)
-(`.github/workflows/deploy.yml`).
+[hermez.dev/adam](https://hermez.dev/adam/)
+(`.github/workflows/deploy.yml`) ; l'ancienne adresse,
+`cardona.digital/adam/`, y renvoie page par page.
 
 L'application de bureau (AppImage et tar.gz Linux x64) est construite à
 chaque PR pour vérifier l'empaquetage, et attachée à la Release de chaque tag
@@ -369,9 +372,16 @@ Le site est servi sous un sous-chemin, d'où le `base` de `vite.config.ts`. Ces
 deux valeurs doivent rester d'accord : si le dépôt est renommé, l'une sans
 l'autre donne un écran noir.
 
+## Documentation
+
+L'index de la documentation est [`docs/README.md`](docs/README.md) :
+direction artistique, déploiement, manette et Steam Deck, captures. L'écran
+titre du jeu, sur [hermez.dev/adam](https://hermez.dev/adam/), y mène en un
+clic (« Documentation », sous ses boutons).
+
 ## Auteur
 
-A Hermez product
+[A Hermez product](https://hermez.dev)
 
 ## Licence
 

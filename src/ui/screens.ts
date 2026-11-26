@@ -332,6 +332,7 @@ export class TitleScreen {
 
     // Les trois gestes du jeu, avant la toute première partie seulement.
     if (firstRun && !resume) panel.append(controls);
+    panel.append(signature(labels));
     this.root.append(panel);
     this.root.append(settings);
     this.unsubscribe = onLocale(() => {
@@ -349,6 +350,29 @@ export class TitleScreen {
 }
 
 /** « Quitter » (application de bureau) : `labels` reçoit de quoi réécrire son libellé à chaque langue. */
+/** La signature de l'agence et la documentation : deux liens discrets, au pied de l'écran titre. */
+export const HERMEZ_URL = 'https://hermez.dev';
+export const DOCS_URL = 'https://github.com/SalvadorCardona/adam#readme';
+
+function signature(labels: (() => void)[]): HTMLElement {
+  const line = document.createElement('p');
+  const brand = document.createElement('a');
+  const docs = document.createElement('a');
+
+  line.className = 'title-signature';
+  for (const [link, href] of [[brand, HERMEZ_URL], [docs, DOCS_URL]] as const) {
+    link.href = href;
+    link.target = '_blank';
+    link.rel = 'noopener';
+  }
+  labels.push(() => {
+    brand.textContent = t().screens.title.signature;
+    docs.textContent = t().screens.title.docs;
+  });
+  line.append(brand, ' · ', docs);
+  return line;
+}
+
 function quitButton(onQuit: () => void, className: string, labels: (() => void)[]): HTMLButtonElement {
   const button = document.createElement('button');
 

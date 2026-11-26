@@ -1426,7 +1426,7 @@ pause, pas de service worker, pause à la perte du focus. Détails et sécurité
 ## Partie de test
 
 **`/adam/test`** — en local `http://localhost:5173/adam/test`,
-en ligne https://cardona.digital/adam/test — ouvre directement,
+en ligne https://hermez.dev/adam/test — ouvre directement,
 sans écran titre, une petite base déjà bâtie (graine 100, matin du jour 1) :
 mairie et son stock, cabane de bûcheron, ferme, puits (au bord de l'eau à l'ouest,
 `WELL_SPOT` : en ligne droite de la mairie), deux postes de logistique (l'un entre

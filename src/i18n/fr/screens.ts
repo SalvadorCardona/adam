@@ -37,6 +37,9 @@ export const screens = {
     corruptSave: 'Sauvegarde illisible : nouvelle partie.',
     /** Un lien vers une autre carte que celle de la sauvegarde. */
     linkedMap: (seed: string): string => `Le lien mène à la carte n° ${seed} : « Nouvelle partie » pour la jouer.`,
+    /** La signature au pied de l'écran titre, et le lien vers la documentation. */
+    signature: 'Un produit Hermez',
+    docs: 'Documentation',
   },
   daily: {
     /** Le bouton de l'écran titre : la carte de la date UTC du jour, la même pour tous. */

@@ -28,6 +28,8 @@ export const screens: Messages['screens'] = {
     oldSave: 'Old save from another version: starting a new game.',
     corruptSave: 'Unreadable save: starting a new game.',
     linkedMap: (seed) => `This link leads to map #${seed}: tap “New game” to play it.`,
+    signature: 'A Hermez product',
+    docs: 'Documentation',
   },
   daily: {
     button: 'Daily map',

@@ -6808,6 +6808,23 @@ button:disabled,
   color: var(--muted);
 }
 
+/* La signature de l'agence et la documentation : du texte, pas des boutons. */
+.title-signature {
+  margin: 0;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 3px 0 var(--paper-shade);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.title-signature a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
 .title-controls {
   display: flex;
   flex-direction: column;
